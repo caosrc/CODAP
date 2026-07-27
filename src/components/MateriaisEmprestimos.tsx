@@ -1588,23 +1588,50 @@ function FormDevolucao({
 // ═══════════════════════════════════════════════════════════════════════════
 // EXPORTAR CATÁLOGO DE MATERIAIS EM EXCEL
 // ═══════════════════════════════════════════════════════════════════════════
+// Converte data URL base64 para { extension, base64 } que o ExcelJS aceita
+function parseDataUrlImagem(dataUrl: string | null | undefined): { extension: 'jpeg' | 'png' | 'gif'; base64: string } | null {
+  if (!dataUrl) return null
+  const m = dataUrl.match(/^data:image\/(jpeg|jpg|png|gif|webp);base64,(.+)/)
+  if (!m) return null
+  const ext = m[1] === 'jpg' || m[1] === 'jpeg' ? 'jpeg' : m[1] === 'png' ? 'png' : 'gif'
+  return { extension: ext as 'jpeg' | 'png' | 'gif', base64: m[2] }
+}
+
 async function exportarMateriaisExcel(materiais: Material[], emprestimos: Emprestimo[]) {
   const { default: ExcelJS } = await import('exceljs')
   const wb = new ExcelJS.Workbook()
   wb.creator = 'Defesa Civil Ouro Branco'
   wb.created = new Date()
 
+  // ── Busca fotos em lote ────────────────────────────────────────────────
+  type FotoLote = { id: string; foto: string | null; foto_placa: string | null }
+  let fotosMap = new Map<string, FotoLote>()
+  try {
+    const ids = materiais.map(m => encodeURIComponent(m.id)).join(',')
+    const res = await fetch(`/api/materiais/fotos-lote?ids=${ids}`)
+    if (res.ok) {
+      const data: FotoLote[] = await res.json()
+      fotosMap = new Map(data.map(f => [f.id, f]))
+    }
+  } catch { /* continua sem fotos se falhar */ }
+
+  const temFotoCol   = materiais.some(m => fotosMap.get(m.id)?.foto)
+  const temPlacaCol  = materiais.some(m => fotosMap.get(m.id)?.foto_placa)
+
   // ── Aba 1: Catálogo de Materiais ───────────────────────────────────────
   const ws1 = wb.addWorksheet('Catálogo')
-  ws1.columns = [
-    { header: 'Código', key: 'codigo', width: 16 },
-    { header: 'Nome', key: 'nome', width: 32 },
-    { header: 'Quantidade', key: 'quantidade', width: 12 },
-    { header: 'Descrição', key: 'descricao', width: 36 },
-    { header: 'Observações', key: 'observacoes', width: 36 },
-    { header: 'Status', key: 'status', width: 16 },
-    { header: 'Cadastrado em', key: 'cadastrado', width: 18 },
+  const colunas: Partial<ExcelJS.Column>[] = [
+    { header: 'Código',       key: 'codigo',     width: 16 },
+    { header: 'Nome',         key: 'nome',        width: 32 },
+    { header: 'Quantidade',   key: 'quantidade',  width: 12 },
+    { header: 'Descrição',    key: 'descricao',   width: 36 },
+    { header: 'Observações',  key: 'observacoes', width: 36 },
+    { header: 'Status',       key: 'status',      width: 16 },
+    { header: 'Cadastrado em',key: 'cadastrado',  width: 18 },
   ]
+  if (temFotoCol)  colunas.push({ header: 'Foto',        key: 'foto',       width: 14 })
+  if (temPlacaCol) colunas.push({ header: 'Foto (Placa)', key: 'foto_placa', width: 14 })
+  ws1.columns = colunas
 
   const headerRow1 = ws1.getRow(1)
   headerRow1.font = { bold: true, color: { argb: 'FFFFFFFF' } }
@@ -1612,22 +1639,61 @@ async function exportarMateriaisExcel(materiais: Material[], emprestimos: Empres
   headerRow1.alignment = { vertical: 'middle', horizontal: 'center' }
   headerRow1.height = 22
 
+  const IMG_W = 80   // px
+  const IMG_H = 80   // px
+  const ROW_H = 65   // pontos Excel (~87 px) — espaço suficiente para a imagem
+
+  // Índices de coluna das fotos (1-based no ExcelJS)
+  const colFoto      = temFotoCol  ? colunas.findIndex(c => c.key === 'foto')      + 1 : 0
+  const colFotoPlaca = temPlacaCol ? colunas.findIndex(c => c.key === 'foto_placa') + 1 : 0
+
   const empAtivos = emprestimos.filter(e => !e.devolvido_em)
-  materiais.forEach(m => {
+
+  materiais.forEach((m, idx) => {
     const emprestado = empAtivos.some(e => e.material_id === m.id || e.material_codigo === m.id)
     const row = ws1.addRow({
-      codigo: m.id,
-      nome: m.nome,
+      codigo:     m.id,
+      nome:       m.nome,
       quantidade: m.quantidade ?? 1,
-      descricao: m.descricao ?? '',
+      descricao:  m.descricao ?? '',
       observacoes: m.observacoes ?? '',
-      status: emprestado ? 'Emprestado' : 'Disponível',
+      status:     emprestado ? 'Emprestado' : 'Disponível',
       cadastrado: m.created_at ? new Date(m.created_at).toLocaleDateString('pt-BR') : '',
     })
     row.getCell('status').font = { color: { argb: emprestado ? 'FFDC2626' : 'FF16A34A' } }
+
+    const fotos = fotosMap.get(m.id)
+    const rowExcel = idx + 2  // linha 1 = header, dados começam na linha 2
+
+    if (temFotoCol || temPlacaCol) {
+      row.height = ROW_H
+    }
+
+    if (temFotoCol && fotos?.foto) {
+      const img = parseDataUrlImagem(fotos.foto)
+      if (img) {
+        const imgId = wb.addImage({ base64: img.base64, extension: img.extension })
+        ws1.addImage(imgId, {
+          tl: { col: colFoto - 1 + 0.1,  row: rowExcel - 1 + 0.1 } as ExcelJS.Anchor,
+          ext: { width: IMG_W, height: IMG_H },
+        })
+      }
+    }
+
+    if (temPlacaCol && fotos?.foto_placa) {
+      const img = parseDataUrlImagem(fotos.foto_placa)
+      if (img) {
+        const imgId = wb.addImage({ base64: img.base64, extension: img.extension })
+        ws1.addImage(imgId, {
+          tl: { col: colFotoPlaca - 1 + 0.1, row: rowExcel - 1 + 0.1 } as ExcelJS.Anchor,
+          ext: { width: IMG_W, height: IMG_H },
+        })
+      }
+    }
   })
 
-  ws1.autoFilter = { from: 'A1', to: 'G1' }
+  const ultimaColLetra = String.fromCharCode(64 + colunas.length)
+  ws1.autoFilter = { from: 'A1', to: `${ultimaColLetra}1` }
 
   // ── Aba 2: Histórico de Empréstimos ──────────────────────────────────────
   const ws2 = wb.addWorksheet('Empréstimos')

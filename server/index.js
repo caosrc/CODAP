@@ -1411,6 +1411,25 @@ app.get('/api/materiais', async (_req, res) => {
   }
 })
 
+// Fotos em lote para exportação Excel — aceita ?ids=cod1,cod2,...
+app.get('/api/materiais/fotos-lote', async (req, res) => {
+  try {
+    const raw = (req.query.ids || '').toString().trim()
+    if (!raw) return res.json([])
+    const ids = raw.split(',').map(s => s.trim()).filter(Boolean)
+    if (ids.length === 0) return res.json([])
+    const placeholders = ids.map((_, i) => `$${i + 1}`).join(',')
+    const result = await query(
+      `SELECT id, foto, foto_placa FROM materiais WHERE id IN (${placeholders})`,
+      ids
+    )
+    res.json(result.rows)
+  } catch (err) {
+    console.error('GET /api/materiais/fotos-lote error:', err)
+    res.status(500).json({ error: err.message })
+  }
+})
+
 // Detalhe completo — inclui foto e foto_placa (carregado só quando o usuário abre o item)
 app.get('/api/materiais/:id', async (req, res) => {
   try {

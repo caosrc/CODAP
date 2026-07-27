@@ -1116,34 +1116,7 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
               eventHandlers={{
                 click: (e) => { e.originalEvent.stopPropagation(); selecionarOc(o) },
               }}
-            >
-              <Popup>
-                <div style={{ minWidth: 170, fontFamily: 'inherit' }}>
-                  <div style={{ fontWeight: 700, fontSize: '0.92rem', marginBottom: 2 }}>
-                    {NATUREZA_ICONE[o.natureza] ?? '📋'} {o.natureza}
-                  </div>
-                  <div style={{ fontSize: '0.78rem', color: '#6b7280', marginBottom: 4 }}>
-                    {o.tipo} · {o.nivel_risco.charAt(0).toUpperCase() + o.nivel_risco.slice(1)}
-                  </div>
-                  {o.endereco && <div style={{ fontSize: '0.78rem', marginBottom: 4 }}>📍 {o.endereco}</div>}
-                  {!temGps && (
-                    <div style={{ fontSize: '0.72rem', color: '#b45309', marginBottom: 6 }}>
-                      ⚠️ Sem coordenadas GPS — posição aproximada
-                    </div>
-                  )}
-                  <button
-                    onClick={(e) => { e.stopPropagation(); onSelecionar(o) }}
-                    style={{
-                      width: '100%', background: '#E05F00', color: 'white',
-                      border: 'none', borderRadius: 6, padding: '6px 0',
-                      fontWeight: 700, cursor: 'pointer', fontSize: '0.8rem',
-                    }}
-                  >
-                    Ver detalhes completos
-                  </button>
-                </div>
-              </Popup>
-            </Marker>
+            />
           )
         })}
 

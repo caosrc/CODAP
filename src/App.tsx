@@ -270,6 +270,75 @@ export default function App() {
     return () => clearTimeout(t)
   }, [logado])
 
+  // Verifica prazos vencidos de Empréstimos/Manutenção e Equipamentos em Campo
+  // logo ao abrir o app (sem precisar entrar no Patrimônio)
+  useEffect(() => {
+    if (!logado) return
+    if (!('Notification' in window)) return
+
+    const t = setTimeout(async () => {
+      try {
+        const hoje = new Date().toISOString().slice(0, 10)
+
+        const [empRes, campoRes] = await Promise.all([
+          fetch('/api/emprestimos'),
+          fetch('/api/equipamentos-campo'),
+        ])
+        const empData = empRes.ok ? await empRes.json() : []
+        const campoData = campoRes.ok ? await campoRes.json() : []
+
+        const empVencidos = (Array.isArray(empData) ? empData : []).filter(
+          (e: { devolvido_em?: string | null; data_devolucao_prevista?: string | null }) =>
+            !e.devolvido_em && e.data_devolucao_prevista && e.data_devolucao_prevista <= hoje
+        )
+        const campoVencidos = (Array.isArray(campoData) ? campoData : []).filter(
+          (c: { status?: string; data_recolha_prevista?: string | null }) =>
+            c.status === 'ativo' && c.data_recolha_prevista && c.data_recolha_prevista <= hoje
+        )
+
+        if (empVencidos.length === 0 && campoVencidos.length === 0) return
+
+        async function dispararNotif(title: string, options: NotificationOptions) {
+          try {
+            new Notification(title, options)
+          } catch {
+            try {
+              const reg = await navigator.serviceWorker.ready
+              await reg.showNotification(title, options)
+            } catch { /* ignore */ }
+          }
+        }
+
+        async function disparar() {
+          for (const e of empVencidos) {
+            await dispararNotif('📦 Prazo vencido — Defesa Civil', {
+              body: `${e.material_nome} emprestado a ${e.responsavel} está com prazo vencido.`,
+              tag: `app-emp-prazo-${e.id}`,
+              icon: '/icons/icon-192.png',
+            })
+          }
+          for (const c of campoVencidos) {
+            await dispararNotif('🚧 Recolha pendente — Defesa Civil', {
+              body: `${c.material_nome ?? 'Equipamento'} em campo atingiu o prazo de recolha.`,
+              tag: `app-campo-prazo-${c.id}`,
+              icon: '/icons/icon-192.png',
+            })
+          }
+        }
+
+        if (Notification.permission === 'granted') {
+          await disparar()
+        } else if (Notification.permission === 'default') {
+          Notification.requestPermission().then(async (p) => {
+            if (p === 'granted') await disparar()
+          })
+        }
+      } catch { /* silencioso — não interrompe o boot */ }
+    }, 4000) // aguarda 4s para não sobrecarregar no boot
+
+    return () => clearTimeout(t)
+  }, [logado])
+
   async function ativarNotificacoes() {
     if (ativandoNotif) return
     const agente = getAgenteLogado()

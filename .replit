@@ -51,6 +51,8 @@ build = ["npx", "vite", "build"]
 VITE_USE_SUPABASE = "false"
 VAPID_SUBJECT = "mailto:defesacivilob@gmail.com"
 VAPID_PUBLIC_KEY = "BM-gE-wibZiGkyOPTZVRfjL0cVY7pzBfDTIAHaSTZDOoiq03OiTaUYN8RfKHCfpyrkoML2EukgmbqwrT6HxBkBk"
+SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNqZHBzcGxiY3Jsa2VrZGZubmxqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY5ODExOTcsImV4cCI6MjA5MjU1NzE5N30.Y5-_Z6Yg99i0hHQBZjTMxBFo0TONMCiicHnjkyj_AH8"
+SUPABASE_URL = "https://sjdpsplbcrlkekdfnnlj.supabase.co"
 
 [userenv.development]
 

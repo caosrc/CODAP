@@ -9,6 +9,7 @@ import { dirname, join } from 'path'
 import { existsSync, readFileSync, readdirSync } from 'fs'
 import { createServer } from 'http'
 import { WebSocketServer } from 'ws'
+import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
@@ -1426,6 +1427,35 @@ app.get('/api/materiais/fotos-lote', async (req, res) => {
     res.json(result.rows)
   } catch (err) {
     console.error('GET /api/materiais/fotos-lote error:', err)
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// Busca fotos em lote direto do Supabase — fallback para quando o PostgreSQL local não tem as fotos
+app.get('/api/materiais/fotos-supabase', async (req, res) => {
+  try {
+    const sbUrl  = process.env.SUPABASE_URL  || ''
+    const sbKey  = process.env.SUPABASE_ANON_KEY || ''
+    if (!sbUrl || !sbKey) return res.status(503).json({ error: 'Supabase não configurado' })
+
+    const raw = (req.query.ids || '').toString().trim()
+    if (!raw) return res.json([])
+    const ids = raw.split(',').map(s => s.trim()).filter(Boolean)
+    if (ids.length === 0) return res.json([])
+
+    const sb = createSupabaseClient(sbUrl, sbKey)
+    const { data, error } = await sb
+      .from('materiais')
+      .select('id, foto, foto_placa, foto_thumb')
+      .in('id', ids)
+
+    if (error) {
+      console.error('Supabase fotos-lote error:', error.message)
+      return res.status(500).json({ error: error.message })
+    }
+    res.json(data ?? [])
+  } catch (err) {
+    console.error('GET /api/materiais/fotos-supabase error:', err)
     res.status(500).json({ error: err.message })
   }
 })

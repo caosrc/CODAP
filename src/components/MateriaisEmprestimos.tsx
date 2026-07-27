@@ -1594,20 +1594,34 @@ async function exportarMateriaisExcel(materiais: Material[], emprestimos: Empres
   wb.creator = 'Defesa Civil Ouro Branco'
   wb.created = new Date()
 
-  // ── Busca fotos em lote ────────────────────────────────────────────────
-  type FotoLote = { id: string; foto: string | null; foto_placa: string | null }
+  // ── Busca fotos em lote — local (PostgreSQL) + Supabase em paralelo ──────
+  type FotoLote = { id: string; foto: string | null; foto_placa: string | null; foto_thumb?: string | null }
   let fotosMap = new Map<string, FotoLote>()
   try {
     const ids = materiais.map(m => m.id).join(',')
-    const res = await fetch(`/api/materiais/fotos-lote?ids=${encodeURIComponent(ids)}`)
-    if (res.ok) {
-      const data: FotoLote[] = await res.json()
-      fotosMap = new Map(data.map(f => [f.id, f]))
+    const [resLocal, resSb] = await Promise.allSettled([
+      fetch(`/api/materiais/fotos-lote?ids=${encodeURIComponent(ids)}`),
+      fetch(`/api/materiais/fotos-supabase?ids=${encodeURIComponent(ids)}`),
+    ])
+
+    // Constrói mapa mesclado: prioriza qualquer campo não-nulo de qualquer fonte
+    const mesclar = (existente: FotoLote | undefined, novo: FotoLote): FotoLote => ({
+      id:         novo.id,
+      foto:       existente?.foto       || novo.foto       || null,
+      foto_placa: existente?.foto_placa || novo.foto_placa || null,
+      foto_thumb: existente?.foto_thumb || novo.foto_thumb || null,
+    })
+
+    for (const resultado of [resLocal, resSb]) {
+      if (resultado.status === 'fulfilled' && resultado.value.ok) {
+        const dados: FotoLote[] = await resultado.value.json()
+        for (const f of dados) fotosMap.set(f.id, mesclar(fotosMap.get(f.id), f))
+      }
     }
   } catch { /* continua sem fotos se falhar */ }
 
-  // Usa foto_thumb (já carregado na listagem) como fallback quando foto full não existir
-  const temFotoCol   = materiais.some(m => !!(fotosMap.get(m.id)?.foto || m.foto_thumb))
+  // Usa foto_thumb (já carregado na listagem) como fallback final
+  const temFotoCol   = materiais.some(m => !!(fotosMap.get(m.id)?.foto || fotosMap.get(m.id)?.foto_thumb || m.foto_thumb))
   const temPlacaCol  = materiais.some(m => !!fotosMap.get(m.id)?.foto_placa)
 
   // ── Aba 1: Catálogo de Materiais ───────────────────────────────────────
@@ -1672,7 +1686,7 @@ async function exportarMateriaisExcel(materiais: Material[], emprestimos: Empres
       } catch { /* ignora imagem inválida */ }
     }
 
-    embedFoto(fotos?.foto || m.foto_thumb, colIdxFoto)
+    embedFoto(fotos?.foto || fotos?.foto_thumb || m.foto_thumb, colIdxFoto)
     embedFoto(fotos?.foto_placa,          colIdxFotoPlaca)
   })
 

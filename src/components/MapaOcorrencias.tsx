@@ -29,6 +29,18 @@ import {
 } from '../gpsService'
 
 
+// ── Cache de ícones no nível do módulo ──────────────────────────
+// Evita recriar objetos DivIcon a cada render — o Leaflet compara por
+// referência e só atualiza o DOM quando o objeto muda. Com o cache,
+// somente os marcadores realmente alterados (selecionado/desselecionado)
+// causam atualização no DOM, em vez de todos os N marcadores.
+const _ICONES_CACHE = new Map<string, L.DivIcon>()
+function getIconeCache(natureza: string, selecionado: boolean, semGps: boolean): L.DivIcon {
+  const key = `${natureza}|${selecionado}|${semGps}`
+  if (!_ICONES_CACHE.has(key)) _ICONES_CACHE.set(key, criarIcone(natureza, selecionado, semGps))
+  return _ICONES_CACHE.get(key)!
+}
+
 // Fix leaflet default marker icons
 delete (L.Icon.Default.prototype as any)._getIconUrl
 L.Icon.Default.mergeOptions({
@@ -1108,11 +1120,12 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
         {mostrarOcorrencias && ocorrencias.filter(o => !naturezasOcultas.has(o.natureza)).map((o) => {
           const temGps = !!(o.lat && o.lng)
           const pos: [number, number] = temGps ? [o.lat!, o.lng!] : coordsSemGps(o.id)
+          const eSelecionada = selecionada?.id === o.id
           return (
             <Marker
               key={o.id}
               position={pos}
-              icon={criarIcone(o.natureza, selecionada?.id === o.id, !temGps)}
+              icon={getIconeCache(o.natureza, eSelecionada, !temGps)}
               eventHandlers={{
                 click: (e) => { e.originalEvent.stopPropagation(); selecionarOc(o) },
               }}

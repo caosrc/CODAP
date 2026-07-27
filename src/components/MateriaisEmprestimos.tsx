@@ -1606,7 +1606,8 @@ async function exportarMateriaisExcel(materiais: Material[], emprestimos: Empres
     }
   } catch { /* continua sem fotos se falhar */ }
 
-  const temFotoCol   = materiais.some(m => !!fotosMap.get(m.id)?.foto)
+  // Usa foto_thumb (já carregado na listagem) como fallback quando foto full não existir
+  const temFotoCol   = materiais.some(m => !!(fotosMap.get(m.id)?.foto || m.foto_thumb))
   const temPlacaCol  = materiais.some(m => !!fotosMap.get(m.id)?.foto_placa)
 
   // ── Aba 1: Catálogo de Materiais ───────────────────────────────────────
@@ -1671,8 +1672,8 @@ async function exportarMateriaisExcel(materiais: Material[], emprestimos: Empres
       } catch { /* ignora imagem inválida */ }
     }
 
-    embedFoto(fotos?.foto,       colIdxFoto)
-    embedFoto(fotos?.foto_placa, colIdxFotoPlaca)
+    embedFoto(fotos?.foto || m.foto_thumb, colIdxFoto)
+    embedFoto(fotos?.foto_placa,          colIdxFotoPlaca)
   })
 
   const ultimaColLetra = String.fromCharCode(64 + colunas.length)

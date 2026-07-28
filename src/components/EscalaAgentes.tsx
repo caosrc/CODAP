@@ -3297,6 +3297,8 @@ export default function EscalaAgentes({ ocorrencias = [] }: EscalaAgentesProps) 
   const hoje = hojeComOffset(offsetDias)
   const agenteLogado = getAgenteLogado()
   const isMoises = agenteLogado === 'Moisés'
+  // Gestores: mesmo acesso que Moisés para editar/visualizar toda a escala
+  const isGestor = isMoises || agenteLogado === 'Talita' || agenteLogado === 'Cristiane'
   const isSobreaviso = AGENTES_SOBREAVISO.some(a => a.nome === agenteLogado)
   const isHorasExtras = AGENTES_SEM_SOBREAVISO.has(agenteLogado)
 
@@ -3591,7 +3593,7 @@ export default function EscalaAgentes({ ocorrencias = [] }: EscalaAgentesProps) 
         <button className="escala-nav-btn" onClick={proximoMes}>›</button>
       </div>
 
-      {isMoises && (
+      {isGestor && (
         <div className="escala-acoes-moises">
           <button
             className={`escala-btn-editar ${editando ? 'ativo' : ''}`}
@@ -3642,7 +3644,7 @@ export default function EscalaAgentes({ ocorrencias = [] }: EscalaAgentesProps) 
         onDiaClick={onDiaClick}
       />
 
-      {editando && isMoises && (
+      {editando && isGestor && (
         <div className="escala-simulador-dias">
           <div className="escala-simulador-titulo">📅 Simular data</div>
           <div className="escala-simulador-controles">
@@ -3700,12 +3702,12 @@ export default function EscalaAgentes({ ocorrencias = [] }: EscalaAgentesProps) 
         afastamentos={dados.afastamentos ?? []}
         mes={mes}
         ano={ano}
-        editavel={editando && isMoises}
+        editavel={editando && isGestor}
         onAgenteClick={(nome) => setAgenteAberto(nome)}
       />
 
       {/* Banco de Horas — agente individual (sobreaviso) */}
-      {!isMoises && isSobreaviso && (
+      {!isGestor && isSobreaviso && (
         <BancoHorasAgente
           agente={agenteLogado}
           sobreavisoSemanal={dados.sobreaviso}
@@ -3725,7 +3727,7 @@ export default function EscalaAgentes({ ocorrencias = [] }: EscalaAgentesProps) 
       )}
 
       {/* Banco de Horas de Ocorrências — Talita / Cristiane / Sócrates (sábado ×1,5 · domingo ×2) */}
-      {!isMoises && isHorasExtras && (
+      {!isGestor && isHorasExtras && (
         <BancoHorasAgente
           agente={agenteLogado}
           sobreavisoSemanal={dados.sobreaviso}
@@ -3747,7 +3749,7 @@ export default function EscalaAgentes({ ocorrencias = [] }: EscalaAgentesProps) 
       )}
 
       {/* Banco de Horas Extras Manuais — Talita / Cristiane / Sócrates */}
-      {!isMoises && isHorasExtras && (() => {
+      {!isGestor && isHorasExtras && (() => {
         const horasOc = calcularBancoHoras(
           agenteLogado, dados.sobreaviso, dados.horasTrabalhadasSobreaviso,
           dados.percDomingoFeriado, dados.percSobreaviso, dados.percSabado,
@@ -3766,8 +3768,8 @@ export default function EscalaAgentes({ ocorrencias = [] }: EscalaAgentesProps) 
         )
       })()}
 
-      {/* Banco de Horas — Moisés vê todos */}
-      {isMoises && (
+      {/* Banco de Horas — gestores veem todos */}
+      {isGestor && (
         <BancoHorasMoises
           sobreavisoSemanal={dados.sobreaviso}
           horasTrabalhadasSobreaviso={dados.horasTrabalhadasSobreaviso}
@@ -3791,7 +3793,7 @@ export default function EscalaAgentes({ ocorrencias = [] }: EscalaAgentesProps) 
       )}
 
       {/* Painéis exclusivos do Moisés em modo edição */}
-      {editando && isMoises && (
+      {editando && isGestor && (
         <>
           <PainelRegras
             percDomingoFeriado={dados.percDomingoFeriado}
@@ -3822,7 +3824,7 @@ export default function EscalaAgentes({ ocorrencias = [] }: EscalaAgentesProps) 
       )}
 
       {/* Modal por agente: clique na legenda → calendário do agente */}
-      {agenteAberto && editando && isMoises && (() => {
+      {agenteAberto && editando && isGestor && (() => {
         const ag = AGENTES_ESCALA.find(a => a.nome === agenteAberto)
         if (!ag) return null
         const podeSb = !AGENTES_SEM_SOBREAVISO.has(ag.nome)

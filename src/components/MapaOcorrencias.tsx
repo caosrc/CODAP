@@ -2,9 +2,6 @@ import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import { MapContainer, TileLayer, Marker, Popup, useMapEvents, useMap, Circle, Polyline, CircleMarker } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
-import 'leaflet.markercluster/dist/MarkerCluster.css'
-import 'leaflet.markercluster/dist/MarkerCluster.Default.css'
-import 'leaflet.markercluster'
 import type { Ocorrencia } from '../types'
 import { NATUREZA_ICONE, NATUREZA_COR, NATUREZAS } from '../types'
 import {
@@ -249,98 +246,15 @@ function criarIconeCone(nome?: string | null, selecionado = false) {
   })
 }
 
-// ── Componente de clustering de ocorrências ──────────────────────
-// Usa leaflet.markercluster de forma imperativa para:
-//  • agrupar marcadores próximos em bolhas com contagem → menos DOM
-//  • reconstruir os marcadores só quando a lista/filtro muda
-//  • atualizar apenas 2 ícones (des/selecionado) na seleção → sem rebuild
-interface ClusterProps {
-  ocorrencias: Ocorrencia[]
-  naturezasOcultas: Set<string>
-  selecionada: Ocorrencia | null
-  onSelect: (o: Ocorrencia) => void
-}
-
-function OcorrenciasCluster({ ocorrencias, naturezasOcultas, selecionada, onSelect }: ClusterProps) {
-  const map = useMap()
-  const groupRef  = useRef<L.MarkerClusterGroup | null>(null)
-  const markersRef = useRef<Map<number, L.Marker>>(new Map())
-  const prevSelRef = useRef<number | null>(null)
-  const onSelectRef = useRef(onSelect)
-  useEffect(() => { onSelectRef.current = onSelect }, [onSelect])
-
-  // Cria o cluster group uma única vez
-  useEffect(() => {
-    const group = (L as any).markerClusterGroup({
-      maxClusterRadius: 50,
-      disableClusteringAtZoom: 17,
-      spiderfyOnMaxZoom: true,
-      showCoverageOnHover: false,
-      iconCreateFunction: (cluster: any) => {
-        const n = cluster.getChildCount()
-        const size = n >= 100 ? 52 : n >= 20 ? 44 : 36
-        const bg   = n >= 100 ? '#b91c1c' : n >= 20 ? '#c2410c' : '#1a4b8c'
-        return L.divIcon({
-          className: '',
-          html: `<div style="
-            width:${size}px;height:${size}px;border-radius:50%;
-            background:${bg};border:3px solid white;
-            box-shadow:0 2px 8px rgba(0,0,0,0.4);
-            display:flex;align-items:center;justify-content:center;
-            color:white;font-weight:700;font-size:${n >= 100 ? 13 : 14}px;
-            font-family:sans-serif;
-          ">${n}</div>`,
-          iconSize: [size, size],
-          iconAnchor: [size / 2, size / 2],
-        })
-      },
-    }) as L.MarkerClusterGroup
-    groupRef.current = group
-    map.addLayer(group)
-    return () => { map.removeLayer(group); groupRef.current = null }
-  }, [map])
-
-  // Reconstrói marcadores quando a lista ou o filtro muda
-  useEffect(() => {
-    const group = groupRef.current
-    if (!group) return
-    group.clearLayers()
-    markersRef.current.clear()
-    prevSelRef.current = null
-
-    const visiveis = ocorrencias.filter(o => !naturezasOcultas.has(o.natureza))
-    for (const o of visiveis) {
-      const temGps = !!(o.lat && o.lng)
-      const pos: [number, number] = temGps ? [o.lat!, o.lng!] : coordsSemGps(o.id)
-      const marker = L.marker(pos, { icon: getIconeCache(o.natureza, false, !temGps) })
-      marker.on('click', (e: any) => {
-        e.originalEvent?.stopPropagation?.()
-        onSelectRef.current(o)
-      })
-      markersRef.current.set(o.id, marker)
-      group.addLayer(marker)
-    }
-  }, [ocorrencias, naturezasOcultas])
-
-  // Atualiza apenas o ícone do marcador que mudou de estado (selecionado ↔ normal)
-  useEffect(() => {
-    const prevId = prevSelRef.current
-    const newId  = selecionada?.id ?? null
-    if (prevId === newId) return
-
-    if (prevId !== null) {
-      const o = ocorrencias.find(x => x.id === prevId)
-      const m = markersRef.current.get(prevId)
-      if (o && m) m.setIcon(getIconeCache(o.natureza, false, !(o.lat && o.lng)))
-    }
-    if (newId !== null) {
-      const o = selecionada!
-      const m = markersRef.current.get(newId)
-      if (m) m.setIcon(getIconeCache(o.natureza, true, !(o.lat && o.lng)))
-    }
-    prevSelRef.current = newId
-  }, [selecionada, ocorrencias])
-
+// ── Viewport culling: rastreia bounds do mapa ────────────────────
+// Dispara onChange só no fim do movimento/zoom (moveend/zoomend) para
+// evitar recalcular a lista de marcadores visíveis a cada pixel arrastado.
+function BoundsTracker({ onChange }: { onChange: (b: L.LatLngBounds) => void }) {
+  const map = useMapEvents({
+    moveend: () => onChange(map.getBounds()),
+    zoomend: () => onChange(map.getBounds()),
+  })
+  useEffect(() => { onChange(map.getBounds()) }, []) // captura bounds iniciais
   return null
 }
 
@@ -459,6 +373,7 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
   const [painelMaterialAberto, setPainelMaterialAberto] = useState(false)
   const [submenuFiltroAberto, setSubmenuFiltroAberto] = useState(false)
   const [naturezasOcultas, setNaturezasOcultas] = useState<Set<string>>(new Set())
+  const [mapaBounds, setMapaBounds] = useState<L.LatLngBounds | null>(null)
 
   // Busca de endereço + rota (estilo Google Maps)
   const [enderecoBusca, setEnderecoBusca] = useState('')
@@ -1078,6 +993,25 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
   const dispositivosArray = useMemo(() => Array.from(dispositivos.values()), [dispositivos])
   const totalOnline = dispositivosArray.length + (statusGps === 'ativo' ? 1 : 0)
 
+  // ── Viewport culling ─────────────────────────────────────────────
+  // Só renderiza marcadores dentro da área visível do mapa + 40% de margem.
+  // Ocorrências sem GPS ficam sempre visíveis (posição virtual perto do centro).
+  const ocorrenciasVisiveis = useMemo(() => {
+    const filtradas = ocorrencias.filter(o => !naturezasOcultas.has(o.natureza))
+    if (!mapaBounds) return filtradas
+    const ne = mapaBounds.getNorthEast()
+    const sw = mapaBounds.getSouthWest()
+    const latPad = (ne.lat - sw.lat) * 0.4
+    const lngPad = (ne.lng - sw.lng) * 0.4
+    return filtradas.filter(o => {
+      if (!(o.lat && o.lng)) return true  // sem GPS → sempre mostra
+      return (
+        o.lat >= sw.lat - latPad && o.lat <= ne.lat + latPad &&
+        o.lng >= sw.lng - lngPad && o.lng <= ne.lng + lngPad
+      )
+    })
+  }, [ocorrencias, naturezasOcultas, mapaBounds])
+
   // ── Render ────────────────────────────────────────────────────
   return (
     <div className="mapa-wrapper">
@@ -1108,6 +1042,7 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
         )}
 
         <MapClickHandler onMapClick={() => setSelecionada(null)} />
+        <BoundsTracker onChange={setMapaBounds} />
 
         {/* Trilha GPS local */}
         {trilha.length >= 2 && (
@@ -1214,15 +1149,19 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
 
         {destino && <FocoDestino destino={destino} rota={rota} />}
 
-        {/* Ocorrências — clustering imperativo (leaflet.markercluster) */}
-        {mostrarOcorrencias && (
-          <OcorrenciasCluster
-            ocorrencias={ocorrencias}
-            naturezasOcultas={naturezasOcultas}
-            selecionada={selecionada}
-            onSelect={selecionarOc}
-          />
-        )}
+        {/* Ocorrências — ícones individuais, viewport culling ativo */}
+        {mostrarOcorrencias && ocorrenciasVisiveis.map(o => {
+          const temGps = !!(o.lat && o.lng)
+          const pos: [number, number] = temGps ? [o.lat!, o.lng!] : coordsSemGps(o.id)
+          return (
+            <Marker
+              key={o.id}
+              position={pos}
+              icon={getIconeCache(o.natureza, selecionada?.id === o.id, !temGps)}
+              eventHandlers={{ click: (e) => { e.originalEvent?.stopPropagation?.(); selecionarOc(o) } }}
+            />
+          )
+        })}
 
         {/* Equipamentos em Campo — cone laranja */}
         {mostrarMateriais && equipamentosCampo.filter(c => c.status === 'ativo' && c.latitude && c.longitude).map((c) => (

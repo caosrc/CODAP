@@ -30,6 +30,37 @@ const FOTO_H = 90   // altura da miniatura em pixels
 const FOTO_COL_W = 17  // largura da coluna em caracteres (≈ 120px)
 const ROW_H_PX_TO_PT = 0.75  // 1pt ≈ 1.33px
 
+// Converte uma URL de imagem (ex: Supabase Storage) em data URL base64
+async function urlParaBase64(url: string): Promise<string | null> {
+  try {
+    const res = await fetch(url)
+    if (!res.ok) return null
+    const blob = await res.blob()
+    return new Promise<string>((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = () => resolve(reader.result as string)
+      reader.onerror = reject
+      reader.readAsDataURL(blob)
+    })
+  } catch {
+    return null
+  }
+}
+
+// Normaliza uma foto (base64 ou URL) para { base64, ext } pronto para o ExcelJS
+async function normalizarFoto(foto: string): Promise<{ base64: string; ext: 'jpeg' | 'png' } | null> {
+  if (!foto) return null
+  let dataUrl = foto
+  if (foto.startsWith('http://') || foto.startsWith('https://')) {
+    const fetched = await urlParaBase64(foto)
+    if (!fetched) return null
+    dataUrl = fetched
+  }
+  const base64 = dataUrl.includes(',') ? dataUrl.split(',')[1] : dataUrl
+  const ext: 'png' | 'jpeg' = dataUrl.startsWith('data:image/png') ? 'png' : 'jpeg'
+  return { base64, ext }
+}
+
 function nivelLabel(n: string) {
   return n === 'alto' ? 'Alto 🔴' : n === 'medio' ? 'Médio 🟡' : 'Baixo 🟢'
 }
@@ -544,7 +575,8 @@ export async function exportarTodasExcel(
   const ROW_H_PT = Math.round(FOTO_H / ROW_H_PX_TO_PT)
   const LINHA_INICIO = 3  // primeira linha de dados (1-indexed)
 
-  ocorrencias.forEach((o, idx) => {
+  for (let idx = 0; idx < ocorrencias.length; idx++) {
+    const o = ocorrencias[idx]
     onProgresso?.(idx + 1, ocorrencias.length)
     const temFotos = o.fotos && o.fotos.length > 0
     const linhaNum = LINHA_INICIO + idx
@@ -619,13 +651,13 @@ export async function exportarTodasExcel(
 
     // Incorpora fotos — linha 0-indexed = linhaNum - 1
     if (temFotos) {
-      o.fotos!.forEach((fotoBase64, fotoIdx) => {
-        const base64Data = fotoBase64.includes(',') ? fotoBase64.split(',')[1] : fotoBase64
-        const ext = fotoBase64.startsWith('data:image/png') ? 'png' : 'jpeg'
+      for (let fotoIdx = 0; fotoIdx < o.fotos!.length; fotoIdx++) {
+        const foto = o.fotos![fotoIdx]
+        const normalizada = await normalizarFoto(foto)
+        if (!normalizada) continue
         const colIdx = 19 + fotoIdx  // 0-indexed: coluna 20 em diante (após Área Queimada)
-
         try {
-          const imageId = wb.addImage({ base64: base64Data, extension: ext })
+          const imageId = wb.addImage({ base64: normalizada.base64, extension: normalizada.ext })
           ws.addImage(imageId, {
             tl: { col: colIdx, row: linhaNum - 1 },
             ext: { width: FOTO_W, height: FOTO_H },
@@ -633,9 +665,9 @@ export async function exportarTodasExcel(
         } catch {
           // ignora imagem inválida
         }
-      })
+      }
     }
-  })
+  }
 
   // ── Aba de Dashboard Analítico ────────────────────────────────────
   await adicionarAbaDashboard(wb, ocorrencias)
@@ -656,7 +688,7 @@ export async function exportarTodasExcel(
 }
 
 // ── Export checklists da viatura ──────────────────────────────────────────────
-export async function exportarChecklistExcel(checklists: ChecklistExportData[]): Promise<void> {
+export async function exportarChecklistExcel(checklists: ChecklistExportData[], nomeArquivo?: string): Promise<void> {
   const { default: ExcelJS } = await import('exceljs')
   const wb = new ExcelJS.Workbook()
   wb.creator = 'Defesa Civil Ouro Branco'
@@ -759,7 +791,8 @@ export async function exportarChecklistExcel(checklists: ChecklistExportData[]):
   ws.autoFilter = { from: { row: 2, column: 1 }, to: { row: 2, column: totalCols } }
   ws.views = [{ state: 'frozen', ySplit: 2 }]
 
-  checklists.forEach((c, idx) => {
+  for (let idx = 0; idx < checklists.length; idx++) {
+    const c = checklists[idx]
     const linhaNum = 3 + idx
     const r = ws.getRow(linhaNum)
     const it = c.itens || {}
@@ -826,13 +859,14 @@ export async function exportarChecklistExcel(checklists: ChecklistExportData[]):
     const temFoto = fotosLinha.some(Boolean)
     r.height = temFoto ? FOTO_CHECKLIST_ROW_H : 16
 
-    fotosLinha.forEach((fotoBase64, fotoIdx) => {
-      if (!fotoBase64) return
-      const base64Data = fotoBase64.includes(',') ? fotoBase64.split(',')[1] : fotoBase64
-      const ext = fotoBase64.startsWith('data:image/png') ? 'png' : 'jpeg'
+    for (let fotoIdx = 0; fotoIdx < fotosLinha.length; fotoIdx++) {
+      const foto = fotosLinha[fotoIdx]
+      if (!foto) continue
+      const normalizada = await normalizarFoto(foto)
+      if (!normalizada) continue
       const colIdx = 9 + ITENS_LABELS.length + fotoIdx
       try {
-        const imageId = wb.addImage({ base64: base64Data, extension: ext })
+        const imageId = wb.addImage({ base64: normalizada.base64, extension: normalizada.ext })
         ws.addImage(imageId, {
           tl: { col: colIdx, row: linhaNum - 1 },
           ext: { width: FOTO_CHECKLIST_SIZE, height: FOTO_CHECKLIST_SIZE },
@@ -840,15 +874,15 @@ export async function exportarChecklistExcel(checklists: ChecklistExportData[]):
       } catch {
         // ignora imagem inválida
       }
-    })
-  })
+    }
+  }
 
   const buffer = await wb.xlsx.writeBuffer()
   const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
-  a.download = `checklists_viatura_${new Date().toLocaleDateString('pt-BR').replace(/\//g, '-')}.xlsx`
+  a.download = `${nomeArquivo ?? `checklists_viatura_${new Date().toLocaleDateString('pt-BR').replace(/\//g, '-')}`}.xlsx`
   a.click()
   URL.revokeObjectURL(url)
 }

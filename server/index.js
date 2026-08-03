@@ -1348,6 +1348,25 @@ app.get('/api/checklists', async (req, res) => {
   }
 })
 
+// Busca fotos de múltiplos checklists em lote (para exportação Excel)
+app.get('/api/checklists/fotos-lote', async (req, res) => {
+  try {
+    const raw = String(req.query.ids || '')
+    const ids = raw.split(',').map(Number).filter(n => Number.isInteger(n) && n > 0)
+    if (ids.length === 0) return res.json([])
+    const placeholders = ids.map((_, i) => `$${i + 1}`).join(',')
+    const result = await query(
+      `SELECT id, foto_frontal, foto_traseira, foto_direita, foto_esquerda, fotos_avarias
+       FROM checklists_viatura WHERE id IN (${placeholders})`,
+      ids
+    )
+    res.json(result.rows)
+  } catch (err) {
+    console.error('GET /api/checklists/fotos-lote error:', err)
+    res.status(500).json({ error: err.message })
+  }
+})
+
 app.get('/api/checklists/:id', async (req, res) => {
   try {
     const result = await query('SELECT * FROM checklists_viatura WHERE id = $1', [req.params.id])

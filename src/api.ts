@@ -390,6 +390,56 @@ export async function buscarFotosOcorrencias(
   return {}
 }
 
+// Busca fotos de múltiplos checklists em lote (para exportação Excel)
+export async function buscarFotosChecklists(
+  ids: number[]
+): Promise<Record<number, { foto_frontal: string | null; foto_traseira: string | null; foto_direita: string | null; foto_esquerda: string | null; fotos_avarias: string[] }>> {
+  if (ids.length === 0) return {}
+
+  // Supabase
+  if (supabaseDisponivel) {
+    try {
+      const { data } = await supabase
+        .from('checklists_viatura')
+        .select('id,foto_frontal,foto_traseira,foto_direita,foto_esquerda,fotos_avarias')
+        .in('id', ids)
+      const result: Record<number, { foto_frontal: string | null; foto_traseira: string | null; foto_direita: string | null; foto_esquerda: string | null; fotos_avarias: string[] }> = {}
+      for (const row of data ?? []) {
+        result[row.id] = {
+          foto_frontal: row.foto_frontal ?? null,
+          foto_traseira: row.foto_traseira ?? null,
+          foto_direita: row.foto_direita ?? null,
+          foto_esquerda: row.foto_esquerda ?? null,
+          fotos_avarias: Array.isArray(row.fotos_avarias) ? row.fotos_avarias : [],
+        }
+      }
+      return result
+    } catch {
+      return {}
+    }
+  }
+
+  // Express (Replit)
+  try {
+    const res = await fetch(`/api/checklists/fotos-lote?ids=${ids.join(',')}`)
+    if (res.ok) {
+      const rows: { id: number; foto_frontal: string | null; foto_traseira: string | null; foto_direita: string | null; foto_esquerda: string | null; fotos_avarias: string[] | null }[] = await res.json()
+      const result: Record<number, { foto_frontal: string | null; foto_traseira: string | null; foto_direita: string | null; foto_esquerda: string | null; fotos_avarias: string[] }> = {}
+      for (const row of rows) {
+        result[row.id] = {
+          foto_frontal: row.foto_frontal ?? null,
+          foto_traseira: row.foto_traseira ?? null,
+          foto_direita: row.foto_direita ?? null,
+          foto_esquerda: row.foto_esquerda ?? null,
+          fotos_avarias: Array.isArray(row.fotos_avarias) ? row.fotos_avarias : [],
+        }
+      }
+      return result
+    }
+  } catch { /* segue com vazio */ }
+  return {}
+}
+
 export async function deletarOcorrencia(id: number): Promise<void> {
   // Supabase direto quando disponível (Netlify)
   if (supabaseDisponivel) {

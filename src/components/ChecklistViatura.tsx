@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { adicionarMarcaDagua, salvarFotoNoDispositivo } from '../utils'
-import { exportarChecklistExcel, type ChecklistExportData } from '../exportExcel'
+import type { ChecklistExportData } from '../exportExcel'
+import { buscarFotosChecklists } from '../api'
 import ModalSenha from './ModalSenha'
 import { wsOn } from '../wsClient'
 import { supabase, supabaseDisponivel } from '../supabaseClient'
@@ -407,6 +408,7 @@ export default function ChecklistViatura() {
   const [checklistsArquivo, setChecklistsArquivo] = useState<ChecklistData[]>([])
   const [carregandoArquivo, setCarregandoArquivo] = useState(false)
   const [carregandoDetalhe, setCarregandoDetalhe] = useState(false)
+  const [excelProgresso, setExcelProgresso] = useState<string | null>(null)
 
   const hoje = dataLocalInput()
   const mesAtual = hoje.substring(0, 7)
@@ -583,6 +585,29 @@ export default function ChecklistViatura() {
       setChecklistsArquivo((Array.isArray(data) ? data : []) as ChecklistData[])
     } catch { if (doEstado.length === 0) setChecklistsArquivo([]) }
     setCarregandoArquivo(false)
+  }
+
+  // Exporta Excel do checklist buscando fotos completas antes de gerar o arquivo
+  async function exportarExcelComFotos(lista: ChecklistData[], nomeArquivo?: string) {
+    if (excelProgresso !== null) return
+    const { exportarChecklistExcel } = await import('../exportExcel')
+    try {
+      const ids = lista.map(c => c.id).filter(id => typeof id === 'number' && id > 0)
+      setExcelProgresso(`⏳ Buscando fotos… 0/${ids.length}`)
+      const fotosMap = await buscarFotosChecklists(ids)
+      setExcelProgresso(`⏳ Gerando planilha…`)
+      const listaCompleta: ChecklistData[] = lista.map(c => ({
+        ...c,
+        foto_frontal: fotosMap[c.id]?.foto_frontal ?? c.foto_frontal ?? null,
+        foto_traseira: fotosMap[c.id]?.foto_traseira ?? c.foto_traseira ?? null,
+        foto_direita: fotosMap[c.id]?.foto_direita ?? c.foto_direita ?? null,
+        foto_esquerda: fotosMap[c.id]?.foto_esquerda ?? c.foto_esquerda ?? null,
+        fotos_avarias: fotosMap[c.id]?.fotos_avarias ?? c.fotos_avarias ?? [],
+      }))
+      await exportarChecklistExcel(listaCompleta, nomeArquivo)
+    } finally {
+      setExcelProgresso(null)
+    }
   }
 
   useEffect(() => { carregar(); carregarMeses() }, [])
@@ -1347,8 +1372,14 @@ export default function ChecklistViatura() {
           </div>
           <div style={{ display: 'flex', gap: '0.5rem' }}>
             {checklistsArquivo.length > 0 && (
-              <button className="btn-excel-global" onClick={() => exportarChecklistExcel(checklistsArquivo)}>
-                📊 Excel
+              <button
+                className="btn-excel-global"
+                onClick={() => exportarExcelComFotos(checklistsArquivo, `checklists_${mesSelecionado}`)}
+                disabled={excelProgresso !== null}
+                title={excelProgresso ?? 'Exportar para Excel com fotos'}
+                style={{ opacity: excelProgresso !== null ? 0.7 : 1, minWidth: excelProgresso ? '12rem' : undefined, fontSize: excelProgresso ? '0.75rem' : undefined }}
+              >
+                {excelProgresso ?? '📊 Excel'}
               </button>
             )}
             <button className="btn-voltar-arquivo" onClick={() => { setMesSelecionado(null); setChecklistsArquivo([]) }}>
@@ -1382,8 +1413,14 @@ export default function ChecklistViatura() {
         </div>
         <div style={{ display: 'flex', gap: '0.5rem' }}>
           {checklistsMesAtual.length > 0 && (
-            <button className="btn-excel-global" onClick={() => exportarChecklistExcel(checklistsMesAtual)}>
-              📊 Excel
+            <button
+              className="btn-excel-global"
+              onClick={() => exportarExcelComFotos(checklistsMesAtual, `checklists_${mesAtual}`)}
+              disabled={excelProgresso !== null}
+              title={excelProgresso ?? 'Exportar para Excel com fotos'}
+              style={{ opacity: excelProgresso !== null ? 0.7 : 1, minWidth: excelProgresso ? '12rem' : undefined, fontSize: excelProgresso ? '0.75rem' : undefined }}
+            >
+              {excelProgresso ?? '📊 Excel'}
             </button>
           )}
           <button className="btn-novo-checklist" onClick={() => { resetForm(); setModo('form') }}>

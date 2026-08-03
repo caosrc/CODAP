@@ -894,6 +894,72 @@ function broadcastOcorrenciasAtualizadas() {
 
 // ── Ocorrências ─────────────────────────────────────────────────────────────
 
+// Busca fotos e vistorias do Supabase server-side (sem CORS) — para exportação Excel
+// Suporta fotos como base64 ou URLs do Supabase Storage (baixa e converte no servidor)
+app.get('/api/ocorrencias/fotos-supabase-lote', async (req, res) => {
+  const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL
+  const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY
+  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+    return res.status(503).json({ error: 'Supabase não configurado no servidor' })
+  }
+  const raw = (req.query.ids || '').toString().trim()
+  if (!raw) return res.json([])
+  const ids = raw.split(',').map(s => parseInt(s, 10)).filter(n => !isNaN(n) && n > 0)
+  if (ids.length === 0) return res.json([])
+
+  try {
+    // Consulta Supabase REST API diretamente do servidor
+    const idsParam = ids.join(',')
+    const apiUrl = `${SUPABASE_URL}/rest/v1/ocorrencias?select=id,fotos,vistorias&id=in.(${idsParam})`
+    const resp = await fetch(apiUrl, {
+      headers: {
+        'apikey': SUPABASE_ANON_KEY,
+        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+        'Accept': 'application/json',
+      }
+    })
+    if (!resp.ok) {
+      const txt = await resp.text()
+      console.error('fotos-supabase-lote Supabase error:', resp.status, txt)
+      return res.status(resp.status).json({ error: txt })
+    }
+    const rows = await resp.json()
+
+    // Processa fotos: Storage URLs → baixa e converte para base64; base64 → passa direto
+    const result = []
+    for (const row of rows) {
+      const fotosProcessadas = []
+      for (const foto of (Array.isArray(row.fotos) ? row.fotos : [])) {
+        if (typeof foto !== 'string' || !foto) continue
+        if (foto.startsWith('https://') && foto.includes('supabase.co/storage')) {
+          // URL do Supabase Storage — baixa server-side e converte para base64
+          try {
+            const imgResp = await fetch(foto, {
+              headers: { 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` }
+            })
+            if (imgResp.ok) {
+              const buf = await imgResp.arrayBuffer()
+              const ct = imgResp.headers.get('content-type') || 'image/jpeg'
+              fotosProcessadas.push(`data:${ct};base64,${Buffer.from(buf).toString('base64')}`)
+            }
+          } catch { /* pula foto que não conseguiu baixar */ }
+        } else {
+          fotosProcessadas.push(foto) // já é base64
+        }
+      }
+      result.push({
+        id: row.id,
+        fotos: fotosProcessadas,
+        vistorias: Array.isArray(row.vistorias) ? row.vistorias : [],
+      })
+    }
+    res.json(result)
+  } catch (err) {
+    console.error('fotos-supabase-lote error:', err.message)
+    res.status(500).json({ error: err.message })
+  }
+})
+
 // Busca fotos e vistorias em lote (para exportação Excel) — aceita ?ids=1,2,3
 app.get('/api/ocorrencias/fotos-lote', async (req, res) => {
   try {

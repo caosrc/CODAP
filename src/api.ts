@@ -347,12 +347,31 @@ export async function atualizarOcorrencia(
 }
 
 // Busca fotos e vistorias em lote para exportação (evita N chamadas individuais)
+// Usa sempre o endpoint servidor como primeira opção (sem CORS, suporta Supabase Storage)
 export async function buscarFotosOcorrencias(
   ids: number[]
 ): Promise<Record<number, { fotos: string[]; vistorias: unknown[] }>> {
   if (ids.length === 0) return {}
 
-  // Supabase — busca apenas os campos pesados num único SELECT
+  // Endpoint servidor busca do Supabase server-side (sem CORS) — primeira opção sempre
+  try {
+    const res = await fetch(`/api/ocorrencias/fotos-supabase-lote?ids=${ids.join(',')}`)
+    if (res.ok) {
+      const rows: { id: number; fotos: string[] | null; vistorias: unknown[] | null }[] = await res.json()
+      if (rows.length > 0) {
+        const result: Record<number, { fotos: string[]; vistorias: unknown[] }> = {}
+        for (const row of rows) {
+          result[row.id] = {
+            fotos: Array.isArray(row.fotos) ? row.fotos : [],
+            vistorias: Array.isArray(row.vistorias) ? row.vistorias : [],
+          }
+        }
+        return result
+      }
+    }
+  } catch { /* cai para fallbacks abaixo */ }
+
+  // Fallback: Supabase direto pelo browser (pode ter CORS para Storage URLs)
   if (supabaseDisponivel) {
     try {
       const { data } = await supabase
@@ -372,7 +391,7 @@ export async function buscarFotosOcorrencias(
     }
   }
 
-  // Express (Replit) — busca fotos e vistorias em lote via rota dedicada
+  // Fallback: PostgreSQL local via Express
   try {
     const res = await fetch(`/api/ocorrencias/fotos-lote?ids=${ids.join(',')}`)
     if (res.ok) {

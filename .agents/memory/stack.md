@@ -1,32 +1,28 @@
 ---
 name: Stack e arquitetura
-description: Visão geral do stack técnico do projeto Defesa Civil Ouro Branco
+description: Stack técnica, configuração do ambiente Replit, e decisões de backend/frontend.
 ---
 
-# Stack — Defesa Civil Ouro Branco PWA
+## Stack
+- Frontend: React 19 + TypeScript + Vite
+- Backend: Express 5 + Node.js 20 + WebSocket (`ws`) — porta 5000
+- Banco primário: Replit PostgreSQL (auto-provisionado)
+- Supabase: usado como fonte de dados real (VITE_USE_SUPABASE=true em shared env)
 
-## Frontend
-- React 19 + TypeScript + Vite (porta 5173 dev, build → `dist/`)
-- Leaflet / react-leaflet para mapas
-- ExcelJS (lazy import via `await import('exceljs')`) para exportação
-- Service Worker em `public/sw.js` — offline, push, cache tiles
+## VITE_USE_SUPABASE — IMPORTANTE
+**Deve ser `true`**. O banco PostgreSQL local (Replit) está vazio — todos os dados reais (ocorrências, fotos, etc.) estão no Supabase. Alterar para `false` quebra o app.
 
-## Backend
-- Express 5 + Node.js em `server/index.js` (porta 5000)
-- WebSocket nativo (`ws`) em `/ws` — broadcast em tempo real
-- `pg` para PostgreSQL (Replit managed)
+**Why:** O projeto foi importado do GitHub com dados já em Supabase. O replit.md diz `false`, mas isso está desatualizado — o usuário usa Supabase como fonte de dados.
 
-## Banco
-- Replit PostgreSQL (DATABASE_URL via env secrets)
-- Schema auto-criado no `initDB()` em `server/index.js`
-- `VITE_USE_SUPABASE=false` — Supabase é fallback inativo
+**How to apply:** Sempre manter `VITE_USE_SUPABASE=true` em shared env. Nunca mudar para `false`.
 
-## Push
-- VAPID keys em `VAPID_PUBLIC_KEY` e `VAPID_PRIVATE_KEY` (env secrets)
-- `web-push` lib no servidor
-- Subscriptions em tabela `push_subscriptions` (endpoint, p256dh, auth, agente)
+## npm install
+- `npm install` falha com "Invalid Version" por entradas `@esbuild` com versão vazia no `package-lock.json`.
+- Workaround obrigatório: `npm install --no-package-lock --silent`.
 
-## Convenções importantes
-- Supabase path sempre preservado como fallback morto (não remover)
-- Conversões Plano ↔ DB: `sbParaPlano` e `planoParaSB` em Planejamento.tsx
-- IDs offline: negativos e estáveis (baseados em localId, não posição)
+## Export Excel — Fotos
+- Fotos das ocorrências são base64 no Supabase (`data:image/jpeg;base64,...`).
+- Buscar fotos pelo browser direto do Supabase pode falhar por CORS.
+- Solução implementada: endpoint `/api/ocorrencias/fotos-supabase-lote?ids=...` no servidor busca do Supabase REST API server-side e retorna base64 pronto.
+- `buscarFotosOcorrencias` em `src/api.ts` tenta esse endpoint primeiro (sem CORS), com fallback para Supabase direto e depois PostgreSQL local.
+- Proxy de imagens também disponível em `/api/proxy-imagem?url=...` para URLs do Supabase Storage.

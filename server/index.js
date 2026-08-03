@@ -1938,6 +1938,32 @@ app.get('/api/tempo', async (_req, res) => {
   }
 })
 
+// ── Proxy de imagens do Supabase Storage (evita CORS no browser) ─────────────
+// Usado pela exportação Excel para baixar fotos do Supabase Storage no servidor
+app.get('/api/proxy-imagem', async (req, res) => {
+  const url = (req.query.url || '').toString().trim()
+  if (!url) return res.status(400).json({ error: 'url obrigatória' })
+  // Permite apenas URLs do Supabase Storage por segurança
+  if (!url.startsWith('https://') || !url.includes('supabase.co/storage')) {
+    return res.status(403).json({ error: 'url não permitida' })
+  }
+  try {
+    const headers = {}
+    const anonKey = process.env.SUPABASE_ANON_KEY
+    if (anonKey) headers['Authorization'] = `Bearer ${anonKey}`
+    const response = await fetch(url, { headers })
+    if (!response.ok) return res.status(response.status).end()
+    const contentType = response.headers.get('content-type') || 'image/jpeg'
+    res.set('Content-Type', contentType)
+    res.set('Cache-Control', 'private, max-age=3600')
+    const buffer = await response.arrayBuffer()
+    res.send(Buffer.from(buffer))
+  } catch (err) {
+    console.error('proxy-imagem error:', err.message)
+    res.status(500).json({ error: err.message })
+  }
+})
+
 // ── Serve frontend build ─────────────────────────────────────────────────────
 const distPath = join(__dirname, '..', 'dist')
 if (existsSync(distPath)) {

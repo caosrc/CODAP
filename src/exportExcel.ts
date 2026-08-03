@@ -31,9 +31,14 @@ const FOTO_COL_W = 17  // largura da coluna em caracteres (≈ 120px)
 const ROW_H_PX_TO_PT = 0.75  // 1pt ≈ 1.33px
 
 // Converte uma URL de imagem (ex: Supabase Storage) em data URL base64
+// URLs do Supabase são buscadas via proxy do servidor para evitar CORS
 async function urlParaBase64(url: string): Promise<string | null> {
   try {
-    const res = await fetch(url)
+    // Roteia URLs do Supabase Storage pelo proxy Express (evita bloqueio CORS)
+    const fetchUrl = url.includes('supabase.co/storage')
+      ? `/api/proxy-imagem?url=${encodeURIComponent(url)}`
+      : url
+    const res = await fetch(fetchUrl)
     if (!res.ok) return null
     const blob = await res.blob()
     return new Promise<string>((resolve, reject) => {

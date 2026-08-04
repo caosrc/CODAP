@@ -139,7 +139,7 @@ export async function gerarRelatorioVistoria(ocorrencia: Ocorrencia): Promise<Bl
     '“Natureza da Ocorrência”': xmlEscape(natureza),
     'Natureza da Ocorrência': xmlEscape(natureza),
     '“data 2”': xmlEscape(formatarDataExtenso(hoje)),
-    '"Endereço"': xmlEscape(formatarEnderecoRelatorio(ocorrencia.endereco)),
+    '\u201cEndere\u00e7o\u201d': xmlEscape(formatarEnderecoRelatorio(ocorrencia.endereco)),
     '"coordenadas do local"': xmlEscape(formatarCoordenadas(ocorrencia.lat, ocorrencia.lng)),
     'coordenadas do local': xmlEscape(formatarCoordenadas(ocorrencia.lat, ocorrencia.lng)),
     '(informações da situação descrita na ocorrência, quadro 9)': xmlEscape(situacao),

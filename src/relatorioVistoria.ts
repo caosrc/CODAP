@@ -108,7 +108,7 @@ async function carregarTemplate(): Promise<ArrayBuffer> {
 export async function gerarRelatorioVistoria(ocorrencia: Ocorrencia): Promise<Blob> {
   const template = await carregarTemplate()
   const zip = await JSZip.loadAsync(template)
-  const hoje = new Date()
+  const hoje = ocorrencia.created_at ? new Date(ocorrencia.created_at) : new Date()
   const natureza = ocorrencia.natureza || 'Não informada'
   const requerente = ocorrencia.proprietario || 'Não informado'
   const endereco = ocorrencia.endereco || 'Não informado'

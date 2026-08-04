@@ -170,8 +170,9 @@ export async function gerarRelatorioVistoria(ocorrencia: Ocorrencia): Promise<Bl
   documentXml = documentXml
     .replace(/[“”]/g, '')
     .replace(/,\s*Zona Rural de Olaria/g, '')
-    .replace(/\s+Zona Rural de Olaria,\s*coordenadas/g, ' coordenadas')
+    .replace(/\s+Zona Rural de Olaria,\s*coordenadas/g, 'coordenadas')
     .replace(/,\s{2,}coordenadas/g, ', coordenadas')
+    .replace(/ {2,}coordenadas/g, ' coordenadas')
     .replace(/\s*descreva a conclus.o\.?/gi, '')
 
   const relsFile = zip.file('word/_rels/document.xml.rels')

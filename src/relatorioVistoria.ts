@@ -59,6 +59,19 @@ function nomeBairro(endereco: string | null | undefined): string {
   return partes.slice(2).join(' ').trim()
 }
 
+function formatarEnderecoRelatorio(endereco: string | null | undefined): string {
+  const texto = String(endereco || '').trim()
+  if (!texto) return 'Não informado'
+  const partes = texto.split(',').map(p => p.trim())
+  if (partes.length >= 3) {
+    const bairro = partes.slice(2).join(', ').trim()
+    if (bairro) {
+      return partes.slice(0, 2).join(', ') + ', Bairro ' + bairro
+    }
+  }
+  return texto
+}
+
 export function relatorioFileName(ocorrencia: Ocorrencia): string {
   const numero = limparNomeArquivo(ocorrencia.id, 'numero')
   const rua = limparNomeArquivo(nomeRua(ocorrencia.endereco), 'Nome_da_Rua')
@@ -126,7 +139,7 @@ export async function gerarRelatorioVistoria(ocorrencia: Ocorrencia): Promise<Bl
     '“Natureza da Ocorrência”': xmlEscape(natureza),
     'Natureza da Ocorrência': xmlEscape(natureza),
     '“data 2”': xmlEscape(formatarDataExtenso(hoje)),
-    '“Endereço”': xmlEscape(endereco),
+    '"Endereço"': xmlEscape(formatarEnderecoRelatorio(ocorrencia.endereco)),
     '"coordenadas do local"': xmlEscape(formatarCoordenadas(ocorrencia.lat, ocorrencia.lng)),
     'coordenadas do local': xmlEscape(formatarCoordenadas(ocorrencia.lat, ocorrencia.lng)),
     '(informações da situação descrita na ocorrência, quadro 9)': xmlEscape(situacao),

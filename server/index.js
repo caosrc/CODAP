@@ -1302,6 +1302,37 @@ app.get('/api/health', (req, res) => res.json({ ok: true }))
 let focosCache = { data: null, ts: 0 }
 const FOCOS_CACHE_MS = 10 * 60 * 1000 // 10 min — GOES atualiza a cada 10 min
 
+// Polígono simplificado do município de Ouro Branco - MG (IBGE 3146206)
+// Cada par é [lat, lng]; ray-casting determina se ponto está dentro do limite municipal
+const OURO_BRANCO_POLIGONO = [
+  [-20.393, -43.838],
+  [-20.378, -43.710],
+  [-20.382, -43.598],
+  [-20.403, -43.493],
+  [-20.478, -43.446],
+  [-20.548, -43.449],
+  [-20.603, -43.478],
+  [-20.648, -43.560],
+  [-20.651, -43.648],
+  [-20.630, -43.752],
+  [-20.601, -43.843],
+  [-20.518, -43.862],
+  [-20.440, -43.851],
+]
+
+function pontoNoCidade(lat, lng) {
+  const poly = OURO_BRANCO_POLIGONO
+  let inside = false
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const [yi, xi] = poly[i]
+    const [yj, xj] = poly[j]
+    const intersect = ((yi > lat) !== (yj > lat)) &&
+      (lng < (xj - xi) * (lat - yi) / (yj - yi) + xi)
+    if (intersect) inside = !inside
+  }
+  return inside
+}
+
 function parsearFirmsCsv(csv, fonteNome) {
   const lines = csv.trim().split('\n')
   if (lines.length < 2) return []
@@ -1363,7 +1394,8 @@ app.get('/api/focos-incendio', async (_req, res) => {
       console.warn('[focos-incendio] GOES falhou:', resGoes.reason?.message)
     }
 
-    const focos = [...focosViirs, ...focosGoes]
+    const todosFocos = [...focosViirs, ...focosGoes]
+    const focos = todosFocos.filter(f => pontoNoCidade(f.lat, f.lng))
     const payload = {
       focos,
       configurado: true,
@@ -1371,7 +1403,7 @@ app.get('/api/focos-incendio', async (_req, res) => {
       atualizadoEm: new Date().toISOString(),
     }
     focosCache = { data: payload, ts: Date.now() }
-    console.log(`[focos-incendio] VIIRS: ${focosViirs.length}, GOES-16: ${focosGoes.length}`)
+    console.log(`[focos-incendio] VIIRS: ${focosViirs.length}, GOES-16: ${focosGoes.length} → dentro de Ouro Branco: ${focos.length}`)
     res.json(payload)
   } catch (e) {
     console.warn('[focos-incendio]', e?.message)

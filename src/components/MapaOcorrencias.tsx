@@ -1385,19 +1385,6 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
         >
           🚧 Material{equipamentosCampo.filter(c => c.status === 'ativo').length > 0 ? ` (${equipamentosCampo.filter(c => c.status === 'ativo').length})` : ''}
         </button>
-        <button
-          className={`mapa-camada-btn mapa-fogo-btn ${mostrarFocos ? 'ativo' : ''} ${focosIncendio.length > 0 ? 'tem-focos' : ''}`}
-          onClick={() => setMostrarFocos(v => !v)}
-          title={
-            focosConfigurado === false
-              ? 'Configure FIRMS_MAP_KEY nas variáveis de ambiente para ativar'
-              : focosIncendio.length > 0
-                ? `${focosIncendio.length} foco(s) — ${focosFontes.join(' + ')} — ${focosAtualizadoEm ? new Date(focosAtualizadoEm).toLocaleTimeString('pt-BR') : ''}`
-                : `Monitoramento via ${focosFontes.length > 0 ? focosFontes.join(' + ') : 'NASA FIRMS'} — atualiza a cada 10min`
-          }
-        >
-          🔥 Incêndios{focosIncendio.length > 0 ? ` (${focosIncendio.length})` : ''}{focosConfigurado === false ? ' ⚠️' : ''}
-        </button>
         <div className="mapa-ocorr-wrap">
           <button
             className={`mapa-camada-btn ${mostrarOcorrencias ? 'ativo' : ''}`}
@@ -1458,6 +1445,19 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
             </div>
           )}
         </div>
+        <button
+          className={`mapa-camada-btn mapa-fogo-btn ${mostrarFocos ? 'ativo' : ''} ${focosIncendio.length > 0 ? 'tem-focos' : ''}`}
+          onClick={() => setMostrarFocos(v => !v)}
+          title={
+            focosConfigurado === false
+              ? 'Configure FIRMS_MAP_KEY nas variáveis de ambiente para ativar'
+              : focosIncendio.length > 0
+                ? `${focosIncendio.length} foco(s) — ${focosFontes.join(' + ')} — ${focosAtualizadoEm ? new Date(focosAtualizadoEm).toLocaleTimeString('pt-BR') : ''}`
+                : `Monitoramento via ${focosFontes.length > 0 ? focosFontes.join(' + ') : 'NASA FIRMS'} — atualiza a cada 10min`
+          }
+        >
+          🔥 Incêndios{focosIncendio.length > 0 ? ` (${focosIncendio.length})` : ''}{focosConfigurado === false ? ' ⚠️' : ''}
+        </button>
       </div>
 
       {/* Painel de equipamentos em campo — aparece quando o botão Material está ativo */}

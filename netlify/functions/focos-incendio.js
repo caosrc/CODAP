@@ -2,17 +2,16 @@
 // Satélites: VIIRS-SNPP · VIIRS-NOAA20 · VIIRS-NOAA21 · MODIS · GOES (geoest.)
 // Espelha a lógica de server/index.js para o deploy no Netlify.
 
-// Polígono do município de Ouro Branco - MG (IBGE 3146206)
-// Divisa leste expandida ~5 km para incluir área limítrofe com Conselheiro Lafaiete
+// Polígono oficial do município de Ouro Branco - MG (IBGE 3146206)
 const OURO_BRANCO_POLIGONO = [
   [-20.393, -43.838],
   [-20.378, -43.710],
   [-20.382, -43.598],
-  [-20.403, -43.480],
-  [-20.478, -43.415],
-  [-20.548, -43.410],
-  [-20.603, -43.388],
-  [-20.648, -43.468],
+  [-20.403, -43.493],
+  [-20.478, -43.446],
+  [-20.548, -43.449],
+  [-20.603, -43.478],
+  [-20.648, -43.560],
   [-20.651, -43.648],
   [-20.630, -43.752],
   [-20.601, -43.843],
@@ -45,10 +44,9 @@ function parsearFirmsCsv(csv, fonteNome) {
     const confNum = parseInt(confRaw)
     if (!isNaN(confNum)) {
       if (fonteNome === 'MODIS') {
-        // MODIS: 0-100 % de confiança
         confidence = confNum >= 70 ? 'h' : confNum >= 30 ? 'n' : 'l'
       } else {
-        // GOES: 10/11=high, 30=nominal, 31-33=low; outros (>65)=high
+        // GOES: 10/11=high, 30=nominal, 31-33=low; >65=high (G19FRP range)
         confidence = confNum <= 11 ? 'h' : confNum <= 30 ? 'n' : confNum <= 65 ? 'l' : 'h'
       }
     } else {
@@ -68,8 +66,6 @@ function parsearFirmsCsv(csv, fonteNome) {
   }).filter(f => !isNaN(f.lat) && !isNaN(f.lng))
 }
 
-// Remove focos duplicados: mesmo incêndio detectado por vários satélites.
-// Considera duplicata se distância < 0.01° (~1 km); mantém o de maior FRP.
 function deduplicarFocos(focos) {
   const out = []
   for (const f of focos) {
@@ -90,17 +86,18 @@ export const handler = async () => {
     }
   }
 
-  // bbox: oeste,sul,leste,norte (margem ~5 km; leste expandido para divisa)
-  const bbox = '-43.95,-20.70,-43.35,-20.33'
+  // bbox: oeste,sul,leste,norte — cobre Ouro Branco com margem ~5 km
+  const bbox = '-43.95,-20.70,-43.40,-20.33'
   const base = `https://firms.modaps.eosdis.nasa.gov/api/area/csv/${firmsKey}`
+  const SIG = 8000 // timeout por satélite (ms)
 
   try {
     const [resSnpp, resN20, resN21, resMod, resGoes] = await Promise.allSettled([
-      fetch(`${base}/VIIRS_SNPP_NRT/${bbox}/1`,   { signal: AbortSignal.timeout(14000) }),
-      fetch(`${base}/VIIRS_NOAA20_NRT/${bbox}/1`, { signal: AbortSignal.timeout(14000) }),
-      fetch(`${base}/VIIRS_NOAA21_NRT/${bbox}/1`, { signal: AbortSignal.timeout(14000) }),
-      fetch(`${base}/MODIS_NRT/${bbox}/1`,          { signal: AbortSignal.timeout(14000) }),
-      fetch(`${base}/GOES_NRT/${bbox}/1`,           { signal: AbortSignal.timeout(14000) }),
+      fetch(`${base}/VIIRS_SNPP_NRT/${bbox}/1`,   { signal: AbortSignal.timeout(SIG) }),
+      fetch(`${base}/VIIRS_NOAA20_NRT/${bbox}/1`, { signal: AbortSignal.timeout(SIG) }),
+      fetch(`${base}/VIIRS_NOAA21_NRT/${bbox}/1`, { signal: AbortSignal.timeout(SIG) }),
+      fetch(`${base}/MODIS_NRT/${bbox}/1`,          { signal: AbortSignal.timeout(SIG) }),
+      fetch(`${base}/GOES_NRT/${bbox}/1`,           { signal: AbortSignal.timeout(SIG) }),
     ])
 
     const fontes = []
@@ -129,14 +126,10 @@ export const handler = async () => {
       statusCode: 200,
       headers: {
         'Content-Type': 'application/json',
-        'Cache-Control': 'public, max-age=600',
+        // GOES atualiza a cada ~10 min → CDN cache 5 min é suficiente
+        'Cache-Control': 'public, max-age=300',
       },
-      body: JSON.stringify({
-        focos,
-        configurado: true,
-        fontes,
-        atualizadoEm: new Date().toISOString(),
-      }),
+      body: JSON.stringify({ focos, configurado: true, fontes, atualizadoEm: new Date().toISOString() }),
     }
   } catch (e) {
     return {

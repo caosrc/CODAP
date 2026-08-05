@@ -1300,20 +1300,25 @@ app.get('/api/health', (req, res) => res.json({ ok: true }))
 
 // ── Focos de Incêndio — NASA FIRMS ─────────────────────────────────────────
 // Satélites: VIIRS-SNPP · VIIRS-NOAA20 · VIIRS-NOAA21 · MODIS · GOES (geoest.)
-let focosCache = { data: null, ts: 0 }
-const FOCOS_CACHE_MS = 10 * 60 * 1000 // 10 min
+//
+// Cache duplo para resposta rápida:
+//   GOES  → TTL 5 min  (satélite geoestacionário, atualiza a cada ~10 min)
+//   Polar → TTL 25 min (VIIRS + MODIS, sobrevoo ~2×/dia — não muda tão rápido)
+let goesCache  = { data: null, ts: 0 }
+let polarCache = { data: null, ts: 0 }
+const GOES_TTL  = 5  * 60 * 1000   //  5 min
+const POLAR_TTL = 25 * 60 * 1000   // 25 min
 
-// Polígono do município de Ouro Branco - MG (IBGE 3146206)
-// Divisa leste expandida ~5 km para incluir área limítrofe com Conselheiro Lafaiete
+// Polígono oficial do município de Ouro Branco - MG (IBGE 3146206)
 const OURO_BRANCO_POLIGONO = [
   [-20.393, -43.838],
   [-20.378, -43.710],
   [-20.382, -43.598],
-  [-20.403, -43.480],
-  [-20.478, -43.415],
-  [-20.548, -43.410],
-  [-20.603, -43.388],
-  [-20.648, -43.468],
+  [-20.403, -43.493],
+  [-20.478, -43.446],
+  [-20.548, -43.449],
+  [-20.603, -43.478],
+  [-20.648, -43.560],
   [-20.651, -43.648],
   [-20.630, -43.752],
   [-20.601, -43.843],
@@ -1349,7 +1354,7 @@ function parsearFirmsCsv(csv, fonteNome) {
         // MODIS: 0-100 % de confiança
         confidence = confNum >= 70 ? 'h' : confNum >= 30 ? 'n' : 'l'
       } else {
-        // GOES: 10/11=high, 30=nominal, 31-33=low; outros (>65)=high
+        // GOES: 10/11=high, 30=nominal, 31-33=low; >65=high (G19FRP range)
         confidence = confNum <= 11 ? 'h' : confNum <= 30 ? 'n' : confNum <= 65 ? 'l' : 'h'
       }
     } else {
@@ -1357,20 +1362,20 @@ function parsearFirmsCsv(csv, fonteNome) {
       confidence = c0 === 'h' ? 'h' : c0 === 'l' ? 'l' : 'n'
     }
     return {
-      lat:       parseFloat(cols[idx('latitude')]),
-      lng:       parseFloat(cols[idx('longitude')]),
+      lat:      parseFloat(cols[idx('latitude')]),
+      lng:      parseFloat(cols[idx('longitude')]),
       confidence,
-      frp:       parseFloat(cols[idx('frp')]) || 0,
-      data:      cols[idx('acq_date')] || '',
-      hora:      cols[idx('acq_time')] || '',
-      satelite:  cols[idx('satellite')] || fonteNome,
-      fonte:     fonteNome,
+      frp:      parseFloat(cols[idx('frp')]) || 0,
+      data:     cols[idx('acq_date')] || '',
+      hora:     cols[idx('acq_time')] || '',
+      satelite: cols[idx('satellite')] || fonteNome,
+      fonte:    fonteNome,
     }
   }).filter(f => !isNaN(f.lat) && !isNaN(f.lng))
 }
 
-// Remove focos duplicados: mesmo incêndio detectado por vários satélites.
-// Considera duplicata se distância < 0.01° (~1 km); mantém o de maior FRP.
+// Remove focos duplicados detectados por múltiplos satélites no mesmo ponto.
+// Distância < 0.01° (~1 km) = mesmo foco; mantém o de maior FRP.
 function deduplicarFocos(focos) {
   const out = []
   for (const f of focos) {
@@ -1383,58 +1388,87 @@ function deduplicarFocos(focos) {
 
 app.get('/api/focos-incendio', async (_req, res) => {
   try {
-    if (focosCache.data && Date.now() - focosCache.ts < FOCOS_CACHE_MS) {
-      return res.json(focosCache.data)
-    }
     const firmsKey = process.env.FIRMS_MAP_KEY
     if (!firmsKey) {
       return res.json({ focos: [], configurado: false, fontes: [], msg: 'FIRMS_MAP_KEY não configurada' })
     }
-    // bbox: oeste,sul,leste,norte (margem ~5 km; leste expandido para divisa)
-    const bbox = '-43.95,-20.70,-43.35,-20.33'
-    const base = `https://firms.modaps.eosdis.nasa.gov/api/area/csv/${firmsKey}`
 
-    // Busca 5 produtos da NASA em paralelo
-    const [resSnpp, resN20, resN21, resMod, resGoes] = await Promise.allSettled([
-      fetch(`${base}/VIIRS_SNPP_NRT/${bbox}/1`,   { signal: AbortSignal.timeout(14000) }),
-      fetch(`${base}/VIIRS_NOAA20_NRT/${bbox}/1`, { signal: AbortSignal.timeout(14000) }),
-      fetch(`${base}/VIIRS_NOAA21_NRT/${bbox}/1`, { signal: AbortSignal.timeout(14000) }),
-      fetch(`${base}/MODIS_NRT/${bbox}/1`,          { signal: AbortSignal.timeout(14000) }),
-      fetch(`${base}/GOES_NRT/${bbox}/1`,           { signal: AbortSignal.timeout(14000) }),
-    ])
+    const now = Date.now()
+    const goesOk  = goesCache.data  && now - goesCache.ts  < GOES_TTL
+    const polarOk = polarCache.data && now - polarCache.ts < POLAR_TTL
 
-    const fontes = []
-    const brutos = {}
-
-    const processar = async (r, nome, label) => {
-      if (r.status === 'fulfilled' && r.value.ok) {
-        const f = parsearFirmsCsv(await r.value.text(), nome)
-        brutos[nome] = f.length
-        fontes.push(label)
-        return f
-      }
-      brutos[nome] = 0
-      console.warn(`[focos-incendio] ${nome} falhou:`, r.reason?.message)
-      return []
+    // Cache duplo: se ambos válidos → retorna imediatamente sem chamar NASA
+    if (goesOk && polarOk) {
+      const focos = deduplicarFocos([...polarCache.data.focos, ...goesCache.data.focos])
+      return res.json({
+        focos,
+        configurado: true,
+        fontes: [...polarCache.data.fontes, ...goesCache.data.fontes],
+        atualizadoEm: goesCache.data.atualizadoEm,
+        cache: 'hit',
+      })
     }
 
-    const grupos = await Promise.all([
-      processar(resSnpp, 'VIIRS-SNPP',  'VIIRS-SNPP'),
-      processar(resN20,  'VIIRS-N20',   'VIIRS-NOAA20'),
-      processar(resN21,  'VIIRS-N21',   'VIIRS-NOAA21'),
-      processar(resMod,  'MODIS',       'MODIS'),
-      processar(resGoes, 'GOES',        'GOES'),
-    ])
+    // bbox: oeste,sul,leste,norte — cobre Ouro Branco com margem ~5 km
+    const bbox = '-43.95,-20.70,-43.40,-20.33'
+    const base = `https://firms.modaps.eosdis.nasa.gov/api/area/csv/${firmsKey}`
+    const SIG = 8000 // timeout por satélite (ms)
 
-    const todos = grupos.flat().filter(f => pontoNoCidade(f.lat, f.lng))
-    const focos = deduplicarFocos(todos)
+    // Busca apenas o que precisa de atualização
+    const tarefas = []
+    if (!polarOk) {
+      tarefas.push(
+        fetch(`${base}/VIIRS_SNPP_NRT/${bbox}/1`,   { signal: AbortSignal.timeout(SIG) }).then(r => ({ r, nome: 'VIIRS-SNPP',  label: 'VIIRS-SNPP'  })),
+        fetch(`${base}/VIIRS_NOAA20_NRT/${bbox}/1`, { signal: AbortSignal.timeout(SIG) }).then(r => ({ r, nome: 'VIIRS-N20',   label: 'VIIRS-NOAA20' })),
+        fetch(`${base}/VIIRS_NOAA21_NRT/${bbox}/1`, { signal: AbortSignal.timeout(SIG) }).then(r => ({ r, nome: 'VIIRS-N21',   label: 'VIIRS-NOAA21' })),
+        fetch(`${base}/MODIS_NRT/${bbox}/1`,          { signal: AbortSignal.timeout(SIG) }).then(r => ({ r, nome: 'MODIS',       label: 'MODIS'        })),
+      )
+    }
+    if (!goesOk) {
+      tarefas.push(
+        fetch(`${base}/GOES_NRT/${bbox}/1`, { signal: AbortSignal.timeout(SIG) }).then(r => ({ r, nome: 'GOES', label: 'GOES' })),
+      )
+    }
 
-    const payload = { focos, configurado: true, fontes, atualizadoEm: new Date().toISOString() }
-    focosCache = { data: payload, ts: Date.now() }
+    const resultados = await Promise.allSettled(tarefas)
+    let novosPolar = [], novosGoes = [], fontesPolar = [], fontesGoes = []
+    const brutos = {}
+
+    for (const res of resultados) {
+      if (res.status !== 'fulfilled') { console.warn('[focos-incendio] fetch falhou:', res.reason?.message); continue }
+      const { r, nome, label } = res.value
+      if (!r.ok) continue
+      const focos = parsearFirmsCsv(await r.text(), nome)
+      brutos[nome] = focos.length
+      if (nome === 'GOES') { novosGoes = focos; fontesGoes.push(label) }
+      else                 { novosPolar.push(...focos); fontesPolar.push(label) }
+    }
+
+    // Atualiza caches seletivamente
+    if (!polarOk && fontesPolar.length > 0) {
+      const fp = novosPolar.filter(f => pontoNoCidade(f.lat, f.lng))
+      polarCache = { data: { focos: fp, fontes: fontesPolar }, ts: now }
+    }
+    if (!goesOk) {
+      const fg = novosGoes.filter(f => pontoNoCidade(f.lat, f.lng))
+      goesCache = { data: { focos: fg, fontes: fontesGoes }, ts: now }
+    }
+
+    const allFocos = [
+      ...(polarCache.data?.focos || []),
+      ...(goesCache.data?.focos  || []),
+    ]
+    const allFontes = [
+      ...(polarCache.data?.fontes || []),
+      ...(goesCache.data?.fontes  || []),
+    ]
+    const focos = deduplicarFocos(allFocos)
+    const atualizadoEm = new Date().toISOString()
+
     console.log(
-      `[focos-incendio] SNPP:${brutos['VIIRS-SNPP']} N20:${brutos['VIIRS-N20']} N21:${brutos['VIIRS-N21']} MODIS:${brutos['MODIS']} GOES:${brutos['GOES']} → Ouro Branco: ${focos.length}`
+      `[focos-incendio] SNPP:${brutos['VIIRS-SNPP']??'-'} N20:${brutos['VIIRS-N20']??'-'} N21:${brutos['VIIRS-N21']??'-'} MODIS:${brutos['MODIS']??'-'} GOES:${brutos['GOES']??'-'} → Ouro Branco: ${focos.length}`
     )
-    res.json(payload)
+    res.json({ focos, configurado: true, fontes: allFontes, atualizadoEm })
   } catch (e) {
     console.warn('[focos-incendio]', e?.message)
     res.status(502).json({ focos: [], configurado: true, fontes: [], erro: e?.message })

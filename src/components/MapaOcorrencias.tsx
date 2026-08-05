@@ -525,7 +525,8 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
   // ── Focos de Incêndio (NASA FIRMS — VIIRS + GOES-16) ───────────
   const buscarFocos = useCallback(async () => {
     try {
-      const resp = await fetch('/api/focos-incendio')
+      const focosUrl = import.meta.env.VITE_FOCOS_API_URL || '/api/focos-incendio'
+      const resp = await fetch(focosUrl)
       if (!resp.ok) return
       const data = await resp.json()
       setFocosConfigurado(data.configurado ?? false)

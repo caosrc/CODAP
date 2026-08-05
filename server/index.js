@@ -1338,7 +1338,7 @@ app.get('/api/focos-incendio', async (_req, res) => {
     if (!firmsKey) {
       return res.json({ focos: [], configurado: false, fontes: [], msg: 'FIRMS_MAP_KEY não configurada' })
     }
-    const bbox = '-43.85,-20.65,-43.50,-20.35'
+    const bbox = '-44.0,-20.6,-43.4,-20.3'
     const base = `https://firms.modaps.eosdis.nasa.gov/api/area/csv/${firmsKey}`
 
     // Busca VIIRS-SNPP e GOES-16 em paralelo

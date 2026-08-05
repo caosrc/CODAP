@@ -29,6 +29,17 @@ import {
 } from '../gpsService'
 
 
+// ── Tipos ───────────────────────────────────────────────────────
+interface FocoIncendio {
+  lat: number
+  lng: number
+  confidence: string  // 'l' | 'n' | 'h'
+  frp: number         // Fire Radiative Power (MW)
+  data: string
+  hora: string
+  satelite: string
+}
+
 // ── Cache de ícones no nível do módulo ──────────────────────────
 // Evita recriar objetos DivIcon a cada render — o Leaflet compara por
 // referência e só atualiza o DOM quando o objeto muda. Com o cache,
@@ -160,6 +171,18 @@ function distanciaKm(lat1: number, lng1: number, lat2: number, lng2: number) {
 
 function corParaDispositivo(_id: string, idx: number) {
   return CORES_EQUIPES[idx % CORES_EQUIPES.length]
+}
+
+function criarIconeFogo(confidence: string): L.DivIcon {
+  const bg = confidence === 'h' ? '#dc2626' : confidence === 'n' ? '#ea580c' : '#d97706'
+  return L.divIcon({
+    className: '',
+    html: `<div style="font-size:16px;width:30px;height:30px;display:flex;align-items:center;
+      justify-content:center;background:${bg};border-radius:50%;border:2px solid white;
+      box-shadow:0 2px 8px rgba(0,0,0,0.5);animation:pulsoFogo 1.8s ease-in-out infinite;">🔥</div>`,
+    iconSize: [30, 30],
+    iconAnchor: [15, 15],
+  })
 }
 
 // ── Componentes auxiliares ──────────────────────────────────────
@@ -414,6 +437,14 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
   const [climaCarregando, setClimaCarregando] = useState(false)
   const [climaAberto, setClimaAberto] = useState(false)
 
+  // Focos de incêndio (NASA FIRMS)
+  const [focosIncendio, setFocosIncendio] = useState<FocoIncendio[]>([])
+  const [mostrarFocos, setMostrarFocos] = useState(true)
+  const [focosConfigurado, setFocosConfigurado] = useState<boolean | null>(null)
+  const [focosFonte, setFocosFonte] = useState<string | null>(null)
+  const [focosAtualizadoEm, setFocosAtualizadoEm] = useState<string | null>(null)
+  const [alertaFocosVisto, setAlertaFocosVisto] = useState(false)
+
   // Mapa offline — inicializa tiles do localStorage para mostrar status imediatamente
   const [statusOffline, setStatusOffline] = useState<StatusOffline>('idle')
   const [progressoMapa, setProgressoMapa] = useState<ProgressoMapa | null>(null)
@@ -479,6 +510,28 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
     const intervalo = setInterval(buscarClima, 10 * 60 * 1000)
     return () => clearInterval(intervalo)
   }, [buscarClima])
+
+  // ── Focos de Incêndio (NASA FIRMS) ─────────────────────────────
+  const buscarFocos = useCallback(async () => {
+    try {
+      const resp = await fetch('/api/focos-incendio')
+      if (!resp.ok) return
+      const data = await resp.json()
+      setFocosConfigurado(data.configurado ?? false)
+      setFocosFonte(data.fonte ?? null)
+      if (data.atualizadoEm) setFocosAtualizadoEm(data.atualizadoEm)
+      if (Array.isArray(data.focos)) {
+        setFocosIncendio(data.focos)
+        if (data.focos.length > 0) setAlertaFocosVisto(false)
+      }
+    } catch { /* ignora */ }
+  }, [])
+
+  useEffect(() => {
+    buscarFocos()
+    const intervalo = setInterval(buscarFocos, 15 * 60 * 1000)
+    return () => clearInterval(intervalo)
+  }, [buscarFocos])
 
   const comGeo = useMemo(() => ocorrencias.filter((o) => o.lat && o.lng), [ocorrencias])
   const semGeo = ocorrencias.length - comGeo.length
@@ -1149,6 +1202,42 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
 
         {destino && <FocoDestino destino={destino} rota={rota} />}
 
+        {/* Focos de incêndio — NASA FIRMS VIIRS */}
+        {mostrarFocos && focosIncendio.map((f, i) => (
+          <Marker
+            key={`fogo-${i}`}
+            position={[f.lat, f.lng]}
+            icon={criarIconeFogo(f.confidence)}
+            zIndexOffset={1500}
+          >
+            <Popup>
+              <div style={{ minWidth: 190, fontFamily: 'inherit' }}>
+                <div style={{ fontWeight: 700, fontSize: '0.92rem', color: '#dc2626', marginBottom: 6 }}>
+                  🔥 Foco de Incêndio
+                </div>
+                <div style={{ fontSize: '0.78rem', color: '#374151', marginBottom: 3 }}>
+                  <strong>Confiança:</strong>{' '}
+                  {f.confidence === 'h' ? '🔴 Alta' : f.confidence === 'n' ? '🟠 Nominal' : '🟡 Baixa'}
+                </div>
+                {f.frp > 0 && (
+                  <div style={{ fontSize: '0.78rem', color: '#374151', marginBottom: 3 }}>
+                    <strong>Potência radiativa:</strong> {f.frp.toFixed(1)} MW
+                  </div>
+                )}
+                <div style={{ fontSize: '0.78rem', color: '#374151', marginBottom: 3 }}>
+                  <strong>Detectado:</strong> {f.data} {f.hora ? `às ${f.hora.slice(0,2)}:${f.hora.slice(2,4)} UTC` : ''}
+                </div>
+                <div style={{ fontSize: '0.78rem', color: '#6b7280' }}>
+                  <strong>Satélite:</strong> {f.satelite || 'VIIRS-SNPP'}
+                </div>
+                <div style={{ fontSize: '0.7rem', color: '#9ca3af', marginTop: 4 }}>
+                  {f.lat.toFixed(5)}, {f.lng.toFixed(5)}
+                </div>
+              </div>
+            </Popup>
+          </Marker>
+        ))}
+
         {/* Ocorrências — ícones individuais, viewport culling ativo */}
         {mostrarOcorrencias && ocorrenciasVisiveis.map(o => {
           const temGps = !!(o.lat && o.lng)
@@ -1204,6 +1293,27 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
         ))}
       </MapContainer>
 
+      {/* Banner de alerta — focos de incêndio detectados */}
+      {focosIncendio.length > 0 && !alertaFocosVisto && (
+        <div className="mapa-fogo-alerta">
+          <span className="mapa-fogo-alerta-icone">🔥</span>
+          <div className="mapa-fogo-alerta-texto">
+            <strong>{focosIncendio.length} foco{focosIncendio.length > 1 ? 's' : ''} de incêndio</strong>
+            <span>detectado{focosIncendio.length > 1 ? 's' : ''} em Ouro Branco</span>
+          </div>
+          <button
+            className="mapa-fogo-alerta-ver"
+            onClick={() => { setMostrarFocos(true); setAlertaFocosVisto(true) }}
+          >
+            Ver no mapa
+          </button>
+          <button
+            className="mapa-fogo-alerta-fechar"
+            onClick={() => setAlertaFocosVisto(true)}
+          >✕</button>
+        </div>
+      )}
+
       {/* Top stats bar */}
       <div className="mapa-topbar">
         <div className="mapa-stat">
@@ -1254,6 +1364,19 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
           title={`${equipamentosCampo.filter(c => c.status === 'ativo').length} em campo`}
         >
           🚧 Material{equipamentosCampo.filter(c => c.status === 'ativo').length > 0 ? ` (${equipamentosCampo.filter(c => c.status === 'ativo').length})` : ''}
+        </button>
+        <button
+          className={`mapa-camada-btn mapa-fogo-btn ${mostrarFocos ? 'ativo' : ''} ${focosIncendio.length > 0 ? 'tem-focos' : ''}`}
+          onClick={() => setMostrarFocos(v => !v)}
+          title={
+            focosConfigurado === false
+              ? 'Configure FIRMS_MAP_KEY nas variáveis de ambiente para ativar'
+              : focosIncendio.length > 0
+                ? `${focosIncendio.length} foco(s) detectado(s) — atualizado ${focosAtualizadoEm ? new Date(focosAtualizadoEm).toLocaleTimeString('pt-BR') : ''}`
+                : `Monitoramento via ${focosFonte ?? 'NASA FIRMS'} — atualizado a cada 15min`
+          }
+        >
+          🔥 Incêndios{focosIncendio.length > 0 ? ` (${focosIncendio.length})` : ''}{focosConfigurado === false ? ' ⚠️' : ''}
         </button>
         <div className="mapa-ocorr-wrap">
           <button

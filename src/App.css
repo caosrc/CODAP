@@ -1445,6 +1445,74 @@ input, select, textarea { font-family: inherit; }
   left: 14px;
   z-index: 600;
 }
+/* ── Focos de Incêndio ─────────────────────────────────────────── */
+@keyframes pulsoFogo {
+  0%, 100% { box-shadow: 0 2px 8px rgba(220,38,38,0.5); }
+  50%       { box-shadow: 0 2px 18px rgba(220,38,38,0.9), 0 0 0 5px rgba(220,38,38,0.25); }
+}
+
+.mapa-fogo-alerta {
+  position: absolute;
+  top: 52px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1200;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #7f1d1d;
+  color: white;
+  border-radius: 12px;
+  padding: 10px 14px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.45);
+  max-width: calc(100vw - 24px);
+  animation: pulsoFogo 2s ease-in-out infinite;
+}
+.mapa-fogo-alerta-icone { font-size: 1.5rem; flex-shrink: 0; }
+.mapa-fogo-alerta-texto {
+  display: flex;
+  flex-direction: column;
+  font-size: 0.8rem;
+  line-height: 1.35;
+  flex: 1;
+}
+.mapa-fogo-alerta-texto strong { font-size: 0.88rem; }
+.mapa-fogo-alerta-ver {
+  background: #ef4444;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 5px 10px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.mapa-fogo-alerta-fechar {
+  background: rgba(255,255,255,0.15);
+  color: white;
+  border: none;
+  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+  font-size: 0.75rem;
+  cursor: pointer;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.mapa-fogo-btn.tem-focos {
+  background: #7f1d1d !important;
+  color: white !important;
+  animation: pulsoFogo 2s ease-in-out infinite;
+}
+.mapa-fogo-btn.tem-focos.ativo {
+  background: #dc2626 !important;
+}
+
 .mapa-clima-btn {
   display: flex;
   align-items: center;

@@ -1034,10 +1034,12 @@ input, select, textarea { font-family: inherit; }
   }
   .mapa-camadas {
     top: 54px;
+    gap: 0.05rem;
+    padding: 0.18rem;
   }
   .mapa-camada-btn {
-    padding: 0.32rem 0.6rem;
-    font-size: 0.72rem;
+    padding: 0.3rem 0.42rem;
+    font-size: 0.68rem;
   }
   .mapa-legenda {
     top: 94px;

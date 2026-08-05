@@ -1298,21 +1298,22 @@ app.put('/api/escala', async (req, res) => {
 
 app.get('/api/health', (req, res) => res.json({ ok: true }))
 
-// ── Focos de Incêndio — NASA FIRMS (VIIRS-SNPP + GOES-16) ───────
+// ── Focos de Incêndio — NASA FIRMS ─────────────────────────────────────────
+// Satélites: VIIRS-SNPP · VIIRS-NOAA20 · VIIRS-NOAA21 · MODIS · GOES (geoest.)
 let focosCache = { data: null, ts: 0 }
-const FOCOS_CACHE_MS = 10 * 60 * 1000 // 10 min — GOES atualiza a cada 10 min
+const FOCOS_CACHE_MS = 10 * 60 * 1000 // 10 min
 
-// Polígono simplificado do município de Ouro Branco - MG (IBGE 3146206)
-// Cada par é [lat, lng]; ray-casting determina se ponto está dentro do limite municipal
+// Polígono do município de Ouro Branco - MG (IBGE 3146206)
+// Divisa leste expandida ~5 km para incluir área limítrofe com Conselheiro Lafaiete
 const OURO_BRANCO_POLIGONO = [
   [-20.393, -43.838],
   [-20.378, -43.710],
   [-20.382, -43.598],
-  [-20.403, -43.493],
-  [-20.478, -43.446],
-  [-20.548, -43.449],
-  [-20.603, -43.478],
-  [-20.648, -43.560],
+  [-20.403, -43.480],
+  [-20.478, -43.415],
+  [-20.548, -43.410],
+  [-20.603, -43.388],
+  [-20.648, -43.468],
   [-20.651, -43.648],
   [-20.630, -43.752],
   [-20.601, -43.843],
@@ -1339,25 +1340,45 @@ function parsearFirmsCsv(csv, fonteNome) {
   const headers = lines[0].split(',')
   const idx = (name) => headers.indexOf(name)
   return lines.slice(1).map(line => {
-    const c = line.split(',')
-    const confRaw = (c[idx('confidence')] || 'n').trim()
-    // GOES usa numérico: 10=high, 11=saturated, 30=nominal, 31-33=low/filtered
-    let confidence = confRaw
-    if (!isNaN(parseInt(confRaw))) {
-      const n = parseInt(confRaw)
-      confidence = n <= 11 ? 'h' : n <= 30 ? 'n' : 'l'
+    const cols = line.split(',')
+    const confRaw = (cols[idx('confidence')] || 'n').trim()
+    let confidence = 'n'
+    const confNum = parseInt(confRaw)
+    if (!isNaN(confNum)) {
+      if (fonteNome === 'MODIS') {
+        // MODIS: 0-100 % de confiança
+        confidence = confNum >= 70 ? 'h' : confNum >= 30 ? 'n' : 'l'
+      } else {
+        // GOES: 10/11=high, 30=nominal, 31-33=low; outros (>65)=high
+        confidence = confNum <= 11 ? 'h' : confNum <= 30 ? 'n' : confNum <= 65 ? 'l' : 'h'
+      }
+    } else {
+      const c0 = confRaw.toLowerCase()[0]
+      confidence = c0 === 'h' ? 'h' : c0 === 'l' ? 'l' : 'n'
     }
     return {
-      lat: parseFloat(c[idx('latitude')]),
-      lng: parseFloat(c[idx('longitude')]),
+      lat:       parseFloat(cols[idx('latitude')]),
+      lng:       parseFloat(cols[idx('longitude')]),
       confidence,
-      frp: parseFloat(c[idx('frp')]) || 0,
-      data: c[idx('acq_date')] || '',
-      hora: c[idx('acq_time')] || '',
-      satelite: c[idx('satellite')] || fonteNome,
-      fonte: fonteNome,
+      frp:       parseFloat(cols[idx('frp')]) || 0,
+      data:      cols[idx('acq_date')] || '',
+      hora:      cols[idx('acq_time')] || '',
+      satelite:  cols[idx('satellite')] || fonteNome,
+      fonte:     fonteNome,
     }
   }).filter(f => !isNaN(f.lat) && !isNaN(f.lng))
+}
+
+// Remove focos duplicados: mesmo incêndio detectado por vários satélites.
+// Considera duplicata se distância < 0.01° (~1 km); mantém o de maior FRP.
+function deduplicarFocos(focos) {
+  const out = []
+  for (const f of focos) {
+    const dup = out.find(r => Math.abs(r.lat - f.lat) < 0.01 && Math.abs(r.lng - f.lng) < 0.01)
+    if (dup) { if (f.frp > dup.frp) Object.assign(dup, f) }
+    else out.push({ ...f })
+  }
+  return out
 }
 
 app.get('/api/focos-incendio', async (_req, res) => {
@@ -1369,42 +1390,50 @@ app.get('/api/focos-incendio', async (_req, res) => {
     if (!firmsKey) {
       return res.json({ focos: [], configurado: false, fontes: [], msg: 'FIRMS_MAP_KEY não configurada' })
     }
-    // bbox de Ouro Branco - MG: oeste,sul,leste,norte (com margem de ~5 km)
-    const bbox = '-43.95,-20.70,-43.40,-20.33'
+    // bbox: oeste,sul,leste,norte (margem ~5 km; leste expandido para divisa)
+    const bbox = '-43.95,-20.70,-43.35,-20.33'
     const base = `https://firms.modaps.eosdis.nasa.gov/api/area/csv/${firmsKey}`
 
-    // Busca VIIRS-SNPP e GOES-16 em paralelo
-    const [resViirs, resGoes] = await Promise.allSettled([
-      fetch(`${base}/VIIRS_SNPP_NRT/${bbox}/1`, { signal: AbortSignal.timeout(12000) }),
-      fetch(`${base}/GOES_NRT/${bbox}/1`,        { signal: AbortSignal.timeout(12000) }),
+    // Busca 5 produtos da NASA em paralelo
+    const [resSnpp, resN20, resN21, resMod, resGoes] = await Promise.allSettled([
+      fetch(`${base}/VIIRS_SNPP_NRT/${bbox}/1`,   { signal: AbortSignal.timeout(14000) }),
+      fetch(`${base}/VIIRS_NOAA20_NRT/${bbox}/1`, { signal: AbortSignal.timeout(14000) }),
+      fetch(`${base}/VIIRS_NOAA21_NRT/${bbox}/1`, { signal: AbortSignal.timeout(14000) }),
+      fetch(`${base}/MODIS_NRT/${bbox}/1`,          { signal: AbortSignal.timeout(14000) }),
+      fetch(`${base}/GOES_NRT/${bbox}/1`,           { signal: AbortSignal.timeout(14000) }),
     ])
 
-    let focosViirs = [], focosGoes = [], fontes = []
+    const fontes = []
+    const brutos = {}
 
-    if (resViirs.status === 'fulfilled' && resViirs.value.ok) {
-      focosViirs = parsearFirmsCsv(await resViirs.value.text(), 'VIIRS')
-      if (focosViirs.length >= 0) fontes.push('VIIRS-SNPP')
-    } else {
-      console.warn('[focos-incendio] VIIRS falhou:', resViirs.reason?.message)
+    const processar = async (r, nome, label) => {
+      if (r.status === 'fulfilled' && r.value.ok) {
+        const f = parsearFirmsCsv(await r.value.text(), nome)
+        brutos[nome] = f.length
+        fontes.push(label)
+        return f
+      }
+      brutos[nome] = 0
+      console.warn(`[focos-incendio] ${nome} falhou:`, r.reason?.message)
+      return []
     }
 
-    if (resGoes.status === 'fulfilled' && resGoes.value.ok) {
-      focosGoes = parsearFirmsCsv(await resGoes.value.text(), 'GOES')
-      if (focosGoes.length >= 0) fontes.push('GOES-16')
-    } else {
-      console.warn('[focos-incendio] GOES falhou:', resGoes.reason?.message)
-    }
+    const grupos = await Promise.all([
+      processar(resSnpp, 'VIIRS-SNPP',  'VIIRS-SNPP'),
+      processar(resN20,  'VIIRS-N20',   'VIIRS-NOAA20'),
+      processar(resN21,  'VIIRS-N21',   'VIIRS-NOAA21'),
+      processar(resMod,  'MODIS',       'MODIS'),
+      processar(resGoes, 'GOES',        'GOES'),
+    ])
 
-    const todosFocos = [...focosViirs, ...focosGoes]
-    const focos = todosFocos.filter(f => pontoNoCidade(f.lat, f.lng))
-    const payload = {
-      focos,
-      configurado: true,
-      fontes,
-      atualizadoEm: new Date().toISOString(),
-    }
+    const todos = grupos.flat().filter(f => pontoNoCidade(f.lat, f.lng))
+    const focos = deduplicarFocos(todos)
+
+    const payload = { focos, configurado: true, fontes, atualizadoEm: new Date().toISOString() }
     focosCache = { data: payload, ts: Date.now() }
-    console.log(`[focos-incendio] VIIRS: ${focosViirs.length}, GOES-16: ${focosGoes.length} → dentro de Ouro Branco: ${focos.length}`)
+    console.log(
+      `[focos-incendio] SNPP:${brutos['VIIRS-SNPP']} N20:${brutos['VIIRS-N20']} N21:${brutos['VIIRS-N21']} MODIS:${brutos['MODIS']} GOES:${brutos['GOES']} → Ouro Branco: ${focos.length}`
+    )
     res.json(payload)
   } catch (e) {
     console.warn('[focos-incendio]', e?.message)

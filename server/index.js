@@ -1369,7 +1369,8 @@ app.get('/api/focos-incendio', async (_req, res) => {
     if (!firmsKey) {
       return res.json({ focos: [], configurado: false, fontes: [], msg: 'FIRMS_MAP_KEY não configurada' })
     }
-    const bbox = '-44.0,-20.6,-43.4,-20.3'
+    // bbox de Ouro Branco - MG: oeste,sul,leste,norte (com margem de ~5 km)
+    const bbox = '-43.95,-20.70,-43.40,-20.33'
     const base = `https://firms.modaps.eosdis.nasa.gov/api/area/csv/${firmsKey}`
 
     // Busca VIIRS-SNPP e GOES-16 em paralelo

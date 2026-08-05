@@ -1298,9 +1298,36 @@ app.put('/api/escala', async (req, res) => {
 
 app.get('/api/health', (req, res) => res.json({ ok: true }))
 
-// ── Focos de Incêndio — NASA FIRMS VIIRS ────────────────────────
+// ── Focos de Incêndio — NASA FIRMS (VIIRS-SNPP + GOES-16) ───────
 let focosCache = { data: null, ts: 0 }
-const FOCOS_CACHE_MS = 15 * 60 * 1000 // 15 minutos
+const FOCOS_CACHE_MS = 10 * 60 * 1000 // 10 min — GOES atualiza a cada 10 min
+
+function parsearFirmsCsv(csv, fonteNome) {
+  const lines = csv.trim().split('\n')
+  if (lines.length < 2) return []
+  const headers = lines[0].split(',')
+  const idx = (name) => headers.indexOf(name)
+  return lines.slice(1).map(line => {
+    const c = line.split(',')
+    const confRaw = (c[idx('confidence')] || 'n').trim()
+    // GOES usa numérico: 10=high, 11=saturated, 30=nominal, 31-33=low/filtered
+    let confidence = confRaw
+    if (!isNaN(parseInt(confRaw))) {
+      const n = parseInt(confRaw)
+      confidence = n <= 11 ? 'h' : n <= 30 ? 'n' : 'l'
+    }
+    return {
+      lat: parseFloat(c[idx('latitude')]),
+      lng: parseFloat(c[idx('longitude')]),
+      confidence,
+      frp: parseFloat(c[idx('frp')]) || 0,
+      data: c[idx('acq_date')] || '',
+      hora: c[idx('acq_time')] || '',
+      satelite: c[idx('satellite')] || fonteNome,
+      fonte: fonteNome,
+    }
+  }).filter(f => !isNaN(f.lat) && !isNaN(f.lng))
+}
 
 app.get('/api/focos-incendio', async (_req, res) => {
   try {
@@ -1309,44 +1336,46 @@ app.get('/api/focos-incendio', async (_req, res) => {
     }
     const firmsKey = process.env.FIRMS_MAP_KEY
     if (!firmsKey) {
-      return res.json({ focos: [], configurado: false, fonte: null, msg: 'FIRMS_MAP_KEY não configurada' })
+      return res.json({ focos: [], configurado: false, fontes: [], msg: 'FIRMS_MAP_KEY não configurada' })
     }
-    // Bounding box: Ouro Branco, MG + margem ~15 km
     const bbox = '-43.85,-20.65,-43.50,-20.35'
-    const url = `https://firms.modaps.eosdis.nasa.gov/api/area/csv/${firmsKey}/VIIRS_SNPP_NRT/${bbox}/1`
-    const resp = await fetch(url, { signal: AbortSignal.timeout(12000) })
-    if (!resp.ok) throw new Error(`FIRMS HTTP ${resp.status}`)
-    const csv = await resp.text()
-    const lines = csv.trim().split('\n')
-    let focos = []
-    if (lines.length >= 2) {
-      const headers = lines[0].split(',')
-      const idx = (name) => headers.indexOf(name)
-      focos = lines.slice(1).map(line => {
-        const c = line.split(',')
-        return {
-          lat: parseFloat(c[idx('latitude')]),
-          lng: parseFloat(c[idx('longitude')]),
-          confidence: c[idx('confidence')] || 'n',
-          frp: parseFloat(c[idx('frp')]) || 0,
-          data: c[idx('acq_date')] || '',
-          hora: c[idx('acq_time')] || '',
-          satelite: c[idx('satellite')] || '',
-        }
-      }).filter(f => !isNaN(f.lat) && !isNaN(f.lng))
+    const base = `https://firms.modaps.eosdis.nasa.gov/api/area/csv/${firmsKey}`
+
+    // Busca VIIRS-SNPP e GOES-16 em paralelo
+    const [resViirs, resGoes] = await Promise.allSettled([
+      fetch(`${base}/VIIRS_SNPP_NRT/${bbox}/1`, { signal: AbortSignal.timeout(12000) }),
+      fetch(`${base}/GOES_NRT/${bbox}/1`,        { signal: AbortSignal.timeout(12000) }),
+    ])
+
+    let focosViirs = [], focosGoes = [], fontes = []
+
+    if (resViirs.status === 'fulfilled' && resViirs.value.ok) {
+      focosViirs = parsearFirmsCsv(await resViirs.value.text(), 'VIIRS')
+      if (focosViirs.length >= 0) fontes.push('VIIRS-SNPP')
+    } else {
+      console.warn('[focos-incendio] VIIRS falhou:', resViirs.reason?.message)
     }
+
+    if (resGoes.status === 'fulfilled' && resGoes.value.ok) {
+      focosGoes = parsearFirmsCsv(await resGoes.value.text(), 'GOES')
+      if (focosGoes.length >= 0) fontes.push('GOES-16')
+    } else {
+      console.warn('[focos-incendio] GOES falhou:', resGoes.reason?.message)
+    }
+
+    const focos = [...focosViirs, ...focosGoes]
     const payload = {
       focos,
       configurado: true,
-      fonte: 'NASA FIRMS VIIRS-SNPP',
+      fontes,
       atualizadoEm: new Date().toISOString(),
     }
     focosCache = { data: payload, ts: Date.now() }
-    console.log(`[focos-incendio] ${focos.length} foco(s) encontrado(s)`)
+    console.log(`[focos-incendio] VIIRS: ${focosViirs.length}, GOES-16: ${focosGoes.length}`)
     res.json(payload)
   } catch (e) {
     console.warn('[focos-incendio]', e?.message)
-    res.status(502).json({ focos: [], configurado: true, fonte: null, erro: e?.message })
+    res.status(502).json({ focos: [], configurado: true, fontes: [], erro: e?.message })
   }
 })
 

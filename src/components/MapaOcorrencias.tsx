@@ -38,6 +38,7 @@ interface FocoIncendio {
   data: string
   hora: string
   satelite: string
+  fonte: string       // 'VIIRS' | 'GOES'
 }
 
 // ── Cache de ícones no nível do módulo ──────────────────────────
@@ -173,15 +174,25 @@ function corParaDispositivo(_id: string, idx: number) {
   return CORES_EQUIPES[idx % CORES_EQUIPES.length]
 }
 
-function criarIconeFogo(confidence: string): L.DivIcon {
-  const bg = confidence === 'h' ? '#dc2626' : confidence === 'n' ? '#ea580c' : '#d97706'
+function criarIconeFogo(confidence: string, fonte: string): L.DivIcon {
+  const isGoes = fonte === 'GOES'
+  // VIIRS: vermelho/laranja — menor resolução, mais preciso
+  // GOES:  âmbar/laranja — resolução ~2km, atualiza a cada 10min
+  const bg = isGoes
+    ? (confidence === 'h' ? '#b45309' : confidence === 'n' ? '#d97706' : '#f59e0b')
+    : (confidence === 'h' ? '#dc2626' : confidence === 'n' ? '#ea580c' : '#f97316')
+  const size = isGoes ? 34 : 30
+  const label = isGoes ? `<div style="position:absolute;top:-1px;right:-1px;width:12px;height:12px;
+    background:#1e40af;border-radius:50%;border:1px solid white;font-size:7px;
+    display:flex;align-items:center;justify-content:center;color:white;font-weight:700;">G</div>` : ''
   return L.divIcon({
     className: '',
-    html: `<div style="font-size:16px;width:30px;height:30px;display:flex;align-items:center;
-      justify-content:center;background:${bg};border-radius:50%;border:2px solid white;
-      box-shadow:0 2px 8px rgba(0,0,0,0.5);animation:pulsoFogo 1.8s ease-in-out infinite;">🔥</div>`,
-    iconSize: [30, 30],
-    iconAnchor: [15, 15],
+    html: `<div style="position:relative;font-size:${isGoes ? 18 : 16}px;width:${size}px;height:${size}px;
+      display:flex;align-items:center;justify-content:center;background:${bg};border-radius:50%;
+      border:2px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.5);
+      animation:pulsoFogo 1.8s ease-in-out infinite;">🔥${label}</div>`,
+    iconSize: [size, size],
+    iconAnchor: [size / 2, size / 2],
   })
 }
 
@@ -437,11 +448,11 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
   const [climaCarregando, setClimaCarregando] = useState(false)
   const [climaAberto, setClimaAberto] = useState(false)
 
-  // Focos de incêndio (NASA FIRMS)
+  // Focos de incêndio (NASA FIRMS — VIIRS + GOES-16)
   const [focosIncendio, setFocosIncendio] = useState<FocoIncendio[]>([])
   const [mostrarFocos, setMostrarFocos] = useState(true)
   const [focosConfigurado, setFocosConfigurado] = useState<boolean | null>(null)
-  const [focosFonte, setFocosFonte] = useState<string | null>(null)
+  const [focosFontes, setFocosFontes] = useState<string[]>([])
   const [focosAtualizadoEm, setFocosAtualizadoEm] = useState<string | null>(null)
   const [alertaFocosVisto, setAlertaFocosVisto] = useState(false)
 
@@ -511,14 +522,14 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
     return () => clearInterval(intervalo)
   }, [buscarClima])
 
-  // ── Focos de Incêndio (NASA FIRMS) ─────────────────────────────
+  // ── Focos de Incêndio (NASA FIRMS — VIIRS + GOES-16) ───────────
   const buscarFocos = useCallback(async () => {
     try {
       const resp = await fetch('/api/focos-incendio')
       if (!resp.ok) return
       const data = await resp.json()
       setFocosConfigurado(data.configurado ?? false)
-      setFocosFonte(data.fonte ?? null)
+      if (Array.isArray(data.fontes)) setFocosFontes(data.fontes)
       if (data.atualizadoEm) setFocosAtualizadoEm(data.atualizadoEm)
       if (Array.isArray(data.focos)) {
         setFocosIncendio(data.focos)
@@ -1202,41 +1213,50 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
 
         {destino && <FocoDestino destino={destino} rota={rota} />}
 
-        {/* Focos de incêndio — NASA FIRMS VIIRS */}
-        {mostrarFocos && focosIncendio.map((f, i) => (
-          <Marker
-            key={`fogo-${i}`}
-            position={[f.lat, f.lng]}
-            icon={criarIconeFogo(f.confidence)}
-            zIndexOffset={1500}
-          >
-            <Popup>
-              <div style={{ minWidth: 190, fontFamily: 'inherit' }}>
-                <div style={{ fontWeight: 700, fontSize: '0.92rem', color: '#dc2626', marginBottom: 6 }}>
-                  🔥 Foco de Incêndio
-                </div>
-                <div style={{ fontSize: '0.78rem', color: '#374151', marginBottom: 3 }}>
-                  <strong>Confiança:</strong>{' '}
-                  {f.confidence === 'h' ? '🔴 Alta' : f.confidence === 'n' ? '🟠 Nominal' : '🟡 Baixa'}
-                </div>
-                {f.frp > 0 && (
-                  <div style={{ fontSize: '0.78rem', color: '#374151', marginBottom: 3 }}>
-                    <strong>Potência radiativa:</strong> {f.frp.toFixed(1)} MW
+        {/* Focos de incêndio — NASA FIRMS (VIIRS + GOES-16) */}
+        {mostrarFocos && focosIncendio.map((f, i) => {
+          const isGoes = f.fonte === 'GOES'
+          const corTitulo = isGoes ? '#b45309' : '#dc2626'
+          return (
+            <Marker
+              key={`fogo-${i}`}
+              position={[f.lat, f.lng]}
+              icon={criarIconeFogo(f.confidence, f.fonte)}
+              zIndexOffset={1500}
+            >
+              <Popup>
+                <div style={{ minWidth: 200, fontFamily: 'inherit' }}>
+                  <div style={{ fontWeight: 700, fontSize: '0.92rem', color: corTitulo, marginBottom: 4 }}>
+                    🔥 Foco de Incêndio
                   </div>
-                )}
-                <div style={{ fontSize: '0.78rem', color: '#374151', marginBottom: 3 }}>
-                  <strong>Detectado:</strong> {f.data} {f.hora ? `às ${f.hora.slice(0,2)}:${f.hora.slice(2,4)} UTC` : ''}
+                  <div style={{ fontSize: '0.72rem', background: isGoes ? '#fef3c7' : '#fee2e2',
+                    color: isGoes ? '#92400e' : '#991b1b', borderRadius: 5, padding: '2px 7px',
+                    display: 'inline-block', marginBottom: 6, fontWeight: 600 }}>
+                    {isGoes ? '🛰️ GOES-16 — a cada 10 min' : '🛰️ VIIRS-SNPP — 375 m resolução'}
+                  </div>
+                  <div style={{ fontSize: '0.78rem', color: '#374151', marginBottom: 3 }}>
+                    <strong>Confiança:</strong>{' '}
+                    {f.confidence === 'h' ? '🔴 Alta' : f.confidence === 'n' ? '🟠 Nominal' : '🟡 Baixa'}
+                  </div>
+                  {f.frp > 0 && (
+                    <div style={{ fontSize: '0.78rem', color: '#374151', marginBottom: 3 }}>
+                      <strong>Potência radiativa:</strong> {f.frp.toFixed(1)} MW
+                    </div>
+                  )}
+                  <div style={{ fontSize: '0.78rem', color: '#374151', marginBottom: 3 }}>
+                    <strong>Detectado:</strong> {f.data}{f.hora ? ` às ${f.hora.slice(0,2)}:${f.hora.slice(2,4)} UTC` : ''}
+                  </div>
+                  <div style={{ fontSize: '0.78rem', color: '#6b7280', marginBottom: 2 }}>
+                    <strong>Satélite:</strong> {f.satelite || f.fonte}
+                  </div>
+                  <div style={{ fontSize: '0.7rem', color: '#9ca3af' }}>
+                    {f.lat.toFixed(5)}, {f.lng.toFixed(5)}
+                  </div>
                 </div>
-                <div style={{ fontSize: '0.78rem', color: '#6b7280' }}>
-                  <strong>Satélite:</strong> {f.satelite || 'VIIRS-SNPP'}
-                </div>
-                <div style={{ fontSize: '0.7rem', color: '#9ca3af', marginTop: 4 }}>
-                  {f.lat.toFixed(5)}, {f.lng.toFixed(5)}
-                </div>
-              </div>
-            </Popup>
-          </Marker>
-        ))}
+              </Popup>
+            </Marker>
+          )
+        })}
 
         {/* Ocorrências — ícones individuais, viewport culling ativo */}
         {mostrarOcorrencias && ocorrenciasVisiveis.map(o => {
@@ -1372,8 +1392,8 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
             focosConfigurado === false
               ? 'Configure FIRMS_MAP_KEY nas variáveis de ambiente para ativar'
               : focosIncendio.length > 0
-                ? `${focosIncendio.length} foco(s) detectado(s) — atualizado ${focosAtualizadoEm ? new Date(focosAtualizadoEm).toLocaleTimeString('pt-BR') : ''}`
-                : `Monitoramento via ${focosFonte ?? 'NASA FIRMS'} — atualizado a cada 15min`
+                ? `${focosIncendio.length} foco(s) — ${focosFontes.join(' + ')} — ${focosAtualizadoEm ? new Date(focosAtualizadoEm).toLocaleTimeString('pt-BR') : ''}`
+                : `Monitoramento via ${focosFontes.length > 0 ? focosFontes.join(' + ') : 'NASA FIRMS'} — atualiza a cada 10min`
           }
         >
           🔥 Incêndios{focosIncendio.length > 0 ? ` (${focosIncendio.length})` : ''}{focosConfigurado === false ? ' ⚠️' : ''}

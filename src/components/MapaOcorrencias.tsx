@@ -395,6 +395,12 @@ function nomeDiaSemana(dateStr: string): string {
 }
 
 const OURO_BRANCO: [number, number] = [-20.5195, -43.6983]
+
+// Limites territoriais do município de Ouro Branco - MG
+const OURO_BRANCO_BOUNDS: [[number, number], [number, number]] = [
+  [-20.6400, -43.8400], // sudoeste
+  [-20.4000, -43.5500], // nordeste
+]
 const MAX_TRILHA = 300
 
 // ── Componente principal ────────────────────────────────────────
@@ -1082,7 +1088,10 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
     <div className="mapa-wrapper">
       <MapContainer
         center={OURO_BRANCO}
-        zoom={14}
+        zoom={13}
+        minZoom={11}
+        maxBounds={OURO_BRANCO_BOUNDS}
+        maxBoundsViscosity={1.0}
         style={{ width: '100%', height: '100%' }}
         zoomControl={false}
         whenReady={() => {}}

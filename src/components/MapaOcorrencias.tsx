@@ -455,6 +455,10 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
   const [focosConfigurado, setFocosConfigurado] = useState<boolean | null>(null)
   const [focosFontes, setFocosFontes] = useState<string[]>([])
   const [focosAtualizadoEm, setFocosAtualizadoEm] = useState<string | null>(null)
+  const [focosMonitoramento, setFocosMonitoramento] = useState<{
+    firms: boolean
+    earthEngine?: { configurado?: boolean; erro?: string | null }
+  } | null>(null)
   const [alertaFocosVisto, setAlertaFocosVisto] = useState(false)
 
   // Mapa offline — inicializa tiles do localStorage para mostrar status imediatamente
@@ -533,6 +537,7 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
       setFocosConfigurado(data.configurado ?? false)
       if (Array.isArray(data.fontes)) setFocosFontes(data.fontes)
       if (data.atualizadoEm) setFocosAtualizadoEm(data.atualizadoEm)
+      if (data.fontesMonitoramento) setFocosMonitoramento(data.fontesMonitoramento)
       if (Array.isArray(data.focos)) {
         setFocosIncendio(data.focos)
         if (data.focos.length > 0) setAlertaFocosVisto(false)
@@ -1454,14 +1459,14 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
           className={`mapa-camada-btn mapa-fogo-btn ${mostrarFocos ? 'ativo' : ''} ${focosIncendio.length > 0 ? 'tem-focos' : ''}`}
           onClick={() => setMostrarFocos(v => !v)}
           title={
-            focosConfigurado === false
-              ? 'Configure FIRMS_MAP_KEY nas variáveis de ambiente para ativar'
+            focosConfigurado === false && !focosMonitoramento?.earthEngine?.configurado
+              ? 'Configure FIRMS_MAP_KEY ou autentique o Google Earth Engine para ativar'
               : focosIncendio.length > 0
                 ? `${focosIncendio.length} foco(s) — ${focosFontes.join(' + ')} — ${focosAtualizadoEm ? new Date(focosAtualizadoEm).toLocaleTimeString('pt-BR') : ''}`
-                : `Monitoramento via ${focosFontes.length > 0 ? focosFontes.join(' + ') : 'NASA FIRMS'} — atualiza a cada 10min`
+                : `Monitoramento via ${focosFontes.length > 0 ? focosFontes.join(' + ') : 'NASA FIRMS + Earth Engine'} — área oficial de Ouro Branco`
           }
         >
-          🔥 Incêndios{focosIncendio.length > 0 ? ` (${focosIncendio.length})` : ''}{focosConfigurado === false ? ' ⚠️' : ''}
+          🔥 Incêndios{focosIncendio.length > 0 ? ` (${focosIncendio.length})` : ''}{focosConfigurado === false && !focosMonitoramento?.earthEngine?.configurado ? ' ⚠️' : ''}
         </button>
       </div>
 

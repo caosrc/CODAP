@@ -1,3 +1,4 @@
 - [Planejamento features](planejamento-features.md) — push ao escalar agentes, confirmação de presença, fotos do evento, Excel com fotos implementados em Mai 2026.
 - [Stack e arquitetura](stack.md) — VITE_USE_SUPABASE=true (dados reais no Supabase, PostgreSQL local vazio); npm install precisa de --no-package-lock; fotos buscadas via endpoint servidor.
 - [Banco de horas ocorrências automáticas](banco-horas-ocorrencias.md) — lógica de horas extras automáticas de ocorrências implementada em EscalaAgentes.tsx (Jun 2026).
+- [Google Earth Engine](earth-engine.md) — monitoramento MODIS depende de autenticação da conta no ambiente; FIRMS permanece como fonte complementar.

@@ -9,6 +9,7 @@ import { dirname, join } from 'path'
 import { existsSync, readFileSync, readdirSync } from 'fs'
 import { createServer } from 'http'
 import { WebSocketServer } from 'ws'
+import { spawn } from 'child_process'
 import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 
 const __filename = fileURLToPath(import.meta.url)
@@ -1306,8 +1307,10 @@ app.get('/api/health', (req, res) => res.json({ ok: true }))
 //   Polar → TTL 25 min (VIIRS + MODIS, sobrevoo ~2×/dia — não muda tão rápido)
 let goesCache  = { data: null, ts: 0 }
 let polarCache = { data: null, ts: 0 }
+let earthEngineCache = { data: null, ts: 0, erro: null }
 const GOES_TTL  = 5  * 60 * 1000   //  5 min
 const POLAR_TTL = 25 * 60 * 1000   // 25 min
+const EARTH_ENGINE_TTL = 15 * 60 * 1000
 
 // Polígono oficial do município de Ouro Branco - MG (IBGE 3146206)
 const OURO_BRANCO_POLIGONO = [
@@ -1386,56 +1389,130 @@ function deduplicarFocos(focos) {
   return out
 }
 
+function consultarEarthEngine() {
+  if (process.env.EARTH_ENGINE_ENABLED === 'false') {
+    return Promise.resolve({ focos: [], configurado: false, habilitado: false, erro: null })
+  }
+
+  const script = join(__dirname, 'earth-engine-focos.py')
+  return new Promise((resolve) => {
+    const processo = spawn('python3', [script], {
+      env: process.env,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    })
+    let stdout = ''
+    let stderr = ''
+    const timer = setTimeout(() => {
+      processo.kill('SIGTERM')
+      resolve({
+        focos: [],
+        configurado: false,
+        habilitado: true,
+        erro: 'Tempo limite excedido ao consultar o Google Earth Engine',
+      })
+    }, 30000)
+
+    processo.stdout.on('data', (chunk) => { stdout += chunk.toString() })
+    processo.stderr.on('data', (chunk) => { stderr += chunk.toString() })
+    processo.on('error', (erro) => {
+      clearTimeout(timer)
+      resolve({ focos: [], configurado: false, habilitado: true, erro: erro.message })
+    })
+    processo.on('close', (codigo) => {
+      clearTimeout(timer)
+      if (codigo !== 0) {
+        resolve({
+          focos: [],
+          configurado: false,
+          habilitado: true,
+          erro: stderr.trim().split('\n').pop() || `Earth Engine encerrou com código ${codigo}`,
+        })
+        return
+      }
+      try {
+        const dados = JSON.parse(stdout.trim())
+        const focos = Array.isArray(dados.focos)
+          ? dados.focos.filter((f) => pontoNoCidade(f.lat, f.lng))
+          : []
+        resolve({ focos, configurado: true, habilitado: true, erro: null })
+      } catch {
+        resolve({
+          focos: [],
+          configurado: false,
+          habilitado: true,
+          erro: 'Resposta inválida do Google Earth Engine',
+        })
+      }
+    })
+  })
+}
+
 app.get('/api/focos-incendio', async (_req, res) => {
   try {
     const firmsKey = process.env.FIRMS_MAP_KEY
-    if (!firmsKey) {
-      return res.json({ focos: [], configurado: false, fontes: [], msg: 'FIRMS_MAP_KEY não configurada' })
-    }
-
     const now = Date.now()
     const goesOk  = goesCache.data  && now - goesCache.ts  < GOES_TTL
     const polarOk = polarCache.data && now - polarCache.ts < POLAR_TTL
+    const earthEngineOk = earthEngineCache.data && now - earthEngineCache.ts < EARTH_ENGINE_TTL
 
-    // Cache duplo: se ambos válidos → retorna imediatamente sem chamar NASA
-    if (goesOk && polarOk) {
-      const focos = deduplicarFocos([...polarCache.data.focos, ...goesCache.data.focos])
+    // Cache das fontes válidas: retorna imediatamente sem chamar os serviços externos.
+    if ((!firmsKey || (goesOk && polarOk)) && earthEngineOk) {
+      const focos = deduplicarFocos([
+        ...(polarCache.data?.focos || []),
+        ...(goesCache.data?.focos || []),
+        ...(earthEngineCache.data?.focos || []),
+      ])
       return res.json({
         focos,
-        configurado: true,
-        fontes: [...polarCache.data.fontes, ...goesCache.data.fontes],
-        atualizadoEm: goesCache.data.atualizadoEm,
+        configurado: Boolean(firmsKey || earthEngineCache.data.configurado),
+        fontes: [
+          ...(polarCache.data?.fontes || []),
+          ...(goesCache.data?.fontes || []),
+          ...(earthEngineCache.data.focos.length > 0 ? ['EARTH-ENGINE-MODIS'] : []),
+        ],
+        fontesMonitoramento: {
+          firms: Boolean(firmsKey),
+          earthEngine: earthEngineCache.data,
+        },
+        atualizadoEm: new Date().toISOString(),
         cache: 'hit',
       })
     }
 
-    // bbox: oeste,sul,leste,norte — cobre Ouro Branco com margem ~5 km
-    const bbox = '-43.95,-20.70,-43.40,-20.33'
-    const base = `https://firms.modaps.eosdis.nasa.gov/api/area/csv/${firmsKey}`
-    const SIG = 8000 // timeout por satélite (ms)
-
-    // Busca apenas o que precisa de atualização
     const tarefas = []
-    if (!polarOk) {
-      tarefas.push(
-        fetch(`${base}/VIIRS_SNPP_NRT/${bbox}/1`,   { signal: AbortSignal.timeout(SIG) }).then(r => ({ r, nome: 'VIIRS-SNPP',  label: 'VIIRS-SNPP'  })),
-        fetch(`${base}/VIIRS_NOAA20_NRT/${bbox}/1`, { signal: AbortSignal.timeout(SIG) }).then(r => ({ r, nome: 'VIIRS-N20',   label: 'VIIRS-NOAA20' })),
-        fetch(`${base}/VIIRS_NOAA21_NRT/${bbox}/1`, { signal: AbortSignal.timeout(SIG) }).then(r => ({ r, nome: 'VIIRS-N21',   label: 'VIIRS-NOAA21' })),
-        fetch(`${base}/MODIS_NRT/${bbox}/1`,          { signal: AbortSignal.timeout(SIG) }).then(r => ({ r, nome: 'MODIS',       label: 'MODIS'        })),
-      )
+    if (firmsKey && (!polarOk || !goesOk)) {
+      // bbox: oeste,sul,leste,norte — área de busca com margem para Ouro Branco.
+      const bbox = '-43.95,-20.70,-43.40,-20.33'
+      const base = `https://firms.modaps.eosdis.nasa.gov/api/area/csv/${firmsKey}`
+      const SIG = 8000
+      if (!polarOk) {
+        tarefas.push(
+          fetch(`${base}/VIIRS_SNPP_NRT/${bbox}/1`, { signal: AbortSignal.timeout(SIG) }).then(r => ({ r, nome: 'VIIRS-SNPP', label: 'VIIRS-SNPP' })),
+          fetch(`${base}/VIIRS_NOAA20_NRT/${bbox}/1`, { signal: AbortSignal.timeout(SIG) }).then(r => ({ r, nome: 'VIIRS-N20', label: 'VIIRS-NOAA20' })),
+          fetch(`${base}/VIIRS_NOAA21_NRT/${bbox}/1`, { signal: AbortSignal.timeout(SIG) }).then(r => ({ r, nome: 'VIIRS-N21', label: 'VIIRS-NOAA21' })),
+          fetch(`${base}/MODIS_NRT/${bbox}/1`, { signal: AbortSignal.timeout(SIG) }).then(r => ({ r, nome: 'MODIS', label: 'MODIS' })),
+        )
+      }
+      if (!goesOk) {
+        tarefas.push(
+          fetch(`${base}/GOES_NRT/${bbox}/1`, { signal: AbortSignal.timeout(SIG) }).then(r => ({ r, nome: 'GOES', label: 'GOES' })),
+        )
+      }
     }
-    if (!goesOk) {
-      tarefas.push(
-        fetch(`${base}/GOES_NRT/${bbox}/1`, { signal: AbortSignal.timeout(SIG) }).then(r => ({ r, nome: 'GOES', label: 'GOES' })),
-      )
-    }
+    if (!earthEngineOk) tarefas.push(consultarEarthEngine().then((dados) => ({ earthEngine: dados })))
 
     const resultados = await Promise.allSettled(tarefas)
     let novosPolar = [], novosGoes = [], fontesPolar = [], fontesGoes = []
     const brutos = {}
+    let resultadoEarthEngine = earthEngineCache.data || { focos: [], configurado: false, habilitado: true, erro: null }
 
     for (const res of resultados) {
       if (res.status !== 'fulfilled') { console.warn('[focos-incendio] fetch falhou:', res.reason?.message); continue }
+      if (res.value.earthEngine) {
+        resultadoEarthEngine = res.value.earthEngine
+        earthEngineCache = { data: resultadoEarthEngine, ts: now, erro: resultadoEarthEngine.erro }
+        continue
+      }
       const { r, nome, label } = res.value
       if (!r.ok) continue
       const focos = parsearFirmsCsv(await r.text(), nome)
@@ -1468,7 +1545,16 @@ app.get('/api/focos-incendio', async (_req, res) => {
     console.log(
       `[focos-incendio] SNPP:${brutos['VIIRS-SNPP']??'-'} N20:${brutos['VIIRS-N20']??'-'} N21:${brutos['VIIRS-N21']??'-'} MODIS:${brutos['MODIS']??'-'} GOES:${brutos['GOES']??'-'} → Ouro Branco: ${focos.length}`
     )
-    res.json({ focos, configurado: true, fontes: allFontes, atualizadoEm })
+    res.json({
+      focos,
+      configurado: Boolean(firmsKey || resultadoEarthEngine.configurado),
+      fontes: [...allFontes, ...(resultadoEarthEngine.focos.length > 0 ? ['EARTH-ENGINE-MODIS'] : [])],
+      fontesMonitoramento: {
+        firms: Boolean(firmsKey),
+        earthEngine: resultadoEarthEngine,
+      },
+      atualizadoEm,
+    })
   } catch (e) {
     console.warn('[focos-incendio]', e?.message)
     res.status(502).json({ focos: [], configurado: true, fontes: [], erro: e?.message })

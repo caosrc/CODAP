@@ -1314,9 +1314,11 @@ app.get('/api/health', (req, res) => res.json({ ok: true }))
 let goesCache  = { data: null, ts: 0 }
 let polarCache = { data: null, ts: 0 }
 let earthEngineCache = { data: null, ts: 0 }
+let earthEngineMonitoramentoCache = { data: null, ts: 0 }
 const GOES_TTL  = 5  * 60 * 1000   //  5 min
 const POLAR_TTL = 25 * 60 * 1000   // 25 min
 const EARTH_ENGINE_TTL = 25 * 60 * 1000
+const EARTH_ENGINE_MONITORAMENTO_TTL = 30 * 60 * 1000
 
 // Polígono oficial do município de Ouro Branco - MG (IBGE 3145901)
 // Fonte: servicodados.ibge.gov.br — resolução 5 (29 vértices)
@@ -1450,6 +1452,55 @@ async function buscarFocosEarthEngine() {
     return { configurado: false, erro: detalhe }
   }
 }
+
+async function buscarMonitoramentoEarthEngine() {
+  if (!process.env.EARTH_ENGINE_SERVICE_ACCOUNT_JSON) {
+    return { configurado: false, erro: 'EARTH_ENGINE_SERVICE_ACCOUNT_JSON não configurada' }
+  }
+
+  const agora = Date.now()
+  if (earthEngineMonitoramentoCache.data && agora - earthEngineMonitoramentoCache.ts < EARTH_ENGINE_MONITORAMENTO_TTL) {
+    return { ...earthEngineMonitoramentoCache.data, cache: 'hit' }
+  }
+
+  try {
+    const { stdout } = await execFileAsync(
+      pythonBin,
+      [join(__dirname, 'earth-engine-focos.py'), 'monitoramento'],
+      {
+        env: process.env,
+        timeout: 90000,
+        maxBuffer: 5 * 1024 * 1024,
+      },
+    )
+    const dados = JSON.parse(stdout)
+    const resultado = {
+      camadas: Array.isArray(dados.camadas) ? dados.camadas : [],
+      indicadores: Array.isArray(dados.indicadores) ? dados.indicadores : [],
+      erros: Array.isArray(dados.erros) ? dados.erros : [],
+      projeto: dados.projeto || null,
+      periodo: dados.periodo || null,
+      atualizadoEm: dados.atualizadoEm || new Date().toISOString(),
+      configurado: true,
+    }
+    earthEngineMonitoramentoCache = { data: resultado, ts: agora }
+    return resultado
+  } catch (e) {
+    const detalhe = e?.stderr?.trim() || e?.message || 'falha desconhecida'
+    console.warn('[earth-engine-monitoramento] consulta falhou:', detalhe)
+    return { configurado: false, camadas: [], indicadores: [], erros: [detalhe] }
+  }
+}
+
+app.get('/api/monitoramento-incendio', async (_req, res) => {
+  try {
+    const resultado = await buscarMonitoramentoEarthEngine()
+    res.json(resultado)
+  } catch (e) {
+    console.warn('[monitoramento-incendio]', e?.message)
+    res.status(502).json({ configurado: false, camadas: [], indicadores: [], erros: [e?.message || 'falha desconhecida'] })
+  }
+})
 
 app.get('/api/focos-incendio', async (_req, res) => {
   try {

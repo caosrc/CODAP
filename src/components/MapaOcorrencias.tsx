@@ -45,9 +45,47 @@ interface CamadaMonitoramento {
   id: string
   nome: string
   descricao: string
-  url: string
+  url: string | null
   periodo: string
 }
+
+const FERRAMENTAS_SATELITE: CamadaMonitoramento[] = [
+  {
+    id: 'ecostress',
+    nome: 'ECOSTRESS',
+    descricao: 'Temperatura da superfície para localizar anomalias de calor e estresse hídrico.',
+    periodo: 'Composição de 90 dias',
+    url: null,
+  },
+  {
+    id: 'sentinel-2',
+    nome: 'Sentinel-2',
+    descricao: 'Índice NBR para observar vegetação seca e cicatrizes recentes de queimadas.',
+    periodo: 'Composição de 30 dias',
+    url: null,
+  },
+  {
+    id: 'landsat-8-9',
+    nome: 'Landsat 8 e 9',
+    descricao: 'Índice NBR de apoio para confirmar áreas afetadas quando houver nuvens.',
+    periodo: 'Composição de 30 dias',
+    url: null,
+  },
+  {
+    id: 'sentinel-1',
+    nome: 'Sentinel-1',
+    descricao: 'Radar que funciona à noite e sob nuvens para observar mudanças e umidade.',
+    periodo: 'Composição de 30 dias',
+    url: null,
+  },
+  {
+    id: 'modis-fire',
+    nome: 'MODIS Fire',
+    descricao: 'Detecção de fogo ativo para confirmar focos térmicos de menor resolução.',
+    periodo: 'Últimos 5 dias',
+    url: null,
+  },
+]
 
 interface IndicadorMonitoramento {
   id: string
@@ -606,6 +644,21 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
 
   const comGeo = useMemo(() => ocorrencias.filter((o) => o.lat && o.lng), [ocorrencias])
   const semGeo = ocorrencias.length - comGeo.length
+
+  // Mantém as cinco ferramentas solicitadas visíveis mesmo quando o Earth
+  // Engine ainda não está autenticado. As URLs reais substituem o catálogo
+  // assim que o endpoint retorna as camadas assinadas.
+  const camadasMonitoramento = useMemo(() => {
+    const reais = new Map((monitoramentoEE?.camadas ?? []).map(camada => [camada.id, camada]))
+    const principais = FERRAMENTAS_SATELITE.map(camada => ({
+      ...camada,
+      ...(reais.get(camada.id) ?? {}),
+    }))
+    const extras = (monitoramentoEE?.camadas ?? []).filter(
+      camada => !FERRAMENTAS_SATELITE.some(principal => principal.id === camada.id),
+    )
+    return [...principais, ...extras]
+  }, [monitoramentoEE])
 
   // Persiste contagem de tiles no localStorage para mostrar status entre recargas
   useEffect(() => {
@@ -1167,10 +1220,10 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
             keepBuffer={4}
           />
         )}
-        {camadaMonitoramento && monitoramentoEE?.camadas.find(c => c.id === camadaMonitoramento)?.url && (
+        {camadaMonitoramento && camadasMonitoramento.find(c => c.id === camadaMonitoramento)?.url && (
           <TileLayer
             key={`earth-engine-${camadaMonitoramento}`}
-            url={monitoramentoEE.camadas.find(c => c.id === camadaMonitoramento)!.url}
+            url={camadasMonitoramento.find(c => c.id === camadaMonitoramento)!.url!}
             opacity={0.62}
             attribution="Dados ambientais: Google Earth Engine"
             maxZoom={18}
@@ -1538,9 +1591,9 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
         <button
           className={`mapa-camada-btn mapa-monitoramento-btn ${painelMonitoramentoAberto ? 'ativo' : ''} ${camadaMonitoramento ? 'camada-ativa' : ''}`}
           onClick={() => setPainelMonitoramentoAberto(v => !v)}
-          title="Camadas ambientais do Google Earth Engine: VIIRS, MODIS, ERA5, CHIRPS, Sentinel-2 e Landsat"
+          title="Camadas para detecção de incêndio: ECOSTRESS, Sentinel-1/2, Landsat 8/9 e MODIS Fire"
         >
-          🌍 Análise EE{monitoramentoCarregando ? ' …' : ''}
+          🛰️ Satélites{monitoramentoCarregando ? ' …' : ''}
         </button>
       </div>
 
@@ -1548,7 +1601,7 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
         <div className="mapa-monitoramento-painel">
           <div className="mapa-monitoramento-header">
             <div>
-              <strong>🌍 Análise de risco de incêndio</strong>
+              <strong>🛰️ Detecção de incêndio por satélite</strong>
               <span>Google Earth Engine · Ouro Branco/MG</span>
             </div>
             <button
@@ -1558,39 +1611,55 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
           </div>
           {!monitoramentoEE?.configurado && (
             <div className="mapa-monitoramento-vazio">
-              Earth Engine não está disponível neste momento. Os focos NASA FIRMS continuam ativos.
+              Earth Engine ainda não está autenticado neste ambiente. As ferramentas aparecem abaixo,
+              mas as sobreposições precisam do Secret <strong>EARTH_ENGINE_SERVICE_ACCOUNT_JSON</strong>.
+              Os focos NASA FIRMS continuam ativos.
               {monitoramentoEE?.erros?.[0] && <small>{monitoramentoEE.erros[0]}</small>}
             </div>
           )}
-          {monitoramentoEE?.configurado && (
-            <>
+          <>
+            {monitoramentoEE?.configurado && (
               <p className="mapa-monitoramento-ajuda">
-                Selecione uma camada para sobrepor ao mapa. A análise combina detecção térmica,
-                chuva, temperatura, vegetação e cicatrizes de queimadas.
+                Selecione uma camada para sobrepor ao mapa. Combine detecção térmica,
+                radar, temperatura, vegetação seca e cicatrizes de queimadas para investigar
+                possíveis incêndios.
               </p>
+            )}
+            {monitoramentoEE?.configurado && (
               <div className="mapa-monitoramento-fontes">
-                <span>🔥 Detecção térmica</span>
-                <strong>{focosMonitoramento?.firms ? 'VIIRS SNPP/NOAA-20/21 + MODIS · NASA FIRMS' : 'MODIS · Earth Engine'} </strong>
+                <span>🔥 Focos ativos</span>
+                <strong>{focosMonitoramento?.firms ? 'VIIRS + MODIS · NASA FIRMS' : 'MODIS Fire · Earth Engine'} </strong>
                 {!focosMonitoramento?.firms && <small>VIIRS FIRMS será ativado ao configurar a chave NASA.</small>}
               </div>
+            )}
               <div className="mapa-monitoramento-camadas">
-                {monitoramentoEE.camadas.map(camada => (
+                {camadasMonitoramento.map(camada => (
                   <button
                     key={camada.id}
-                    className={camadaMonitoramento === camada.id ? 'selecionada' : ''}
-                    onClick={() => setCamadaMonitoramento(prev => prev === camada.id ? null : camada.id)}
+                    className={`${camadaMonitoramento === camada.id ? 'selecionada' : ''} ${camada.url ? '' : 'indisponivel'}`}
+                    onClick={() => camada.url && setCamadaMonitoramento(prev => prev === camada.id ? null : camada.id)}
                     title={camada.descricao}
                   >
-                    <span>{camada.id === 'viirs' || camada.id === 'modis' ? '🔥' : camada.id === 'chirps' ? '🌧️' : camada.id === 'era5' ? '🌡️' : camada.id === 'area-queimada' ? '🟤' : '🌿'}</span>
+                    <span>{
+                      camada.id === 'modis-fire' ? '🔥'
+                        : camada.id === 'ecostress' ? '🌡️'
+                          : camada.id === 'sentinel-1' ? '📡'
+                            : camada.id === 'sentinel-2' ? '🌿'
+                              : camada.id === 'landsat-8-9' ? '🛰️'
+                                : camada.id === 'chirps' ? '🌧️'
+                                  : camada.id === 'era5' ? '🌡️'
+                                    : camada.id === 'area-queimada' ? '🟤'
+                                      : '🌍'
+                    }</span>
                     <span>
                       <strong>{camada.nome}</strong>
-                      <small>{camada.periodo}</small>
+                      <small>{camada.url ? camada.periodo : 'Aguardando Earth Engine'}</small>
                     </span>
                     {camadaMonitoramento === camada.id && <b>✓</b>}
                   </button>
                 ))}
               </div>
-              {monitoramentoEE.indicadores.length > 0 && (
+              {monitoramentoEE?.configurado && monitoramentoEE.indicadores.length > 0 && (
                 <div className="mapa-monitoramento-indicadores">
                   <div className="mapa-monitoramento-subtitulo">Indicadores médios do município</div>
                   {monitoramentoEE.indicadores.map(indicador => (
@@ -1601,17 +1670,16 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
                   ))}
                 </div>
               )}
-              {monitoramentoEE.erros.length > 0 && (
+              {monitoramentoEE?.configurado && monitoramentoEE.erros.length > 0 && (
                 <div className="mapa-monitoramento-aviso">
                   Algumas fontes indisponíveis: {monitoramentoEE.erros.length}. As demais camadas permanecem disponíveis.
                 </div>
               )}
               <div className="mapa-monitoramento-rodape">
-                {monitoramentoEE.atualizadoEm ? `Atualizado ${new Date(monitoramentoEE.atualizadoEm).toLocaleString('pt-BR')}` : 'Atualização automática a cada 30 min'}
+                {monitoramentoEE?.atualizadoEm ? `Atualizado ${new Date(monitoramentoEE.atualizadoEm).toLocaleString('pt-BR')}` : 'Atualização automática a cada 30 min'}
                 <button onClick={buscarMonitoramento} disabled={monitoramentoCarregando}>↻ Atualizar</button>
               </div>
-            </>
-          )}
+          </>
         </div>
       )}
 

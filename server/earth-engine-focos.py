@@ -114,10 +114,7 @@ def consultar_monitoramento():
         except Exception as exc:
             erros.append(f"{nome}: {str(exc)[:180]}")
 
-    # O VIIRS já é consultado no endpoint NASA FIRMS (VIIRS SNPP/NOAA-20/21),
-    # que fornece os pontos e o FRP de forma mais atualizada que os catálogos
-    # NRT disponíveis neste projeto do Earth Engine. O painel da tela combina
-    # essa fonte com o MODIS abaixo.
+    # MODIS Fire: detecção de fogo ativo e confirmação territorial.
     try:
         modis = (
             ee.ImageCollection("MODIS/061/MOD14A1")
@@ -127,8 +124,8 @@ def consultar_monitoramento():
             .max()
         )
         adicionar_camadas(
-            "modis",
-            ("MODIS FireMask", "Máscara de fogo ativo do MODIS para confirmar focos de menor resolução.", f"Últimos 5 dias até {fim}"),
+            "modis-fire",
+            ("MODIS Fire", "Detecção de fogo ativo para confirmar focos térmicos de menor resolução.", f"Últimos 5 dias até {fim}"),
             modis,
             {"min": 0, "max": 9, "palette": ["000000", "fef3c7", "f97316", "dc2626", "7f1d1d"]},
             [{"id": "modis-mask", "nome": "Intensidade MODIS", "valor": estatistica_media(modis, regiao, 1000, "FireMask"), "unidade": "escala 0–9"}],
@@ -176,8 +173,32 @@ def consultar_monitoramento():
     except Exception as exc:
         erros.append(f"era5: {str(exc)[:180]}")
 
-    # Sentinel-2 e Landsat: índices de vegetação recentes, úteis para
-    # localizar biomassa seca e conferir visualmente áreas afetadas.
+    # ECOSTRESS: temperatura da superfície, útil para localizar anomalias
+    # térmicas e estresse de calor. A janela é maior porque o sensor não
+    # revisita o mesmo ponto diariamente.
+    try:
+        ecostress = (
+            ee.ImageCollection("NASA/ECOSTRESS/L2_LSTE/002")
+            .filterDate((hoje - datetime.timedelta(days=90)).strftime("%Y-%m-%d"), fim)
+            .filterBounds(regiao)
+            .select("LST")
+            .median()
+            .multiply(0.02)
+            .subtract(273.15)
+            .rename("LST_C")
+        )
+        adicionar_camadas(
+            "ecostress",
+            ("ECOSTRESS", "Temperatura da superfície para identificar anomalias de calor e estresse hídrico.", f"Composição de 90 dias até {fim}"),
+            ecostress,
+            {"min": 15, "max": 55, "palette": ["2563eb", "67e8f9", "fef08a", "fb923c", "dc2626", "7f1d1d"]},
+            [{"id": "ecostress-lst", "nome": "Temperatura ECOSTRESS", "valor": estatistica_media(ecostress, regiao, 70, "LST_C"), "unidade": "°C"}],
+        )
+    except Exception as exc:
+        erros.append(f"ecostress: {str(exc)[:180]}")
+
+    # Sentinel-2: o NBR destaca áreas com vegetação seca e cicatrizes recentes
+    # com resolução de 10–20 m. A composição mediana reduz o efeito de nuvens.
     try:
         sentinel = (
             ee.ImageCollection("COPERNICUS/S2_SR_HARMONIZED")
@@ -186,17 +207,18 @@ def consultar_monitoramento():
             .filter(ee.Filter.lt("CLOUDY_PIXEL_PERCENTAGE", 60))
             .median()
         )
-        ndvi_s2 = sentinel.normalizedDifference(["B8", "B4"]).rename("NDVI")
+        nbr_s2 = sentinel.normalizedDifference(["B8", "B12"]).rename("NBR")
         adicionar_camadas(
-            "sentinel-ndvi",
-            ("Sentinel-2 NDVI", "Índice de vegetação para observar biomassa e estresse da cobertura vegetal.", f"Composição de 30 dias até {fim}"),
-            ndvi_s2,
-            {"min": -0.2, "max": 0.9, "palette": ["8b0000", "f97316", "fef08a", "84cc16", "166534"]},
-            [{"id": "sentinel-ndvi-valor", "nome": "NDVI Sentinel-2", "valor": estatistica_media(ndvi_s2, regiao, 20, "NDVI"), "unidade": "índice"}],
+            "sentinel-2",
+            ("Sentinel-2", "Índice NBR para localizar vegetação seca e cicatrizes de queimadas recentes.", f"Composição de 30 dias até {fim}"),
+            nbr_s2,
+            {"min": -0.5, "max": 0.8, "palette": ["7f1d1d", "dc2626", "f97316", "fef08a", "84cc16", "166534"]},
+            [{"id": "sentinel-2-nbr", "nome": "NBR Sentinel-2", "valor": estatistica_media(nbr_s2, regiao, 20, "NBR"), "unidade": "índice"}],
         )
     except Exception as exc:
         erros.append(f"sentinel-2: {str(exc)[:180]}")
 
+    # Landsat 8 e 9: NBR de apoio, com revisitamento menor e resolução de 30 m.
     try:
         landsat = (
             ee.ImageCollection("LANDSAT/LC08/C02/T1_L2")
@@ -206,16 +228,38 @@ def consultar_monitoramento():
             .filter(ee.Filter.lt("CLOUD_COVER", 70))
             .median()
         )
-        ndvi_landsat = landsat.normalizedDifference(["SR_B5", "SR_B4"]).rename("NDVI")
+        nbr_landsat = landsat.normalizedDifference(["SR_B5", "SR_B7"]).rename("NBR")
         adicionar_camadas(
-            "landsat-ndvi",
-            ("Landsat NDVI", "Índice de vegetação de apoio quando o Sentinel-2 estiver coberto por nuvens.", f"Composição de 30 dias até {fim}"),
-            ndvi_landsat,
-            {"min": -0.2, "max": 0.9, "palette": ["8b0000", "f97316", "fef08a", "84cc16", "166534"]},
-            [{"id": "landsat-ndvi-valor", "nome": "NDVI Landsat", "valor": estatistica_media(ndvi_landsat, regiao, 30, "NDVI"), "unidade": "índice"}],
+            "landsat-8-9",
+            ("Landsat 8 e 9", "Índice NBR de apoio para confirmar áreas afetadas quando houver nuvens no Sentinel-2.", f"Composição de 30 dias até {fim}"),
+            nbr_landsat,
+            {"min": -0.5, "max": 0.8, "palette": ["7f1d1d", "dc2626", "f97316", "fef08a", "84cc16", "166534"]},
+            [{"id": "landsat-nbr", "nome": "NBR Landsat 8/9", "valor": estatistica_media(nbr_landsat, regiao, 30, "NBR"), "unidade": "índice"}],
         )
     except Exception as exc:
         erros.append(f"landsat: {str(exc)[:180]}")
+
+    # Sentinel-1: radar funciona à noite e através de nuvens; a retrodispersão
+    # VV é útil para observar mudanças na estrutura e umidade da vegetação.
+    try:
+        sentinel1 = (
+            ee.ImageCollection("COPERNICUS/S1_GRD")
+            .filterDate(inicio_30d, fim)
+            .filterBounds(regiao)
+            .filter(ee.Filter.eq("instrumentMode", "IW"))
+            .filter(ee.Filter.listContains("transmitterReceiverPolarisation", "VV"))
+            .select("VV")
+            .median()
+        )
+        adicionar_camadas(
+            "sentinel-1",
+            ("Sentinel-1", "Radar VV que opera mesmo à noite e sob nuvens para observar mudanças e umidade da vegetação.", f"Composição de 30 dias até {fim}"),
+            sentinel1,
+            {"min": -25, "max": 5, "palette": ["0f172a", "1d4ed8", "38bdf8", "fef08a", "f97316", "7f1d1d"]},
+            [{"id": "sentinel-1-vv", "nome": "Retrodispersão Sentinel-1", "valor": estatistica_media(sentinel1, regiao, 30, "VV"), "unidade": "dB"}],
+        )
+    except Exception as exc:
+        erros.append(f"sentinel-1: {str(exc)[:180]}")
 
     # MCD64A1 confirma cicatrizes de queimadas (não é foco ativo).
     try:

@@ -14,6 +14,8 @@ Required env vars (all set in Replit shared env / secrets):
 - `PORT` — Express server port (set to 5000)
 - `VITE_USE_SUPABASE` — set to `false` (disables Supabase; Express+PostgreSQL is the primary backend)
 - `NODE_ENV` — set to `production`
+- `EARTH_ENGINE_SERVICE_ACCOUNT_JSON` — Secret containing the complete Google Cloud service-account JSON key
+- `EARTH_ENGINE_PROJECT` — optional Earth Engine/Google Cloud project ID; when omitted, uses the `project_id` from the JSON key
 
 ## Stack
 - **Frontend**: React 19 + TypeScript + Vite
@@ -61,6 +63,7 @@ Required env vars (all set in Replit shared env / secrets):
 - DB tables auto-created on server startup — no separate migration step needed on Replit
 - Production: `npm run build && node server/index.js` — Express serves built `/dist`
 - Push notifications require `VAPID_PRIVATE_KEY` secret to be set in Replit secrets
+- Earth Engine requires the service account to have Earth Engine access and the `Service Usage Consumer` role on the Google Cloud project
 
 ## Pointers
 - DB schema: `server/index.js` → `initDb()` function

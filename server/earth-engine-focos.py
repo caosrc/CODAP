@@ -5,15 +5,47 @@ import datetime
 import json
 import os
 import sys
+import tempfile
 
 import ee
 
 
-PROJECT_ID = os.environ.get("EARTH_ENGINE_PROJECT", "studio-6342191983-7ea1e")
+def inicializar_earth_engine():
+    """Inicializa o EE com a conta de serviço configurada no Secret do Replit."""
+    chave_json = os.environ.get("EARTH_ENGINE_SERVICE_ACCOUNT_JSON", "").strip()
+    if not chave_json:
+        project_id = os.environ.get("EARTH_ENGINE_PROJECT", "studio-6342191983-7ea1e")
+        ee.Initialize(project=project_id)
+        return project_id
+
+    try:
+        dados = json.loads(chave_json)
+        email = dados["client_email"]
+        project_id = os.environ.get("EARTH_ENGINE_PROJECT") or dados["project_id"]
+        arquivo = tempfile.NamedTemporaryFile(
+            mode="w", suffix=".json", prefix="ee-key-", delete=False
+        )
+        try:
+            json.dump(dados, arquivo)
+            arquivo.close()
+            os.chmod(arquivo.name, 0o600)
+            credenciais = ee.ServiceAccountCredentials(email, arquivo.name)
+            ee.Initialize(credentials=credenciais, project=project_id)
+            return project_id
+        finally:
+            try:
+                os.unlink(arquivo.name)
+            except OSError:
+                pass
+    except (json.JSONDecodeError, KeyError) as exc:
+        raise RuntimeError(
+            "EARTH_ENGINE_SERVICE_ACCOUNT_JSON inválido: "
+            "use o conteúdo completo da chave JSON"
+        ) from exc
 
 
 def main():
-    ee.Initialize(project=PROJECT_ID)
+    project_id = inicializar_earth_engine()
 
     hoje = datetime.datetime.now(datetime.timezone.utc).date()
     data_fim = hoje.strftime("%Y-%m-%d")
@@ -74,6 +106,7 @@ def main():
     print(json.dumps({
         "focos": focos,
         "fonte": "EARTH-ENGINE-MODIS",
+        "projeto": project_id,
         "periodo": {"inicio": data_inicio, "fim": data_fim},
     }))
 

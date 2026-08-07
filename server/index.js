@@ -10,9 +10,16 @@ import { existsSync, readFileSync, readdirSync } from 'fs'
 import { createServer } from 'http'
 import { WebSocketServer } from 'ws'
 import { createClient as createSupabaseClient } from '@supabase/supabase-js'
+import { execFile } from 'child_process'
+import { promisify } from 'util'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
+const execFileAsync = promisify(execFile)
+const pythonBin = process.env.PYTHON_BIN
+  || (existsSync(join(__dirname, '..', '.pythonlibs', 'bin', 'python'))
+    ? join(__dirname, '..', '.pythonlibs', 'bin', 'python')
+    : 'python3')
 
 // ── PostgreSQL — usa Supabase se SUPABASE_DB_URL estiver definido ──────────
 const dbUrl = process.env.SUPABASE_DB_URL || process.env.DATABASE_URL
@@ -1306,8 +1313,10 @@ app.get('/api/health', (req, res) => res.json({ ok: true }))
 //   Polar → TTL 25 min (VIIRS + MODIS, sobrevoo ~2×/dia — não muda tão rápido)
 let goesCache  = { data: null, ts: 0 }
 let polarCache = { data: null, ts: 0 }
+let earthEngineCache = { data: null, ts: 0 }
 const GOES_TTL  = 5  * 60 * 1000   //  5 min
 const POLAR_TTL = 25 * 60 * 1000   // 25 min
+const EARTH_ENGINE_TTL = 25 * 60 * 1000
 
 // Polígono oficial do município de Ouro Branco - MG (IBGE 3145901)
 // Fonte: servicodados.ibge.gov.br — resolução 5 (29 vértices)
@@ -1403,11 +1412,66 @@ function deduplicarFocos(focos) {
   return out
 }
 
+async function buscarFocosEarthEngine() {
+  if (!process.env.EARTH_ENGINE_SERVICE_ACCOUNT_JSON) {
+    return { configurado: false, erro: 'EARTH_ENGINE_SERVICE_ACCOUNT_JSON não configurada' }
+  }
+
+  const agora = Date.now()
+  if (earthEngineCache.data && agora - earthEngineCache.ts < EARTH_ENGINE_TTL) {
+    return { ...earthEngineCache.data, cache: 'hit' }
+  }
+
+  try {
+    const { stdout } = await execFileAsync(
+      pythonBin,
+      [join(__dirname, 'earth-engine-focos.py')],
+      {
+        env: process.env,
+        timeout: 30000,
+        maxBuffer: 2 * 1024 * 1024,
+      },
+    )
+    const dados = JSON.parse(stdout)
+    const resultado = {
+      focos: Array.isArray(dados.focos)
+        ? dados.focos.filter(f => pontoNoCidade(f.lat, f.lng))
+        : [],
+      fonte: 'EARTH-ENGINE-MODIS',
+      projeto: dados.projeto || null,
+      periodo: dados.periodo || null,
+      configurado: true,
+    }
+    earthEngineCache = { data: resultado, ts: agora }
+    return resultado
+  } catch (e) {
+    const detalhe = e?.stderr?.trim() || e?.message || 'falha desconhecida'
+    console.warn('[earth-engine] consulta falhou:', detalhe)
+    return { configurado: false, erro: detalhe }
+  }
+}
+
 app.get('/api/focos-incendio', async (_req, res) => {
   try {
     const firmsKey = process.env.FIRMS_MAP_KEY
+    const earthEngine = await buscarFocosEarthEngine()
+    const earthEngineFocos = earthEngine.focos || []
+    const earthEngineFontes = earthEngine.configurado ? [earthEngine.fonte] : []
+
     if (!firmsKey) {
-      return res.json({ focos: [], configurado: false, fontes: [], msg: 'FIRMS_MAP_KEY não configurada' })
+      return res.json({
+        focos: earthEngineFocos,
+        configurado: earthEngine.configurado,
+        fontes: earthEngineFontes,
+        fontesMonitoramento: {
+          firms: false,
+          earthEngine: {
+            configurado: earthEngine.configurado,
+            erro: earthEngine.erro || null,
+          },
+        },
+        msg: 'FIRMS_MAP_KEY não configurada',
+      })
     }
 
     const now = Date.now()
@@ -1416,12 +1480,27 @@ app.get('/api/focos-incendio', async (_req, res) => {
 
     // Cache duplo: se ambos válidos → retorna imediatamente sem chamar NASA
     if (goesOk && polarOk) {
-      const focos = deduplicarFocos([...polarCache.data.focos, ...goesCache.data.focos])
+      const focos = deduplicarFocos([
+        ...polarCache.data.focos,
+        ...goesCache.data.focos,
+        ...earthEngineFocos,
+      ])
       return res.json({
         focos,
         configurado: true,
-        fontes: [...polarCache.data.fontes, ...goesCache.data.fontes],
+        fontes: [...new Set([
+          ...polarCache.data.fontes,
+          ...goesCache.data.fontes,
+          ...earthEngineFontes,
+        ])],
         atualizadoEm: goesCache.data.atualizadoEm,
+        fontesMonitoramento: {
+          firms: true,
+          earthEngine: {
+            configurado: earthEngine.configurado,
+            erro: earthEngine.erro || null,
+          },
+        },
         cache: 'hit',
       })
     }
@@ -1474,10 +1553,12 @@ app.get('/api/focos-incendio', async (_req, res) => {
     const allFocos = [
       ...(polarCache.data?.focos || []),
       ...(goesCache.data?.focos  || []),
+      ...earthEngineFocos,
     ]
     const allFontes = [
       ...(polarCache.data?.fontes || []),
       ...(goesCache.data?.fontes  || []),
+      ...earthEngineFontes,
     ]
     const focos = deduplicarFocos(allFocos)
     const atualizadoEm = new Date().toISOString()
@@ -1485,7 +1566,19 @@ app.get('/api/focos-incendio', async (_req, res) => {
     console.log(
       `[focos-incendio] SNPP:${brutos['VIIRS-SNPP']??'-'} N20:${brutos['VIIRS-N20']??'-'} N21:${brutos['VIIRS-N21']??'-'} MODIS:${brutos['MODIS']??'-'} GOES:${brutos['GOES']??'-'} → Ouro Branco: ${focos.length}`
     )
-    res.json({ focos, configurado: true, fontes: allFontes, atualizadoEm })
+    res.json({
+      focos,
+      configurado: true,
+      fontes: [...new Set(allFontes)],
+      atualizadoEm,
+      fontesMonitoramento: {
+        firms: true,
+        earthEngine: {
+          configurado: earthEngine.configurado,
+          erro: earthEngine.erro || null,
+        },
+      },
+    })
   } catch (e) {
     console.warn('[focos-incendio]', e?.message)
     res.status(502).json({ focos: [], configurado: true, fontes: [], erro: e?.message })

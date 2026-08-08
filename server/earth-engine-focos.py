@@ -178,7 +178,7 @@ def consultar_monitoramento():
     # revisita o mesmo ponto diariamente.
     try:
         ecostress = (
-            ee.ImageCollection("NASA/ECOSTRESS/L2_LSTE/002")
+            ee.ImageCollection("NASA/ECOSTRESS/L2T_LSTE/V2")
             .filterDate((hoje - datetime.timedelta(days=90)).strftime("%Y-%m-%d"), fim)
             .filterBounds(regiao)
             .select("LST")

@@ -1439,7 +1439,7 @@ async function buscarFocosEarthEngine() {
       focos: Array.isArray(dados.focos)
         ? dados.focos.filter(f => pontoNoCidade(f.lat, f.lng))
         : [],
-      fonte: 'EARTH-ENGINE-MODIS',
+      fonte: 'EARTH-ENGINE-MULTISATELITE',
       projeto: dados.projeto || null,
       periodo: dados.periodo || null,
       configurado: true,

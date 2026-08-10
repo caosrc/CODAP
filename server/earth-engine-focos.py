@@ -82,255 +82,62 @@ def estatistica_media(imagem, regiao, escala=1000, banda=None, multiplicador=1):
         return None
 
 
-def consultar_monitoramento():
-    """Monta camadas úteis para prevenção e confirmação de incêndios.
+SATELITES_FOGO = [
+    {
+        "id": "modis-terra-fire",
+        "nome": "MODIS Terra",
+        "satelite": "MODIS Terra",
+        "colecao": "MODIS/061/MOD14A1",
+        "escala": 1000,
+    },
+    {
+        "id": "modis-aqua-fire",
+        "nome": "MODIS Aqua",
+        "satelite": "MODIS Aqua",
+        "colecao": "MODIS/061/MYD14A1",
+        "escala": 1000,
+    },
+    {
+        "id": "viirs-fire",
+        "nome": "VIIRS Suomi-NPP",
+        "satelite": "VIIRS Suomi-NPP",
+        "colecao": "NOAA/VIIRS/001/VNP14A1",
+        "escala": 375,
+    },
+]
 
-    Cada dataset é isolado para que uma indisponibilidade no catálogo não
-    esconda os demais indicadores. As URLs retornadas são tiles temporários
-    assinados pelo Earth Engine e não expõem a chave da conta de serviço.
+
+def imagem_fogo_ativo(config, regiao, inicio, fim):
+    """Retorna a maior máscara de fogo ativo no período selecionado.
+
+    FireMask 7, 8 e 9 são os pixels classificados como fogo provável/ativo.
+    Os valores menores ficam ocultos para não transformar calor residual em
+    alerta de incêndio.
     """
-    project_id = inicializar_earth_engine()
-    regiao = obter_municipio()
-    hoje = datetime.datetime.now(datetime.timezone.utc).date()
-    fim = hoje.strftime("%Y-%m-%d")
-    inicio_5d = (hoje - datetime.timedelta(days=5)).strftime("%Y-%m-%d")
-    inicio_30d = (hoje - datetime.timedelta(days=30)).strftime("%Y-%m-%d")
-    camadas = []
-    indicadores = []
-    erros = []
-
-    def adicionar_camadas(nome, descricao, imagem, vis_params, estatisticas=None):
-        try:
-            url = gerar_url_tiles(imagem, vis_params)
-            camadas.append({
-                "id": nome,
-                "nome": descricao[0],
-                "descricao": descricao[1],
-                "url": url,
-                "periodo": descricao[2],
-            })
-            if estatisticas:
-                indicadores.extend(estatisticas)
-        except Exception as exc:
-            erros.append(f"{nome}: {str(exc)[:180]}")
-
-    # MODIS Fire: detecção de fogo ativo e confirmação territorial.
-    try:
-        modis = (
-            ee.ImageCollection("MODIS/061/MOD14A1")
-            .filterDate(inicio_5d, fim)
-            .filterBounds(regiao)
-            .select("FireMask")
-            .max()
-        )
-        adicionar_camadas(
-            "modis-fire",
-            ("MODIS Fire", "Detecção de fogo ativo para confirmar focos térmicos de menor resolução.", f"Últimos 5 dias até {fim}"),
-            modis,
-            {"min": 0, "max": 9, "palette": ["000000", "fef3c7", "f97316", "dc2626", "7f1d1d"]},
-            [{"id": "modis-mask", "nome": "Intensidade MODIS", "valor": estatistica_media(modis, regiao, 1000, "FireMask"), "unidade": "escala 0–9"}],
-        )
-    except Exception as exc:
-        erros.append(f"modis: {str(exc)[:180]}")
-
-    # CHIRPS e ERA5-Land ajudam a explicar risco de propagação e estiagem.
-    try:
-        chirps = (
-            ee.ImageCollection("UCSB-CHG/CHIRPS/DAILY")
-            .filterDate(inicio_30d, fim)
-            .filterBounds(regiao)
-            .select("precipitation")
-            .sum()
-        )
-        adicionar_camadas(
-            "chirps",
-            ("Chuva CHIRPS", "Precipitação acumulada para identificar áreas secas e úmidas.", f"Acumulado de 30 dias até {fim}"),
-            chirps,
-            {"min": 0, "max": 180, "palette": ["7f1d1d", "f97316", "facc15", "86efac", "2563eb"]},
-            [{"id": "chirps-chuva", "nome": "Chuva CHIRPS", "valor": estatistica_media(chirps, regiao, 5000, "precipitation"), "unidade": "mm / 30 dias"}],
-        )
-    except Exception as exc:
-        erros.append(f"chirps: {str(exc)[:180]}")
-
-    try:
-        era5 = (
-            ee.ImageCollection("ECMWF/ERA5_LAND/DAILY_AGGR")
-            .filterDate(inicio_30d, fim)
-            .filterBounds(regiao)
-        )
-        chuva_era5 = era5.select("total_precipitation_sum").sum()
-        temp_era5 = era5.select("temperature_2m").mean().subtract(273.15)
-        adicionar_camadas(
-            "era5",
-            ("ERA5-Land: umidade e temperatura", "Reanálise meteorológica para indicar estresse térmico e condições de propagação.", f"Média/acumulado de 30 dias até {fim}"),
-            temp_era5,
-            {"min": 15, "max": 38, "palette": ["2563eb", "67e8f9", "fef08a", "fb923c", "dc2626"]},
-            [
-                {"id": "era5-temperatura", "nome": "Temperatura ERA5", "valor": estatistica_media(temp_era5, regiao, 10000), "unidade": "°C"},
-                {"id": "era5-chuva", "nome": "Chuva ERA5", "valor": estatistica_media(chuva_era5, regiao, 10000, "total_precipitation_sum", 1000), "unidade": "mm / 30 dias"},
-            ],
-        )
-    except Exception as exc:
-        erros.append(f"era5: {str(exc)[:180]}")
-
-    # ECOSTRESS: temperatura da superfície, útil para localizar anomalias
-    # térmicas e estresse de calor. A janela é maior porque o sensor não
-    # revisita o mesmo ponto diariamente.
-    try:
-        ecostress = (
-            ee.ImageCollection("NASA/ECOSTRESS/L2T_LSTE/V2")
-            .filterDate((hoje - datetime.timedelta(days=90)).strftime("%Y-%m-%d"), fim)
-            .filterBounds(regiao)
-            .select("LST")
-            .median()
-            .multiply(0.02)
-            .subtract(273.15)
-            .rename("LST_C")
-        )
-        adicionar_camadas(
-            "ecostress",
-            ("ECOSTRESS", "Temperatura da superfície para identificar anomalias de calor e estresse hídrico.", f"Composição de 90 dias até {fim}"),
-            ecostress,
-            {"min": 15, "max": 55, "palette": ["2563eb", "67e8f9", "fef08a", "fb923c", "dc2626", "7f1d1d"]},
-            [{"id": "ecostress-lst", "nome": "Temperatura ECOSTRESS", "valor": estatistica_media(ecostress, regiao, 70, "LST_C"), "unidade": "°C"}],
-        )
-    except Exception as exc:
-        erros.append(f"ecostress: {str(exc)[:180]}")
-
-    # Sentinel-2: o NBR destaca áreas com vegetação seca e cicatrizes recentes
-    # com resolução de 10–20 m. A composição mediana reduz o efeito de nuvens.
-    try:
-        sentinel = (
-            ee.ImageCollection("COPERNICUS/S2_SR_HARMONIZED")
-            .filterDate(inicio_30d, fim)
-            .filterBounds(regiao)
-            .filter(ee.Filter.lt("CLOUDY_PIXEL_PERCENTAGE", 60))
-            .median()
-        )
-        nbr_s2 = sentinel.normalizedDifference(["B8", "B12"]).rename("NBR")
-        adicionar_camadas(
-            "sentinel-2",
-            ("Sentinel-2", "Índice NBR para localizar vegetação seca e cicatrizes de queimadas recentes.", f"Composição de 30 dias até {fim}"),
-            nbr_s2,
-            {"min": -0.5, "max": 0.8, "palette": ["7f1d1d", "dc2626", "f97316", "fef08a", "84cc16", "166534"]},
-            [{"id": "sentinel-2-nbr", "nome": "NBR Sentinel-2", "valor": estatistica_media(nbr_s2, regiao, 20, "NBR"), "unidade": "índice"}],
-        )
-    except Exception as exc:
-        erros.append(f"sentinel-2: {str(exc)[:180]}")
-
-    # Landsat 8 e 9: NBR de apoio, com revisitamento menor e resolução de 30 m.
-    try:
-        landsat = (
-            ee.ImageCollection("LANDSAT/LC08/C02/T1_L2")
-            .merge(ee.ImageCollection("LANDSAT/LC09/C02/T1_L2"))
-            .filterDate(inicio_30d, fim)
-            .filterBounds(regiao)
-            .filter(ee.Filter.lt("CLOUD_COVER", 70))
-            .median()
-        )
-        nbr_landsat = landsat.normalizedDifference(["SR_B5", "SR_B7"]).rename("NBR")
-        adicionar_camadas(
-            "landsat-8-9",
-            ("Landsat 8 e 9", "Índice NBR de apoio para confirmar áreas afetadas quando houver nuvens no Sentinel-2.", f"Composição de 30 dias até {fim}"),
-            nbr_landsat,
-            {"min": -0.5, "max": 0.8, "palette": ["7f1d1d", "dc2626", "f97316", "fef08a", "84cc16", "166534"]},
-            [{"id": "landsat-nbr", "nome": "NBR Landsat 8/9", "valor": estatistica_media(nbr_landsat, regiao, 30, "NBR"), "unidade": "índice"}],
-        )
-    except Exception as exc:
-        erros.append(f"landsat: {str(exc)[:180]}")
-
-    # Sentinel-1: radar funciona à noite e através de nuvens; a retrodispersão
-    # VV é útil para observar mudanças na estrutura e umidade da vegetação.
-    try:
-        sentinel1 = (
-            ee.ImageCollection("COPERNICUS/S1_GRD")
-            .filterDate(inicio_30d, fim)
-            .filterBounds(regiao)
-            .filter(ee.Filter.eq("instrumentMode", "IW"))
-            .filter(ee.Filter.listContains("transmitterReceiverPolarisation", "VV"))
-            .select("VV")
-            .median()
-        )
-        adicionar_camadas(
-            "sentinel-1",
-            ("Sentinel-1", "Radar VV que opera mesmo à noite e sob nuvens para observar mudanças e umidade da vegetação.", f"Composição de 30 dias até {fim}"),
-            sentinel1,
-            {"min": -25, "max": 5, "palette": ["0f172a", "1d4ed8", "38bdf8", "fef08a", "f97316", "7f1d1d"]},
-            [{"id": "sentinel-1-vv", "nome": "Retrodispersão Sentinel-1", "valor": estatistica_media(sentinel1, regiao, 30, "VV"), "unidade": "dB"}],
-        )
-    except Exception as exc:
-        erros.append(f"sentinel-1: {str(exc)[:180]}")
-
-    # MCD64A1 confirma cicatrizes de queimadas (não é foco ativo).
-    try:
-        queimadas = (
-            ee.ImageCollection("MODIS/061/MCD64A1")
-            .filterDate((hoje - datetime.timedelta(days=365)).strftime("%Y-%m-%d"), fim)
-            .filterBounds(regiao)
-            .select("BurnDate")
-            .max()
-        )
-        adicionar_camadas(
-            "area-queimada",
-            ("Área queimada MODIS", "Cicatrizes de queimadas detectadas no último ano; não representa fogo ativo.", f"Últimos 12 meses até {fim}"),
-            queimadas,
-            {"min": 1, "max": 366, "palette": ["fee2e2", "f97316", "dc2626", "7f1d1d"]},
-        )
-    except Exception as exc:
-        erros.append(f"area-queimada: {str(exc)[:180]}")
-
-    return {
-        "camadas": camadas,
-        "indicadores": [i for i in indicadores if i.get("valor") is not None],
-        "erros": erros,
-        "projeto": project_id,
-        "atualizadoEm": datetime.datetime.now(datetime.timezone.utc).isoformat(),
-        "periodo": {"inicio": inicio_30d, "fim": fim},
-    }
-
-
-def main():
-    project_id = inicializar_earth_engine()
-
-    if len(sys.argv) > 1 and sys.argv[1] == "monitoramento":
-        print(json.dumps(consultar_monitoramento()))
-        return
-
-    hoje = datetime.datetime.now(datetime.timezone.utc).date()
-    data_fim = hoje.strftime("%Y-%m-%d")
-    data_inicio = (hoje - datetime.timedelta(days=2)).strftime("%Y-%m-%d")
-
-    ouro_branco = ee.FeatureCollection([ee.Feature(obter_municipio())])
-
-    imagens = (
-        ee.ImageCollection("MODIS/006/MOD14A1")
-        .filterDate(data_inicio, data_fim)
-        .filterBounds(ouro_branco.geometry())
+    return (
+        ee.ImageCollection(config["colecao"])
+        .filterDate(inicio, fim)
+        .filterBounds(regiao)
+        .select("FireMask")
+        .max()
     )
 
-    if imagens.size().getInfo() == 0:
-        print(json.dumps({
-            "focos": [],
-            "fonte": "EARTH-ENGINE-MODIS",
-            "periodo": {"inicio": data_inicio, "fim": data_fim},
-        }))
-        return
 
-    mascara_fogo = imagens.mosaic().select("FireMask").gte(7)
-    pontos = mascara_fogo.reduceToVectors(
-        geometry=ouro_branco.geometry(),
-        scale=1000,
-        geometryType="point",
-        labelProperty="fogo",
+def extrair_focos(imagem, regiao, config, data_fim):
+    """Converte pixels de fogo ativo em pontos para os marcadores do mapa."""
+    mascara = imagem.gte(7).selfMask()
+    pontos = mascara.reduceToVectors(
+        geometry=regiao,
+        scale=config["escala"],
+        geometryType="centroid",
+        reducer=ee.Reducer.countEvery(),
         bestEffort=True,
         maxPixels=100000000,
     )
     resultado = pontos.getInfo()
     focos = []
-
     for feature in resultado.get("features", []):
-        geometry = feature.get("geometry") or {}
-        coords = geometry.get("coordinates") or []
+        coords = (feature.get("geometry") or {}).get("coordinates") or []
         if len(coords) < 2:
             continue
         focos.append({
@@ -340,15 +147,87 @@ def main():
             "frp": 0,
             "data": data_fim,
             "hora": "",
-            "satelite": "MODIS",
-            "fonte": "EARTH-ENGINE-MODIS",
+            "satelite": config["satelite"],
+            "fonte": f"EARTH-ENGINE-{config['id'].upper()}",
         })
+    return focos
 
-    print(json.dumps({
+
+def consultar_monitoramento():
+    """Consulta exclusivamente detecção de incêndio ativo no Earth Engine.
+
+    As camadas são assinadas pelo Earth Engine e exibem somente FireMask >= 7
+    de MODIS Terra, MODIS Aqua e VIIRS. Não são incluídos chuva, vegetação,
+    radar ou cicatriz de queimadas, pois eles não representam fogo ativo.
+    """
+    project_id = inicializar_earth_engine()
+    regiao = obter_municipio()
+    hoje = datetime.datetime.now(datetime.timezone.utc).date()
+    fim = hoje.strftime("%Y-%m-%d")
+    inicio = (hoje - datetime.timedelta(days=3)).strftime("%Y-%m-%d")
+    camadas = []
+    indicadores = []
+    focos = []
+    erros = []
+
+    for config in SATELITES_FOGO:
+        try:
+            imagem = imagem_fogo_ativo(config, regiao, inicio, fim)
+            mascara = imagem.gte(7).selfMask()
+            url = gerar_url_tiles(
+                mascara,
+                {"min": 7, "max": 9, "palette": ["fef08a", "f97316", "dc2626"]},
+            )
+            focos_sat = extrair_focos(imagem, regiao, config, fim)
+            focos.extend(focos_sat)
+            camadas.append({
+                "id": config["id"],
+                "nome": config["nome"],
+                "descricao": f"Focos de fogo ativo detectados pelo {config['nome']}.",
+                "url": url,
+                "periodo": f"Últimos 3 dias até {fim}",
+            })
+            indicadores.append({
+                "id": f"{config['id']}-total",
+                "nome": f"Focos {config['nome']}",
+                "valor": len(focos_sat),
+                "unidade": "detecção(ões)",
+            })
+        except Exception as exc:
+            erros.append(f"{config['nome']}: {str(exc)[:180]}")
+
+    return {
+        "camadas": camadas,
         "focos": focos,
-        "fonte": "EARTH-ENGINE-MODIS",
+        "indicadores": indicadores,
+        "erros": erros,
         "projeto": project_id,
-        "periodo": {"inicio": data_inicio, "fim": data_fim},
+        "atualizadoEm": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+        "periodo": {"inicio": inicio, "fim": fim},
+    }
+
+
+def consultar_focos_ativos():
+    """Consulta pontos de fogo ativo sem gerar as URLs de visualização."""
+    resultado = consultar_monitoramento()
+    return {
+        "focos": resultado["focos"],
+        "projeto": resultado["projeto"],
+        "periodo": resultado["periodo"],
+    }
+
+
+def main():
+    if len(sys.argv) > 1 and sys.argv[1] == "monitoramento":
+        print(json.dumps(consultar_monitoramento()))
+        return
+
+    resultado = consultar_focos_ativos()
+    print(json.dumps({
+        "focos": resultado["focos"],
+        "fonte": "EARTH-ENGINE-MULTISATELITE",
+        "projeto": resultado["projeto"],
+        "periodo": resultado["periodo"],
     }))
 
 

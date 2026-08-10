@@ -38,7 +38,7 @@ interface FocoIncendio {
   data: string
   hora: string
   satelite: string
-  fonte: string       // 'VIIRS' | 'GOES' | 'EARTH-ENGINE-MODIS'
+  fonte: string       // FIRMS ou EARTH-ENGINE-MULTISATELITE
 }
 
 interface CamadaMonitoramento {
@@ -51,38 +51,24 @@ interface CamadaMonitoramento {
 
 const FERRAMENTAS_SATELITE: CamadaMonitoramento[] = [
   {
-    id: 'ecostress',
-    nome: 'ECOSTRESS',
-    descricao: 'Temperatura da superfície para localizar anomalias de calor e estresse hídrico.',
-    periodo: 'Composição de 90 dias',
+    id: 'modis-terra-fire',
+    nome: 'MODIS Terra',
+    descricao: 'Focos de fogo ativo detectados pelo MODIS Terra.',
+    periodo: 'Últimos 3 dias',
     url: null,
   },
   {
-    id: 'sentinel-2',
-    nome: 'Sentinel-2',
-    descricao: 'Índice NBR para observar vegetação seca e cicatrizes recentes de queimadas.',
-    periodo: 'Composição de 30 dias',
+    id: 'modis-aqua-fire',
+    nome: 'MODIS Aqua',
+    descricao: 'Focos de fogo ativo detectados pelo MODIS Aqua.',
+    periodo: 'Últimos 3 dias',
     url: null,
   },
   {
-    id: 'landsat-8-9',
-    nome: 'Landsat 8 e 9',
-    descricao: 'Índice NBR de apoio para confirmar áreas afetadas quando houver nuvens.',
-    periodo: 'Composição de 30 dias',
-    url: null,
-  },
-  {
-    id: 'sentinel-1',
-    nome: 'Sentinel-1',
-    descricao: 'Radar que funciona à noite e sob nuvens para observar mudanças e umidade.',
-    periodo: 'Composição de 30 dias',
-    url: null,
-  },
-  {
-    id: 'modis-fire',
-    nome: 'MODIS Fire',
-    descricao: 'Detecção de fogo ativo para confirmar focos térmicos de menor resolução.',
-    periodo: 'Últimos 5 dias',
+    id: 'viirs-fire',
+    nome: 'VIIRS Suomi-NPP',
+    descricao: 'Focos de fogo ativo detectados pelo VIIRS, com maior resolução espacial.',
+    periodo: 'Últimos 3 dias',
     url: null,
   },
 ]
@@ -505,7 +491,7 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
   const [climaCarregando, setClimaCarregando] = useState(false)
   const [climaAberto, setClimaAberto] = useState(false)
 
-  // Focos de incêndio (NASA FIRMS — VIIRS + GOES-16)
+  // Focos de incêndio (NASA FIRMS + Earth Engine — somente fogo ativo)
   const [focosIncendio, setFocosIncendio] = useState<FocoIncendio[]>([])
   const [mostrarFocos, setMostrarFocos] = useState(true)
   const [focosConfigurado, setFocosConfigurado] = useState<boolean | null>(null)
@@ -592,7 +578,7 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
     return () => clearInterval(intervalo)
   }, [buscarClima])
 
-  // ── Focos de Incêndio (NASA FIRMS — VIIRS + GOES-16) ───────────
+  // ── Focos de Incêndio (NASA FIRMS + Earth Engine) ─────────────
   const buscarFocos = useCallback(async () => {
     try {
       const focosUrl = import.meta.env.VITE_FOCOS_API_URL || '/api/focos-incendio'
@@ -645,7 +631,7 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
   const comGeo = useMemo(() => ocorrencias.filter((o) => o.lat && o.lng), [ocorrencias])
   const semGeo = ocorrencias.length - comGeo.length
 
-  // Mantém as cinco ferramentas solicitadas visíveis mesmo quando o Earth
+  // Mantém as ferramentas de fogo visíveis mesmo quando o Earth
   // Engine ainda não está autenticado. As URLs reais substituem o catálogo
   // assim que o endpoint retorna as camadas assinadas.
   const camadasMonitoramento = useMemo(() => {
@@ -1339,10 +1325,11 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
 
         {destino && <FocoDestino destino={destino} rota={rota} />}
 
-        {/* Focos de incêndio — NASA FIRMS (VIIRS + GOES-16) */}
+         {/* Focos de incêndio — FIRMS + Earth Engine (somente fogo ativo) */}
         {mostrarFocos && focosIncendio.map((f, i) => {
-          const isGoes = f.fonte === 'GOES'
-          const corTitulo = isGoes ? '#b45309' : '#dc2626'
+           const isGoes = f.fonte === 'GOES'
+           const isEarthEngine = f.fonte.startsWith('EARTH-ENGINE-')
+           const corTitulo = isGoes ? '#b45309' : isEarthEngine ? '#7c2d12' : '#dc2626'
           return (
             <Marker
               key={`fogo-${i}`}
@@ -1358,10 +1345,10 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
                   <div style={{ fontSize: '0.72rem', background: isGoes ? '#fef3c7' : '#fee2e2',
                     color: isGoes ? '#92400e' : '#991b1b', borderRadius: 5, padding: '2px 7px',
                     display: 'inline-block', marginBottom: 6, fontWeight: 600 }}>
-                    {isGoes
+                     {isGoes
                       ? '🛰️ GOES-16 — a cada 10 min'
-                      : f.fonte === 'EARTH-ENGINE-MODIS'
-                        ? '🛰️ MODIS / Earth Engine — confirmação territorial'
+                       : isEarthEngine
+                         ? `🛰️ ${f.satelite || 'Multissatélite'} / Earth Engine — fogo ativo`
                         : `🛰️ ${f.satelite || 'VIIRS'} — detecção térmica`}
                   </div>
                   <div style={{ fontSize: '0.78rem', color: '#374151', marginBottom: 3 }}>
@@ -1591,7 +1578,7 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
         <button
           className={`mapa-camada-btn mapa-monitoramento-btn ${painelMonitoramentoAberto ? 'ativo' : ''} ${camadaMonitoramento ? 'camada-ativa' : ''}`}
           onClick={() => setPainelMonitoramentoAberto(v => !v)}
-          title="Camadas para detecção de incêndio: ECOSTRESS, Sentinel-1/2, Landsat 8/9 e MODIS Fire"
+           title="Camadas de fogo ativo: MODIS Terra, MODIS Aqua e VIIRS"
         >
           🛰️ Satélites{monitoramentoCarregando ? ' …' : ''}
         </button>
@@ -1620,15 +1607,14 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
           <>
             {monitoramentoEE?.configurado && (
               <p className="mapa-monitoramento-ajuda">
-                Selecione uma camada para sobrepor ao mapa. Combine detecção térmica,
-                radar, temperatura, vegetação seca e cicatrizes de queimadas para investigar
-                possíveis incêndios.
+                 Selecione uma camada para sobrepor ao mapa. Todas as camadas abaixo
+                 representam somente detecções de fogo ativo no município.
               </p>
             )}
             {monitoramentoEE?.configurado && (
               <div className="mapa-monitoramento-fontes">
                 <span>🔥 Focos ativos</span>
-                <strong>{focosMonitoramento?.firms ? 'VIIRS + MODIS · NASA FIRMS' : 'MODIS Fire · Earth Engine'} </strong>
+                <strong>{focosMonitoramento?.firms ? 'VIIRS + MODIS + GOES · NASA FIRMS' : 'MODIS + VIIRS · Earth Engine'} </strong>
                 {!focosMonitoramento?.firms && <small>VIIRS FIRMS será ativado ao configurar a chave NASA.</small>}
               </div>
             )}
@@ -1641,15 +1627,7 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
                     title={camada.descricao}
                   >
                     <span>{
-                      camada.id === 'modis-fire' ? '🔥'
-                        : camada.id === 'ecostress' ? '🌡️'
-                          : camada.id === 'sentinel-1' ? '📡'
-                            : camada.id === 'sentinel-2' ? '🌿'
-                              : camada.id === 'landsat-8-9' ? '🛰️'
-                                : camada.id === 'chirps' ? '🌧️'
-                                  : camada.id === 'era5' ? '🌡️'
-                                    : camada.id === 'area-queimada' ? '🟤'
-                                      : '🌍'
+                      camada.id.includes('modis') || camada.id.includes('viirs') ? '🔥' : '🛰️'
                     }</span>
                     <span>
                       <strong>{camada.nome}</strong>

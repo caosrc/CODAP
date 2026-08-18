@@ -48,9 +48,7 @@ exports.handler = async () => {
 
     const hoje = new Date();
     const fim = hoje.toISOString().slice(0, 10);
-    const inicio = new Date(
-      hoje.getTime() - 60 * 24 * 60 * 60 * 1000
-    ).toISOString().slice(0, 10);
+    const inicio = fim;
 
     const colecoes = [
       {
@@ -145,7 +143,7 @@ exports.handler = async () => {
         nome: config.nome,
         descricao: `Focos de fogo ativo detectados pelo ${config.nome}.`,
         url: mapa.urlFormat,
-        periodo: `Últimos 60 dias até ${fim}`,
+        periodo: `Somente hoje — ${fim}`,
         imagens: quantidade,
       });
 

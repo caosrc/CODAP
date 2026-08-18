@@ -3,5 +3,5 @@
 /api/focos-incendio  /.netlify/functions/focos-incendio  200!
 /api/send-sos-push  /.netlify/functions/send-sos-push  200!
 
-# SPA — toda rota desconhecida cai no index.html
+# SPA
 /*  /index.html  200

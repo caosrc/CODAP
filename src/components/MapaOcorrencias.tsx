@@ -1330,11 +1330,12 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
 
         {destino && <FocoDestino destino={destino} rota={rota} />}
 
-         {/* Focos de incêndio — FIRMS + Earth Engine (somente fogo ativo) */}
+        {/* Focos de incêndio — NASA FIRMS + Earth Engine (fogo ativo) */}
         {mostrarFocos && focosIncendio.map((f, i) => {
-           const isGoes = f.fonte === 'GOES'
-           const isEarthEngine = f.fonte.startsWith('EARTH-ENGINE-')
-           const corTitulo = isGoes ? '#b45309' : isEarthEngine ? '#7c2d12' : '#dc2626'
+          const fonte = f.fonte || ''
+          const isGoes = fonte === 'GOES'
+          const isEarthEngine = fonte.startsWith('EARTH-ENGINE-')
+          const corTitulo = isGoes ? '#b45309' : isEarthEngine ? '#7c2d12' : '#dc2626'
           return (
             <Marker
               key={`fogo-${i}`}
@@ -1350,11 +1351,9 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
                   <div style={{ fontSize: '0.72rem', background: isGoes ? '#fef3c7' : '#fee2e2',
                     color: isGoes ? '#92400e' : '#991b1b', borderRadius: 5, padding: '2px 7px',
                     display: 'inline-block', marginBottom: 6, fontWeight: 600 }}>
-                     {isGoes
-                      ? '🛰️ GOES-16 — a cada 10 min'
-                       : isEarthEngine
-                         ? `🛰️ ${f.satelite || 'Multissatélite'} / Earth Engine — fogo ativo`
-                        : `🛰️ ${f.satelite || 'VIIRS'} — detecção térmica`}
+                    {isEarthEngine
+                      ? `🛰️ ${f.satelite || 'Multissatélite'} / Earth Engine — fogo ativo`
+                      : `🛰️ ${f.satelite || (isGoes ? 'GOES' : 'VIIRS')} / NASA FIRMS — fogo ativo`}
                   </div>
                   <div style={{ fontSize: '0.78rem', color: '#374151', marginBottom: 3 }}>
                     <strong>Confiança:</strong>{' '}

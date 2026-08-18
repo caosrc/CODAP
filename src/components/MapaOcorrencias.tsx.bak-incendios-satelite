@@ -533,41 +533,31 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
   // Mantém ref sempre atualizada com o nome atual
   useEffect(() => { nomeLocalRef.current = nomeLocal }, [nomeLocal])
 
-  // ── Clima (Open-Meteo) ──────────────────────────────────────────
+  // ── Clima (API do servidor / INMET) ─────────────────────────────
   const buscarClima = useCallback(async () => {
     setClimaCarregando(true)
     try {
-      const lat = OURO_BRANCO[0]
-      const lon = OURO_BRANCO[1]
-      const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,wind_speed_10m,wind_direction_10m,precipitation,weather_code&daily=temperature_2m_max,temperature_2m_min,weather_code,precipitation_sum&timezone=America%2FSao_Paulo&wind_speed_unit=ms&forecast_days=7`
-      const resp = await fetch(url)
-      if (!resp.ok) return
+      const resp = await fetch('/api/tempo', { cache: 'no-store' })
+      if (!resp.ok) throw new Error(`API clima: ${resp.status}`)
+
       const json = await resp.json()
-      const c = json?.current
-      if (!c) return
-      const ventoVel = c.wind_speed_10m != null ? parseFloat(c.wind_speed_10m) : null
-      const d = json?.daily
-      const diasPrevisao: DiaPrevisao[] = d ? (d.time || []).map((dt: string, i: number) => ({
-        data: dt,
-        weatherCode: d.weather_code?.[i] ?? 0,
-        tempMin: d.temperature_2m_min?.[i] ?? 0,
-        tempMax: d.temperature_2m_max?.[i] ?? 0,
-        precip: d.precipitation_sum?.[i] ?? 0,
-      })) : []
-      setPrevisao(diasPrevisao)
+
+      setPrevisao([])
       setClima({
-        temperatura: c.temperature_2m != null ? parseFloat(c.temperature_2m) : null,
-        umidade: c.relative_humidity_2m != null ? parseFloat(c.relative_humidity_2m) : null,
-        ventoKmh: ventoVel != null ? Math.round(ventoVel * 3.6) : null,
-        ventoDir: c.wind_direction_10m != null ? parseFloat(c.wind_direction_10m) : null,
-        chuva: c.precipitation != null ? parseFloat(c.precipitation) : null,
-        horario: c.time || null,
-        fonte: 'Open-Meteo',
-        weatherCode: c.weather_code != null ? parseInt(c.weather_code) : null,
-        tempMin: diasPrevisao[0]?.tempMin ?? null,
-        tempMax: diasPrevisao[0]?.tempMax ?? null,
+        temperatura: json.temperatura ?? null,
+        umidade: json.umidade ?? null,
+        ventoKmh: json.ventoKmh ?? null,
+        ventoDir: json.ventoDir ?? null,
+        chuva: json.chuva ?? null,
+        horario: json.horario ?? null,
+        fonte: json.fonte ?? 'INMET',
+        weatherCode: null,
+        tempMin: null,
+        tempMax: null,
       })
-    } catch { /* silencioso */ } finally {
+    } catch (err) {
+      console.error('Erro ao buscar clima:', err)
+    } finally {
       setClimaCarregando(false)
     }
   }, [])

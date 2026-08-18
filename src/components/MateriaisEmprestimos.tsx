@@ -1,13 +1,14 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { getAgenteLogado } from './Login'
 import { parseExcelPatrimonio, type ItemImportado, type ResultadoParse } from '../importarExcelPatrimonio'
-import { matApi } from '../matApi'
+import { matApi, type MatChecklistFerramenta } from '../matApi'
 import { supabase, supabaseDisponivel } from '../supabaseClient'
 
 // ─── Tipos ─────────────────────────────────────────────────────────────────
 interface Material {
   id: string
   nome: string
+  categoria: 'escritorio' | 'ferramental' | null
   descricao: string | null
   observacoes: string | null
   foto_thumb: string | null        // miniatura — presente na listagem
@@ -179,6 +180,7 @@ export default function MateriaisEmprestimos({ onIrParaMapa, abrirCampoId, onAbr
   const [emprestimos, setEmprestimos] = useState<Emprestimo[]>([])
   const [equipamentosCampo, setEquipamentosCampo] = useState<EquipamentoCampo[]>([])
   const [materialSelecionado, setMaterialSelecionado] = useState<Material | null>(null)
+  const [categoriaPatrimonio, setCategoriaPatrimonio] = useState<'escritorio' | 'ferramental'>('escritorio')
   const [emprestimoSelecionado, setEmprestimoSelecionado] = useState<Emprestimo | null>(null)
   const [campoSelecionado, setCampoSelecionado] = useState<EquipamentoCampo | null>(null)
   const [mostrarDevolvidos, setMostrarDevolvidos] = useState(false)
@@ -190,7 +192,6 @@ export default function MateriaisEmprestimos({ onIrParaMapa, abrirCampoId, onAbr
   const [notificacoesPrazo, setNotificacoesPrazo] = useState<Emprestimo[]>([])
   const [tipoOperacao, setTipoOperacao] = useState<'emprestimo' | 'manutencao'>('emprestimo')
   const [exportandoCatalogo, setExportandoCatalogo] = useState(false)
-  const [tipoPatrimonio, setTipoPatrimonio] = useState<'escritorio' | 'ferramental'>('escritorio')
 
   function showToast(msg: string) {
     setToast(msg)
@@ -408,10 +409,10 @@ export default function MateriaisEmprestimos({ onIrParaMapa, abrirCampoId, onAbr
       <div className="mat-tela">
         <div className="mat-subheader"><button className="btn-voltar" onClick={() => setModo('inicial')}>‹</button><h2>📋 Patrimônio</h2><span style={{ width: '2rem' }} /></div>
         <div className="mat-categoria-grid">
-          <button className="mat-categoria-card" onClick={() => { setTipoPatrimonio('escritorio'); setBusca(''); setModo('materiais') }}>
+          <button className="mat-categoria-card" onClick={() => { setCategoriaPatrimonio('escritorio'); setBusca(''); setModo('materiais') }}>
             <span>🗂️</span><strong>Materiais de Escritório</strong><small>Cadastro e estoque de materiais</small>
           </button>
-          <button className="mat-categoria-card mat-categoria-ferramenta" onClick={() => { setTipoPatrimonio('ferramental'); setBusca(''); setModo('materiais') }}>
+          <button className="mat-categoria-card mat-categoria-ferramenta" onClick={() => { setCategoriaPatrimonio('ferramental'); setBusca(''); setModo('materiais') }}>
             <span>🛠️</span><strong>Ferramental</strong><small>Ferramentas e checklists de condição</small>
           </button>
         </div>
@@ -421,10 +422,10 @@ export default function MateriaisEmprestimos({ onIrParaMapa, abrirCampoId, onAbr
 
   // ─── LISTA DE MATERIAIS ──────────────────────────────────────────────────
   if (modo === 'materiais') {
+    const materiaisDaCategoria = materiais.filter(m => (m.categoria ?? 'escritorio') === categoriaPatrimonio)
     const buscaLow = busca.trim().toLowerCase()
-    const totalDisponiveis = materiais.filter(m => !emprestimoAtivoDe(m.id)).length
-    const totalEmprestadosFiltro = materiais.filter(m => !!emprestimoAtivoDe(m.id)).length
-    const materiaisDaCategoria = materiais.filter(m => (m.tipo || 'escritorio') === tipoPatrimonio)
+    const totalDisponiveis = materiaisDaCategoria.filter(m => !emprestimoAtivoDe(m.id)).length
+    const totalEmprestadosFiltro = materiaisDaCategoria.filter(m => !!emprestimoAtivoDe(m.id)).length
     const filtrados = materiaisDaCategoria.filter((m) => {
       if (buscaLow && !m.id.toLowerCase().includes(buscaLow) && !m.nome.toLowerCase().includes(buscaLow)) return false
       if (filtroStatus === 'disponivel' && emprestimoAtivoDe(m.id)) return false
@@ -436,7 +437,7 @@ export default function MateriaisEmprestimos({ onIrParaMapa, abrirCampoId, onAbr
         {toast && <div className="toast">{toast}</div>}
         <div className="mat-subheader">
           <button className="btn-voltar" onClick={() => { setBusca(''); setModo('patrimonioMenu') }}>‹</button>
-          <h2>{tipoPatrimonio === 'ferramental' ? '🛠️ Ferramental' : '🗂️ Materiais de Escritório'} ({materiaisDaCategoria.length})</h2>
+          <h2>{categoriaPatrimonio === 'ferramental' ? '🧰 Ferramental' : '📋 Materiais de Escritório'} ({materiaisDaCategoria.length})</h2>
           <div style={{ display: 'flex', gap: '0.4rem' }}>
             <button
               className="mat-btn-exportar"
@@ -458,6 +459,23 @@ export default function MateriaisEmprestimos({ onIrParaMapa, abrirCampoId, onAbr
           </div>
         </div>
 
+        <div className="mat-categoria-menu">
+          <label htmlFor="categoria-patrimonio">Patrimônio</label>
+          <select
+            id="categoria-patrimonio"
+            className="campo-select"
+            value={categoriaPatrimonio}
+            onChange={(e) => {
+              setCategoriaPatrimonio(e.target.value as 'escritorio' | 'ferramental')
+              setBusca('')
+              setFiltroStatus('todos')
+            }}
+          >
+            <option value="escritorio">📋 Materiais de Escritório</option>
+            <option value="ferramental">🧰 Ferramental</option>
+          </select>
+        </div>
+
         <div className="mat-busca-wrap">
           <input
             className="busca-input"
@@ -469,10 +487,10 @@ export default function MateriaisEmprestimos({ onIrParaMapa, abrirCampoId, onAbr
         </div>
 
         <div className="mat-filtros-wrap">
-          <button
+            <button
             className={`mat-filtro-pill ${filtroStatus === 'todos' ? 'ativo' : ''}`}
             onClick={() => setFiltroStatus('todos')}
-          >Todos ({materiais.length})</button>
+            >Todos ({materiaisDaCategoria.length})</button>
           <button
             className={`mat-filtro-pill mat-filtro-verde ${filtroStatus === 'disponivel' ? 'ativo' : ''}`}
             onClick={() => setFiltroStatus('disponivel')}
@@ -501,18 +519,18 @@ export default function MateriaisEmprestimos({ onIrParaMapa, abrirCampoId, onAbr
             )}
             {!busca && filtroStatus === 'todos' && (
               <button className="btn-nova-vazia" onClick={() => { setMaterialSelecionado(null); setModo('formMaterial') }}>
-                + Cadastrar primeiro item
+                + Cadastrar {categoriaPatrimonio === 'ferramental' ? 'ferramental' : 'material de escritório'}
               </button>
             )}
           </div>
         ) : (
           <div className="mat-lista">
-            {filtrados.map((m) => {
+             {filtrados.map((m) => {
               const empr = emprestimoAtivoDe(m.id)
               const total = m.quantidade ?? 1
               const disp = qtdDisponivel(m)
-              return (
-                <button key={m.id} className="mat-card" onClick={() => { setMaterialSelecionado(m); setModo('detalheMaterial') }}>
+               return (
+                 <div key={m.id} className="mat-card" role="button" tabIndex={0} onClick={() => { setMaterialSelecionado(m); setModo('detalheMaterial') }} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setMaterialSelecionado(m); setModo('detalheMaterial') } }}>
                   <div className="mat-card-foto">
                     {m.foto_thumb
                       ? <img src={m.foto_thumb} alt={m.nome} loading="lazy" />
@@ -536,8 +554,15 @@ export default function MateriaisEmprestimos({ onIrParaMapa, abrirCampoId, onAbr
                     <span style={{ fontSize: '1.1rem', fontWeight: 800 }}>{disp}</span>
                     <span style={{ fontSize: '0.65rem', lineHeight: 1 }}>disp</span>
                   </div>
-                  <span className="mat-card-seta">›</span>
-                </button>
+                   {categoriaPatrimonio === 'ferramental' ? (
+                     <button
+                       type="button"
+                       className="mat-btn-checklist"
+                       onClick={(e) => { e.stopPropagation(); setMaterialSelecionado(m); setModo('checklistFerramenta') }}
+                     >Checklist</button>
+                   ) : null}
+                   <span className="mat-card-seta">›</span>
+                 </div>
               )
             })}
           </div>
@@ -555,6 +580,9 @@ export default function MateriaisEmprestimos({ onIrParaMapa, abrirCampoId, onAbr
         onVoltar={() => setModo('materiais')}
         onChecklist={materialSelecionado.tipo === 'ferramental' ? () => setModo('checklistFerramenta') : undefined}
         onEditar={() => setModo('editarMaterial')}
+        onChecklist={categoriaPatrimonio === 'ferramental'
+          ? () => setModo('checklistFerramenta')
+          : undefined}
         onExcluir={async () => {
           if (!confirm(`Excluir definitivamente o material "${materialSelecionado.nome}"?\nIsso apaga TODOS os empréstimos relacionados.`)) return
           try {
@@ -590,7 +618,7 @@ export default function MateriaisEmprestimos({ onIrParaMapa, abrirCampoId, onAbr
     return (
       <FormMaterial
         existentes={materiais.map((m) => m.id)}
-        tipo={tipoPatrimonio}
+        categoria={categoriaPatrimonio}
         onCancelar={() => setModo('materiais')}
         onSalvo={async () => {
           showToast('✅ Material cadastrado!')
@@ -606,13 +634,27 @@ export default function MateriaisEmprestimos({ onIrParaMapa, abrirCampoId, onAbr
     return (
       <FormMaterial
         existentes={materiais.map((m) => m.id)}
-        tipo={materialSelecionado.tipo || tipoPatrimonio}
+        tipo={materialSelecionado.tipo || categoriaPatrimonio}
         materialInicial={materialSelecionado}
+          categoria={materialSelecionado.categoria === 'ferramental' ? 'ferramental' : 'escritorio'}
         onCancelar={() => setModo('detalheMaterial')}
         onSalvo={async (atualizado) => {
           if (atualizado) setMaterialSelecionado(atualizado)
           showToast('✅ Material atualizado!')
           await carregar()
+          setModo('detalheMaterial')
+        }}
+      />
+    )
+  }
+
+  if (modo === 'checklistFerramenta' && materialSelecionado) {
+    return (
+      <ChecklistFerramenta
+        ferramenta={materialSelecionado}
+        onCancelar={() => setModo('materiais')}
+        onSalvo={async () => {
+          showToast('✅ Checklist da ferramenta registrado!')
           setModo('detalheMaterial')
         }}
       />
@@ -904,6 +946,7 @@ function DetalheMaterial({
   emprestimoAtivo: Emprestimo | undefined
   onVoltar: () => void
   onEditar: () => void
+  onChecklist?: () => void
   onExcluir: () => void
   onChecklist?: () => void
 }) {
@@ -935,9 +978,11 @@ function DetalheMaterial({
     <div className="mat-tela">
       <div className="mat-subheader">
         <button className="btn-voltar" onClick={onVoltar}>‹</button>
-        <h2>📦 {material.id}</h2>
+        <h2>{material.categoria === 'ferramental' ? '🧰' : '📦'} {material.id}</h2>
         <div style={{ display: 'flex', gap: '0.4rem' }}>
-          {onChecklist && <button className="mat-btn-checklist" onClick={onChecklist} title="Fazer checklist">✓ Checklist</button>}
+          {onChecklist && (
+            <button className="mat-btn-checklist" onClick={onChecklist} title="Fazer checklist da ferramenta">✓ Checklist</button>
+          )}
           <button className="mat-btn-editar" onClick={onEditar} title="Editar material">✏️</button>
           <button className="mat-btn-excluir" onClick={onExcluir} title="Excluir material">🗑️</button>
         </div>
@@ -977,6 +1022,16 @@ function DetalheMaterial({
           <span className="mat-detalhe-valor">{material.nome}</span>
         </div>
 
+        <div className="mat-detalhe-bloco">
+          <span className="mat-detalhe-label">Categoria</span>
+          <span className="mat-detalhe-valor">{material.categoria === 'ferramental' ? 'Ferramental' : 'Materiais de Escritório'}</span>
+        </div>
+
+        <div className="mat-detalhe-bloco">
+          <span className="mat-detalhe-label">Quantidade em estoque</span>
+          <span className="mat-detalhe-valor">{material.quantidade ?? 1}</span>
+        </div>
+
         {material.descricao && (
           <div className="mat-detalhe-bloco">
             <span className="mat-detalhe-label">Descrição</span>
@@ -1006,15 +1061,75 @@ function DetalheMaterial({
             <strong>✅ Disponível</strong>
           )}
         </div>
+
+        {material.categoria === 'ferramental' && (
+          <HistoricoChecklists ferramentaId={material.id} quantidadeCadastrada={material.quantidade ?? 1} />
+        )}
       </div>
     </div>
   )
 }
 
+function HistoricoChecklists({ ferramentaId, quantidadeCadastrada }: {
+  ferramentaId: string
+  quantidadeCadastrada: number
+}) {
+  const [checklists, setChecklists] = useState<MatChecklistFerramenta[]>([])
+  const [carregando, setCarregando] = useState(true)
+
+  useEffect(() => {
+    let cancelado = false
+    matApi.listarChecklistsFerramenta(ferramentaId)
+      .then((data) => { if (!cancelado) setChecklists(data) })
+      .catch(() => { if (!cancelado) setChecklists([]) })
+      .finally(() => { if (!cancelado) setCarregando(false) })
+    return () => { cancelado = true }
+  }, [ferramentaId])
+
+  return (
+    <div className="mat-checklist-historico">
+      <div className="mat-checklist-historico-titulo">🧾 Histórico de checklists</div>
+      {carregando ? (
+        <div className="campo-label-sub">Carregando histórico...</div>
+      ) : checklists.length === 0 ? (
+        <div className="campo-label-sub">Nenhum checklist realizado ainda.</div>
+      ) : (
+        <div className="mat-checklist-lista">
+          {checklists.map((checklist) => {
+            const faltantes = Math.max(0, checklist.quantidade_cadastrada - checklist.quantidade_conferida)
+            return (
+              <div key={checklist.id} className={`mat-checklist-registro condicao-${checklist.condicao}`}>
+                <div className="mat-checklist-registro-cab">
+                  <strong>{formatarDataBr(checklist.data_checklist)}</strong>
+                  <span className={`mat-condicao-pill condicao-${checklist.condicao}`}>
+                    {checklist.condicao === 'boa' ? 'Boa' : checklist.condicao === 'media' ? 'Média' : 'Ruim'}
+                  </span>
+                </div>
+                <div className="mat-checklist-registro-qtd">
+                  Quantidade: {checklist.quantidade_conferida}/{checklist.quantidade_cadastrada || quantidadeCadastrada}
+                  {faltantes > 0 ? ` · ${faltantes} item(ns) faltante(s)` : ' · Todos os itens encontrados'}
+                </div>
+                {faltantes > 0 && (
+                  <div className="mat-checklist-falta">
+                    <strong>Item faltante:</strong> {checklist.item_faltante || 'Não informado'}
+                    {checklist.justificativa ? <><br /><strong>Justificativa:</strong> {checklist.justificativa}</> : null}
+                  </div>
+                )}
+                {checklist.realizado_por && <div className="campo-label-sub">Registrado por {checklist.realizado_por}</div>}
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
+
 function FormMaterial({
-  existentes, materialInicial, tipo = 'escritorio', onCancelar, onSalvo,
+  existentes, categoria, materialInicial, onCancelar, onSalvo,
 }: {
   existentes: string[]
+  categoria: 'escritorio' | 'ferramental'
   materialInicial?: Material
   tipo?: 'escritorio' | 'ferramental'
   onCancelar: () => void
@@ -1088,6 +1203,7 @@ function FormMaterial({
         await matApi.criarMaterial({
           id: cod,
           nome: nm,
+           categoria,
           descricao: descricao.trim() || null,
           observacoes: observacoes.trim() || null,
           foto,
@@ -1106,7 +1222,9 @@ function FormMaterial({
     <div className="mat-tela">
       <div className="mat-subheader">
         <button className="btn-voltar" onClick={onCancelar}>‹</button>
-        <h2>{editando ? '✏️ Editar Item' : `➕ Novo ${tipo === 'ferramental' ? 'Ferramental' : 'Material de Escritório'}`}</h2>
+        <h2>{editando
+          ? `✏️ Editar ${categoria === 'ferramental' ? 'Ferramental' : 'Material de Escritório'}`
+          : `➕ Novo ${categoria === 'ferramental' ? 'Ferramental' : 'Material de Escritório'}`}</h2>
         <span style={{ width: '2rem' }} />
       </div>
 
@@ -1135,11 +1253,11 @@ function FormMaterial({
         )}
 
         <div className="campo">
-          <label className="campo-label">Nome *</label>
+             <label className="campo-label">Nome *</label>
           <input
             className="campo-input"
             type="text"
-            placeholder="Ex: Motobomba"
+               placeholder={categoria === 'ferramental' ? 'Ex: Furadeira' : 'Ex: Papel A4'}
             value={nome}
             onChange={(e) => { setNome(e.target.value); setErro('') }}
           />
@@ -1219,7 +1337,7 @@ function FormMaterial({
         {erro && <div className="login-erro" style={{ marginBottom: '0.8rem' }}>{erro}</div>}
 
         <button className="btn-salvar" onClick={salvar} disabled={salvando}>
-          {salvando ? '⏳ Salvando...' : editando ? '💾 Salvar Alterações' : '💾 Salvar Material'}
+           {salvando ? '⏳ Salvando...' : editando ? '💾 Salvar Alterações' : `💾 Salvar ${categoria === 'ferramental' ? 'Ferramental' : 'Material'}`}
         </button>
       </div>
     </div>
@@ -1227,101 +1345,147 @@ function FormMaterial({
 }
 
 function ChecklistFerramenta({
-  ferramenta, onVoltar, onSalvo,
+  ferramenta, onCancelar, onSalvo,
 }: {
   ferramenta: Material
-  onVoltar: () => void
-  onSalvo: () => void
+  onCancelar: () => void
+  onSalvo: (checklist: MatChecklistFerramenta) => void
 }) {
-  const [quantidade, setQuantidade] = useState(String(ferramenta.quantidade ?? 1))
-  const [condicao, setCondicao] = useState<'boa' | 'media' | 'ruim'>('boa')
+  const quantidadeCadastrada = Math.max(1, ferramenta.quantidade ?? 1)
+  const [quantidadeConferida, setQuantidadeConferida] = useState(quantidadeCadastrada)
+  const [condicao, setCondicao] = useState<'boa' | 'media' | 'ruim' | ''>('')
+  const [itemFaltante, setItemFaltante] = useState('')
   const [justificativa, setJustificativa] = useState('')
-  const [historico, setHistorico] = useState<ChecklistFerramenta[]>([])
   const [salvando, setSalvando] = useState(false)
   const [erro, setErro] = useState('')
-  const qtdCadastrada = ferramenta.quantidade ?? 1
-  const qtdVerificada = Number(quantidade)
-  const temFalta = Number.isInteger(qtdVerificada) && qtdVerificada < qtdCadastrada
-
-  useEffect(() => {
-    matApi.listarChecklistsFerramenta(ferramenta.id)
-      .then(setHistorico)
-      .catch(() => setErro('Não foi possível carregar o histórico.'))
-  }, [ferramenta.id])
+  const quantidadeFaltante = Math.max(0, quantidadeCadastrada - quantidadeConferida)
 
   async function salvar() {
-    if (!Number.isInteger(qtdVerificada) || qtdVerificada < 0 || qtdVerificada > qtdCadastrada) {
-      setErro(`Informe uma quantidade entre 0 e ${qtdCadastrada}.`)
+    if (!condicao) { setErro('Marque a condição da ferramenta.'); return }
+    if (quantidadeConferida < quantidadeCadastrada && !itemFaltante.trim()) {
+      setErro('Informe onde está o item faltante.')
       return
     }
-    if (temFalta && !justificativa.trim()) {
-      setErro('Justifique onde está o item faltante.')
+    if (quantidadeConferida < quantidadeCadastrada && !justificativa.trim()) {
+      setErro('Justifique a quantidade faltante.')
       return
     }
-    setSalvando(true); setErro('')
+    setSalvando(true)
+    setErro('')
     try {
-      await matApi.criarChecklistFerramenta(ferramenta.id, {
-        quantidade_verificada: qtdVerificada,
+      const checklist = await matApi.criarChecklistFerramenta({
+        ferramenta_id: ferramenta.id,
+        quantidade_cadastrada: quantidadeCadastrada,
+        quantidade_conferida: quantidadeConferida,
         condicao,
-        justificativa_falta: temFalta ? justificativa.trim() : null,
+        item_faltante: quantidadeFaltante > 0 ? itemFaltante.trim() : null,
+        justificativa: quantidadeFaltante > 0 ? justificativa.trim() : null,
         realizado_por: getAgenteLogado() || null,
       })
-      onSalvo()
-    } catch (e) {
-      setErro((e as Error).message || 'Erro ao salvar checklist.')
-    } finally { setSalvando(false) }
+      onSalvo(checklist)
+    } catch (e: any) {
+      setErro(`Erro ao salvar: ${e?.message ?? 'tente novamente'}`)
+    } finally {
+      setSalvando(false)
+    }
   }
 
   return (
     <div className="mat-tela">
       <div className="mat-subheader">
-        <button className="btn-voltar" onClick={onVoltar}>‹</button>
-        <h2>✓ Checklist da ferramenta</h2>
+        <button className="btn-voltar" onClick={onCancelar}>‹</button>
+        <h2>🧰 Checklist da ferramenta</h2>
         <span style={{ width: '2rem' }} />
       </div>
-      <div className="mat-checklist">
+
+      <div className="mat-form">
         <div className="mat-checklist-identificacao">
+          <span className="mat-card-codigo">{ferramenta.id}</span>
           <strong>{ferramenta.nome}</strong>
-          <span>Código: {ferramenta.id}</span>
-          <span>Quantidade cadastrada: <b>{qtdCadastrada}</b></span>
+          <span className="campo-label-sub">Conferência de estoque e condição</span>
         </div>
+
         <div className="campo">
-          <label className="campo-label">Quantidade encontrada *</label>
-          <input className="campo-input" type="number" min="0" max={qtdCadastrada} value={quantidade}
-            onChange={e => { setQuantidade(e.target.value); setErro('') }} />
+          <label className="campo-label">Quantidade cadastrada</label>
+          <input className="campo-input" type="number" value={quantidadeCadastrada} disabled />
         </div>
-        {temFalta && (
-          <div className="campo mat-falta-box">
-            <label className="campo-label">Justificativa do item faltante *</label>
-            <textarea className="campo-input" rows={3} placeholder="Informe onde está o item ou o motivo da falta"
-              value={justificativa} onChange={e => { setJustificativa(e.target.value); setErro('') }} />
-            <span className="campo-label-sub">Faltam {qtdCadastrada - qtdVerificada} item(ns).</span>
+
+        <div className="campo">
+          <label className="campo-label">Quantidade de itens encontrada *</label>
+          <input
+            className="campo-input"
+            type="number"
+            min={0}
+            max={quantidadeCadastrada}
+            value={quantidadeConferida}
+            onChange={(e) => {
+              const valor = Math.min(quantidadeCadastrada, Math.max(0, parseInt(e.target.value, 10) || 0))
+              setQuantidadeConferida(valor)
+              setErro('')
+            }}
+          />
+          <span className={`campo-label-sub ${quantidadeFaltante > 0 ? 'mat-checklist-alerta' : ''}`}>
+            {quantidadeFaltante > 0
+              ? `Atenção: ${quantidadeFaltante} item(ns) a menos que o cadastrado.`
+              : 'Todos os itens cadastrados foram encontrados.'}
+          </span>
+        </div>
+
+        {quantidadeFaltante > 0 && (
+          <div className="mat-checklist-falta-form">
+            <div className="mat-checklist-falta-form-titulo">⚠️ Item faltante</div>
+            <div className="campo">
+              <label className="campo-label">Onde está o item faltante? *</label>
+              <input
+                className="campo-input"
+                type="text"
+                placeholder="Ex: Em manutenção, com o agente João..."
+                value={itemFaltante}
+                onChange={(e) => { setItemFaltante(e.target.value); setErro('') }}
+              />
+            </div>
+            <div className="campo">
+              <label className="campo-label">Justificativa *</label>
+              <textarea
+                className="campo-textarea"
+                placeholder="Explique o motivo da falta."
+                value={justificativa}
+                onChange={(e) => { setJustificativa(e.target.value); setErro('') }}
+              />
+            </div>
           </div>
         )}
+
         <div className="campo">
-          <label className="campo-label">Condição das ferramentas *</label>
-          <div className="mat-condicao-grid">
-            {([['boa', '✅ Boa'], ['media', '⚠️ Média'], ['ruim', '❌ Ruim']] as const).map(([valor, label]) => (
-              <button type="button" key={valor} className={`mat-condicao-btn ${condicao === valor ? 'ativo' : ''}`}
-                onClick={() => setCondicao(valor)}>{label}</button>
+          <label className="campo-label">Condição da ferramenta *</label>
+          <div className="mat-condicao-opcoes">
+            {([
+              ['boa', '✅ Boa', 'Em perfeito estado de uso'],
+              ['media', '⚠️ Média', 'Apresenta sinais de uso'],
+              ['ruim', '❌ Ruim', 'Precisa de reparo ou substituição'],
+            ] as const).map(([valor, titulo, descricao]) => (
+              <label key={valor} className={`mat-condicao-opcao ${condicao === valor ? `selecionada condicao-${valor}` : ''}`}>
+                <input
+                  type="radio"
+                  name="condicao-ferramenta"
+                  value={valor}
+                  checked={condicao === valor}
+                  onChange={() => { setCondicao(valor); setErro('') }}
+                />
+                <span>
+                  <strong>{titulo}</strong>
+                  <small>{descricao}</small>
+                </span>
+              </label>
             ))}
           </div>
         </div>
-        {erro && <div className="mat-form-erro">{erro}</div>}
-        <button className="mat-btn-salvar" disabled={salvando} onClick={salvar}>
-          {salvando ? 'Salvando...' : 'Registrar checklist'}
+
+        {erro && <div className="login-erro" style={{ marginBottom: '0.8rem' }}>{erro}</div>}
+
+        <button className="btn-salvar" onClick={salvar} disabled={salvando}>
+          {salvando ? '⏳ Registrando...' : '✅ Salvar checklist'}
         </button>
-      </div>
-      <div className="mat-historico-checklist">
-        <h3>Histórico de checklists</h3>
-        {historico.length === 0 ? <p>Nenhum checklist realizado ainda.</p> : historico.map(item => (
-          <div className="mat-historico-item" key={item.id}>
-            <div><strong>{formatarDataBr(item.realizado_em)}</strong> · {item.realizado_por || 'Usuário não informado'}</div>
-            <div>{item.quantidade_verificada}/{qtdCadastrada} itens · <b className={`condicao-${item.condicao}`}>{item.condicao === 'media' ? 'média' : item.condicao}</b>
-              {item.quantidade_verificada < qtdCadastrada && <span className="mat-falta-tag"> · menos itens</span>}</div>
-            {item.justificativa_falta && <small>Justificativa: {item.justificativa_falta}</small>}
-          </div>
-        ))}
       </div>
     </div>
   )

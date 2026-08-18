@@ -738,14 +738,12 @@ async function initDb() {
     CREATE TABLE IF NOT EXISTS materiais (
       id TEXT PRIMARY KEY,
       nome TEXT NOT NULL,
-      categoria TEXT NOT NULL DEFAULT 'escritorio',
       descricao TEXT,
       observacoes TEXT,
       foto TEXT,
       foto_placa TEXT,
       foto_thumb TEXT,
       quantidade INTEGER NOT NULL DEFAULT 1,
-      tipo TEXT NOT NULL DEFAULT 'escritorio',
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
   `)
@@ -753,35 +751,6 @@ async function initDb() {
   await query(`ALTER TABLE materiais ADD COLUMN IF NOT EXISTS foto TEXT`)
   await query(`ALTER TABLE materiais ADD COLUMN IF NOT EXISTS foto_placa TEXT`)
   await query(`ALTER TABLE materiais ADD COLUMN IF NOT EXISTS foto_thumb TEXT`)
-  await query(`ALTER TABLE materiais ADD COLUMN IF NOT EXISTS tipo TEXT NOT NULL DEFAULT 'escritorio'`)
-  await query(`ALTER TABLE materiais ADD COLUMN IF NOT EXISTS categoria TEXT NOT NULL DEFAULT 'escritorio'`)
-
-  await query(`
-    CREATE TABLE IF NOT EXISTS checklists_ferramentas (
-      id BIGSERIAL PRIMARY KEY,
-      ferramenta_id TEXT NOT NULL REFERENCES materiais(id) ON DELETE CASCADE,
-      quantidade_verificada INTEGER NOT NULL,
-      condicao TEXT NOT NULL,
-      justificativa_falta TEXT,
-      realizado_por TEXT,
-      realizado_em TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    )
-  `)
-
-  await query(`
-    CREATE TABLE IF NOT EXISTS checklists_ferramental (
-      id BIGSERIAL PRIMARY KEY,
-      ferramenta_id TEXT NOT NULL REFERENCES materiais(id) ON DELETE CASCADE,
-      quantidade_cadastrada INTEGER NOT NULL,
-      quantidade_conferida INTEGER NOT NULL,
-      condicao TEXT NOT NULL CHECK (condicao IN ('boa', 'media', 'ruim')),
-      item_faltante TEXT,
-      justificativa TEXT,
-      realizado_por TEXT,
-      data_checklist TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    )
-  `)
 
   await query(`
     CREATE TABLE IF NOT EXISTS emprestimos (
@@ -1848,9 +1817,6 @@ function broadcastMateriaisAtualizados() {
 function broadcastEmprestimosAtualizados() {
   broadcastParaTodos({ tipo: 'emprestimos_atualizados' })
 }
-function broadcastChecklistsFerramentalAtualizados() {
-  broadcastParaTodos({ tipo: 'checklists_ferramental_atualizados' })
-}
 
 // Retorna lista de agentes online no momento (via REST, sem depender de timing do WS)
 app.get('/api/agentes-online', (_req, res) => {
@@ -1861,7 +1827,7 @@ app.get('/api/agentes-online', (_req, res) => {
 app.get('/api/materiais', async (_req, res) => {
   try {
     const result = await query(
-      "SELECT id, nome, categoria, descricao, observacoes, foto_thumb, quantidade, tipo, created_at FROM materiais ORDER BY id" 
+      'SELECT id, nome, descricao, observacoes, foto_thumb, quantidade, created_at FROM materiais ORDER BY id'
     )
     res.json(result.rows)
   } catch (err) {
@@ -1929,17 +1895,14 @@ app.get('/api/materiais/:id', async (req, res) => {
 })
 
 app.post('/api/materiais', async (req, res) => {
-  const { id, nome, categoria, descricao, observacoes, foto, foto_placa, foto_thumb, quantidade, tipo } = req.body || {}
+  const { id, nome, descricao, observacoes, foto, foto_placa, foto_thumb, quantidade } = req.body || {}
   if (!id || !nome) return res.status(400).json({ error: 'id e nome obrigatórios' })
   try {
     const result = await query(
-      `INSERT INTO materiais (id, nome, categoria, descricao, observacoes, foto, foto_placa, foto_thumb, quantidade, tipo)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING id, nome, categoria, descricao, observacoes, foto_thumb, quantidade, tipo, created_at`,
-      [String(id).trim(), String(nome).trim(),
-       categoria === 'ferramental' ? 'ferramental' : 'escritorio',
-       descricao || null, observacoes || null,
-       foto || null, foto_placa || null, foto_thumb || null, Math.max(1, quantidade || 1),
-       tipo === 'ferramental' ? 'ferramental' : 'escritorio']
+      `INSERT INTO materiais (id, nome, descricao, observacoes, foto, foto_placa, foto_thumb, quantidade)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id, nome, descricao, observacoes, foto_thumb, quantidade, created_at`,
+      [String(id).trim(), String(nome).trim(), descricao || null, observacoes || null,
+       foto || null, foto_placa || null, foto_thumb || null, Math.max(1, quantidade || 1)]
     )
     broadcastMateriaisAtualizados()
     res.status(201).json(result.rows[0])
@@ -1951,28 +1914,23 @@ app.post('/api/materiais', async (req, res) => {
 })
 
 app.patch('/api/materiais/:id', async (req, res) => {
-  const { nome, categoria, descricao, observacoes, foto, foto_placa, foto_thumb, quantidade, tipo } = req.body || {}
+  const { nome, descricao, observacoes, foto, foto_placa, foto_thumb, quantidade } = req.body || {}
   const sets = []
   const vals = []
   let idx = 1
   if (typeof nome === 'string') { sets.push(`nome=$${idx++}`); vals.push(nome.trim()) }
-  if (categoria !== undefined) {
-    sets.push(`categoria=$${idx++}`)
-    vals.push(categoria === 'ferramental' ? 'ferramental' : 'escritorio')
-  }
   if (descricao !== undefined) { sets.push(`descricao=$${idx++}`); vals.push(descricao || null) }
   if (observacoes !== undefined) { sets.push(`observacoes=$${idx++}`); vals.push(observacoes || null) }
   if (foto !== undefined) { sets.push(`foto=$${idx++}`); vals.push(foto || null) }
   if (foto_placa !== undefined) { sets.push(`foto_placa=$${idx++}`); vals.push(foto_placa || null) }
   if (foto_thumb !== undefined) { sets.push(`foto_thumb=$${idx++}`); vals.push(foto_thumb || null) }
   if (quantidade !== undefined) { sets.push(`quantidade=$${idx++}`); vals.push(Math.max(1, quantidade || 1)) }
-  if (tipo !== undefined) { sets.push(`tipo=$${idx++}`); vals.push(tipo === 'ferramental' ? 'ferramental' : 'escritorio') }
   if (sets.length === 0) return res.status(400).json({ error: 'Nada para atualizar' })
   vals.push(req.params.id)
   try {
     const result = await query(
       `UPDATE materiais SET ${sets.join(', ')} WHERE id=$${idx}
-       RETURNING id, nome, categoria, descricao, observacoes, foto_thumb, quantidade, tipo, created_at`,
+       RETURNING id, nome, descricao, observacoes, foto_thumb, quantidade, created_at`,
       vals
     )
     if (!result.rows[0]) return res.status(404).json({ error: 'Material não encontrado' })
@@ -1984,33 +1942,6 @@ app.patch('/api/materiais/:id', async (req, res) => {
   }
 })
 
-app.get('/api/ferramentas/:id/checklists', async (req, res) => {
-  try {
-    const result = await query(
-      'SELECT * FROM checklists_ferramentas WHERE ferramenta_id=$1 ORDER BY realizado_em DESC',
-      [req.params.id]
-    )
-    res.json(result.rows)
-  } catch (err) { res.status(500).json({ error: err.message }) }
-})
-
-app.post('/api/ferramentas/:id/checklists', async (req, res) => {
-  const { quantidade_verificada, condicao, justificativa_falta, realizado_por } = req.body || {}
-  const qtd = Number(quantidade_verificada)
-  if (!Number.isInteger(qtd) || qtd < 0 || !['boa', 'media', 'ruim'].includes(condicao)) {
-    return res.status(400).json({ error: 'Quantidade e condição são obrigatórias' })
-  }
-  try {
-    const result = await query(
-      `INSERT INTO checklists_ferramentas
-       (ferramenta_id, quantidade_verificada, condicao, justificativa_falta, realizado_por)
-       VALUES ($1,$2,$3,$4,$5) RETURNING *`,
-      [req.params.id, qtd, condicao, justificativa_falta || null, realizado_por || null]
-    )
-    res.status(201).json(result.rows[0])
-  } catch (err) { res.status(500).json({ error: err.message }) }
-})
-
 app.delete('/api/materiais/:id', async (req, res) => {
   try {
     await query('DELETE FROM materiais WHERE id = $1', [req.params.id])
@@ -2018,64 +1949,6 @@ app.delete('/api/materiais/:id', async (req, res) => {
     broadcastEmprestimosAtualizados()
     res.json({ success: true })
   } catch (err) {
-    res.status(500).json({ error: err.message })
-  }
-})
-
-// ── Checklists de ferramental ────────────────────────────────────────────────
-app.get('/api/ferramentas/:id/checklists', async (req, res) => {
-  try {
-    const result = await query(
-      'SELECT * FROM checklists_ferramental WHERE ferramenta_id = $1 ORDER BY data_checklist DESC',
-      [req.params.id]
-    )
-    res.json(result.rows)
-  } catch (err) {
-    res.status(500).json({ error: err.message })
-  }
-})
-
-app.post('/api/ferramentas/checklists', async (req, res) => {
-  const {
-    ferramenta_id, quantidade_cadastrada, quantidade_conferida,
-    condicao, item_faltante, justificativa, realizado_por, data_checklist,
-  } = req.body || {}
-  const cadastrada = Number(quantidade_cadastrada)
-  const conferida = Number(quantidade_conferida)
-  if (!ferramenta_id || !Number.isInteger(cadastrada) || cadastrada < 1 ||
-      !Number.isInteger(conferida) || conferida < 0 || conferida > cadastrada) {
-    return res.status(400).json({ error: 'Informe quantidades válidas para o checklist.' })
-  }
-  if (!['boa', 'media', 'ruim'].includes(condicao)) {
-    return res.status(400).json({ error: 'Informe a condição da ferramenta.' })
-  }
-  if (conferida < cadastrada && !String(item_faltante || '').trim()) {
-    return res.status(400).json({ error: 'Informe onde está o item faltante.' })
-  }
-  if (conferida < cadastrada && !String(justificativa || '').trim()) {
-    return res.status(400).json({ error: 'Justifique a quantidade faltante.' })
-  }
-  try {
-    const ferramenta = await query(
-      "SELECT id FROM materiais WHERE id = $1 AND categoria = 'ferramental'",
-      [ferramenta_id]
-    )
-    if (!ferramenta.rows[0]) return res.status(404).json({ error: 'Ferramental não encontrado.' })
-    const result = await query(
-      `INSERT INTO checklists_ferramental
-        (ferramenta_id, quantidade_cadastrada, quantidade_conferida, condicao,
-         item_faltante, justificativa, realizado_por, data_checklist)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
-      [ferramenta_id, cadastrada, conferida, condicao,
-       conferida < cadastrada ? String(item_faltante).trim() : null,
-       conferida < cadastrada ? String(justificativa).trim() : null,
-       realizado_por ? String(realizado_por).trim() : null,
-       data_checklist || new Date().toISOString()]
-    )
-    broadcastChecklistsFerramentalAtualizados()
-    res.status(201).json(result.rows[0])
-  } catch (err) {
-    console.error('POST /api/ferramentas/checklists error:', err)
     res.status(500).json({ error: err.message })
   }
 })

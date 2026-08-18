@@ -1,2 +1,7 @@
-# ── SPA — toda rota desconhecida cai no index.html para o React Router cuidar ──
+# APIs / Netlify Functions — devem vir antes do fallback SPA
+/api/planet-focos  /.netlify/functions/planet-focos  200!
+/api/focos-incendio  /.netlify/functions/focos-incendio  200!
+/api/send-sos-push  /.netlify/functions/send-sos-push  200!
+
+# SPA — toda rota desconhecida cai no index.html
 /*  /index.html  200

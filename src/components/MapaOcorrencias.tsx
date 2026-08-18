@@ -609,7 +609,12 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
       const resp = await fetch('/.netlify/functions/earth-engine-focos')
       if (!resp.ok) return
       const data = await resp.json()
-      setMonitoramentoEE(data)
+      setMonitoramentoEE({
+        ...data,
+        camadas: Array.isArray(data.camadas) ? data.camadas : [],
+        indicadores: Array.isArray(data.indicadores) ? data.indicadores : [],
+        erros: Array.isArray(data.erros) ? data.erros : [],
+      })
     } catch {
       setMonitoramentoEE(prev => prev ?? {
         configurado: false,

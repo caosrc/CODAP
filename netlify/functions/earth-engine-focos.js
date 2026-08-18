@@ -1,3 +1,4 @@
+process.chdir('/tmp');
 const ee = require('@google/earthengine');
 
 function resposta(statusCode, body) {

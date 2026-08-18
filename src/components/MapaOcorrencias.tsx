@@ -1637,7 +1637,7 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
                   </button>
                 ))}
               </div>
-              {monitoramentoEE?.configurado && monitoramentoEE.indicadores.length > 0 && (
+              {monitoramentoEE?.configurado && (monitoramentoEE.indicadores ?? []).length > 0 && (
                 <div className="mapa-monitoramento-indicadores">
                   <div className="mapa-monitoramento-subtitulo">Indicadores médios do município</div>
                   {monitoramentoEE.indicadores.map(indicador => (
@@ -1648,9 +1648,9 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
                   ))}
                 </div>
               )}
-              {monitoramentoEE?.configurado && monitoramentoEE.erros.length > 0 && (
+              {monitoramentoEE?.configurado && (monitoramentoEE.erros ?? []).length > 0 && (
                 <div className="mapa-monitoramento-aviso">
-                  Algumas fontes indisponíveis: {monitoramentoEE.erros.length}. As demais camadas permanecem disponíveis.
+                  Algumas fontes indisponíveis: {(monitoramentoEE.erros ?? []).length}. As demais camadas permanecem disponíveis.
                 </div>
               )}
               <div className="mapa-monitoramento-rodape">

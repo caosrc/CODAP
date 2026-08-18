@@ -6,7 +6,7 @@ function resposta(statusCode, body) {
     statusCode,
     headers: {
       'Content-Type': 'application/json',
-      'Cache-Control': 'public, max-age=300',
+      'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
     },
     body: JSON.stringify(body),
   };
@@ -47,8 +47,13 @@ exports.handler = async () => {
       .geometry();
 
     const hoje = new Date();
-    const fim = hoje.toISOString().slice(0, 10);
-    const inicio = fim;
+    const inicio = hoje.toISOString().slice(0, 10);
+
+    // Earth Engine usa intervalo [inicio, fim).
+    // Usamos amanhã como limite para incluir todo o dia de hoje.
+    const amanha = new Date(hoje);
+    amanha.setUTCDate(amanha.getUTCDate() + 1);
+    const fim = amanha.toISOString().slice(0, 10);
 
     const colecoes = [
       {

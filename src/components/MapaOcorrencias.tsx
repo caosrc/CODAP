@@ -606,7 +606,7 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
   const buscarMonitoramento = useCallback(async () => {
     setMonitoramentoCarregando(true)
     try {
-      const resp = await fetch('/api/monitoramento-incendio')
+      const resp = await fetch('/.netlify/functions/earth-engine-focos')
       if (!resp.ok) return
       const data = await resp.json()
       setMonitoramentoEE(data)

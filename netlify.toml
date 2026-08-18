@@ -61,3 +61,9 @@
   to = "/.netlify/functions/earth-engine-focos"
   status = 200
   force = true
+
+[[redirects]]
+  from = "/api/monitoramento-incendio"
+  to = "/.netlify/functions/earth-engine-focos"
+  status = 200
+  force = true

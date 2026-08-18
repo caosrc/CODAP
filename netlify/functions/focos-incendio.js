@@ -144,7 +144,7 @@ export const handler = async () => {
       headers: {
         'Content-Type': 'application/json',
         // GOES atualiza a cada ~10 min → CDN cache 5 min é suficiente
-        'Cache-Control': 'public, max-age=300',
+        'Cache-Control': 'public, max-age=60, must-revalidate',
       },
       body: JSON.stringify({ focos, configurado: true, fontes, atualizadoEm: new Date().toISOString() }),
     }

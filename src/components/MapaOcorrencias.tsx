@@ -598,8 +598,20 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
 
   useEffect(() => {
     buscarFocos()
-    const intervalo = setInterval(buscarFocos, 5 * 60 * 1000)
-    return () => clearInterval(intervalo)
+    const intervalo = setInterval(buscarFocos, 2 * 60 * 1000)
+
+    const atualizarAoVoltar = () => {
+      if (document.visibilityState === 'visible') {
+        buscarFocos()
+      }
+    }
+
+    document.addEventListener('visibilitychange', atualizarAoVoltar)
+
+    return () => {
+      clearInterval(intervalo)
+      document.removeEventListener('visibilitychange', atualizarAoVoltar)
+    }
   }, [buscarFocos])
 
   // ── Análise ambiental do Earth Engine ─────────────────────────
@@ -1618,8 +1630,11 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
             {monitoramentoEE?.configurado && (
               <div className="mapa-monitoramento-fontes">
                 <span>🔥 Focos ativos</span>
-                <strong>{focosMonitoramento?.firms ? 'VIIRS + MODIS + GOES · NASA FIRMS' : 'MODIS + VIIRS · Earth Engine'} </strong>
-                {!focosMonitoramento?.firms && <small>VIIRS FIRMS será ativado ao configurar a chave NASA.</small>}
+                <strong>
+                  {focosConfigurado
+                    ? `${focosFontes.join(' + ')} · NASA FIRMS`
+                    : 'MODIS + VIIRS · Earth Engine'}
+                </strong>
               </div>
             )}
               <div className="mapa-monitoramento-camadas">

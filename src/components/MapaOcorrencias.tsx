@@ -582,7 +582,10 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
   const buscarFocos = useCallback(async () => {
     try {
       const focosUrl = import.meta.env.VITE_FOCOS_API_URL || '/api/focos-incendio'
-      const resp = await fetch(focosUrl)
+      const separador = focosUrl.includes('?') ? '&' : '?'
+      const resp = await fetch(`${focosUrl}${separador}_ts=${Date.now()}`, {
+        cache: 'no-store',
+      })
       if (!resp.ok) return
       const data = await resp.json()
       setFocosConfigurado(data.configurado ?? false)
@@ -1605,7 +1608,12 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
           <div className="mapa-monitoramento-header">
             <div>
               <strong>🛰️ Detecção de incêndio por satélite</strong>
-              <span>Google Earth Engine · Ouro Branco/MG</span>
+              <span>
+  NASA FIRMS · Ouro Branco/MG
+  {focosAtualizadoEm
+    ? ` · atualizado às ${new Date(focosAtualizadoEm).toLocaleTimeString('pt-BR')}`
+    : ''}
+</span>
             </div>
             <button
               onClick={() => setPainelMonitoramentoAberto(false)}

@@ -601,7 +601,7 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
 
   useEffect(() => {
     buscarFocos()
-    const intervalo = setInterval(buscarFocos, 2 * 60 * 1000)
+    const intervalo = setInterval(buscarFocos, 60 * 1000)
 
     const atualizarAoVoltar = () => {
       if (document.visibilityState === 'visible') {

@@ -224,3 +224,35 @@ body.radar-tv-active .radar-page {
   .radar-ticker > span { font-size: .7rem; padding: 0 .75rem; }
   .radar-ticker b { font-size: .78rem; }
 }
+
+/* O Radar atual usa o calendário e os registros na mesma coluna direita.
+   Estas regras substituem os limites do layout antigo, que deixavam essa
+   coluna estreita e esticavam o cartão de lembretes até a tela inteira. */
+@media (min-width: 701px) {
+  .radar-layout {
+    grid-template-columns: minmax(320px, .9fr) minmax(500px, 1.3fr);
+    min-height: 0;
+    padding: 1rem clamp(1rem, 3vw, 2.6rem);
+    align-items: start;
+  }
+
+  .radar-note-card,
+  .radar-calendar-card {
+    min-height: 0;
+    height: auto;
+  }
+
+  .radar-bilhete-large {
+    min-height: 0;
+  }
+
+  .radar-bilhete-large textarea {
+    min-height: 230px;
+    flex: initial;
+    resize: vertical;
+  }
+
+  .radar-calendar-card {
+    max-height: none;
+  }
+}

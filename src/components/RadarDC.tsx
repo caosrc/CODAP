@@ -167,6 +167,7 @@ export default function RadarDC() {
           <div className="radar-mini-list">{lembretes.length === 0 ? <span>Nenhum lembrete cadastrado.</span> : lembretes.map(l => <div className="radar-mini-item" key={l.id}><b>{l.criadoPor}</b><span>{l.texto}</span><button onClick={() => remover(l.id)} title="Remover lembrete">×</button></div>)}</div>
         </div>
 
+        <div className="radar-right-column">
         <div className="radar-calendar-card">
           <div className="calendar-top"><div><span>CALENDÁRIO DE NOTIFICAÇÕES</span><h2>{mes.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}</h2></div><div className="month-buttons"><button onClick={() => setMes(new Date(mes.getFullYear(), mes.getMonth() - 1, 1))}>‹</button><button onClick={() => setMes(new Date(mes.getFullYear(), mes.getMonth() + 1, 1))}>›</button></div></div>
           <div className="weekdays">{['DOM', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SÁB'].map(d => <span key={d}>{d}</span>)}</div>
@@ -179,15 +180,15 @@ export default function RadarDC() {
             <button className="radar-add" type="submit" disabled={!textoNotificacao.trim()}>+ Colocar no Radar DC</button>
           </form>}
         </div>
-      </div>
-
-      <section className="radar-activities">
+        <section className="radar-activities">
         <div className="radar-list-heading"><div><span className="card-label">REGISTROS OPERACIONAIS</span><h2>Atividades de {dataBonita(dataSelecionada)}</h2></div><strong>{atividades.checklists.length + atividades.ocorrencias.length} registro(s)</strong></div>
         <div className="radar-activity-columns">
           <div><h3>🚗 Checklists do dia</h3>{atividades.checklists.length === 0 ? <div className="radar-empty">Nenhum checklist registrado.</div> : atividades.checklists.map(c => <button className="radar-activity" key={c.id} onClick={() => disparar('dc:abrir-checklist', { id: c.id })}><b>{c.agente}</b><span>{c.hora} · placa {c.placa || 'não informada'}</span><em>abrir ›</em></button>)}</div>
           <div><h3>⚠️ Ocorrências do dia</h3>{atividades.ocorrencias.length === 0 ? <div className="radar-empty">Nenhuma ocorrência registrada.</div> : atividades.ocorrencias.map(o => <button className="radar-activity" key={o.id} onClick={() => disparar('dc:abrir-ocorrencia', { id: o.id })}><b>{o.agente}</b><span>{o.hora} · {o.natureza || 'Natureza não informada'}</span><small>{o.endereco || 'Endereço não informado'}</small><em>abrir ›</em></button>)}</div>
         </div>
-      </section>
+        </section>
+        </div>
+      </div>
       <div className="radar-ticker"><span>RADAR DC</span><div>{(proximasNotificacoes.length ? proximasNotificacoes : notificacoes).map(n => <b key={n.id}>● {dataBonita(n.data)} · {n.texto}</b>)}</div></div>
     </section>
   )

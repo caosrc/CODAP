@@ -375,58 +375,6 @@ type StatusWs = 'desconectado' | 'conectando' | 'conectado'
 type CamadaMapa = 'padrao' | 'satelite'
 type CamadaMonitoramentoId = string | null
 
-interface DadosClima {
-  temperatura: number | null
-  umidade: number | null
-  ventoKmh: number | null
-  ventoDir: number | null
-  chuva: number | null
-  horario: string | null
-  fonte: string
-  cache?: boolean
-  weatherCode: number | null
-  tempMin: number | null
-  tempMax: number | null
-}
-
-interface DiaPrevisao {
-  data: string
-  weatherCode: number
-  tempMin: number
-  tempMax: number
-  precip: number
-}
-
-function wmoEmoji(code: number | null): string {
-  if (code === null) return '🌡️'
-  if (code === 0) return '☀️'
-  if (code <= 2) return '🌤️'
-  if (code === 3) return '☁️'
-  if (code <= 48) return '🌫️'
-  if (code <= 55) return '🌦️'
-  if (code <= 65) return '🌧️'
-  if (code <= 67) return '🌨️'
-  if (code <= 77) return '❄️'
-  if (code <= 82) return '🌦️'
-  if (code <= 86) return '🌨️'
-  if (code <= 99) return '⛈️'
-  return '🌡️'
-}
-
-function wmoDesc(code: number | null): string {
-  if (code === null) return '–'
-  if (code === 0) return 'Céu limpo'
-  if (code === 1) return 'Principalmente limpo'
-  if (code === 2) return 'Parcialmente nublado'
-  if (code === 3) return 'Nublado'
-  if (code === 45 || code === 48) return 'Neblina'
-  if (code >= 51 && code <= 55) return 'Garoa'
-  if (code >= 61 && code <= 65) return 'Chuva'
-  if (code >= 80 && code <= 82) return 'Pancadas de chuva'
-  if (code === 95) return 'Tempestade'
-  if (code >= 96) return 'Tempestade c/ granizo'
-  return 'Variável'
-}
 
 function nomeDiaSemana(dateStr: string): string {
   const dias = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
@@ -485,11 +433,6 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
   const nomeLocalRef = useRef(nomeLocal)
   const dispositivoId = useRef(getDispositivoId())
 
-  // Clima INMET
-  const [clima, setClima] = useState<DadosClima | null>(null)
-  const [previsao, setPrevisao] = useState<DiaPrevisao[]>([])
-  const [climaCarregando, setClimaCarregando] = useState(false)
-  const [climaAberto, setClimaAberto] = useState(false)
 
   // Focos de incêndio (NASA FIRMS + Earth Engine — somente fogo ativo)
   const [focosIncendio, setFocosIncendio] = useState<FocoIncendio[]>([])
@@ -533,40 +476,6 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
   // Mantém ref sempre atualizada com o nome atual
   useEffect(() => { nomeLocalRef.current = nomeLocal }, [nomeLocal])
 
-  // ── Clima (API do servidor / INMET) ─────────────────────────────
-  const buscarClima = useCallback(async () => {
-    setClimaCarregando(true)
-    try {
-      const resp = await fetch('/api/tempo', { cache: 'no-store' })
-      if (!resp.ok) throw new Error(`API clima: ${resp.status}`)
-
-      const json = await resp.json()
-
-      setPrevisao([])
-      setClima({
-        temperatura: json.temperatura ?? null,
-        umidade: json.umidade ?? null,
-        ventoKmh: json.ventoKmh ?? null,
-        ventoDir: json.ventoDir ?? null,
-        chuva: json.chuva ?? null,
-        horario: json.horario ?? null,
-        fonte: json.fonte ?? 'INMET',
-        weatherCode: null,
-        tempMin: null,
-        tempMax: null,
-      })
-    } catch (err) {
-      console.error('Erro ao buscar clima:', err)
-    } finally {
-      setClimaCarregando(false)
-    }
-  }, [])
-
-  useEffect(() => {
-    buscarClima()
-    const intervalo = setInterval(buscarClima, 10 * 60 * 1000)
-    return () => clearInterval(intervalo)
-  }, [buscarClima])
 
   // ── Focos de Incêndio (NASA FIRMS + Earth Engine) ─────────────
   const buscarFocos = useCallback(async () => {

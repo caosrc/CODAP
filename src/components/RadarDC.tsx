@@ -42,6 +42,27 @@ function disparar(nome: string, detail: unknown) {
   window.dispatchEvent(new CustomEvent(nome, { detail }))
 }
 
+function tocarSininho() {
+  try {
+    if (typeof window === 'undefined' || !window.AudioContext) return
+    const contexto = new window.AudioContext()
+    const agora = contexto.currentTime
+    ;[0, 0.16].forEach((atraso, indice) => {
+      const oscilador = contexto.createOscillator()
+      const ganho = contexto.createGain()
+      oscilador.type = 'sine'
+      oscilador.frequency.value = indice === 0 ? 880 : 1175
+      ganho.gain.setValueAtTime(0.0001, agora + atraso)
+      ganho.gain.exponentialRampToValueAtTime(0.18, agora + atraso + 0.015)
+      ganho.gain.exponentialRampToValueAtTime(0.0001, agora + atraso + 0.14)
+      oscilador.connect(ganho).connect(contexto.destination)
+      oscilador.start(agora + atraso)
+      oscilador.stop(agora + atraso + 0.15)
+    })
+    window.setTimeout(() => contexto.close().catch(() => {}), 450)
+  } catch { /* áudio pode estar bloqueado até interação */ }
+}
+
 export default function RadarDC() {
   const agente = getAgenteLogado() || 'Agente DC'
   const [registros, setRegistros] = useState<RegistroRadar[]>([])
@@ -62,13 +83,21 @@ export default function RadarDC() {
   const carregadoRef = useRef(false)
   const pendentesRef = useRef(new Set<string>())
   const notificacoesDisparadasRef = useRef(new Set<string>())
+  const ocorrenciasNotificadasRef = useRef(new Set<number>())
   const calendarioRef = useRef<HTMLDivElement>(null)
 
   const carregar = useCallback(async () => {
     try {
-      const res = await fetch('/api/radar-bilhetes')
-      if (!res.ok) throw new Error()
-      const rows = await res.json() as Array<Record<string, unknown>>
+      let rows: Array<Record<string, unknown>>
+      if (supabaseDisponivel) {
+        const result = await supabase.from('radar_bilhetes').select('*').order('data', { ascending: true }).order('hora', { ascending: true }).order('criado_em', { ascending: true })
+        if (result.error) throw new Error(result.error.message)
+        rows = (result.data || []) as Array<Record<string, unknown>>
+      } else {
+        const res = await fetch('/api/radar-bilhetes')
+        if (!res.ok) throw new Error('Servidor do Radar indisponível.')
+        rows = await res.json() as Array<Record<string, unknown>>
+      }
       const remotos = rows.map(row => ({
         id: String(row.id), texto: String(row.texto), data: String(row.data), hora: String(row.hora),
         prioridade: (row.prioridade as Prioridade) || 'normal', concluido: Boolean(row.concluido),
@@ -89,7 +118,19 @@ export default function RadarDC() {
     }
   }, [])
 
-  const carregarAtividades = useCallback(async () => {
+  const notificarOcorrenciasNovas = useCallback((ocorrencias: Atividade[], avisar: boolean) => {
+    ocorrencias.forEach(ocorrencia => {
+      if (!avisar) { ocorrenciasNotificadasRef.current.add(ocorrencia.id); return }
+      if (ocorrenciasNotificadasRef.current.has(ocorrencia.id)) return
+      ocorrenciasNotificadasRef.current.add(ocorrencia.id)
+      if ('Notification' in window && Notification.permission === 'granted') {
+        const detalhes = [ocorrencia.hora, ocorrencia.natureza || 'Ocorrência registrada', ocorrencia.endereco || 'Endereço não informado'].join(' · ')
+        new Notification('Nova ocorrência no Radar DC', { body: detalhes, tag: 'radar-ocorrencia-' + ocorrencia.id })
+      }
+    })
+  }, [])
+
+  const carregarAtividades = useCallback(async (avisar = false) => {
     try {
       if (supabaseDisponivel) {
         const proximoDia = new Date(`${dataSelecionada}T12:00:00`)
@@ -110,7 +151,11 @@ export default function RadarDC() {
         }
       }
       const res = await fetch(`/api/atividades-dia?data=${dataSelecionada}`)
-      if (res.ok) setAtividades(await res.json())
+      if (res.ok) {
+        const dados = await res.json() as { checklists: Atividade[]; ocorrencias: Atividade[] }
+        setAtividades(dados)
+        notificarOcorrenciasNovas(dados.ocorrencias, avisar)
+      }
     } catch { setAtividades({ checklists: [], ocorrencias: [] }) }
   }, [dataSelecionada])
 
@@ -140,8 +185,9 @@ export default function RadarDC() {
   useEffect(() => { carregar(); return wsOn('radar_bilhetes_atualizados', carregar) }, [carregar])
   useEffect(() => {
     carregarAtividades()
-    const offChecklist = wsOn('checklist_atualizado', carregarAtividades)
-    const offOcorrencias = wsOn('ocorrencias_atualizadas', carregarAtividades)
+    const avisarAtualizacao = () => { tocarSininho(); carregarAtividades(true) }
+    const offChecklist = wsOn('checklist_atualizado', avisarAtualizacao)
+    const offOcorrencias = wsOn('ocorrencias_atualizadas', avisarAtualizacao)
     return () => { offChecklist(); offOcorrencias() }
   }, [carregarAtividades])
   useEffect(() => {
@@ -176,15 +222,22 @@ export default function RadarDC() {
     setErroSalvamento('')
     pendentesRef.current.add(novo.id)
     try {
-      const res = await fetch('/api/radar-bilhetes', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...novo, criado_por: agente, tipo }),
-      })
-      if (!res.ok) {
-        const detalhe = await res.json().catch(() => null) as { error?: string } | null
-        throw new Error(detalhe?.error || 'Não foi possível salvar o registro.')
+      let row: Record<string, unknown>
+      if (supabaseDisponivel) {
+        const result = await supabase.from('radar_bilhetes').upsert({ id: novo.id, texto: novo.texto, data: novo.data, hora: novo.hora, prioridade: novo.prioridade, concluido: false, criado_por: agente, tipo }, { onConflict: 'id' }).select().single()
+        if (result.error || !result.data) throw new Error(result.error?.message || 'Não foi possível salvar no banco.')
+        row = result.data as Record<string, unknown>
+      } else {
+        const res = await fetch('/api/radar-bilhetes', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...novo, criado_por: agente, tipo }),
+        })
+        if (!res.ok) {
+          const detalhe = await res.json().catch(() => null) as { error?: string } | null
+          throw new Error(detalhe?.error || 'Não foi possível salvar o registro.')
+        }
+        row = await res.json() as Record<string, unknown>
       }
-      const row = await res.json() as Record<string, unknown>
       const salvo: RegistroRadar = {
         id: String(row.id), texto: String(row.texto), data: String(row.data), hora: String(row.hora),
         prioridade: (row.prioridade as Prioridade) || novo.prioridade, concluido: Boolean(row.concluido),
@@ -206,12 +259,17 @@ export default function RadarDC() {
   async function remover(id: string) {
     setErroSalvamento('')
     try {
-      const res = await fetch('/api/radar-bilhetes/' + id, {
-        method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ agente }),
-      })
-      if (!res.ok) {
-        const detalhe = await res.json().catch(() => null) as { error?: string } | null
-        throw new Error(detalhe?.error || 'Não foi possível remover o registro.')
+      if (supabaseDisponivel) {
+        const result = await supabase.from('radar_bilhetes').delete().eq('id', id).eq('criado_por', agente)
+        if (result.error) throw new Error(result.error.message)
+      } else {
+        const res = await fetch('/api/radar-bilhetes/' + id, {
+          method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ agente }),
+        })
+        if (!res.ok) {
+          const detalhe = await res.json().catch(() => null) as { error?: string } | null
+          throw new Error(detalhe?.error || 'Não foi possível remover o registro.')
+        }
       }
       setRegistros(prev => prev.filter(r => r.id !== id))
     } catch (error) {

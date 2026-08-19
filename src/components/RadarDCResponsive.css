@@ -77,9 +77,9 @@ body.radar-tv-active .radar-page {
 
 @media (min-width: 701px) {
   .radar-layout {
-    grid-template-columns: minmax(0, 1.65fr) minmax(280px, .65fr);
+    grid-template-columns: minmax(0, 1.9fr) minmax(260px, .55fr);
     min-height: calc(100vh - 185px);
-    padding: 1.2rem clamp(1.2rem, 4vw, 4.5rem) 2rem;
+    padding: 1.2rem clamp(.35rem, 1vw, 1rem) 2rem .45rem;
     align-items: stretch;
   }
 
@@ -99,6 +99,7 @@ body.radar-tv-active .radar-page {
     flex: 1;
     min-height: 0;
     resize: none;
+    font-size: 1.08rem;
   }
 
   .radar-calendar-card {

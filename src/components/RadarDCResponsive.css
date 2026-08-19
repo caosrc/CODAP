@@ -23,7 +23,37 @@
   animation-duration: 14s;
 }
 
+.radar-bilhete-large {
+  min-height: 390px;
+}
+
+.radar-bilhete-large textarea {
+  min-height: 270px;
+  font-size: 1rem;
+  line-height: 1.55;
+}
+
+.radar-calendar-editor {
+  border-top: 1px solid #e3eaf3;
+  margin-top: .85rem;
+  padding-top: .85rem;
+}
+
+.radar-calendar-editor strong {
+  display: block;
+  color: #1e64b7;
+  font-size: .82rem;
+  margin-bottom: .25rem;
+}
+
+.radar-calendar-editor .radar-add:disabled {
+  opacity: .45;
+  cursor: not-allowed;
+}
+
 @media (max-width: 700px) {
+  .radar-bilhete-large { min-height: 300px; }
+  .radar-bilhete-large textarea { min-height: 190px; }
   .radar-page { padding-bottom: 3.2rem; }
   .radar-header {
     align-items: flex-start;

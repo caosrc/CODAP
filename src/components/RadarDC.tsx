@@ -162,8 +162,16 @@ export default function RadarDC() {
         <div className="radar-calendar-card">
           <div className="calendar-top"><div><span>CALENDÁRIO DE ALERTAS</span><h2>{mes.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}</h2></div><div className="month-buttons"><button onClick={() => setMes(new Date(mes.getFullYear(), mes.getMonth() - 1, 1))}>‹</button><button onClick={() => setMes(new Date(mes.getFullYear(), mes.getMonth() + 1, 1))}>›</button></div></div>
           <div className="weekdays">{['DOM', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SÁB'].map(d => <span key={d}>{d}</span>)}</div>
-          <div className="calendar-grid">{dias.map(d => { const key = d.toISOString().slice(0, 10); const count = bilhetes.filter(b => b.data === key && !b.concluido).length; return <button key={key} className={`${d.getMonth() !== mes.getMonth() ? 'other-month ' : ''}${key === dataSelecionada ? 'selected ' : ''}${key === hoje() ? 'today' : ''}`} onClick={() => setDataSelecionada(key)}><span>{d.getDate()}</span>{count > 0 && <i>{count}</i>}</button> })}</div>
+          <div className="calendar-grid">{dias.map(d => { const key = d.toISOString().slice(0, 10); const count = bilhetes.filter(b => b.data === key && !b.concluido).length; return <button type="button" key={key} className={`${d.getMonth() !== mes.getMonth() ? 'other-month ' : ''}${key === dataSelecionada ? 'selected ' : ''}${key === hoje() ? 'today' : ''}`} onClick={() => { setDataSelecionada(key); setEditorAberto(true) }}><span>{d.getDate()}</span>{count > 0 && <i>{count}</i>}</button> })}</div>
           <div className="calendar-legend"><span><i className="legend-green" /> lembrete</span><span><i className="legend-red" /> urgente</span></div>
+          {editorAberto && <form className="radar-calendar-editor" onSubmit={criar}>
+            <strong>Agendar bilhete para {dataBonita(dataSelecionada)}</strong>
+            <div className="radar-form-row">
+              <label>⏰ Hora<input type="time" value={hora} onChange={e => setHora(e.target.value)} /></label>
+              <label>Nível do alerta<select value={prioridade} onChange={e => setPrioridade(e.target.value as Prioridade)}>{Object.entries(prioridadeConfig).map(([key, c]) => <option key={key} value={key}>{c.emoji} {c.label}</option>)}</select></label>
+            </div>
+            <button className="radar-add" type="submit" disabled={!texto.trim()}>+ Colocar no Radar</button>
+          </form>}
         </div>
       </div>
 

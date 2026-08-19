@@ -12,7 +12,7 @@ Required env vars (all set in Replit shared env / secrets):
 - `VAPID_PRIVATE_KEY` — VAPID private key (**secret** — needed for push notifications)
 - `VAPID_SUBJECT` — mailto: contact for VAPID (already set)
 - `PORT` — Express server port (set to 5000)
-- `VITE_USE_SUPABASE` — set to `false` (disables Supabase; Express+PostgreSQL is the primary backend)
+- `VITE_USE_SUPABASE` — defaults to `true` when Supabase URL and key are present; set to `false` only for an explicit local-only fallback
 - `NODE_ENV` — set to `production`
 - `EARTH_ENGINE_SERVICE_ACCOUNT_JSON` — Secret containing the complete Google Cloud service-account JSON key
 - `EARTH_ENGINE_PROJECT` — optional Earth Engine/Google Cloud project ID; when omitted, uses the `project_id` from the JSON key
@@ -38,7 +38,7 @@ Required env vars (all set in Replit shared env / secrets):
 - `attached_assets/` — report template (.docx)
 
 ## Architecture on Replit
-- **Express + Replit PostgreSQL** is the unified data store (`VITE_USE_SUPABASE=false`)
+- **Supabase** is the primary data store when configured; Express + Replit PostgreSQL remains the shared fallback for server-only features
 - Supabase code is present for Netlify fallback but completely inactive on Replit
 - DB tables auto-created on server startup — no separate migration step needed
 - In production, Express serves the built `/dist` frontend directly on port 5000
@@ -60,7 +60,7 @@ Required env vars (all set in Replit shared env / secrets):
 - Portuguese (pt-BR) UI
 
 ## Gotchas
-- `VITE_USE_SUPABASE=false` must remain set — this disables Supabase and routes all data through Express
+- Keep Supabase credentials configured for shared production data. Use `VITE_USE_SUPABASE=false` only when intentionally testing the local fallback.
 - DB tables auto-created on server startup — no separate migration step needed on Replit
 - Production: `npm run build && node server/index.js` — Express serves built `/dist`
 - Push notifications require `VAPID_PRIVATE_KEY` secret to be set in Replit secrets

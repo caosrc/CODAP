@@ -3,6 +3,7 @@ import './RadarDC.css'
 import './RadarDCResponsive.css'
 import { getAgenteLogado } from './Login'
 import { wsOn } from '../wsClient'
+import { supabase, supabaseDisponivel } from '../supabaseClient'
 
 type Prioridade = 'normal' | 'importante' | 'urgente'
 type RegistroRadar = {
@@ -62,6 +63,22 @@ export default function RadarDC() {
 
   const carregarAtividades = useCallback(async () => {
     try {
+      if (supabaseDisponivel) {
+        const proximoDia = new Date(`${dataSelecionada}T12:00:00`)
+        proximoDia.setDate(proximoDia.getDate() + 1)
+        const proximo = proximoDia.toLocaleDateString('en-CA')
+        const [checklistsResult, ocorrenciasResult] = await Promise.all([
+          supabase.from('checklists_viatura').select('id,data_checklist,placa,motorista,created_at').gte('data_checklist', dataSelecionada).lt('data_checklist', proximo).order('created_at', { ascending: false }),
+          supabase.from('ocorrencias').select('id,natureza,endereco,agentes,responsavel_registro,created_at,hora_inicio,data_ocorrencia').or(`data_ocorrencia.eq.${dataSelecionada},created_at.gte.${dataSelecionada}T00:00:00`).order('created_at', { ascending: false }),
+        ])
+        if (!checklistsResult.error && !ocorrenciasResult.error) {
+          setAtividades({
+            checklists: (checklistsResult.data || []).map(row => ({ ...row, agente: row.motorista || 'Agente não informado', hora: row.data_checklist?.includes('T') ? row.data_checklist.slice(11, 16) : new Date(row.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) })) as Atividade[],
+            ocorrencias: (ocorrenciasResult.data || []).map(row => ({ ...row, agente: row.responsavel_registro || (Array.isArray(row.agentes) ? row.agentes[0] : null) || 'Agente não informado', hora: row.hora_inicio || new Date(row.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) })) as Atividade[],
+          })
+          return
+        }
+      }
       const res = await fetch(`/api/atividades-dia?data=${dataSelecionada}`)
       if (res.ok) setAtividades(await res.json())
     } catch { setAtividades({ checklists: [], ocorrencias: [] }) }

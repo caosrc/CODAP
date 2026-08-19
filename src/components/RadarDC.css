@@ -1,2 +1,199 @@
-.radar-ticker>span{font-size:.74rem}.radar-ticker b{font-size:.86rem;line-height:1.2}
-.radar-header{padding-top:.78rem;padding-bottom:.78rem}.radar-header h1{font-size:clamp(1.35rem,2.5vw,2rem);margin:.08rem 0}.radar-header p{font-size:.78rem}
+.radar-page {
+  --ink: #12253f;
+  --muted: #6f849b;
+  --blue: #1e64b7;
+  min-height: 100%;
+  padding-bottom: 4.5rem;
+  background: #f4f7fb;
+  color: var(--ink);
+  font-family: inherit;
+}
+
+.radar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.5rem;
+  padding: .85rem clamp(1rem, 3vw, 2.6rem);
+  color: #fff;
+  background: linear-gradient(120deg, #092d59, #1676c7);
+}
+
+.radar-kicker {
+  color: #d1ebff;
+  font-size: .65rem;
+  font-weight: 800;
+  letter-spacing: .14em;
+}
+
+.radar-header h1 {
+  display: flex;
+  align-items: center;
+  gap: .35rem;
+  margin: .15rem 0;
+  font-size: clamp(1.5rem, 3vw, 2.25rem);
+  line-height: 1.1;
+}
+
+.radar-header h1 b { color: #7fe3ff; }
+.radar-header p { margin: 0; color: #c7e5ff; font-size: .8rem; }
+.radar-header-icon { width: 2.25rem; height: 2.25rem; border-radius: 50%; object-fit: cover; }
+
+.radar-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: .5rem;
+}
+
+.radar-actions button,
+.radar-add {
+  border: 0;
+  border-radius: 9px;
+  padding: .65rem .85rem;
+  font: inherit;
+  font-size: .78rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.radar-notify { color: #fff; background: #ffffff22; border: 1px solid #ffffff66 !important; }
+.radar-tv-btn { color: #082e55; background: #8fe5ff; }
+
+.radar-layout {
+  display: grid;
+  grid-template-columns: minmax(300px, .9fr) minmax(420px, 1.3fr);
+  align-items: start;
+  gap: 1rem;
+  padding: 1rem clamp(1rem, 3vw, 2.6rem);
+}
+
+.radar-right-column { display: grid; gap: 1rem; min-width: 0; }
+
+.radar-note-card,
+.radar-calendar-card,
+.radar-activities {
+  border: 1px solid #e1e9f2;
+  border-radius: 16px;
+  padding: 1rem;
+  background: #fff;
+  box-shadow: 0 8px 28px #14385d0d;
+}
+
+.card-label {
+  color: #3970a8;
+  font-size: .68rem;
+  font-weight: 900;
+  letter-spacing: .12em;
+}
+
+.label-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 5px;
+  border-radius: 50%;
+  background: #34c58a;
+}
+
+.radar-note-card h2,
+.radar-calendar-card h2,
+.radar-list-heading h2 {
+  margin: .3rem 0 .8rem;
+  font-size: 1.15rem;
+}
+
+.radar-note-card textarea,
+.radar-calendar-editor textarea,
+.radar-calendar-editor input,
+.radar-calendar-editor select {
+  box-sizing: border-box;
+  width: 100%;
+  margin-top: .3rem;
+  border: 1px solid #d3dfec;
+  border-radius: 9px;
+  padding: .65rem;
+  color: var(--ink);
+  background: #f8fbff;
+  font: inherit;
+}
+
+.radar-note-card textarea,
+.radar-calendar-editor textarea { resize: vertical; }
+.radar-note-card textarea { min-height: 190px; line-height: 1.45; }
+.radar-add { display: block; width: 100%; margin-top: .65rem; color: #fff; background: var(--blue); }
+.radar-add:hover { background: #18569e; }
+.radar-add:disabled { cursor: not-allowed; opacity: .5; }
+.radar-note-card small { display: block; margin-top: .5rem; color: #8294a7; font-size: .68rem; text-align: center; }
+
+.radar-mini-list { display: grid; max-height: 270px; gap: .4rem; margin-top: .85rem; overflow-y: auto; }
+.radar-mini-item { display: flex; align-items: center; gap: .45rem; padding: .55rem .6rem; border-radius: 9px; background: #f2f7fc; font-size: .78rem; }
+.radar-mini-item b { flex: 0 0 auto; color: #3970a8; font-size: .68rem; }
+.radar-mini-item span { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.radar-mini-item button { border: 0; color: #879aae; background: transparent; font-size: 1.2rem; cursor: pointer; }
+
+.calendar-top { display: flex; align-items: flex-start; justify-content: space-between; gap: .5rem; }
+.calendar-top > div > span { color: #7c8da1; font-size: .63rem; font-weight: 900; letter-spacing: .1em; }
+.calendar-top h2 { margin-top: .2rem; text-transform: capitalize; }
+.month-buttons { display: flex; gap: .3rem; }
+.month-buttons button { width: 31px; height: 31px; border: 1px solid #dce6f1; border-radius: 8px; color: var(--blue); background: #fff; font-size: 1.2rem; cursor: pointer; }
+.weekdays, .calendar-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
+.weekdays { margin-bottom: 5px; color: #96a8ba; font-size: .6rem; font-weight: 900; text-align: center; }
+.calendar-grid button { position: relative; min-height: 40px; border: 0; border-radius: 8px; color: #34506d; background: #f5f9fd; cursor: pointer; }
+.calendar-grid button:hover { background: #e5f2ff; }
+.calendar-grid .other-month { opacity: .35; }
+.calendar-grid .selected { color: #0868ba; background: #d6efff; box-shadow: inset 0 0 0 2px #49b6e8; }
+.calendar-grid .today span { font-weight: 900; }
+.calendar-grid .today span::after { display: block; width: 4px; height: 4px; margin: 2px auto 0; border-radius: 50%; background: #ef7055; content: ""; }
+.calendar-grid i { position: absolute; top: 3px; right: 3px; padding: 1px 4px; border-radius: 10px; color: #fff; background: #ef7055; font-size: .55rem; font-style: normal; }
+.calendar-legend { display: flex; gap: .8rem; margin-top: .65rem; color: #8999aa; font-size: .64rem; }
+.calendar-legend i { display: inline-block; width: 7px; height: 7px; margin-right: 4px; border-radius: 50%; background: #f04438; }
+
+.radar-calendar-editor { margin-top: .8rem; padding-top: .75rem; border-top: 1px solid #e3eaf3; }
+.radar-calendar-editor strong { display: block; margin-bottom: .2rem; color: var(--blue); font-size: .8rem; }
+.radar-calendar-editor .radar-form-row { display: grid; grid-template-columns: 1fr 1fr; gap: .5rem; margin-top: .5rem; }
+.radar-calendar-editor label { display: block; color: #55708d; font-size: .7rem; font-weight: 800; }
+
+.radar-activities { padding: .8rem 1rem; border-radius: 12px; }
+.radar-list-heading { display: flex; align-items: flex-end; justify-content: space-between; gap: .5rem; margin-bottom: .5rem; }
+.radar-list-heading strong { color: var(--muted); font-size: .7rem; }
+.radar-list-heading h2 { margin: .2rem 0 0; font-size: 1rem; }
+.radar-activity-columns { display: grid; grid-template-columns: 1fr 1fr; gap: .65rem; }
+.radar-activity-columns h3 { margin: .2rem 0 .35rem; font-size: .75rem; }
+.radar-activity { display: grid; grid-template-columns: 1fr auto; width: 100%; gap: .15rem .45rem; margin: .25rem 0; padding: .5rem; border: 1px solid #e0e9f2; border-radius: 8px; color: var(--ink); background: #f8fbff; text-align: left; cursor: pointer; }
+.radar-activity:hover { border-color: #53aee0; background: #eff8ff; }
+.radar-activity b { font-size: .7rem; }
+.radar-activity span, .radar-activity small { color: #68809a; font-size: .64rem; }
+.radar-activity small { grid-column: 1 / -1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.radar-activity em { grid-column: 2; grid-row: 1 / 4; color: var(--blue); font-size: .65rem; font-style: normal; }
+.radar-empty { padding: .7rem; border: 1px dashed #cad8e6; border-radius: 8px; color: #7890a7; background: #fff; font-size: .7rem; text-align: center; }
+
+.radar-ticker { position: fixed; right: 0; bottom: 0; left: 0; z-index: 20; display: flex; align-items: center; height: 48px; overflow: hidden; color: #d6edff; background: #0b2545; }
+.radar-ticker > span { display: flex; align-items: center; align-self: stretch; flex-shrink: 0; padding: 0 1rem; color: #fff; background: #0a8bc1; font-size: .78rem; font-weight: 900; letter-spacing: .08em; }
+.radar-ticker > div { min-width: 0; overflow: hidden; }
+.radar-ticker > div > b { display: inline-block; padding-left: 2rem; animation: radar-scroll 28s linear infinite; font-size: .86rem; font-weight: 700; white-space: nowrap; }
+@keyframes radar-scroll { to { transform: translateX(-35%); } }
+
+.radar-tv { position: fixed; inset: 0; z-index: 100; overflow: auto; color: #e9f5ff; background: #071c34; }
+.radar-tv .radar-header { padding: 2.5vh 4vw; }
+.radar-tv .radar-layout { max-width: 1500px; margin: auto; padding: 3vh 4vw; }
+.radar-tv .radar-note-card, .radar-tv .radar-calendar-card, .radar-tv .radar-activities { border-color: #235073; color: #e9f5ff; background: #102d4b; }
+.radar-tv .calendar-grid button, .radar-tv .radar-activity { color: #cae7ff; background: #163957; }
+
+@media (max-width: 700px) {
+  .radar-page { padding-bottom: 4rem; }
+  .radar-header { align-items: flex-start; flex-direction: column; gap: .65rem; padding: .8rem .75rem; }
+  .radar-header h1 { font-size: 1.65rem; }
+  .radar-actions { width: 100%; justify-content: stretch; }
+  .radar-actions button { flex: 1; padding: .55rem .35rem; font-size: .7rem; }
+  .radar-layout { grid-template-columns: 1fr; gap: .7rem; padding: .7rem .6rem 1rem; }
+  .radar-note-card, .radar-calendar-card, .radar-activities { padding: .8rem; border-radius: 12px; }
+  .radar-note-card textarea { min-height: 150px; }
+  .radar-activity-columns { grid-template-columns: 1fr; gap: .35rem; }
+  .radar-list-heading { align-items: flex-start; flex-direction: column; }
+  .calendar-grid { gap: 3px; }
+  .calendar-grid button { min-height: 36px; }
+  .radar-ticker { height: 42px; }
+  .radar-ticker > span { padding: 0 .65rem; font-size: .68rem; }
+  .radar-ticker > div > b { font-size: .76rem; }
+}

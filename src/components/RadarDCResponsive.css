@@ -2,6 +2,26 @@
   filter: drop-shadow(0 2px 2px rgba(11, 71, 122, .34));
 }
 
+body.radar-tv-active {
+  overflow: hidden;
+}
+
+body.radar-tv-active .app-shell > :not(.app-content),
+body.radar-tv-active .bottom-nav {
+  visibility: hidden;
+  pointer-events: none;
+}
+
+body.radar-tv-active .radar-page {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  width: 100vw;
+  height: 100vh;
+  min-height: 100vh;
+  overflow-y: auto;
+}
+
 .radar-shield {
   display: inline-block;
   filter: drop-shadow(0 3px 2px rgba(3, 27, 56, .34));

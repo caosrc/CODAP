@@ -124,11 +124,16 @@ export default function RadarDC() {
     return () => window.clearInterval(timer)
   }, [bilhetes])
 
+  useEffect(() => {
+    document.body.classList.toggle('radar-tv-active', tv)
+    return () => document.body.classList.remove('radar-tv-active')
+  }, [tv])
+
   const entrarTV = async () => {
-    await pedirNotificacao()
-    try { await document.documentElement.requestFullscreen?.() } catch { /* fullscreen pode ser bloqueado pelo navegador */ }
-    try { await screen.orientation?.lock?.('landscape') } catch { /* alguns navegadores não permitem orientação em desktop */ }
     setTv(true)
+    await pedirNotificacao()
+    try { await document.documentElement.requestFullscreen?.() } catch { /* o modo visual continua ativo quando o navegador bloqueia fullscreen */ }
+    try { screen.orientation?.lock?.('landscape').catch(() => {}) } catch { /* orientação é opcional */ }
   }
 
   const sairTV = () => {

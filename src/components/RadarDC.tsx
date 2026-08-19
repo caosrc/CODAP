@@ -152,22 +152,12 @@ export default function RadarDC() {
       </header>
 
       <div className="radar-layout">
-        <form className="radar-note-card" onSubmit={criar}>
-          <div className="card-label"><span className="label-dot" /> NOVO BILHETE</div>
-          <h2>Deixe no radar</h2>
-          <textarea value={texto} onChange={e => setTexto(e.target.value)} placeholder="Ex.: Confirmar cones para a operação de sábado..." rows={4} />
-          <div className="radar-form-row">
-            <label>📅 Data<input type="date" value={dataSelecionada} onChange={e => setDataSelecionada(e.target.value)} /></label>
-            <label>⏰ Hora<input type="time" value={hora} onChange={e => setHora(e.target.value)} /></label>
-          </div>
-          <label className="radar-priority">Nível do alerta
-            <select value={prioridade} onChange={e => setPrioridade(e.target.value as Prioridade)}>
-              {Object.entries(prioridadeConfig).map(([key, c]) => <option key={key} value={key}>{c.emoji} {c.label}</option>)}
-            </select>
-          </label>
-          <button className="radar-add" type="submit">+ Colocar no Radar</button>
-          <small>O alerta fica visível para a equipe neste dispositivo.</small>
-        </form>
+        <div className="radar-note-card radar-bilhete-large">
+          <div className="card-label"><span className="label-dot" /> BILHETE</div>
+          <h2>Bilhete</h2>
+          <textarea value={texto} onChange={e => setTexto(e.target.value)} placeholder="Escreva uma mensagem ou pendência para todos os agentes..." rows={11} />
+          <small>Escreva aqui. Depois clique em um dia no calendário para escolher data, hora e nível do alerta.</small>
+        </div>
 
         <div className="radar-calendar-card">
           <div className="calendar-top"><div><span>CALENDÁRIO DE ALERTAS</span><h2>{mes.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}</h2></div><div className="month-buttons"><button onClick={() => setMes(new Date(mes.getFullYear(), mes.getMonth() - 1, 1))}>‹</button><button onClick={() => setMes(new Date(mes.getFullYear(), mes.getMonth() + 1, 1))}>›</button></div></div>

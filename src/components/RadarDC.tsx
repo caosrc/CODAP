@@ -15,6 +15,14 @@ type Atividade = {
   endereco?: string; created_at: string
 }
 
+type DiaPrevisao = { data: string; codigo: number; precipitacao: number; probabilidade: number; umidade: number; vento: number; rajada: number }
+type TempoDC = { atual: { codigo: number; temperatura: number; chuva: number; vento: number; rajada: number; umidade: number }; dias: DiaPrevisao[] }
+
+const OURO_BRANCO = { latitude: -20.5236, longitude: -43.6949 }
+const nomesTempo: Record<number, string> = { 0: 'Céu limpo', 1: 'Predominantemente limpo', 2: 'Parcialmente nublado', 3: 'Nublado', 45: 'Neblina', 48: 'Neblina com gelo', 51: 'Garoa leve', 53: 'Garoa moderada', 55: 'Garoa intensa', 61: 'Chuva leve', 63: 'Chuva moderada', 65: 'Chuva forte', 71: 'Neve leve', 73: 'Neve moderada', 75: 'Neve forte', 80: 'Pancadas leves', 81: 'Pancadas moderadas', 82: 'Pancadas fortes', 95: 'Trovoada', 96: 'Trovoada com granizo', 99: 'Trovoada forte' }
+function iconeTempo(codigo: number) { return codigo >= 95 ? '⛈️' : codigo >= 80 ? '🌦️' : codigo >= 51 ? '🌧️' : codigo >= 45 ? '🌫️' : codigo >= 2 ? '⛅' : '☀️' }
+function dataTempo(data: string) { return new Date(data + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) }
+
 const STORAGE_KEY = 'defesacivil-radar-dc-v2'
 const prioridadeConfig: Record<Prioridade, { label: string; emoji: string }> = {
   normal: { label: 'Normal', emoji: '🟢' },
@@ -47,6 +55,8 @@ export default function RadarDC() {
   const [tv, setTv] = useState(false)
   const [notificacaoAtiva, setNotificacaoAtiva] = useState(false)
   const [atividades, setAtividades] = useState<{ checklists: Atividade[]; ocorrencias: Atividade[] }>({ checklists: [], ocorrencias: [] })
+  const [tempo, setTempo] = useState<TempoDC | null>(null)
+  const [erroTempo, setErroTempo] = useState('')
   const [salvando, setSalvando] = useState(false)
   const [erroSalvamento, setErroSalvamento] = useState('')
   const carregadoRef = useRef(false)
@@ -104,6 +114,29 @@ export default function RadarDC() {
     } catch { setAtividades({ checklists: [], ocorrencias: [] }) }
   }, [dataSelecionada])
 
+
+  useEffect(() => {
+    let ativo = true
+    const carregarTempo = async () => {
+      try {
+        const params = new URLSearchParams({ latitude: String(OURO_BRANCO.latitude), longitude: String(OURO_BRANCO.longitude), current: 'temperature_2m,weather_code,precipitation,relative_humidity_2m,wind_speed_10m,wind_gusts_10m', daily: 'weather_code,precipitation_sum,precipitation_probability_max,relative_humidity_2m_min,wind_speed_10m_max,wind_gusts_10m_max', timezone: 'America/Sao_Paulo', forecast_days: '16', wind_speed_unit: 'kmh', precipitation_unit: 'mm' })
+        const res = await fetch('https://api.open-meteo.com/v1/forecast?' + params)
+        if (!res.ok) throw new Error('Serviço meteorológico indisponível.')
+        const json = await res.json() as { current: Record<string, number>; daily: Record<string, Array<string | number>> }
+        if (!ativo) return
+        setTempo({
+          atual: { codigo: json.current.weather_code, temperatura: json.current.temperature_2m, chuva: json.current.precipitation, vento: json.current.wind_speed_10m, rajada: json.current.wind_gusts_10m, umidade: json.current.relative_humidity_2m },
+          dias: json.daily.time.map((data, i) => ({ data: String(data), codigo: Number(json.daily.weather_code[i]), precipitacao: Number(json.daily.precipitation_sum[i]), probabilidade: Number(json.daily.precipitation_probability_max[i]), umidade: Number(json.daily.relative_humidity_2m_min[i]), vento: Number(json.daily.wind_speed_10m_max[i]), rajada: Number(json.daily.wind_gusts_10m_max[i]) }))
+        })
+        setErroTempo('')
+      } catch (error) {
+        if (ativo) setErroTempo(error instanceof Error ? error.message : 'Não foi possível carregar o tempo.')
+      }
+    }
+    carregarTempo()
+    return () => { ativo = false }
+  }, [])
+
   useEffect(() => { carregar(); return wsOn('radar_bilhetes_atualizados', carregar) }, [carregar])
   useEffect(() => {
     carregarAtividades()
@@ -123,6 +156,15 @@ export default function RadarDC() {
   const lembretes = registros.filter(r => r.tipo === 'lembrete')
   const notificacoes = registros.filter(r => r.tipo === 'notificacao')
   const proximasNotificacoes = notificacoes.filter(r => !r.concluido).sort((a, b) => `${a.data}${a.hora}`.localeCompare(`${b.data}${b.hora}`))
+  const destaquesTempo = useMemo(() => {
+    if (!tempo?.dias.length) return null
+    return {
+      chuva: tempo.dias.reduce((maior, dia) => dia.precipitacao > maior.precipitacao ? dia : maior),
+      umidade: tempo.dias.reduce((menor, dia) => dia.umidade < menor.umidade ? dia : menor),
+      rajada: tempo.dias.reduce((maior, dia) => dia.rajada > maior.rajada ? dia : maior),
+    }
+  }, [tempo])
+
 
   async function salvarRegistro(tipo: RegistroRadar['tipo'], texto: string, data: string, horaRegistro: string) {
     if (!texto.trim() || salvando) return
@@ -229,6 +271,13 @@ export default function RadarDC() {
         </div>
       </header>
 
+
+      <section className="radar-weather" aria-labelledby="radar-weather-title">
+        <div className="radar-weather-heading"><div><span className="card-label">CONDIÇÕES METEOROLÓGICAS</span><h2 id="radar-weather-title">Ouro Branco – MG</h2><p>Previsão detalhada para os próximos 16 dias · Open-Meteo</p></div>{tempo && <span className="weather-updated">Atualizado agora</span>}</div>
+        {erroTempo && <p className="radar-save-error" role="alert">{erroTempo}</p>}
+        {!tempo && !erroTempo && <p className="radar-weather-loading">Carregando previsão...</p>}
+        {tempo && <><div className="radar-weather-current"><div className="weather-condition"><span>{iconeTempo(tempo.atual.codigo)}</span><div><strong>{Math.round(tempo.atual.temperatura)}°C</strong><b>{nomesTempo[tempo.atual.codigo] || 'Condição variável'}</b></div></div><div className="weather-metrics"><span>🌧️ Chuva <b>{tempo.atual.chuva.toFixed(1)} mm</b></span><span>☔ Prob. hoje <b>{tempo.dias[0]?.probabilidade ?? 0}%</b></span><span>💨 Vento <b>{Math.round(tempo.atual.vento)} km/h</b></span><span>💨 Rajadas <b>{Math.round(tempo.atual.rajada)} km/h</b></span><span>💧 Umidade <b>{Math.round(tempo.atual.umidade)}%</b></span></div></div>{destaquesTempo && <div className="weather-highlights"><div><span>🌧️ Maior precipitação</span><strong>{dataTempo(destaquesTempo.chuva.data)} · {destaquesTempo.chuva.precipitacao.toFixed(1)} mm</strong></div><div><span>💧 Menor umidade</span><strong>{dataTempo(destaquesTempo.umidade.data)} · {Math.round(destaquesTempo.umidade.umidade)}%</strong></div><div><span>💨 Maior rajada</span><strong>{dataTempo(destaquesTempo.rajada.data)} · {Math.round(destaquesTempo.rajada.rajada)} km/h</strong></div></div>}<small className="weather-disclaimer">Os 16 dias são uma estimativa meteorológica; quanto mais distante a data, menor a precisão.</small></>}
+      </section>
       <div className="radar-layout">
         <div className="radar-note-card radar-bilhete-large">
           <div className="card-label"><span className="label-dot" /> LEMBRETE</div>

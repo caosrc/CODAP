@@ -204,3 +204,26 @@
   .radar-ticker > span { padding: 0 .65rem; font-size: .68rem; }
   .radar-ticker > div > b { font-size: .76rem; }
 }
+
+.radar-weather { margin: 0 clamp(.65rem, 3vw, 2.6rem) 1rem; padding: 1.1rem 1.25rem; border: 1px solid rgba(43, 102, 166, .2); border-radius: 16px; background: linear-gradient(135deg, #f5faff, #fff); box-shadow: 0 8px 24px rgba(24, 69, 114, .08); }
+.radar-weather-heading { display: flex; justify-content: space-between; gap: 1rem; align-items: flex-start; }
+.radar-weather-heading h2 { margin: .2rem 0 .1rem; font-size: 1.35rem; color: #173b62; }
+.radar-weather-heading p { margin: 0; color: #59728a; font-size: .82rem; }
+.weather-updated { color: #2876b8; font-size: .75rem; font-weight: 700; }
+.radar-weather-current { display: flex; align-items: center; gap: 2rem; margin-top: 1rem; padding: .9rem; border-radius: 12px; background: #eaf5ff; }
+.weather-condition { display: flex; align-items: center; gap: .7rem; min-width: 180px; }
+.weather-condition > span { font-size: 2.3rem; }
+.weather-condition strong, .weather-condition b { display: block; }
+.weather-condition strong { color: #123e69; font-size: 1.8rem; }
+.weather-condition b { color: #4b6780; font-size: .82rem; }
+.weather-metrics { display: flex; flex-wrap: wrap; gap: .55rem 1rem; color: #45647d; font-size: .8rem; }
+.weather-metrics span { white-space: nowrap; }
+.weather-metrics b { color: #173b62; }
+.weather-highlights { display: grid; grid-template-columns: repeat(3, 1fr); gap: .7rem; margin-top: .8rem; }
+.weather-highlights > div { padding: .75rem; border-radius: 10px; background: #fff; border: 1px solid #dbeaf5; }
+.weather-highlights span, .weather-highlights strong { display: block; }
+.weather-highlights span { color: #527089; font-size: .73rem; }
+.weather-highlights strong { margin-top: .25rem; color: #173b62; font-size: .86rem; }
+.weather-disclaimer { display: block; margin-top: .75rem; color: #70889d; font-size: .7rem; }
+.radar-weather-loading { margin: 1rem 0 0; color: #527089; font-size: .85rem; }
+@media (max-width: 700px) { .radar-weather { margin-inline: .65rem; padding: .9rem; } .radar-weather-heading { flex-direction: column; } .radar-weather-current { align-items: flex-start; flex-direction: column; gap: .8rem; } .weather-highlights { grid-template-columns: 1fr; } }

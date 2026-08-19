@@ -180,10 +180,6 @@ export default function RadarDC() {
         </div>
       </div>
 
-      <section className="radar-list-section">
-        <div className="radar-list-heading"><div><span className="radar-kicker">VISÃO DA EQUIPE</span><h2>Radar DC: <em>{dataBonita(dataSelecionada)}</em></h2></div><strong>{proximos.length} pendência{proximos.length === 1 ? '' : 's'}</strong></div>
-        {doDia.length === 0 ? <div className="radar-empty"><span>🛰️</span><b>Nenhum alerta para este dia</b><small>Adicione um bilhete para manter a equipe alinhada.</small></div> : <div className="radar-tickets">{doDia.map(b => { const c = prioridadeConfig[b.prioridade]; const souAutor = b.criadoPor === agente; return <article className={`radar-ticket ${b.concluido ? 'done' : ''}`} key={b.id}><div className="ticket-time">{b.hora}<span>{b.concluido ? 'CONCLUÍDO' : 'ALERTA'}</span></div><div className="ticket-line" style={{ background: c.cor }} /><div className="ticket-copy"><div><span className="ticket-priority" style={{ color: c.cor }}>{c.emoji} {c.label}</span><span className="ticket-author">por {b.criadoPor}</span></div><p>{b.texto}</p></div>{souAutor && <><button className="ticket-check" onClick={() => alternar(b.id)}>{b.concluido ? '↩' : '✓'}</button><button className="ticket-remove" onClick={() => remover(b.id)}>×</button></>}</article> })}</div>}
-      </section>
       <div className="radar-ticker"><span>RADAR DC</span><div>{(proximos.length ? proximos : bilhetes).map(b => <b key={b.id}>● {dataBonita(b.data)} · {b.texto}</b>)}</div></div>
     </section>
   )

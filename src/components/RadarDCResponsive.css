@@ -44,13 +44,18 @@ body.radar-tv-active .radar-page {
 }
 
 .radar-bilhete-large {
-  min-height: 390px;
+  min-height: 480px;
 }
 
 .radar-bilhete-large textarea {
-  min-height: 270px;
+  min-height: 350px;
   font-size: 1rem;
   line-height: 1.55;
+}
+
+.radar-calendar-card {
+  transform: scale(.94);
+  transform-origin: top center;
 }
 
 .radar-calendar-editor {
@@ -72,8 +77,9 @@ body.radar-tv-active .radar-page {
 }
 
 @media (max-width: 700px) {
-  .radar-bilhete-large { min-height: 300px; }
-  .radar-bilhete-large textarea { min-height: 190px; }
+  .radar-bilhete-large { min-height: 390px; }
+  .radar-bilhete-large textarea { min-height: 280px; }
+  .radar-calendar-card { transform: none; }
   .radar-page { padding-bottom: 3.2rem; }
   .radar-header {
     align-items: flex-start;

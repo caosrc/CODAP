@@ -51,6 +51,7 @@ export default function RadarDC() {
   const [erroSalvamento, setErroSalvamento] = useState('')
   const carregadoRef = useRef(false)
   const pendentesRef = useRef(new Set<string>())
+  const notificacoesDisparadasRef = useRef(new Set<string>())
   const calendarioRef = useRef<HTMLDivElement>(null)
 
   const carregar = useCallback(async () => {
@@ -161,10 +162,19 @@ export default function RadarDC() {
   }
 
   async function remover(id: string) {
-    const res = await fetch(`/api/radar-bilhetes/${id}`, {
-      method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ agente }),
-    })
-    if (res.ok) setRegistros(prev => prev.filter(r => r.id !== id))
+    setErroSalvamento('')
+    try {
+      const res = await fetch('/api/radar-bilhetes/' + id, {
+        method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ agente }),
+      })
+      if (!res.ok) {
+        const detalhe = await res.json().catch(() => null) as { error?: string } | null
+        throw new Error(detalhe?.error || 'Não foi possível remover o registro.')
+      }
+      setRegistros(prev => prev.filter(r => r.id !== id))
+    } catch (error) {
+      setErroSalvamento(error instanceof Error ? error.message : 'Não foi possível remover o registro.')
+    }
   }
 
   const pedirNotificacao = useCallback(async () => {
@@ -174,13 +184,21 @@ export default function RadarDC() {
   }, [])
 
   useEffect(() => {
-    if ('Notification' in window) setNotificacaoAtiva(Notification.permission === 'granted')
-    const timer = window.setInterval(() => {
-      const chave = `${hoje()}|${new Date().toTimeString().slice(0, 5)}`
-      proximasNotificacoes.filter(n => `${n.data}|${n.hora}` === chave).forEach(n => {
-        if ('Notification' in window && Notification.permission === 'granted') new Notification('Radar DC', { body: n.texto, tag: n.id })
+    if (!('Notification' in window)) return
+    setNotificacaoAtiva(Notification.permission === 'granted')
+
+    const verificarNotificacoes = () => {
+      if (Notification.permission !== 'granted') return
+      const chave = hoje() + '|' + horaAgora()
+      proximasNotificacoes.filter(n => n.data + '|' + n.hora === chave).forEach(n => {
+        if (notificacoesDisparadasRef.current.has(n.id)) return
+        notificacoesDisparadasRef.current.add(n.id)
+        new Notification('Radar DC', { body: n.texto, tag: n.id })
       })
-    }, 30000)
+    }
+
+    verificarNotificacoes()
+    const timer = window.setInterval(verificarNotificacoes, 15000)
     return () => window.clearInterval(timer)
   }, [proximasNotificacoes])
 
@@ -224,9 +242,9 @@ export default function RadarDC() {
 
         <div className="radar-right-column">
         <div className="radar-calendar-card" ref={calendarioRef}>
-          <div className="calendar-top"><div><span>CALENDÁRIO DE NOTIFICAÇÕES</span><h2>{mes.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}</h2></div><div className="month-buttons"><button onClick={() => setMes(new Date(mes.getFullYear(), mes.getMonth() - 1, 1))}>‹</button><button onClick={() => setMes(new Date(mes.getFullYear(), mes.getMonth() + 1, 1))}>›</button></div></div>
+          <div className="calendar-top"><div><span>CALENDÁRIO DE NOTIFICAÇÕES</span><h2>{mes.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}</h2></div><div className="month-buttons"><button type="button" aria-label="Mês anterior" onClick={() => setMes(new Date(mes.getFullYear(), mes.getMonth() - 1, 1))}>‹</button><button type="button" aria-label="Próximo mês" onClick={() => setMes(new Date(mes.getFullYear(), mes.getMonth() + 1, 1))}>›</button></div></div>
           <div className="weekdays">{['DOM', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SÁB'].map(d => <span key={d}>{d}</span>)}</div>
-          <div className="calendar-grid">{dias.map(d => { const key = dataLocalISO(d); const count = notificacoes.filter(n => n.data === key && !n.concluido).length; return <button type="button" key={key} className={`${d.getMonth() !== mes.getMonth() ? 'other-month ' : ''}${key === dataSelecionada ? 'selected ' : ''}${key === hoje() ? 'today' : ''}`} onClick={() => { setDataSelecionada(key); setEditorAberto(true) }}><span>{d.getDate()}</span>{count > 0 && <i>{count}</i>}</button> })}</div>
+          <div className="calendar-grid">{dias.map(d => { const key = dataLocalISO(d); const count = notificacoes.filter(n => n.data === key && !n.concluido).length; return <button type="button" key={key} aria-label={dataBonita(key)} className={`${d.getMonth() !== mes.getMonth() ? 'other-month ' : ''}${key === dataSelecionada ? 'selected ' : ''}${key === hoje() ? 'today' : ''}`} onClick={() => { setDataSelecionada(key); setEditorAberto(true) }}><span>{d.getDate()}</span>{count > 0 && <i>{count}</i>}</button> })}</div>
           <div className="calendar-legend"><span><i className="legend-red" /> notificações</span></div>
           {editorAberto && <form className="radar-calendar-editor" onSubmit={e => { e.preventDefault(); salvarRegistro('notificacao', textoNotificacao, dataSelecionada, hora) }}>
             <strong>Notificar em {dataBonita(dataSelecionada)}</strong>

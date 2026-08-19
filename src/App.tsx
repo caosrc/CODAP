@@ -204,6 +204,28 @@ export default function App() {
   const [destinoCampo, setDestinoCampo] = useState<{ lat: number; lng: number; nome?: string; soMostrar?: boolean } | null>(null)
   const [equipamentosCampoMapa, setEquipamentosCampoMapa] = useState<EquipamentoCampoMapa[]>([])
   const [abrirCampoId, setAbrirCampoId] = useState<number | null>(null)
+  const [abrirChecklistId, setAbrirChecklistId] = useState<number | null>(null)
+
+  useEffect(() => {
+    function abrirChecklist(e: Event) {
+      const id = (e as CustomEvent<{ id: number }>).detail?.id
+      if (typeof id !== 'number') return
+      setAbrirChecklistId(id)
+      setAba('viatura')
+    }
+    function abrirOcorrencia(e: Event) {
+      const id = (e as CustomEvent<{ id: number }>).detail?.id
+      if (typeof id !== 'number') return
+      const encontrada = ocorrencias.find(o => o.id === id)
+      if (encontrada) { setSelecionada(encontrada); setAba('lista') }
+    }
+    window.addEventListener('dc:abrir-checklist', abrirChecklist)
+    window.addEventListener('dc:abrir-ocorrencia', abrirOcorrencia)
+    return () => {
+      window.removeEventListener('dc:abrir-checklist', abrirChecklist)
+      window.removeEventListener('dc:abrir-ocorrencia', abrirOcorrencia)
+    }
+  }, [ocorrencias])
 
   useEffect(() => {
     function aoSolicitarRota(e: Event) {
@@ -1027,7 +1049,7 @@ export default function App() {
         {aba === 'viatura' && (
           <ErrorBoundary>
             <Suspense fallback={<LazyFallback />}>
-              <ChecklistViatura />
+              <ChecklistViatura abrirId={abrirChecklistId} />
             </Suspense>
           </ErrorBoundary>
         )}

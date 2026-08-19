@@ -4374,7 +4374,7 @@ export default function Planejamento() {
 
       {subAba === 'radar' ? (
         <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
-          <RadarDC />
+           <RadarDC />
         </div>
       ) : subAba === 'emergencia' ? (
         <div style={{ flex: 1, overflowY: 'auto' }}>

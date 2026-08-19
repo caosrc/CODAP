@@ -397,7 +397,7 @@ function mesLabel(yyyymm: string) {
   return `${MESES_PT[Number(m) - 1]} ${y}`
 }
 
-export default function ChecklistViatura() {
+export default function ChecklistViatura({ abrirId }: { abrirId?: number | null } = {}) {
   const [modo, setModo] = useState<Modo>('lista')
   const [checklists, setChecklists] = useState<ChecklistData[]>([])
   const [carregando, setCarregando] = useState(true)
@@ -611,6 +611,12 @@ export default function ChecklistViatura() {
   }
 
   useEffect(() => { carregar(); carregarMeses() }, [])
+
+  useEffect(() => {
+    if (abrirId == null || !checklists.length) return
+    const encontrado = checklists.find(c => c.id === abrirId)
+    if (encontrado) abrirDetalhe(encontrado)
+  }, [abrirId, checklists])
 
   // Atualiza em tempo real quando outro agente salva ou apaga um checklist
   useEffect(() => {

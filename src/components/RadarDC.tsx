@@ -5,105 +5,107 @@ import { getAgenteLogado } from './Login'
 import { wsOn } from '../wsClient'
 
 type Prioridade = 'normal' | 'importante' | 'urgente'
-type Bilhete = {
-  id: string
-  texto: string
-  data: string
-  hora: string
-  prioridade: Prioridade
-  concluido: boolean
-  criadoPor: string
-  criadoEm: string
+type RegistroRadar = {
+  id: string; texto: string; data: string; hora: string; prioridade: Prioridade
+  concluido: boolean; criadoPor: string; criadoEm: string; tipo: 'lembrete' | 'notificacao'
+}
+type Atividade = {
+  id: number; agente: string; hora: string; placa?: string; natureza?: string
+  endereco?: string; created_at: string
 }
 
-const STORAGE_KEY = 'defesacivil-radar-dc-v1'
-const prioridadeConfig: Record<Prioridade, { label: string; cor: string; emoji: string }> = {
-  normal: { label: 'Normal', cor: '#36b37e', emoji: '🟢' },
-  importante: { label: 'Importante', cor: '#f59e0b', emoji: '🟠' },
-  urgente: { label: 'Urgente', cor: '#f04438', emoji: '🔴' },
+const STORAGE_KEY = 'defesacivil-radar-dc-v2'
+const prioridadeConfig: Record<Prioridade, { label: string; emoji: string }> = {
+  normal: { label: 'Normal', emoji: '🟢' },
+  importante: { label: 'Importante', emoji: '🟠' },
+  urgente: { label: 'Urgente', emoji: '🔴' },
 }
 
-function hoje() {
-  return new Date().toISOString().slice(0, 10)
-}
-
+function hoje() { return new Date().toLocaleDateString('en-CA') }
+function horaAgora() { return new Date().toTimeString().slice(0, 5) }
 function dataBonita(data: string) {
-  if (!data) return 'Sem data'
-  return new Date(`${data}T12:00:00`).toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: 'short' }).replace('.', '')
+  return data ? new Date(`${data}T12:00:00`).toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: 'short' }).replace('.', '') : 'Sem data'
+}
+function disparar(nome: string, detail: unknown) {
+  window.dispatchEvent(new CustomEvent(nome, { detail }))
 }
 
 export default function RadarDC() {
   const agente = getAgenteLogado() || 'Agente DC'
-  const [bilhetes, setBilhetes] = useState<Bilhete[]>([])
+  const [registros, setRegistros] = useState<RegistroRadar[]>([])
   const [dataSelecionada, setDataSelecionada] = useState(hoje())
   const [mes, setMes] = useState(() => new Date(`${hoje()}T12:00:00`))
-  const [texto, setTexto] = useState('')
-  const [hora, setHora] = useState('08:00')
+  const [textoLembrete, setTextoLembrete] = useState('')
+  const [textoNotificacao, setTextoNotificacao] = useState('')
+  const [hora, setHora] = useState(horaAgora())
   const [prioridade, setPrioridade] = useState<Prioridade>('normal')
   const [editorAberto, setEditorAberto] = useState(false)
   const [tv, setTv] = useState(false)
   const [notificacaoAtiva, setNotificacaoAtiva] = useState(false)
+  const [atividades, setAtividades] = useState<{ checklists: Atividade[]; ocorrencias: Atividade[] }>({ checklists: [], ocorrencias: [] })
 
-  const carregarBilhetes = useCallback(async () => {
+  const carregar = useCallback(async () => {
     try {
       const res = await fetch('/api/radar-bilhetes')
-      if (!res.ok) throw new Error('Falha ao carregar')
+      if (!res.ok) throw new Error()
       const rows = await res.json() as Array<Record<string, unknown>>
-      setBilhetes(rows.map(row => ({
+      setRegistros(rows.map(row => ({
         id: String(row.id), texto: String(row.texto), data: String(row.data), hora: String(row.hora),
         prioridade: (row.prioridade as Prioridade) || 'normal', concluido: Boolean(row.concluido),
         criadoPor: String(row.criado_por), criadoEm: String(row.criado_em),
+        tipo: row.tipo === 'notificacao' ? 'notificacao' : 'lembrete',
       })))
     } catch {
-      try { setBilhetes(JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]')) } catch { setBilhetes([]) }
+      try { setRegistros(JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]')) } catch { setRegistros([]) }
     }
   }, [])
 
-  useEffect(() => {
-    carregarBilhetes()
-    return wsOn('radar_bilhetes_atualizados', carregarBilhetes)
-  }, [carregarBilhetes])
+  const carregarAtividades = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/atividades-dia?data=${dataSelecionada}`)
+      if (res.ok) setAtividades(await res.json())
+    } catch { setAtividades({ checklists: [], ocorrencias: [] }) }
+  }, [dataSelecionada])
 
-  useEffect(() => { localStorage.setItem(STORAGE_KEY, JSON.stringify(bilhetes)) }, [bilhetes])
+  useEffect(() => { carregar(); return wsOn('radar_bilhetes_atualizados', carregar) }, [carregar])
+  useEffect(() => {
+    carregarAtividades()
+    const offChecklist = wsOn('checklist_atualizado', carregarAtividades)
+    const offOcorrencias = wsOn('ocorrencias_atualizadas', carregarAtividades)
+    return () => { offChecklist(); offOcorrencias() }
+  }, [carregarAtividades])
+  useEffect(() => { localStorage.setItem(STORAGE_KEY, JSON.stringify(registros)) }, [registros])
 
   const dias = useMemo(() => {
     const primeiro = new Date(mes.getFullYear(), mes.getMonth(), 1)
-    const inicio = new Date(primeiro)
-    inicio.setDate(1 - primeiro.getDay())
-    return Array.from({ length: 42 }, (_, i) => {
-      const dia = new Date(inicio)
-      dia.setDate(inicio.getDate() + i)
-      return dia
-    })
+    const inicio = new Date(primeiro); inicio.setDate(1 - primeiro.getDay())
+    return Array.from({ length: 42 }, (_, i) => { const d = new Date(inicio); d.setDate(inicio.getDate() + i); return d })
   }, [mes])
+  const lembretes = registros.filter(r => r.tipo === 'lembrete')
+  const notificacoes = registros.filter(r => r.tipo === 'notificacao')
+  const proximasNotificacoes = notificacoes.filter(r => !r.concluido).sort((a, b) => `${a.data}${a.hora}`.localeCompare(`${b.data}${b.hora}`))
 
-  const doDia = bilhetes.filter(b => b.data === dataSelecionada)
-  const proximos = bilhetes.filter(b => !b.concluido).sort((a, b) => `${a.data}${a.hora}`.localeCompare(`${b.data}${b.hora}`))
-
-  const criar = async (e: React.FormEvent) => {
-    e.preventDefault()
+  async function salvarRegistro(tipo: RegistroRadar['tipo'], texto: string, data: string, horaRegistro: string) {
     if (!texto.trim()) return
-    const novo = {
-      id: crypto.randomUUID(), texto: texto.trim(), data: dataSelecionada, hora,
-      prioridade, concluido: false, criadoPor: agente, criadoEm: new Date().toISOString(),
+    const novo: RegistroRadar = {
+      id: crypto.randomUUID(), texto: texto.trim(), data, hora: horaRegistro,
+      prioridade, concluido: false, criadoPor: agente, criadoEm: new Date().toISOString(), tipo,
     }
-    const res = await fetch('/api/radar-bilhetes', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...novo, criado_por: agente }) })
+    const res = await fetch('/api/radar-bilhetes', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...novo, criado_por: agente, tipo }),
+    })
     if (!res.ok) return
-    setBilhetes(prev => [...prev, novo])
-    setTexto('')
-    setHora('08:00')
-    setEditorAberto(false)
+    setRegistros(prev => [...prev, novo])
+    if (tipo === 'lembrete') setTextoLembrete('')
+    else { setTextoNotificacao(''); setHora(horaAgora()); setEditorAberto(false) }
   }
 
-  const alternar = async (id: string) => {
-    const bilhete = bilhetes.find(b => b.id === id)
-    if (!bilhete || bilhete.criadoPor !== agente) return
-    const res = await fetch(`/api/radar-bilhetes/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ agente, concluido: !bilhete.concluido }) })
-    if (res.ok) setBilhetes(prev => prev.map(b => b.id === id ? { ...b, concluido: !b.concluido } : b))
-  }
-  const remover = async (id: string) => {
-    const res = await fetch(`/api/radar-bilhetes/${id}`, { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ agente }) })
-    if (res.ok) setBilhetes(prev => prev.filter(b => b.id !== id))
+  async function remover(id: string) {
+    const res = await fetch(`/api/radar-bilhetes/${id}`, {
+      method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ agente }),
+    })
+    if (res.ok) setRegistros(prev => prev.filter(r => r.id !== id))
   }
 
   const pedirNotificacao = useCallback(async () => {
@@ -115,72 +117,61 @@ export default function RadarDC() {
   useEffect(() => {
     if ('Notification' in window) setNotificacaoAtiva(Notification.permission === 'granted')
     const timer = window.setInterval(() => {
-      const agora = new Date()
-      const chave = `${agora.toISOString().slice(0, 10)}|${agora.toTimeString().slice(0, 5)}`
-      bilhetes.filter(b => !b.concluido && `${b.data}|${b.hora}` === chave).forEach(b => {
-        if ('Notification' in window && Notification.permission === 'granted') new Notification('Radar DC', { body: b.texto, tag: b.id })
+      const chave = `${hoje()}|${new Date().toTimeString().slice(0, 5)}`
+      proximasNotificacoes.filter(n => `${n.data}|${n.hora}` === chave).forEach(n => {
+        if ('Notification' in window && Notification.permission === 'granted') new Notification('Radar DC', { body: n.texto, tag: n.id })
       })
     }, 30000)
     return () => window.clearInterval(timer)
-  }, [bilhetes])
+  }, [proximasNotificacoes])
 
   useEffect(() => {
     document.body.classList.toggle('radar-tv-active', tv)
     return () => document.body.classList.remove('radar-tv-active')
   }, [tv])
 
-  const entrarTV = async () => {
-    setTv(true)
-    await pedirNotificacao()
-    try { await document.documentElement.requestFullscreen?.() } catch { /* o modo visual continua ativo quando o navegador bloqueia fullscreen */ }
-    try { screen.orientation?.lock?.('landscape').catch(() => {}) } catch { /* orientação é opcional */ }
-  }
-
-  const sairTV = () => {
-    document.exitFullscreen?.()
-    try { screen.orientation?.unlock?.() } catch { /* orientação volta ao padrão do dispositivo */ }
-    setTv(false)
-  }
-
   return (
     <section className={`radar-page ${tv ? 'radar-tv' : ''}`}>
       <header className="radar-header">
-        <div>
-          <div className="radar-kicker">CENTRAL DE LEMBRETES OPERACIONAIS</div>
-          <h1><img className="radar-header-icon" src="/api/radar-icon" alt="" /> Radar <b>DC</b></h1>
-          <p>O que precisa entrar no radar da equipe hoje?</p>
-        </div>
+        <div><div className="radar-kicker">CENTRAL DE LEMBRETES OPERACIONAIS</div><h1><img className="radar-header-icon" src="/api/radar-icon" alt="" /> Radar <b>DC</b></h1><p>Informações compartilhadas por toda a equipe.</p></div>
         <div className="radar-actions">
           {!notificacaoAtiva && <button className="radar-notify" onClick={pedirNotificacao}>🔔 Ativar notificações</button>}
-          <button className="radar-tv-btn" onClick={tv ? sairTV : entrarTV}>{tv ? '↙ Voltar ao app' : '▣ Modo TV'}</button>
+          <button className="radar-tv-btn" onClick={() => setTv(!tv)}>{tv ? '↙ Voltar ao app' : '▣ Modo TV'}</button>
         </div>
       </header>
 
       <div className="radar-layout">
         <div className="radar-note-card radar-bilhete-large">
-          <div className="card-label"><span className="label-dot" /> BILHETE</div>
-          <h2>Bilhete</h2>
-          <textarea value={texto} onChange={e => setTexto(e.target.value)} placeholder="Escreva uma mensagem ou pendência para todos os agentes..." rows={11} />
-          <small>Escreva aqui. Depois clique em um dia no calendário para escolher data, hora e nível do alerta.</small>
+          <div className="card-label"><span className="label-dot" /> LEMBRETE</div>
+          <h2>Novo lembrete</h2>
+          <textarea value={textoLembrete} onChange={e => setTextoLembrete(e.target.value)} placeholder="Deixe um lembrete para a equipe..." rows={7} />
+          <button className="radar-add" onClick={() => salvarRegistro('lembrete', textoLembrete, hoje(), horaAgora())} disabled={!textoLembrete.trim()}>+ Salvar lembrete</button>
+          <small>O lembrete fica visível até o agente que o criou removê-lo.</small>
+          <div className="radar-mini-list">{lembretes.length === 0 ? <span>Nenhum lembrete cadastrado.</span> : lembretes.map(l => <div className="radar-mini-item" key={l.id}><b>{l.criadoPor}</b><span>{l.texto}</span><button onClick={() => remover(l.id)} title="Remover lembrete">×</button></div>)}</div>
         </div>
 
         <div className="radar-calendar-card">
-          <div className="calendar-top"><div><span>CALENDÁRIO DE ALERTAS</span><h2>{mes.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}</h2></div><div className="month-buttons"><button onClick={() => setMes(new Date(mes.getFullYear(), mes.getMonth() - 1, 1))}>‹</button><button onClick={() => setMes(new Date(mes.getFullYear(), mes.getMonth() + 1, 1))}>›</button></div></div>
+          <div className="calendar-top"><div><span>CALENDÁRIO DE NOTIFICAÇÕES</span><h2>{mes.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}</h2></div><div className="month-buttons"><button onClick={() => setMes(new Date(mes.getFullYear(), mes.getMonth() - 1, 1))}>‹</button><button onClick={() => setMes(new Date(mes.getFullYear(), mes.getMonth() + 1, 1))}>›</button></div></div>
           <div className="weekdays">{['DOM', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SÁB'].map(d => <span key={d}>{d}</span>)}</div>
-          <div className="calendar-grid">{dias.map(d => { const key = d.toISOString().slice(0, 10); const count = bilhetes.filter(b => b.data === key && !b.concluido).length; return <button type="button" key={key} className={`${d.getMonth() !== mes.getMonth() ? 'other-month ' : ''}${key === dataSelecionada ? 'selected ' : ''}${key === hoje() ? 'today' : ''}`} onClick={() => { setDataSelecionada(key); setEditorAberto(true) }}><span>{d.getDate()}</span>{count > 0 && <i>{count}</i>}</button> })}</div>
-          <div className="calendar-legend"><span><i className="legend-green" /> lembrete</span><span><i className="legend-red" /> urgente</span></div>
-          {editorAberto && <form className="radar-calendar-editor" onSubmit={criar}>
-            <strong>Agendar bilhete para {dataBonita(dataSelecionada)}</strong>
-            <div className="radar-form-row">
-              <label>⏰ Hora<input type="time" value={hora} onChange={e => setHora(e.target.value)} /></label>
-              <label>Nível do alerta<select value={prioridade} onChange={e => setPrioridade(e.target.value as Prioridade)}>{Object.entries(prioridadeConfig).map(([key, c]) => <option key={key} value={key}>{c.emoji} {c.label}</option>)}</select></label>
-            </div>
-            <button className="radar-add" type="submit" disabled={!texto.trim()}>+ Colocar no Radar</button>
+          <div className="calendar-grid">{dias.map(d => { const key = d.toLocaleDateString('en-CA'); const count = notificacoes.filter(n => n.data === key && !n.concluido).length; return <button type="button" key={key} className={`${d.getMonth() !== mes.getMonth() ? 'other-month ' : ''}${key === dataSelecionada ? 'selected ' : ''}${key === hoje() ? 'today' : ''}`} onClick={() => { setDataSelecionada(key); setEditorAberto(true) }}><span>{d.getDate()}</span>{count > 0 && <i>{count}</i>}</button> })}</div>
+          <div className="calendar-legend"><span><i className="legend-red" /> notificações</span></div>
+          {editorAberto && <form className="radar-calendar-editor" onSubmit={e => { e.preventDefault(); salvarRegistro('notificacao', textoNotificacao, dataSelecionada, hora) }}>
+            <strong>Notificar em {dataBonita(dataSelecionada)}</strong>
+            <textarea value={textoNotificacao} onChange={e => setTextoNotificacao(e.target.value)} placeholder="Escreva a notificação..." rows={3} />
+            <div className="radar-form-row"><label>⏰ Hora<input type="time" value={hora} onChange={e => setHora(e.target.value)} /></label><label>Nível<select value={prioridade} onChange={e => setPrioridade(e.target.value as Prioridade)}>{Object.entries(prioridadeConfig).map(([key, c]) => <option key={key} value={key}>{c.emoji} {c.label}</option>)}</select></label></div>
+            <button className="radar-add" type="submit" disabled={!textoNotificacao.trim()}>+ Colocar no Radar DC</button>
           </form>}
         </div>
       </div>
 
-      <div className="radar-ticker"><span>RADAR DC</span><div>{(proximos.length ? proximos : bilhetes).map(b => <b key={b.id}>● {dataBonita(b.data)} · {b.texto}</b>)}</div></div>
+      <section className="radar-activities">
+        <div className="radar-list-heading"><div><span className="card-label">REGISTROS OPERACIONAIS</span><h2>Atividades de {dataBonita(dataSelecionada)}</h2></div><strong>{atividades.checklists.length + atividades.ocorrencias.length} registro(s)</strong></div>
+        <div className="radar-activity-columns">
+          <div><h3>🚗 Checklists do dia</h3>{atividades.checklists.length === 0 ? <div className="radar-empty">Nenhum checklist registrado.</div> : atividades.checklists.map(c => <button className="radar-activity" key={c.id} onClick={() => disparar('dc:abrir-checklist', { id: c.id })}><b>{c.agente}</b><span>{c.hora} · placa {c.placa || 'não informada'}</span><em>abrir ›</em></button>)}</div>
+          <div><h3>⚠️ Ocorrências do dia</h3>{atividades.ocorrencias.length === 0 ? <div className="radar-empty">Nenhuma ocorrência registrada.</div> : atividades.ocorrencias.map(o => <button className="radar-activity" key={o.id} onClick={() => disparar('dc:abrir-ocorrencia', { id: o.id })}><b>{o.agente}</b><span>{o.hora} · {o.natureza || 'Natureza não informada'}</span><small>{o.endereco || 'Endereço não informado'}</small><em>abrir ›</em></button>)}</div>
+        </div>
+      </section>
+      <div className="radar-ticker"><span>RADAR DC</span><div>{(proximasNotificacoes.length ? proximasNotificacoes : notificacoes).map(n => <b key={n.id}>● {dataBonita(n.data)} · {n.texto}</b>)}</div></div>
     </section>
   )
 }

@@ -1,0 +1,72 @@
+.radar-page .radar-shield-icon {
+  filter: drop-shadow(0 2px 2px rgba(11, 71, 122, .34));
+}
+
+.radar-shield {
+  display: inline-block;
+  filter: drop-shadow(0 3px 2px rgba(3, 27, 56, .34));
+  transform: translateY(2px);
+}
+
+.radar-ticker > span {
+  position: relative;
+  z-index: 2;
+}
+
+.radar-ticker > div {
+  position: relative;
+  z-index: 1;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  background: #0b2545;
+  animation-duration: 14s;
+}
+
+@media (max-width: 700px) {
+  .radar-page { padding-bottom: 3.2rem; }
+  .radar-header {
+    align-items: flex-start;
+    flex-direction: column;
+    padding: 1rem .85rem;
+  }
+  .radar-header h1 { font-size: 1.75rem; }
+  .radar-header p { font-size: .78rem; }
+  .radar-actions {
+    width: 100%;
+    justify-content: stretch;
+  }
+  .radar-actions button {
+    flex: 1;
+    font-size: .72rem;
+    padding: .65rem .45rem;
+  }
+  .radar-layout {
+    grid-template-columns: 1fr;
+    padding: .7rem .65rem;
+    gap: .7rem;
+  }
+  .radar-note-card, .radar-calendar-card {
+    border-radius: 12px;
+    padding: .85rem;
+  }
+  .radar-note-card h2, .radar-calendar-card h2 { font-size: 1.05rem; }
+  .calendar-grid { gap: 2px; }
+  .calendar-grid button { min-height: 38px; }
+  .radar-list-section { padding: 0 .65rem .7rem; }
+  .radar-list-heading {
+    align-items: flex-start;
+    gap: .5rem;
+    flex-direction: column;
+  }
+  .radar-list-heading h2 { font-size: 1rem; }
+  .radar-ticket { gap: .45rem; padding: .65rem .55rem; }
+  .ticket-time { width: 40px; font-size: .72rem; }
+  .ticket-copy p { font-size: .78rem; }
+  .ticket-author {
+    display: block;
+    margin: .18rem 0 0;
+  }
+  .radar-ticker { height: 31px; }
+  .radar-ticker b { font-size: .62rem; }
+}

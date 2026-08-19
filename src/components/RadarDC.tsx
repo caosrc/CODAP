@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import './RadarDC.css'
+import './RadarDCResponsive.css'
 import { getAgenteLogado } from './Login'
 
 type Prioridade = 'normal' | 'importante' | 'urgente'

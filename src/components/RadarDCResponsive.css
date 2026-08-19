@@ -142,6 +142,37 @@ body.radar-tv-active .radar-page {
   cursor: not-allowed;
 }
 
+.radar-ticker {
+  height: 58px;
+}
+
+.radar-ticker > span {
+  font-size: .9rem;
+  padding: 0 1.25rem;
+}
+
+.radar-ticker b {
+  font-size: 1rem;
+  font-weight: 800;
+}
+
+.calendar-grid i {
+  font-size: .68rem;
+  padding: 2px 5px;
+}
+
+.radar-tv .radar-ticker {
+  height: 72px;
+}
+
+.radar-tv .radar-ticker > span {
+  font-size: 1rem;
+}
+
+.radar-tv .radar-ticker b {
+  font-size: 1.2rem;
+}
+
 @media (max-width: 700px) {
   .radar-bilhete-large { min-height: 390px; }
   .radar-bilhete-large textarea { min-height: 280px; }
@@ -189,6 +220,7 @@ body.radar-tv-active .radar-page {
     display: block;
     margin: .18rem 0 0;
   }
-  .radar-ticker { height: 31px; }
-  .radar-ticker b { font-size: .62rem; }
+  .radar-ticker { height: 44px; }
+  .radar-ticker > span { font-size: .7rem; padding: 0 .75rem; }
+  .radar-ticker b { font-size: .78rem; }
 }

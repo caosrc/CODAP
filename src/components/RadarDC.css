@@ -57,6 +57,13 @@
   cursor: pointer;
 }
 
+.radar-save-error {
+  margin: 0.5rem 0 0;
+  color: #b42318;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
 .radar-notify { color: #fff; background: #ffffff22; border: 1px solid #ffffff66 !important; }
 .radar-tv-btn { color: #082e55; background: #8fe5ff; }
 

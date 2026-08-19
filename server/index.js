@@ -888,6 +888,18 @@ async function initDb() {
   await query(`ALTER TABLE planejamentos ADD COLUMN IF NOT EXISTS fotos_evento JSONB DEFAULT '[]'`)
   await query(`ALTER TABLE planejamentos ADD COLUMN IF NOT EXISTS conclusao TEXT`)
   await query(`ALTER TABLE ocorrencias ADD COLUMN IF NOT EXISTS descricoes_fotos JSONB DEFAULT '[]'`)
+  await query(`
+    CREATE TABLE IF NOT EXISTS radar_bilhetes (
+      id TEXT PRIMARY KEY,
+      texto TEXT NOT NULL,
+      data TEXT NOT NULL,
+      hora TEXT NOT NULL,
+      prioridade TEXT NOT NULL DEFAULT 'normal',
+      concluido BOOLEAN NOT NULL DEFAULT FALSE,
+      criado_por TEXT NOT NULL,
+      criado_em TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `)
 
   console.log('[DB] Tabelas verificadas/criadas com sucesso')
 
@@ -1193,6 +1205,58 @@ app.delete('/api/planejamentos/:id', async (req, res) => {
   try {
     await query('DELETE FROM planejamentos WHERE id = $1', [req.params.id])
     broadcastParaTodos({ tipo: 'planejamentos_atualizados' })
+    res.json({ success: true })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// ── Radar DC — bilhetes compartilhados entre os agentes ───────────────────
+app.get('/api/radar-bilhetes', async (_req, res) => {
+  try {
+    const result = await query('SELECT * FROM radar_bilhetes ORDER BY data ASC, hora ASC, criado_em ASC')
+    res.json(result.rows)
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+app.post('/api/radar-bilhetes', async (req, res) => {
+  try {
+    const { id, texto, data, hora, prioridade, criado_por } = req.body
+    if (!id || !texto?.trim() || !data || !hora || !criado_por) return res.status(400).json({ error: 'Bilhete incompleto' })
+    const result = await query(
+      `INSERT INTO radar_bilhetes (id, texto, data, hora, prioridade, criado_por)
+       VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+      [id, texto.trim(), data, hora, prioridade || 'normal', criado_por]
+    )
+    broadcastParaTodos({ tipo: 'radar_bilhetes_atualizados' })
+    res.status(201).json(result.rows[0])
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+app.patch('/api/radar-bilhetes/:id', async (req, res) => {
+  try {
+    const { agente, concluido } = req.body
+    const result = await query(
+      `UPDATE radar_bilhetes SET concluido=$1 WHERE id=$2 AND criado_por=$3 RETURNING *`,
+      [Boolean(concluido), req.params.id, agente]
+    )
+    if (!result.rows[0]) return res.status(403).json({ error: 'Somente o agente que criou o bilhete pode alterá-lo' })
+    broadcastParaTodos({ tipo: 'radar_bilhetes_atualizados' })
+    res.json(result.rows[0])
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+app.delete('/api/radar-bilhetes/:id', async (req, res) => {
+  try {
+    const result = await query('DELETE FROM radar_bilhetes WHERE id=$1 AND criado_por=$2 RETURNING id', [req.params.id, req.body.agente])
+    if (!result.rows[0]) return res.status(403).json({ error: 'Somente o agente que criou o bilhete pode apagá-lo' })
+    broadcastParaTodos({ tipo: 'radar_bilhetes_atualizados' })
     res.json({ success: true })
   } catch (err) {
     res.status(500).json({ error: err.message })

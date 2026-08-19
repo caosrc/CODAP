@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import './RadarDC.css'
 import './RadarDCResponsive.css'
 import { getAgenteLogado } from './Login'
+import { wsOn } from '../wsClient'
 
 type Prioridade = 'normal' | 'importante' | 'urgente'
 type Bilhete = {
@@ -39,16 +40,31 @@ export default function RadarDC() {
   const [texto, setTexto] = useState('')
   const [hora, setHora] = useState('08:00')
   const [prioridade, setPrioridade] = useState<Prioridade>('normal')
+  const [editorAberto, setEditorAberto] = useState(false)
   const [tv, setTv] = useState(false)
   const [notificacaoAtiva, setNotificacaoAtiva] = useState(false)
 
-  useEffect(() => {
-    try { setBilhetes(JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]')) } catch { setBilhetes([]) }
+  const carregarBilhetes = useCallback(async () => {
+    try {
+      const res = await fetch('/api/radar-bilhetes')
+      if (!res.ok) throw new Error('Falha ao carregar')
+      const rows = await res.json() as Array<Record<string, unknown>>
+      setBilhetes(rows.map(row => ({
+        id: String(row.id), texto: String(row.texto), data: String(row.data), hora: String(row.hora),
+        prioridade: (row.prioridade as Prioridade) || 'normal', concluido: Boolean(row.concluido),
+        criadoPor: String(row.criado_por), criadoEm: String(row.criado_em),
+      })))
+    } catch {
+      try { setBilhetes(JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]')) } catch { setBilhetes([]) }
+    }
   }, [])
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(bilhetes))
-  }, [bilhetes])
+    carregarBilhetes()
+    return wsOn('radar_bilhetes_atualizados', carregarBilhetes)
+  }, [carregarBilhetes])
+
+  useEffect(() => { localStorage.setItem(STORAGE_KEY, JSON.stringify(bilhetes)) }, [bilhetes])
 
   const dias = useMemo(() => {
     const primeiro = new Date(mes.getFullYear(), mes.getMonth(), 1)
@@ -64,19 +80,31 @@ export default function RadarDC() {
   const doDia = bilhetes.filter(b => b.data === dataSelecionada)
   const proximos = bilhetes.filter(b => !b.concluido).sort((a, b) => `${a.data}${a.hora}`.localeCompare(`${b.data}${b.hora}`))
 
-  const criar = (e: React.FormEvent) => {
+  const criar = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!texto.trim()) return
-    setBilhetes(prev => [...prev, {
+    const novo = {
       id: crypto.randomUUID(), texto: texto.trim(), data: dataSelecionada, hora,
       prioridade, concluido: false, criadoPor: agente, criadoEm: new Date().toISOString(),
-    }])
+    }
+    const res = await fetch('/api/radar-bilhetes', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...novo, criado_por: agente }) })
+    if (!res.ok) return
+    setBilhetes(prev => [...prev, novo])
     setTexto('')
     setHora('08:00')
+    setEditorAberto(false)
   }
 
-  const alternar = (id: string) => setBilhetes(prev => prev.map(b => b.id === id ? { ...b, concluido: !b.concluido } : b))
-  const remover = (id: string) => setBilhetes(prev => prev.filter(b => b.id !== id))
+  const alternar = async (id: string) => {
+    const bilhete = bilhetes.find(b => b.id === id)
+    if (!bilhete || bilhete.criadoPor !== agente) return
+    const res = await fetch(`/api/radar-bilhetes/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ agente, concluido: !bilhete.concluido }) })
+    if (res.ok) setBilhetes(prev => prev.map(b => b.id === id ? { ...b, concluido: !b.concluido } : b))
+  }
+  const remover = async (id: string) => {
+    const res = await fetch(`/api/radar-bilhetes/${id}`, { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ agente }) })
+    if (res.ok) setBilhetes(prev => prev.filter(b => b.id !== id))
+  }
 
   const pedirNotificacao = useCallback(async () => {
     if (!('Notification' in window)) return

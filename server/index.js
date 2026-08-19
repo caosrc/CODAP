@@ -904,6 +904,7 @@ async function initDb() {
       criado_em TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
   `)
+  await query(`ALTER TABLE radar_bilhetes ADD COLUMN IF NOT EXISTS tipo TEXT NOT NULL DEFAULT 'lembrete'`)
 
   console.log('[DB] Tabelas verificadas/criadas com sucesso')
 
@@ -1215,7 +1216,7 @@ app.delete('/api/planejamentos/:id', async (req, res) => {
   }
 })
 
-// ── Radar DC — bilhetes compartilhados entre os agentes ───────────────────
+// ── Radar DC — lembretes e notificações compartilhados entre os agentes ────
 app.get('/api/radar-bilhetes', async (_req, res) => {
   try {
     const result = await query('SELECT * FROM radar_bilhetes ORDER BY data ASC, hora ASC, criado_em ASC')
@@ -1227,15 +1228,50 @@ app.get('/api/radar-bilhetes', async (_req, res) => {
 
 app.post('/api/radar-bilhetes', async (req, res) => {
   try {
-    const { id, texto, data, hora, prioridade, criado_por } = req.body
-    if (!id || !texto?.trim() || !data || !hora || !criado_por) return res.status(400).json({ error: 'Bilhete incompleto' })
+    const { id, texto, data, hora, prioridade, criado_por, tipo = 'lembrete' } = req.body
+    if (!id || !texto?.trim() || !data || !hora || !criado_por) return res.status(400).json({ error: 'Registro incompleto' })
     const result = await query(
-      `INSERT INTO radar_bilhetes (id, texto, data, hora, prioridade, criado_por)
-       VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
-      [id, texto.trim(), data, hora, prioridade || 'normal', criado_por]
+      `INSERT INTO radar_bilhetes (id, texto, data, hora, prioridade, criado_por, tipo)
+       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+      [id, texto.trim(), data, hora, prioridade || 'normal', criado_por, tipo === 'notificacao' ? 'notificacao' : 'lembrete']
     )
     broadcastParaTodos({ tipo: 'radar_bilhetes_atualizados' })
     res.status(201).json(result.rows[0])
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+app.get('/api/atividades-dia', async (req, res) => {
+  try {
+    const data = String(req.query.data || '').slice(0, 10)
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(data)) return res.status(400).json({ error: 'Data inválida' })
+    const checklists = await query(
+      `SELECT id, data_checklist, placa, motorista, created_at
+       FROM checklists_viatura WHERE data_checklist LIKE $1 ORDER BY created_at DESC`,
+      [`${data}%`],
+    )
+    const ocorrencias = await query(
+      `SELECT id, natureza, endereco, agentes, responsavel_registro, created_at, hora_inicio
+       FROM ocorrencias
+       WHERE (data_ocorrencia LIKE $1 OR created_at::date = $2::date)
+       ORDER BY created_at DESC`,
+      [`${data}%`, data],
+    )
+    res.json({
+      checklists: checklists.rows.map(row => ({
+        ...row,
+        agente: row.motorista || 'Agente não informado',
+        hora: String(row.data_checklist || '').includes('T')
+          ? String(row.data_checklist).slice(11, 16)
+          : new Date(row.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+      })),
+      ocorrencias: ocorrencias.rows.map(row => ({
+        ...row,
+        agente: row.responsavel_registro || (Array.isArray(row.agentes) ? row.agentes[0] : null) || 'Agente não informado',
+        hora: row.hora_inicio || new Date(row.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+      })),
+    })
   } catch (err) {
     res.status(500).json({ error: err.message })
   }

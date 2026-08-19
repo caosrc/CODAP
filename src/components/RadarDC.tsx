@@ -51,6 +51,7 @@ export default function RadarDC() {
   const [erroSalvamento, setErroSalvamento] = useState('')
   const carregadoRef = useRef(false)
   const pendentesRef = useRef(new Set<string>())
+  const calendarioRef = useRef<HTMLDivElement>(null)
 
   const carregar = useCallback(async () => {
     try {
@@ -184,6 +185,18 @@ export default function RadarDC() {
   }, [proximasNotificacoes])
 
   useEffect(() => {
+    if (!editorAberto) return
+    const fecharAoClicarFora = (event: PointerEvent) => {
+      const alvo = event.target
+      if (alvo instanceof Node && !calendarioRef.current?.contains(alvo)) {
+        setEditorAberto(false)
+      }
+    }
+    document.addEventListener('pointerdown', fecharAoClicarFora)
+    return () => document.removeEventListener('pointerdown', fecharAoClicarFora)
+  }, [editorAberto])
+
+  useEffect(() => {
     document.body.classList.toggle('radar-tv-active', tv)
     return () => document.body.classList.remove('radar-tv-active')
   }, [tv])
@@ -210,7 +223,7 @@ export default function RadarDC() {
         </div>
 
         <div className="radar-right-column">
-        <div className="radar-calendar-card">
+        <div className="radar-calendar-card" ref={calendarioRef}>
           <div className="calendar-top"><div><span>CALENDÁRIO DE NOTIFICAÇÕES</span><h2>{mes.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}</h2></div><div className="month-buttons"><button onClick={() => setMes(new Date(mes.getFullYear(), mes.getMonth() - 1, 1))}>‹</button><button onClick={() => setMes(new Date(mes.getFullYear(), mes.getMonth() + 1, 1))}>›</button></div></div>
           <div className="weekdays">{['DOM', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SÁB'].map(d => <span key={d}>{d}</span>)}</div>
           <div className="calendar-grid">{dias.map(d => { const key = dataLocalISO(d); const count = notificacoes.filter(n => n.data === key && !n.concluido).length; return <button type="button" key={key} className={`${d.getMonth() !== mes.getMonth() ? 'other-month ' : ''}${key === dataSelecionada ? 'selected ' : ''}${key === hoje() ? 'today' : ''}`} onClick={() => { setDataSelecionada(key); setEditorAberto(true) }}><span>{d.getDate()}</span>{count > 0 && <i>{count}</i>}</button> })}</div>

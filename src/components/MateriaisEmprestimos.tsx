@@ -580,9 +580,6 @@ export default function MateriaisEmprestimos({ onIrParaMapa, abrirCampoId, onAbr
         onVoltar={() => setModo('materiais')}
         onChecklist={materialSelecionado.tipo === 'ferramental' ? () => setModo('checklistFerramenta') : undefined}
         onEditar={() => setModo('editarMaterial')}
-        onChecklist={categoriaPatrimonio === 'ferramental'
-          ? () => setModo('checklistFerramenta')
-          : undefined}
         onExcluir={async () => {
           if (!confirm(`Excluir definitivamente o material "${materialSelecionado.nome}"?\nIsso apaga TODOS os empréstimos relacionados.`)) return
           try {

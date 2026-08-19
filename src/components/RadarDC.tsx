@@ -147,7 +147,7 @@ export default function RadarDC() {
       <header className="radar-header">
         <div>
           <div className="radar-kicker">CENTRAL DE LEMBRETES OPERACIONAIS</div>
-          <h1><span className="radar-shield">🛡️</span> Radar <b>DC</b></h1>
+          <h1><img className="radar-header-icon" src="/api/radar-icon" alt="" /> Radar <b>DC</b></h1>
           <p>O que precisa entrar no radar da equipe hoje?</p>
         </div>
         <div className="radar-actions">

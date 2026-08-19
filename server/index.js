@@ -72,6 +72,10 @@ app.get('/api/vapid-public-key', (_req, res) => {
   res.json({ publicKey: VAPID_PUBLIC_KEY })
 })
 
+app.get('/api/radar-icon', (_req, res) => {
+  res.sendFile(join(__dirname, '..', 'attached_assets', 'image_1787161275303.png'))
+})
+
 // ── WebSocket — Rastreamento em tempo real ──────────────────────────────────
 const wss = new WebSocketServer({ server: httpServer, path: '/ws' })
 

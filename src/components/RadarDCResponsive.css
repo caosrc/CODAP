@@ -2,6 +2,24 @@
   filter: drop-shadow(0 2px 2px rgba(11, 71, 122, .34));
 }
 
+.radar-tab-icon {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  object-fit: cover;
+  box-shadow: 0 2px 7px rgba(14, 55, 105, .25);
+}
+
+.radar-header-icon {
+  width: 2.7rem;
+  height: 2.7rem;
+  border-radius: 50%;
+  object-fit: cover;
+  vertical-align: middle;
+  margin-right: .35rem;
+  box-shadow: 0 3px 10px rgba(1, 19, 49, .4);
+}
+
 body.radar-tv-active {
   overflow: hidden;
 }
@@ -54,8 +72,55 @@ body.radar-tv-active .radar-page {
 }
 
 .radar-calendar-card {
-  transform: scale(.94);
-  transform-origin: top center;
+  transform: none;
+}
+
+@media (min-width: 701px) {
+  .radar-layout {
+    grid-template-columns: minmax(0, 1.65fr) minmax(280px, .65fr);
+    min-height: calc(100vh - 185px);
+    padding: 1.2rem clamp(1.2rem, 4vw, 4.5rem) 2rem;
+    align-items: stretch;
+  }
+
+  .radar-note-card,
+  .radar-calendar-card {
+    min-height: calc(100vh - 230px);
+    height: auto;
+  }
+
+  .radar-bilhete-large {
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .radar-bilhete-large textarea {
+    flex: 1;
+    min-height: 0;
+    resize: none;
+  }
+
+  .radar-calendar-card {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .radar-calendar-card .calendar-grid {
+    flex: 1;
+    align-content: space-evenly;
+  }
+
+  .radar-calendar-card {
+    min-height: 0;
+    max-height: 560px;
+    align-self: start;
+    padding: .9rem;
+  }
+
+  .radar-calendar-card .calendar-grid button {
+    min-height: 32px;
+  }
 }
 
 .radar-calendar-editor {

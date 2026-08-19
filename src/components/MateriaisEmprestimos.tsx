@@ -571,6 +571,20 @@ export default function MateriaisEmprestimos({ onIrParaMapa, abrirCampoId, onAbr
     )
   }
 
+  if (modo === 'checklistFerramenta' && materialSelecionado) {
+    return (
+      <ChecklistFerramenta
+        ferramenta={materialSelecionado}
+        onVoltar={() => setModo('detalheMaterial')}
+        onSalvo={async () => {
+          showToast('✅ Checklist registrado!')
+          await carregar()
+          setModo('detalheMaterial')
+        }}
+      />
+    )
+  }
+
   // ─── FORMULÁRIO DE NOVO MATERIAL ─────────────────────────────────────────
   if (modo === 'formMaterial') {
     return (
@@ -884,13 +898,14 @@ export default function MateriaisEmprestimos({ onIrParaMapa, abrirCampoId, onAbr
 // ═══════════════════════════════════════════════════════════════════════════
 
 function DetalheMaterial({
-  material, emprestimoAtivo, onVoltar, onEditar, onExcluir,
+  material, emprestimoAtivo, onVoltar, onEditar, onExcluir, onChecklist,
 }: {
   material: Material
   emprestimoAtivo: Emprestimo | undefined
   onVoltar: () => void
   onEditar: () => void
   onExcluir: () => void
+  onChecklist?: () => void
 }) {
   // Busca fotos em alta resolução só quando o usuário abre o detalhe
   const [fotoCompleta, setFotoCompleta] = useState<{ foto: string | null; foto_placa: string | null } | null>(null)
@@ -922,6 +937,7 @@ function DetalheMaterial({
         <button className="btn-voltar" onClick={onVoltar}>‹</button>
         <h2>📦 {material.id}</h2>
         <div style={{ display: 'flex', gap: '0.4rem' }}>
+          {onChecklist && <button className="mat-btn-checklist" onClick={onChecklist} title="Fazer checklist">✓ Checklist</button>}
           <button className="mat-btn-editar" onClick={onEditar} title="Editar material">✏️</button>
           <button className="mat-btn-excluir" onClick={onExcluir} title="Excluir material">🗑️</button>
         </div>
@@ -996,10 +1012,11 @@ function DetalheMaterial({
 }
 
 function FormMaterial({
-  existentes, materialInicial, onCancelar, onSalvo,
+  existentes, materialInicial, tipo = 'escritorio', onCancelar, onSalvo,
 }: {
   existentes: string[]
   materialInicial?: Material
+  tipo?: 'escritorio' | 'ferramental'
   onCancelar: () => void
   onSalvo: (atualizado?: Material) => void
 }) {
@@ -1043,7 +1060,7 @@ function FormMaterial({
 
   async function salvar() {
     const nm = nome.trim()
-    if (!nm) { setErro('Informe o nome do material.'); return }
+    if (!nm) { setErro(`Informe o nome ${tipo === 'ferramental' ? 'da ferramenta' : 'do material'}.`); return }
     setSalvando(true); setErro('')
     try {
       if (editando && materialInicial) {
@@ -1052,6 +1069,7 @@ function FormMaterial({
           descricao: descricao.trim() || null,
           observacoes: observacoes.trim() || null,
           quantidade: Math.max(1, quantidade),
+          tipo,
         }
         // Só inclui foto/thumb se o usuário trocou ou removeu a foto
         if (fotoAlterada) {
@@ -1088,7 +1106,7 @@ function FormMaterial({
     <div className="mat-tela">
       <div className="mat-subheader">
         <button className="btn-voltar" onClick={onCancelar}>‹</button>
-        <h2>{editando ? '✏️ Editar Material' : '➕ Novo Material'}</h2>
+        <h2>{editando ? '✏️ Editar Item' : `➕ Novo ${tipo === 'ferramental' ? 'Ferramental' : 'Material de Escritório'}`}</h2>
         <span style={{ width: '2rem' }} />
       </div>
 
@@ -1104,7 +1122,7 @@ function FormMaterial({
               onChange={(e) => { setCodigo(e.target.value); setErro('') }}
               autoCapitalize="characters"
             />
-            <span className="campo-label-sub">Identificador único do item.</span>
+              <span className="campo-label-sub">Identificador único do item.</span>
           </div>
         )}
 
@@ -1203,6 +1221,107 @@ function FormMaterial({
         <button className="btn-salvar" onClick={salvar} disabled={salvando}>
           {salvando ? '⏳ Salvando...' : editando ? '💾 Salvar Alterações' : '💾 Salvar Material'}
         </button>
+      </div>
+    </div>
+  )
+}
+
+function ChecklistFerramenta({
+  ferramenta, onVoltar, onSalvo,
+}: {
+  ferramenta: Material
+  onVoltar: () => void
+  onSalvo: () => void
+}) {
+  const [quantidade, setQuantidade] = useState(String(ferramenta.quantidade ?? 1))
+  const [condicao, setCondicao] = useState<'boa' | 'media' | 'ruim'>('boa')
+  const [justificativa, setJustificativa] = useState('')
+  const [historico, setHistorico] = useState<ChecklistFerramenta[]>([])
+  const [salvando, setSalvando] = useState(false)
+  const [erro, setErro] = useState('')
+  const qtdCadastrada = ferramenta.quantidade ?? 1
+  const qtdVerificada = Number(quantidade)
+  const temFalta = Number.isInteger(qtdVerificada) && qtdVerificada < qtdCadastrada
+
+  useEffect(() => {
+    matApi.listarChecklistsFerramenta(ferramenta.id)
+      .then(setHistorico)
+      .catch(() => setErro('Não foi possível carregar o histórico.'))
+  }, [ferramenta.id])
+
+  async function salvar() {
+    if (!Number.isInteger(qtdVerificada) || qtdVerificada < 0 || qtdVerificada > qtdCadastrada) {
+      setErro(`Informe uma quantidade entre 0 e ${qtdCadastrada}.`)
+      return
+    }
+    if (temFalta && !justificativa.trim()) {
+      setErro('Justifique onde está o item faltante.')
+      return
+    }
+    setSalvando(true); setErro('')
+    try {
+      await matApi.criarChecklistFerramenta(ferramenta.id, {
+        quantidade_verificada: qtdVerificada,
+        condicao,
+        justificativa_falta: temFalta ? justificativa.trim() : null,
+        realizado_por: getAgenteLogado() || null,
+      })
+      onSalvo()
+    } catch (e) {
+      setErro((e as Error).message || 'Erro ao salvar checklist.')
+    } finally { setSalvando(false) }
+  }
+
+  return (
+    <div className="mat-tela">
+      <div className="mat-subheader">
+        <button className="btn-voltar" onClick={onVoltar}>‹</button>
+        <h2>✓ Checklist da ferramenta</h2>
+        <span style={{ width: '2rem' }} />
+      </div>
+      <div className="mat-checklist">
+        <div className="mat-checklist-identificacao">
+          <strong>{ferramenta.nome}</strong>
+          <span>Código: {ferramenta.id}</span>
+          <span>Quantidade cadastrada: <b>{qtdCadastrada}</b></span>
+        </div>
+        <div className="campo">
+          <label className="campo-label">Quantidade encontrada *</label>
+          <input className="campo-input" type="number" min="0" max={qtdCadastrada} value={quantidade}
+            onChange={e => { setQuantidade(e.target.value); setErro('') }} />
+        </div>
+        {temFalta && (
+          <div className="campo mat-falta-box">
+            <label className="campo-label">Justificativa do item faltante *</label>
+            <textarea className="campo-input" rows={3} placeholder="Informe onde está o item ou o motivo da falta"
+              value={justificativa} onChange={e => { setJustificativa(e.target.value); setErro('') }} />
+            <span className="campo-label-sub">Faltam {qtdCadastrada - qtdVerificada} item(ns).</span>
+          </div>
+        )}
+        <div className="campo">
+          <label className="campo-label">Condição das ferramentas *</label>
+          <div className="mat-condicao-grid">
+            {([['boa', '✅ Boa'], ['media', '⚠️ Média'], ['ruim', '❌ Ruim']] as const).map(([valor, label]) => (
+              <button type="button" key={valor} className={`mat-condicao-btn ${condicao === valor ? 'ativo' : ''}`}
+                onClick={() => setCondicao(valor)}>{label}</button>
+            ))}
+          </div>
+        </div>
+        {erro && <div className="mat-form-erro">{erro}</div>}
+        <button className="mat-btn-salvar" disabled={salvando} onClick={salvar}>
+          {salvando ? 'Salvando...' : 'Registrar checklist'}
+        </button>
+      </div>
+      <div className="mat-historico-checklist">
+        <h3>Histórico de checklists</h3>
+        {historico.length === 0 ? <p>Nenhum checklist realizado ainda.</p> : historico.map(item => (
+          <div className="mat-historico-item" key={item.id}>
+            <div><strong>{formatarDataBr(item.realizado_em)}</strong> · {item.realizado_por || 'Usuário não informado'}</div>
+            <div>{item.quantidade_verificada}/{qtdCadastrada} itens · <b className={`condicao-${item.condicao}`}>{item.condicao === 'media' ? 'média' : item.condicao}</b>
+              {item.quantidade_verificada < qtdCadastrada && <span className="mat-falta-tag"> · menos itens</span>}</div>
+            {item.justificativa_falta && <small>Justificativa: {item.justificativa_falta}</small>}
+          </div>
+        ))}
       </div>
     </div>
   )

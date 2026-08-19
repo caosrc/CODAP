@@ -1,0 +1,151 @@
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import './RadarDC.css'
+import { getAgenteLogado } from './Login'
+
+type Prioridade = 'normal' | 'importante' | 'urgente'
+type Bilhete = {
+  id: string
+  texto: string
+  data: string
+  hora: string
+  prioridade: Prioridade
+  concluido: boolean
+  criadoPor: string
+  criadoEm: string
+}
+
+const STORAGE_KEY = 'defesacivil-radar-dc-v1'
+const prioridadeConfig: Record<Prioridade, { label: string; cor: string; emoji: string }> = {
+  normal: { label: 'Normal', cor: '#36b37e', emoji: '🟢' },
+  importante: { label: 'Importante', cor: '#f59e0b', emoji: '🟠' },
+  urgente: { label: 'Urgente', cor: '#f04438', emoji: '🔴' },
+}
+
+function hoje() {
+  return new Date().toISOString().slice(0, 10)
+}
+
+function dataBonita(data: string) {
+  if (!data) return 'Sem data'
+  return new Date(`${data}T12:00:00`).toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: 'short' }).replace('.', '')
+}
+
+export default function RadarDC() {
+  const agente = getAgenteLogado() || 'Agente DC'
+  const [bilhetes, setBilhetes] = useState<Bilhete[]>([])
+  const [dataSelecionada, setDataSelecionada] = useState(hoje())
+  const [mes, setMes] = useState(() => new Date(`${hoje()}T12:00:00`))
+  const [texto, setTexto] = useState('')
+  const [hora, setHora] = useState('08:00')
+  const [prioridade, setPrioridade] = useState<Prioridade>('normal')
+  const [tv, setTv] = useState(false)
+  const [notificacaoAtiva, setNotificacaoAtiva] = useState(false)
+
+  useEffect(() => {
+    try { setBilhetes(JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]')) } catch { setBilhetes([]) }
+  }, [])
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(bilhetes))
+  }, [bilhetes])
+
+  const dias = useMemo(() => {
+    const primeiro = new Date(mes.getFullYear(), mes.getMonth(), 1)
+    const inicio = new Date(primeiro)
+    inicio.setDate(1 - primeiro.getDay())
+    return Array.from({ length: 42 }, (_, i) => {
+      const dia = new Date(inicio)
+      dia.setDate(inicio.getDate() + i)
+      return dia
+    })
+  }, [mes])
+
+  const doDia = bilhetes.filter(b => b.data === dataSelecionada)
+  const proximos = bilhetes.filter(b => !b.concluido).sort((a, b) => `${a.data}${a.hora}`.localeCompare(`${b.data}${b.hora}`))
+
+  const criar = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!texto.trim()) return
+    setBilhetes(prev => [...prev, {
+      id: crypto.randomUUID(), texto: texto.trim(), data: dataSelecionada, hora,
+      prioridade, concluido: false, criadoPor: agente, criadoEm: new Date().toISOString(),
+    }])
+    setTexto('')
+    setHora('08:00')
+  }
+
+  const alternar = (id: string) => setBilhetes(prev => prev.map(b => b.id === id ? { ...b, concluido: !b.concluido } : b))
+  const remover = (id: string) => setBilhetes(prev => prev.filter(b => b.id !== id))
+
+  const pedirNotificacao = useCallback(async () => {
+    if (!('Notification' in window)) return
+    const permissao = Notification.permission === 'granted' ? 'granted' : await Notification.requestPermission()
+    setNotificacaoAtiva(permissao === 'granted')
+  }, [])
+
+  useEffect(() => {
+    if ('Notification' in window) setNotificacaoAtiva(Notification.permission === 'granted')
+    const timer = window.setInterval(() => {
+      const agora = new Date()
+      const chave = `${agora.toISOString().slice(0, 10)}|${agora.toTimeString().slice(0, 5)}`
+      bilhetes.filter(b => !b.concluido && `${b.data}|${b.hora}` === chave).forEach(b => {
+        if ('Notification' in window && Notification.permission === 'granted') new Notification('Radar DC', { body: b.texto, tag: b.id })
+      })
+    }, 30000)
+    return () => window.clearInterval(timer)
+  }, [bilhetes])
+
+  const entrarTV = async () => {
+    await pedirNotificacao()
+    try { await document.documentElement.requestFullscreen?.() } catch { /* fullscreen pode ser bloqueado pelo navegador */ }
+    setTv(true)
+  }
+
+  return (
+    <section className={`radar-page ${tv ? 'radar-tv' : ''}`}>
+      <header className="radar-header">
+        <div>
+          <div className="radar-kicker">CENTRAL DE LEMBRETES OPERACIONAIS</div>
+          <h1><span>📡</span> Radar <b>DC</b></h1>
+          <p>O que precisa entrar no radar da equipe hoje?</p>
+        </div>
+        <div className="radar-actions">
+          {!notificacaoAtiva && <button className="radar-notify" onClick={pedirNotificacao}>🔔 Ativar notificações</button>}
+          <button className="radar-tv-btn" onClick={tv ? () => { document.exitFullscreen?.(); setTv(false) } : entrarTV}>{tv ? '↙ Voltar ao app' : '▣ Modo TV'}</button>
+        </div>
+      </header>
+
+      <div className="radar-layout">
+        <form className="radar-note-card" onSubmit={criar}>
+          <div className="card-label"><span className="label-dot" /> NOVO BILHETE</div>
+          <h2>Deixe no radar</h2>
+          <textarea value={texto} onChange={e => setTexto(e.target.value)} placeholder="Ex.: Confirmar cones para a operação de sábado..." rows={4} />
+          <div className="radar-form-row">
+            <label>📅 Data<input type="date" value={dataSelecionada} onChange={e => setDataSelecionada(e.target.value)} /></label>
+            <label>⏰ Hora<input type="time" value={hora} onChange={e => setHora(e.target.value)} /></label>
+          </div>
+          <label className="radar-priority">Nível do alerta
+            <select value={prioridade} onChange={e => setPrioridade(e.target.value as Prioridade)}>
+              {Object.entries(prioridadeConfig).map(([key, c]) => <option key={key} value={key}>{c.emoji} {c.label}</option>)}
+            </select>
+          </label>
+          <button className="radar-add" type="submit">+ Colocar no Radar</button>
+          <small>O alerta fica visível para a equipe neste dispositivo.</small>
+        </form>
+
+        <div className="radar-calendar-card">
+          <div className="calendar-top"><div><span>CALENDÁRIO DE ALERTAS</span><h2>{mes.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}</h2></div><div className="month-buttons"><button onClick={() => setMes(new Date(mes.getFullYear(), mes.getMonth() - 1, 1))}>‹</button><button onClick={() => setMes(new Date(mes.getFullYear(), mes.getMonth() + 1, 1))}>›</button></div></div>
+          <div className="weekdays">{['DOM', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SÁB'].map(d => <span key={d}>{d}</span>)}</div>
+          <div className="calendar-grid">{dias.map(d => { const key = d.toISOString().slice(0, 10); const count = bilhetes.filter(b => b.data === key && !b.concluido).length; return <button key={key} className={`${d.getMonth() !== mes.getMonth() ? 'other-month ' : ''}${key === dataSelecionada ? 'selected ' : ''}${key === hoje() ? 'today' : ''}`} onClick={() => setDataSelecionada(key)}><span>{d.getDate()}</span>{count > 0 && <i>{count}</i>}</button> })}</div>
+          <div className="calendar-legend"><span><i className="legend-green" /> lembrete</span><span><i className="legend-red" /> urgente</span></div>
+        </div>
+      </div>
+
+      <section className="radar-list-section">
+        <div className="radar-list-heading"><div><span className="radar-kicker">VISÃO DA EQUIPE</span><h2>Radar DC: <em>{dataBonita(dataSelecionada)}</em></h2></div><strong>{proximos.length} pendência{proximos.length === 1 ? '' : 's'}</strong></div>
+        {doDia.length === 0 ? <div className="radar-empty"><span>🛰️</span><b>Nenhum alerta para este dia</b><small>Adicione um bilhete para manter a equipe alinhada.</small></div> : <div className="radar-tickets">{doDia.map(b => { const c = prioridadeConfig[b.prioridade]; return <article className={`radar-ticket ${b.concluido ? 'done' : ''}`} key={b.id}><div className="ticket-time">{b.hora}<span>{b.concluido ? 'CONCLUÍDO' : 'ALERTA'}</span></div><div className="ticket-line" style={{ background: c.cor }} /><div className="ticket-copy"><div><span className="ticket-priority" style={{ color: c.cor }}>{c.emoji} {c.label}</span><span className="ticket-author">por {b.criadoPor}</span></div><p>{b.texto}</p></div><button className="ticket-check" onClick={() => alternar(b.id)}>{b.concluido ? '↩' : '✓'}</button><button className="ticket-remove" onClick={() => remover(b.id)}>×</button></article> })}</div>}
+      </section>
+      <div className="radar-ticker"><span>RADAR DC</span><div>{(proximos.length ? proximos : bilhetes).map(b => <b key={b.id}>● {dataBonita(b.data)} · {b.texto}</b>)}</div></div>
+    </section>
+  )
+}

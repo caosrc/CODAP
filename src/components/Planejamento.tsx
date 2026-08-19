@@ -9,6 +9,7 @@ import { ativarGps, desativarGps, subscribeGps, getEstadoGps, getDispositivoIdGl
 import { supabase, supabaseDisponivel } from '../supabaseClient'
 import { saveFotoCampoPendente, getFotosCampoPendentes, removeFotoCampoPendente, clearFotosCampoPendentesPlano } from '../offline'
 import { salvarFotoNoDispositivo } from '../utils'
+import RadarDC from './RadarDC'
 
 const ORGAOS_EMPENHO: { categoria: string; emoji: string; orgaos: { emoji: string; nome: string }[] }[] = [
   { categoria: 'Segurança Pública', emoji: '🚔', orgaos: [
@@ -130,6 +131,7 @@ L.Icon.Default.mergeOptions({
 
 // ── Tipos ──────────────────────────────────────────────────────────────
 type TipoPlano = 'evento' | 'operacao' | 'simulado' | 'emergencia'
+type SubAbaPlanejamento = TipoPlano | 'radar'
 type StatusPlano = 'planejado' | 'em_curso' | 'concluido' | 'cancelado'
 
 interface MaterialPlano {
@@ -4161,7 +4163,7 @@ function ListaPlanos({
 
 // ── Componente principal ────────────────────────────────────────────────
 export default function Planejamento() {
-  const [subAba, setSubAba] = useState<TipoPlano>('evento')
+  const [subAba, setSubAba] = useState<SubAbaPlanejamento>('radar')
   const [planos, setPlanos] = useState<Plano[]>(() => carregarPlanos())
   const [criando, setCriando] = useState(false)
   const [aberto, setAberto] = useState<Plano | null>(null)
@@ -4334,6 +4336,13 @@ export default function Planejamento() {
   return (
     <div className="plan-wrap">
       <div className="plan-subtabs">
+        <button
+          className={`plan-subtab radar-subtab ${subAba === 'radar' ? 'ativo' : ''}`}
+          onClick={() => setSubAba('radar')}
+        >
+          <span className="st-emoji">📡</span>
+          Radar DC
+        </button>
         {(['evento', 'operacao', 'simulado', 'emergencia'] as TipoPlano[]).map(t => {
           const c = TIPOS_CONFIG[t]
           const total = t !== 'emergencia' ? totalPorTipo(t) : 0
@@ -4363,7 +4372,11 @@ export default function Planejamento() {
         })}
       </div>
 
-      {subAba === 'emergencia' ? (
+      {subAba === 'radar' ? (
+        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
+          <RadarDC />
+        </div>
+      ) : subAba === 'emergencia' ? (
         <div style={{ flex: 1, overflowY: 'auto' }}>
           <Suspense fallback={<div style={{ padding: '2rem', textAlign: 'center' }}>Carregando...</div>}>
             <PlanoEmergencia />

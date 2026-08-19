@@ -744,6 +744,7 @@ async function initDb() {
       foto_placa TEXT,
       foto_thumb TEXT,
       quantidade INTEGER NOT NULL DEFAULT 1,
+      tipo TEXT NOT NULL DEFAULT 'escritorio',
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
   `)
@@ -751,6 +752,19 @@ async function initDb() {
   await query(`ALTER TABLE materiais ADD COLUMN IF NOT EXISTS foto TEXT`)
   await query(`ALTER TABLE materiais ADD COLUMN IF NOT EXISTS foto_placa TEXT`)
   await query(`ALTER TABLE materiais ADD COLUMN IF NOT EXISTS foto_thumb TEXT`)
+  await query(`ALTER TABLE materiais ADD COLUMN IF NOT EXISTS tipo TEXT NOT NULL DEFAULT 'escritorio'`)
+
+  await query(`
+    CREATE TABLE IF NOT EXISTS checklists_ferramentas (
+      id BIGSERIAL PRIMARY KEY,
+      ferramenta_id TEXT NOT NULL REFERENCES materiais(id) ON DELETE CASCADE,
+      quantidade_verificada INTEGER NOT NULL,
+      condicao TEXT NOT NULL,
+      justificativa_falta TEXT,
+      realizado_por TEXT,
+      realizado_em TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `)
 
   await query(`
     CREATE TABLE IF NOT EXISTS emprestimos (
@@ -1827,7 +1841,7 @@ app.get('/api/agentes-online', (_req, res) => {
 app.get('/api/materiais', async (_req, res) => {
   try {
     const result = await query(
-      'SELECT id, nome, descricao, observacoes, foto_thumb, quantidade, created_at FROM materiais ORDER BY id'
+      "SELECT id, nome, descricao, observacoes, foto_thumb, quantidade, tipo, created_at FROM materiais ORDER BY id"
     )
     res.json(result.rows)
   } catch (err) {
@@ -1895,14 +1909,15 @@ app.get('/api/materiais/:id', async (req, res) => {
 })
 
 app.post('/api/materiais', async (req, res) => {
-  const { id, nome, descricao, observacoes, foto, foto_placa, foto_thumb, quantidade } = req.body || {}
+  const { id, nome, descricao, observacoes, foto, foto_placa, foto_thumb, quantidade, tipo } = req.body || {}
   if (!id || !nome) return res.status(400).json({ error: 'id e nome obrigatórios' })
   try {
     const result = await query(
-      `INSERT INTO materiais (id, nome, descricao, observacoes, foto, foto_placa, foto_thumb, quantidade)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id, nome, descricao, observacoes, foto_thumb, quantidade, created_at`,
+      `INSERT INTO materiais (id, nome, descricao, observacoes, foto, foto_placa, foto_thumb, quantidade, tipo)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id, nome, descricao, observacoes, foto_thumb, quantidade, tipo, created_at`,
       [String(id).trim(), String(nome).trim(), descricao || null, observacoes || null,
-       foto || null, foto_placa || null, foto_thumb || null, Math.max(1, quantidade || 1)]
+       foto || null, foto_placa || null, foto_thumb || null, Math.max(1, quantidade || 1),
+       tipo === 'ferramental' ? 'ferramental' : 'escritorio']
     )
     broadcastMateriaisAtualizados()
     res.status(201).json(result.rows[0])
@@ -1914,7 +1929,7 @@ app.post('/api/materiais', async (req, res) => {
 })
 
 app.patch('/api/materiais/:id', async (req, res) => {
-  const { nome, descricao, observacoes, foto, foto_placa, foto_thumb, quantidade } = req.body || {}
+  const { nome, descricao, observacoes, foto, foto_placa, foto_thumb, quantidade, tipo } = req.body || {}
   const sets = []
   const vals = []
   let idx = 1
@@ -1925,12 +1940,13 @@ app.patch('/api/materiais/:id', async (req, res) => {
   if (foto_placa !== undefined) { sets.push(`foto_placa=$${idx++}`); vals.push(foto_placa || null) }
   if (foto_thumb !== undefined) { sets.push(`foto_thumb=$${idx++}`); vals.push(foto_thumb || null) }
   if (quantidade !== undefined) { sets.push(`quantidade=$${idx++}`); vals.push(Math.max(1, quantidade || 1)) }
+  if (tipo !== undefined) { sets.push(`tipo=$${idx++}`); vals.push(tipo === 'ferramental' ? 'ferramental' : 'escritorio') }
   if (sets.length === 0) return res.status(400).json({ error: 'Nada para atualizar' })
   vals.push(req.params.id)
   try {
     const result = await query(
       `UPDATE materiais SET ${sets.join(', ')} WHERE id=$${idx}
-       RETURNING id, nome, descricao, observacoes, foto_thumb, quantidade, created_at`,
+       RETURNING id, nome, descricao, observacoes, foto_thumb, quantidade, tipo, created_at`,
       vals
     )
     if (!result.rows[0]) return res.status(404).json({ error: 'Material não encontrado' })
@@ -1940,6 +1956,33 @@ app.patch('/api/materiais/:id', async (req, res) => {
     console.error('PATCH /api/materiais error:', err)
     res.status(500).json({ error: err.message })
   }
+})
+
+app.get('/api/ferramentas/:id/checklists', async (req, res) => {
+  try {
+    const result = await query(
+      'SELECT * FROM checklists_ferramentas WHERE ferramenta_id=$1 ORDER BY realizado_em DESC',
+      [req.params.id]
+    )
+    res.json(result.rows)
+  } catch (err) { res.status(500).json({ error: err.message }) }
+})
+
+app.post('/api/ferramentas/:id/checklists', async (req, res) => {
+  const { quantidade_verificada, condicao, justificativa_falta, realizado_por } = req.body || {}
+  const qtd = Number(quantidade_verificada)
+  if (!Number.isInteger(qtd) || qtd < 0 || !['boa', 'media', 'ruim'].includes(condicao)) {
+    return res.status(400).json({ error: 'Quantidade e condição são obrigatórias' })
+  }
+  try {
+    const result = await query(
+      `INSERT INTO checklists_ferramentas
+       (ferramenta_id, quantidade_verificada, condicao, justificativa_falta, realizado_por)
+       VALUES ($1,$2,$3,$4,$5) RETURNING *`,
+      [req.params.id, qtd, condicao, justificativa_falta || null, realizado_por || null]
+    )
+    res.status(201).json(result.rows[0])
+  } catch (err) { res.status(500).json({ error: err.message }) }
 })
 
 app.delete('/api/materiais/:id', async (req, res) => {

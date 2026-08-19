@@ -14,7 +14,17 @@ interface Material {
   foto?: string | null             // foto original — carregada só no detalhe
   foto_placa?: string | null       // foto da placa  — carregada só no detalhe
   quantidade: number | null
+  tipo?: 'escritorio' | 'ferramental'
   created_at: string
+}
+
+interface ChecklistFerramenta {
+  id: number
+  quantidade_verificada: number
+  condicao: 'boa' | 'media' | 'ruim'
+  justificativa_falta: string | null
+  realizado_por: string | null
+  realizado_em: string
 }
 
 interface Emprestimo {
@@ -62,8 +72,10 @@ interface EquipamentoCampo {
 
 type Modo =
   | 'inicial'
+  | 'patrimonioMenu'
   | 'materiais'
   | 'detalheMaterial'
+  | 'checklistFerramenta'
   | 'formMaterial'
   | 'editarMaterial'
   | 'emprestimos'
@@ -178,6 +190,7 @@ export default function MateriaisEmprestimos({ onIrParaMapa, abrirCampoId, onAbr
   const [notificacoesPrazo, setNotificacoesPrazo] = useState<Emprestimo[]>([])
   const [tipoOperacao, setTipoOperacao] = useState<'emprestimo' | 'manutencao'>('emprestimo')
   const [exportandoCatalogo, setExportandoCatalogo] = useState(false)
+  const [tipoPatrimonio, setTipoPatrimonio] = useState<'escritorio' | 'ferramental'>('escritorio')
 
   function showToast(msg: string) {
     setToast(msg)
@@ -368,7 +381,7 @@ export default function MateriaisEmprestimos({ onIrParaMapa, abrirCampoId, onAbr
         </div>
 
         <div className="mat-botoes-grandes">
-          <button className="mat-btn-grande mat-btn-azul" onClick={() => setModo('materiais')}>
+          <button className="mat-btn-grande mat-btn-azul" onClick={() => setModo('patrimonioMenu')}>
             <span className="mat-btn-emoji">📋</span>
             <span className="mat-btn-titulo">Patrimônio</span>
             <span className="mat-btn-sub">Catálogo e cadastro</span>
@@ -390,12 +403,29 @@ export default function MateriaisEmprestimos({ onIrParaMapa, abrirCampoId, onAbr
     )
   }
 
+  if (modo === 'patrimonioMenu') {
+    return (
+      <div className="mat-tela">
+        <div className="mat-subheader"><button className="btn-voltar" onClick={() => setModo('inicial')}>‹</button><h2>📋 Patrimônio</h2><span style={{ width: '2rem' }} /></div>
+        <div className="mat-categoria-grid">
+          <button className="mat-categoria-card" onClick={() => { setTipoPatrimonio('escritorio'); setBusca(''); setModo('materiais') }}>
+            <span>🗂️</span><strong>Materiais de Escritório</strong><small>Cadastro e estoque de materiais</small>
+          </button>
+          <button className="mat-categoria-card mat-categoria-ferramenta" onClick={() => { setTipoPatrimonio('ferramental'); setBusca(''); setModo('materiais') }}>
+            <span>🛠️</span><strong>Ferramental</strong><small>Ferramentas e checklists de condição</small>
+          </button>
+        </div>
+      </div>
+    )
+  }
+
   // ─── LISTA DE MATERIAIS ──────────────────────────────────────────────────
   if (modo === 'materiais') {
     const buscaLow = busca.trim().toLowerCase()
     const totalDisponiveis = materiais.filter(m => !emprestimoAtivoDe(m.id)).length
     const totalEmprestadosFiltro = materiais.filter(m => !!emprestimoAtivoDe(m.id)).length
-    const filtrados = materiais.filter((m) => {
+    const materiaisDaCategoria = materiais.filter(m => (m.tipo || 'escritorio') === tipoPatrimonio)
+    const filtrados = materiaisDaCategoria.filter((m) => {
       if (buscaLow && !m.id.toLowerCase().includes(buscaLow) && !m.nome.toLowerCase().includes(buscaLow)) return false
       if (filtroStatus === 'disponivel' && emprestimoAtivoDe(m.id)) return false
       if (filtroStatus === 'emprestado' && !emprestimoAtivoDe(m.id)) return false
@@ -405,8 +435,8 @@ export default function MateriaisEmprestimos({ onIrParaMapa, abrirCampoId, onAbr
       <div className="mat-tela">
         {toast && <div className="toast">{toast}</div>}
         <div className="mat-subheader">
-          <button className="btn-voltar" onClick={() => { setBusca(''); setModo('inicial') }}>‹</button>
-          <h2>📋 Materiais ({materiais.length})</h2>
+          <button className="btn-voltar" onClick={() => { setBusca(''); setModo('patrimonioMenu') }}>‹</button>
+          <h2>{tipoPatrimonio === 'ferramental' ? '🛠️ Ferramental' : '🗂️ Materiais de Escritório'} ({materiaisDaCategoria.length})</h2>
           <div style={{ display: 'flex', gap: '0.4rem' }}>
             <button
               className="mat-btn-exportar"
@@ -471,7 +501,7 @@ export default function MateriaisEmprestimos({ onIrParaMapa, abrirCampoId, onAbr
             )}
             {!busca && filtroStatus === 'todos' && (
               <button className="btn-nova-vazia" onClick={() => { setMaterialSelecionado(null); setModo('formMaterial') }}>
-                + Cadastrar primeiro material
+                + Cadastrar primeiro item
               </button>
             )}
           </div>
@@ -523,6 +553,7 @@ export default function MateriaisEmprestimos({ onIrParaMapa, abrirCampoId, onAbr
         material={materialSelecionado}
         emprestimoAtivo={emprestimoAtivoDe(materialSelecionado.id)}
         onVoltar={() => setModo('materiais')}
+        onChecklist={materialSelecionado.tipo === 'ferramental' ? () => setModo('checklistFerramenta') : undefined}
         onEditar={() => setModo('editarMaterial')}
         onExcluir={async () => {
           if (!confirm(`Excluir definitivamente o material "${materialSelecionado.nome}"?\nIsso apaga TODOS os empréstimos relacionados.`)) return
@@ -545,6 +576,7 @@ export default function MateriaisEmprestimos({ onIrParaMapa, abrirCampoId, onAbr
     return (
       <FormMaterial
         existentes={materiais.map((m) => m.id)}
+        tipo={tipoPatrimonio}
         onCancelar={() => setModo('materiais')}
         onSalvo={async () => {
           showToast('✅ Material cadastrado!')
@@ -560,6 +592,7 @@ export default function MateriaisEmprestimos({ onIrParaMapa, abrirCampoId, onAbr
     return (
       <FormMaterial
         existentes={materiais.map((m) => m.id)}
+        tipo={materialSelecionado.tipo || tipoPatrimonio}
         materialInicial={materialSelecionado}
         onCancelar={() => setModo('detalheMaterial')}
         onSalvo={async (atualizado) => {

@@ -9,7 +9,18 @@ export interface MatMaterial {
   foto?: string | null
   foto_placa?: string | null
   quantidade: number | null
+  tipo?: 'escritorio' | 'ferramental'
   created_at: string
+}
+
+export interface MatChecklistFerramenta {
+  id: number
+  ferramenta_id: string
+  quantidade_verificada: number
+  condicao: 'boa' | 'media' | 'ruim'
+  justificativa_falta: string | null
+  realizado_por: string | null
+  realizado_em: string
 }
 
 export interface MatEmprestimo {
@@ -71,7 +82,7 @@ export const matApi = {
     if (supabaseDisponivel) {
       const { data, error } = await supabase
         .from('materiais')
-        .select('id, nome, descricao, observacoes, foto_thumb, quantidade, created_at')
+        .select('id, nome, descricao, observacoes, foto_thumb, quantidade, tipo, created_at')
         .order('id', { ascending: true })
       if (error) sbErr(error, 'listarMateriais')
       return (data ?? []) as MatMaterial[]
@@ -101,6 +112,7 @@ export const matApi = {
     foto?: string | null
     foto_placa?: string | null
     quantidade?: number
+    tipo?: 'escritorio' | 'ferramental'
   }): Promise<MatMaterial> {
     if (supabaseDisponivel) {
       const { data, error } = await supabase
@@ -135,6 +147,7 @@ export const matApi = {
       foto: string | null
       foto_placa: string | null
       quantidade: number
+      tipo: 'escritorio' | 'ferramental'
     }>
   ): Promise<MatMaterial> {
     if (supabaseDisponivel) {
@@ -161,6 +174,23 @@ export const matApi = {
       return
     }
     await apiFetch<unknown>(`/api/materiais/${encodeURIComponent(id)}`, { method: 'DELETE' })
+  },
+
+  async listarChecklistsFerramenta(id: string): Promise<MatChecklistFerramenta[]> {
+    return apiFetch<MatChecklistFerramenta[]>(`/api/ferramentas/${encodeURIComponent(id)}/checklists`)
+  },
+
+  async criarChecklistFerramenta(id: string, checklist: {
+    quantidade_verificada: number
+    condicao: 'boa' | 'media' | 'ruim'
+    justificativa_falta?: string | null
+    realizado_por?: string | null
+  }): Promise<MatChecklistFerramenta> {
+    return apiFetch<MatChecklistFerramenta>(`/api/ferramentas/${encodeURIComponent(id)}/checklists`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(checklist),
+    })
   },
 
   async listarEmprestimos(): Promise<MatEmprestimo[]> {

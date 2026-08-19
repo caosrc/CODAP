@@ -1232,7 +1232,14 @@ app.post('/api/radar-bilhetes', async (req, res) => {
     if (!id || !texto?.trim() || !data || !hora || !criado_por) return res.status(400).json({ error: 'Registro incompleto' })
     const result = await query(
       `INSERT INTO radar_bilhetes (id, texto, data, hora, prioridade, criado_por, tipo)
-       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       ON CONFLICT (id) DO UPDATE SET
+         texto = EXCLUDED.texto,
+         data = EXCLUDED.data,
+         hora = EXCLUDED.hora,
+         prioridade = EXCLUDED.prioridade,
+         tipo = EXCLUDED.tipo
+       RETURNING *`,
       [id, texto.trim(), data, hora, prioridade || 'normal', criado_por, tipo === 'notificacao' ? 'notificacao' : 'lembrete']
     )
     broadcastParaTodos({ tipo: 'radar_bilhetes_atualizados' })
@@ -1248,13 +1255,13 @@ app.get('/api/atividades-dia', async (req, res) => {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(data)) return res.status(400).json({ error: 'Data inválida' })
     const checklists = await query(
       `SELECT id, data_checklist, placa, motorista, created_at
-       FROM checklists_viatura WHERE data_checklist LIKE $1 ORDER BY created_at DESC`,
+       FROM checklists_viatura WHERE data_checklist::text LIKE $1 ORDER BY created_at DESC`,
       [`${data}%`],
     )
     const ocorrencias = await query(
       `SELECT id, natureza, endereco, agentes, responsavel_registro, created_at, hora_inicio
        FROM ocorrencias
-       WHERE (data_ocorrencia LIKE $1 OR created_at::date = $2::date)
+       WHERE (data_ocorrencia::text LIKE $1 OR created_at::date = $2::date)
        ORDER BY created_at DESC`,
       [`${data}%`, data],
     )

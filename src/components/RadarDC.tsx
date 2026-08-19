@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import './RadarDC.css'
 import './RadarDCResponsive.css'
 import { getAgenteLogado } from './Login'
@@ -22,7 +22,10 @@ const prioridadeConfig: Record<Prioridade, { label: string; emoji: string }> = {
   urgente: { label: 'Urgente', emoji: '🔴' },
 }
 
-function hoje() { return new Date().toLocaleDateString('en-CA') }
+function dataLocalISO(date = new Date()) {
+  return [date.getFullYear(), String(date.getMonth() + 1).padStart(2, '0'), String(date.getDate()).padStart(2, '0')].join('-')
+}
+function hoje() { return dataLocalISO() }
 function horaAgora() { return new Date().toTimeString().slice(0, 5) }
 function dataBonita(data: string) {
   return data ? new Date(`${data}T12:00:00`).toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: 'short' }).replace('.', '') : 'Sem data'
@@ -44,20 +47,33 @@ export default function RadarDC() {
   const [tv, setTv] = useState(false)
   const [notificacaoAtiva, setNotificacaoAtiva] = useState(false)
   const [atividades, setAtividades] = useState<{ checklists: Atividade[]; ocorrencias: Atividade[] }>({ checklists: [], ocorrencias: [] })
+  const [salvando, setSalvando] = useState(false)
+  const [erroSalvamento, setErroSalvamento] = useState('')
+  const carregadoRef = useRef(false)
+  const pendentesRef = useRef(new Set<string>())
 
   const carregar = useCallback(async () => {
     try {
       const res = await fetch('/api/radar-bilhetes')
       if (!res.ok) throw new Error()
       const rows = await res.json() as Array<Record<string, unknown>>
-      setRegistros(rows.map(row => ({
+      const remotos = rows.map(row => ({
         id: String(row.id), texto: String(row.texto), data: String(row.data), hora: String(row.hora),
         prioridade: (row.prioridade as Prioridade) || 'normal', concluido: Boolean(row.concluido),
         criadoPor: String(row.criado_por), criadoEm: String(row.criado_em),
         tipo: row.tipo === 'notificacao' ? 'notificacao' : 'lembrete',
-      })))
+      }))
+      setRegistros(prev => {
+        const idsRemotos = new Set(remotos.map(row => row.id))
+        const aindaPendentes = prev.filter(row => pendentesRef.current.has(row.id) && !idsRemotos.has(row.id))
+        return [...remotos, ...aindaPendentes]
+      })
+      carregadoRef.current = true
     } catch {
-      try { setRegistros(JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]')) } catch { setRegistros([]) }
+      try {
+        setRegistros(JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'))
+        carregadoRef.current = true
+      } catch { setRegistros([]) }
     }
   }, [])
 
@@ -66,10 +82,12 @@ export default function RadarDC() {
       if (supabaseDisponivel) {
         const proximoDia = new Date(`${dataSelecionada}T12:00:00`)
         proximoDia.setDate(proximoDia.getDate() + 1)
-        const proximo = proximoDia.toLocaleDateString('en-CA')
+        const proximo = dataLocalISO(proximoDia)
         const [checklistsResult, ocorrenciasResult] = await Promise.all([
           supabase.from('checklists_viatura').select('id,data_checklist,placa,motorista,created_at').gte('data_checklist', dataSelecionada).lt('data_checklist', proximo).order('created_at', { ascending: false }),
-          supabase.from('ocorrencias').select('id,natureza,endereco,agentes,responsavel_registro,created_at,hora_inicio,data_ocorrencia').or(`data_ocorrencia.eq.${dataSelecionada},created_at.gte.${dataSelecionada}T00:00:00`).order('created_at', { ascending: false }),
+          supabase.from('ocorrencias').select('id,natureza,endereco,agentes,responsavel_registro,created_at,hora_inicio,data_ocorrencia')
+            .or(`and(data_ocorrencia.gte.${dataSelecionada}T00:00:00,data_ocorrencia.lt.${proximo}T00:00:00),and(created_at.gte.${dataSelecionada}T00:00:00,created_at.lt.${proximo}T00:00:00)`)
+            .order('created_at', { ascending: false }),
         ])
         if (!checklistsResult.error && !ocorrenciasResult.error) {
           setAtividades({
@@ -91,7 +109,9 @@ export default function RadarDC() {
     const offOcorrencias = wsOn('ocorrencias_atualizadas', carregarAtividades)
     return () => { offChecklist(); offOcorrencias() }
   }, [carregarAtividades])
-  useEffect(() => { localStorage.setItem(STORAGE_KEY, JSON.stringify(registros)) }, [registros])
+  useEffect(() => {
+    if (carregadoRef.current) localStorage.setItem(STORAGE_KEY, JSON.stringify(registros))
+  }, [registros])
 
   const dias = useMemo(() => {
     const primeiro = new Date(mes.getFullYear(), mes.getMonth(), 1)
@@ -103,19 +123,40 @@ export default function RadarDC() {
   const proximasNotificacoes = notificacoes.filter(r => !r.concluido).sort((a, b) => `${a.data}${a.hora}`.localeCompare(`${b.data}${b.hora}`))
 
   async function salvarRegistro(tipo: RegistroRadar['tipo'], texto: string, data: string, horaRegistro: string) {
-    if (!texto.trim()) return
+    if (!texto.trim() || salvando) return
     const novo: RegistroRadar = {
       id: crypto.randomUUID(), texto: texto.trim(), data, hora: horaRegistro,
       prioridade, concluido: false, criadoPor: agente, criadoEm: new Date().toISOString(), tipo,
     }
-    const res = await fetch('/api/radar-bilhetes', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...novo, criado_por: agente, tipo }),
-    })
-    if (!res.ok) return
-    setRegistros(prev => [...prev, novo])
-    if (tipo === 'lembrete') setTextoLembrete('')
-    else { setTextoNotificacao(''); setHora(horaAgora()); setEditorAberto(false) }
+    setSalvando(true)
+    setErroSalvamento('')
+    pendentesRef.current.add(novo.id)
+    try {
+      const res = await fetch('/api/radar-bilhetes', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...novo, criado_por: agente, tipo }),
+      })
+      if (!res.ok) {
+        const detalhe = await res.json().catch(() => null) as { error?: string } | null
+        throw new Error(detalhe?.error || 'Não foi possível salvar o registro.')
+      }
+      const row = await res.json() as Record<string, unknown>
+      const salvo: RegistroRadar = {
+        id: String(row.id), texto: String(row.texto), data: String(row.data), hora: String(row.hora),
+        prioridade: (row.prioridade as Prioridade) || novo.prioridade, concluido: Boolean(row.concluido),
+        criadoPor: String(row.criado_por || agente), criadoEm: String(row.criado_em || novo.criadoEm),
+        tipo: row.tipo === 'notificacao' ? 'notificacao' : 'lembrete',
+      }
+      setRegistros(prev => [...prev.filter(r => r.id !== salvo.id && r.id !== novo.id), salvo])
+      pendentesRef.current.delete(novo.id)
+      if (tipo === 'lembrete') setTextoLembrete('')
+      else { setTextoNotificacao(''); setHora(horaAgora()); setEditorAberto(false) }
+    } catch (error) {
+      pendentesRef.current.delete(novo.id)
+      setErroSalvamento(error instanceof Error ? error.message : 'Não foi possível salvar o registro.')
+    } finally {
+      setSalvando(false)
+    }
   }
 
   async function remover(id: string) {
@@ -162,7 +203,8 @@ export default function RadarDC() {
           <div className="card-label"><span className="label-dot" /> LEMBRETE</div>
           <h2>Novo lembrete</h2>
           <textarea value={textoLembrete} onChange={e => setTextoLembrete(e.target.value)} placeholder="Deixe um lembrete para a equipe..." rows={7} />
-          <button className="radar-add" onClick={() => salvarRegistro('lembrete', textoLembrete, hoje(), horaAgora())} disabled={!textoLembrete.trim()}>+ Salvar lembrete</button>
+          <button className="radar-add" onClick={() => salvarRegistro('lembrete', textoLembrete, hoje(), horaAgora())} disabled={!textoLembrete.trim() || salvando}>{salvando ? 'Salvando...' : '+ Salvar lembrete'}</button>
+          {erroSalvamento && <p className="radar-save-error" role="alert">{erroSalvamento}</p>}
           <small>O lembrete fica visível até o agente que o criou removê-lo.</small>
           <div className="radar-mini-list">{lembretes.length === 0 ? <span>Nenhum lembrete cadastrado.</span> : lembretes.map(l => <div className="radar-mini-item" key={l.id}><b>{l.criadoPor}</b><span>{l.texto}</span><button onClick={() => remover(l.id)} title="Remover lembrete">×</button></div>)}</div>
         </div>
@@ -177,7 +219,8 @@ export default function RadarDC() {
             <strong>Notificar em {dataBonita(dataSelecionada)}</strong>
             <textarea value={textoNotificacao} onChange={e => setTextoNotificacao(e.target.value)} placeholder="Escreva a notificação..." rows={3} />
             <div className="radar-form-row"><label>⏰ Hora<input type="time" value={hora} onChange={e => setHora(e.target.value)} /></label><label>Nível<select value={prioridade} onChange={e => setPrioridade(e.target.value as Prioridade)}>{Object.entries(prioridadeConfig).map(([key, c]) => <option key={key} value={key}>{c.emoji} {c.label}</option>)}</select></label></div>
-            <button className="radar-add" type="submit" disabled={!textoNotificacao.trim()}>+ Colocar no Radar DC</button>
+            <button className="radar-add" type="submit" disabled={!textoNotificacao.trim() || salvando}>{salvando ? 'Salvando...' : '+ Colocar no Radar DC'}</button>
+            {erroSalvamento && <p className="radar-save-error" role="alert">{erroSalvamento}</p>}
           </form>}
         </div>
         <section className="radar-activities">

@@ -4340,7 +4340,7 @@ export default function Planejamento() {
           className={`plan-subtab radar-subtab ${subAba === 'radar' ? 'ativo' : ''}`}
           onClick={() => setSubAba('radar')}
         >
-          <span className="st-emoji">📡</span>
+          <span className="st-emoji radar-shield-icon">🛡️</span>
           Radar DC
         </button>
         {(['evento', 'operacao', 'simulado', 'emergencia'] as TipoPlano[]).map(t => {

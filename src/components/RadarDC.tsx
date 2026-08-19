@@ -98,7 +98,14 @@ export default function RadarDC() {
   const entrarTV = async () => {
     await pedirNotificacao()
     try { await document.documentElement.requestFullscreen?.() } catch { /* fullscreen pode ser bloqueado pelo navegador */ }
+    try { await screen.orientation?.lock?.('landscape') } catch { /* alguns navegadores não permitem orientação em desktop */ }
     setTv(true)
+  }
+
+  const sairTV = () => {
+    document.exitFullscreen?.()
+    try { screen.orientation?.unlock?.() } catch { /* orientação volta ao padrão do dispositivo */ }
+    setTv(false)
   }
 
   return (
@@ -106,12 +113,12 @@ export default function RadarDC() {
       <header className="radar-header">
         <div>
           <div className="radar-kicker">CENTRAL DE LEMBRETES OPERACIONAIS</div>
-          <h1><span>📡</span> Radar <b>DC</b></h1>
+          <h1><span className="radar-shield">🛡️</span> Radar <b>DC</b></h1>
           <p>O que precisa entrar no radar da equipe hoje?</p>
         </div>
         <div className="radar-actions">
           {!notificacaoAtiva && <button className="radar-notify" onClick={pedirNotificacao}>🔔 Ativar notificações</button>}
-          <button className="radar-tv-btn" onClick={tv ? () => { document.exitFullscreen?.(); setTv(false) } : entrarTV}>{tv ? '↙ Voltar ao app' : '▣ Modo TV'}</button>
+          <button className="radar-tv-btn" onClick={tv ? sairTV : entrarTV}>{tv ? '↙ Voltar ao app' : '▣ Modo TV'}</button>
         </div>
       </header>
 

@@ -87,6 +87,7 @@ export default function RadarDC() {
   const pendentesRef = useRef(new Set<string>())
   const notificacoesDisparadasRef = useRef(new Set<string>())
   const ocorrenciasNotificadasRef = useRef(new Set<number>())
+  const atividadesAssinaturaRef = useRef('')
   const calendarioRef = useRef<HTMLDivElement>(null)
 
   const carregar = useCallback(async () => {
@@ -134,6 +135,18 @@ export default function RadarDC() {
     })
   }, [])
 
+  const atualizarAtividadesNaTela = useCallback((dados: { checklists: Atividade[]; ocorrencias: Atividade[] }, avisar: boolean) => {
+    const assinatura = JSON.stringify({
+      checklists: dados.checklists.map(item => [item.id, item.created_at, item.hora, item.placa]),
+      ocorrencias: dados.ocorrencias.map(item => [item.id, item.created_at, item.hora, item.natureza, item.endereco]),
+    })
+    const mudouDesdeUmaLeituraAnterior = Boolean(atividadesAssinaturaRef.current) && atividadesAssinaturaRef.current !== assinatura
+    atividadesAssinaturaRef.current = assinatura
+    setAtividades(dados)
+    notificarOcorrenciasNovas(dados.ocorrencias, avisar)
+    if (avisar || mudouDesdeUmaLeituraAnterior) tocarSininho()
+  }, [notificarOcorrenciasNovas])
+
   const carregarAtividades = useCallback(async (avisar = false) => {
     try {
       if (supabaseDisponivel) {
@@ -151,19 +164,17 @@ export default function RadarDC() {
             checklists: (checklistsResult.data || []).map(row => ({ ...row, agente: row.motorista || 'Agente não informado', hora: row.data_checklist?.includes('T') ? row.data_checklist.slice(11, 16) : new Date(row.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) })) as Atividade[],
             ocorrencias: (ocorrenciasResult.data || []).map(row => ({ ...row, agente: row.responsavel_registro || (Array.isArray(row.agentes) ? row.agentes[0] : null) || 'Agente não informado', hora: row.hora_inicio || new Date(row.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) })) as Atividade[],
           }
-          setAtividades(dados)
-          notificarOcorrenciasNovas(dados.ocorrencias, avisar)
+           atualizarAtividadesNaTela(dados, avisar)
           return
         }
       }
       const res = await fetch(`/api/atividades-dia?data=${dataSelecionada}`)
       if (res.ok) {
         const dados = await res.json() as { checklists: Atividade[]; ocorrencias: Atividade[] }
-        setAtividades(dados)
-        notificarOcorrenciasNovas(dados.ocorrencias, avisar)
+         atualizarAtividadesNaTela(dados, avisar)
       }
     } catch { setAtividades({ checklists: [], ocorrencias: [] }) }
-  }, [dataSelecionada])
+  }, [dataSelecionada, atualizarAtividadesNaTela])
 
 
   useEffect(() => {
@@ -201,7 +212,7 @@ export default function RadarDC() {
   }, [carregar])
   useEffect(() => {
     carregarAtividades()
-    const avisarAtualizacao = () => { tocarSininho(); carregarAtividades(true) }
+    const avisarAtualizacao = () => carregarAtividades(true)
     const offChecklist = wsOn('checklist_atualizado', avisarAtualizacao)
     const offOcorrencias = wsOn('ocorrencias_atualizadas', avisarAtualizacao)
     const timer = window.setInterval(() => { carregarAtividades(false) }, 10000)

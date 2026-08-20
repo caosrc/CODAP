@@ -427,7 +427,7 @@ export default function RadarDC() {
               <span>Nenhum lembrete cadastrado.</span>
             ) : lembretes.map(l => (
               <div className="radar-mini-item" key={l.id}>
-                <b>{l.criadoPor}</b>
+                 <b>{l.agentesEnvolvidos.length > 0 ? l.agentesEnvolvidos.join(', ') : l.criadoPor}</b>
                 <span>{l.texto}</span>
                  {l.criadoPor === agente && (
                    <button onClick={() => remover(l.id)} title="Apagar meu lembrete" aria-label="Apagar meu lembrete">×</button>

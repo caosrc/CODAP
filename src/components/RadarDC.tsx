@@ -339,7 +339,7 @@ export default function RadarDC() {
       <div className="radar-layout">
         <div className="radar-note-card radar-bilhete-large">
           <div className="card-label"><span className="label-dot" /> LEMBRETE</div>
-          <h2>Novo lembrete</h2>
+          <h2>Lembrete</h2>
           <textarea value={textoLembrete} onChange={e => setTextoLembrete(e.target.value)} placeholder="Deixe um lembrete para a equipe..." rows={7} />
           <button className="radar-add" onClick={() => salvarRegistro('lembrete', textoLembrete, hoje(), horaAgora())} disabled={!textoLembrete.trim() || salvando}>{salvando ? 'Salvando...' : '+ Salvar lembrete'}</button>
           {erroSalvamento && <p className="radar-save-error" role="alert">{erroSalvamento}</p>}

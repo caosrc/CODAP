@@ -185,7 +185,7 @@
 .radar-ticker-viewport { min-width: 0; flex: 1; overflow: hidden; }
 .radar-ticker-track { display: flex; width: max-content; animation: radar-scroll var(--ticker-duration, 16s) linear infinite; will-change: transform; }
 .radar-ticker-group { display: flex; align-items: center; flex-shrink: 0; gap: 4rem; padding-right: 4rem; }
-.radar-ticker-group > b, .radar-ticker-empty { display: block; font-size: .86rem; font-weight: 700; white-space: nowrap; }
+.radar-ticker-group > b, .radar-ticker-empty { display: block; font-size: 1.05rem; font-weight: 800; white-space: nowrap; }
 @keyframes radar-scroll { to { transform: translateX(-50%); } }
 
 .radar-tv { position: fixed; inset: 0; z-index: 100; overflow: auto; color: #e9f5ff; background: #071c34; }

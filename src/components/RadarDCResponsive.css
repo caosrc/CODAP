@@ -348,7 +348,7 @@ body.radar-tv-active .radar-page {
   }
   .radar-ticker { height: 44px; }
   .radar-ticker > span { font-size: .7rem; padding: 0 .75rem; }
-  .radar-ticker-group > b, .radar-ticker-empty { font-size: .78rem; }
+  .radar-ticker-group > b, .radar-ticker-empty { font-size: .92rem; }
 }
 
 /* O Radar atual usa o calendário e os registros na mesma coluna direita.

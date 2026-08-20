@@ -152,8 +152,15 @@ body.radar-tv-active .radar-page {
 }
 
 @media (min-width: 701px) {
+  .radar-weather {
+    width: 70%;
+    margin-right: auto;
+    margin-left: auto;
+    box-sizing: border-box;
+  }
+
   .radar-layout {
-    grid-template-columns: minmax(0, 1.9fr) minmax(260px, .55fr);
+    grid-template-columns: minmax(0, 2.35fr) minmax(220px, .42fr);
     min-height: calc(100vh - 185px);
     padding: 1.2rem clamp(.35rem, 1vw, 1rem) 2rem .45rem;
     align-items: stretch;

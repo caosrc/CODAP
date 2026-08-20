@@ -29,6 +29,12 @@ const pool = new pg.Pool({
   ssl: process.env.SUPABASE_DB_URL ? { rejectUnauthorized: false } : false,
 })
 
+const supabasePushUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || ''
+const supabasePushKey = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || ''
+const supabasePush = supabasePushUrl && supabasePushKey
+  ? createSupabaseClient(supabasePushUrl, supabasePushKey)
+  : null
+
 async function query(sql, params = []) {
   const client = await pool.connect()
   try {
@@ -164,8 +170,18 @@ async function enviarPushSosServidor(msg) {
 async function enviarPushParaAgentes(agentesAlvo, payloadJson, excluirAgente = null) {
   if (!vapidConfigured || !agentesAlvo || agentesAlvo.length === 0) return 0
   try {
-    const result = await query('SELECT id, endpoint, p256dh, auth, agente FROM push_subscriptions')
-    const subs = result.rows.filter(s => {
+    let subs = []
+    if (supabasePush) {
+      const result = await supabasePush
+        .from('push_subscriptions')
+        .select('id, endpoint, p256dh, auth, agente')
+      if (result.error) throw new Error(result.error.message)
+      subs = result.data || []
+    } else {
+      const result = await query('SELECT id, endpoint, p256dh, auth, agente FROM push_subscriptions')
+      subs = result.rows
+    }
+    subs = subs.filter(s => {
       if (!s.agente) return false
       if (excluirAgente && s.agente === excluirAgente) return false
       return agentesAlvo.includes(s.agente)
@@ -187,7 +203,8 @@ async function enviarPushParaAgentes(agentesAlvo, payloadJson, excluirAgente = n
       }
     }))
     if (removidos.length > 0) {
-      await query('DELETE FROM push_subscriptions WHERE id = ANY($1)', [removidos])
+      if (supabasePush) await supabasePush.from('push_subscriptions').delete().in('id', removidos)
+      else await query('DELETE FROM push_subscriptions WHERE id = ANY($1)', [removidos])
     }
     return enviados
   } catch (e) {
@@ -392,6 +409,9 @@ wss.on('connection', (ws) => {
       if (msg.tipo === 'sos') processarSos(msg, ws)
       if (msg.tipo === 'sos-audio') processarSosAudio(msg, ws)
       if (msg.tipo === 'sos-cancelar') processarSosCancelar(msg, ws)
+      if (msg.tipo === 'radar_notificacao_agente') {
+        broadcastParaTodos(msg, ws)
+      }
 
       if (msg.tipo === 'sos-visualizar') {
         const { id, agente } = msg
@@ -901,10 +921,12 @@ async function initDb() {
       prioridade TEXT NOT NULL DEFAULT 'normal',
       concluido BOOLEAN NOT NULL DEFAULT FALSE,
       criado_por TEXT NOT NULL,
-      criado_em TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      criado_em TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      agentes_envolvidos TEXT[] NOT NULL DEFAULT '{}'
     )
   `)
   await query(`ALTER TABLE radar_bilhetes ADD COLUMN IF NOT EXISTS tipo TEXT NOT NULL DEFAULT 'lembrete'`)
+  await query(`ALTER TABLE radar_bilhetes ADD COLUMN IF NOT EXISTS agentes_envolvidos TEXT[] NOT NULL DEFAULT '{}'`)
 
   console.log('[DB] Tabelas verificadas/criadas com sucesso')
 
@@ -1228,22 +1250,44 @@ app.get('/api/radar-bilhetes', async (_req, res) => {
 
 app.post('/api/radar-bilhetes', async (req, res) => {
   try {
-    const { id, texto, data, hora, prioridade, criado_por, tipo = 'lembrete' } = req.body
+    const { id, texto, data, hora, prioridade, criado_por, tipo = 'lembrete', agentes_envolvidos = [] } = req.body
     if (!id || !texto?.trim() || !data || !hora || !criado_por) return res.status(400).json({ error: 'Registro incompleto' })
+    const agentes = tipo === 'notificacao' && Array.isArray(agentes_envolvidos) ? agentes_envolvidos : []
     const result = await query(
-      `INSERT INTO radar_bilhetes (id, texto, data, hora, prioridade, criado_por, tipo)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
+      `INSERT INTO radar_bilhetes (id, texto, data, hora, prioridade, criado_por, tipo, agentes_envolvidos)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
        ON CONFLICT (id) DO UPDATE SET
          texto = EXCLUDED.texto,
          data = EXCLUDED.data,
          hora = EXCLUDED.hora,
          prioridade = EXCLUDED.prioridade,
-         tipo = EXCLUDED.tipo
+          tipo = EXCLUDED.tipo,
+          agentes_envolvidos = EXCLUDED.agentes_envolvidos
        RETURNING *`,
-      [id, texto.trim(), data, hora, prioridade || 'normal', criado_por, tipo === 'notificacao' ? 'notificacao' : 'lembrete']
+      [id, texto.trim(), data, hora, prioridade || 'normal', criado_por, tipo === 'notificacao' ? 'notificacao' : 'lembrete', agentes]
     )
     broadcastParaTodos({ tipo: 'radar_bilhetes_atualizados' })
     res.status(201).json(result.rows[0])
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+app.post('/api/push/radar', async (req, res) => {
+  try {
+    const { agentes, texto, data, hora, prioridade, remetente, notificacaoId } = req.body || {}
+    if (!Array.isArray(agentes) || agentes.length === 0 || !texto) return res.json({ enviados: 0 })
+    const payload = {
+      title: '📅 Radar DC — nova notificação',
+      body: `${data || ''} às ${hora || ''} · ${texto}`,
+      tag: `radar-${notificacaoId || Date.now()}`,
+      tipo: 'radar_notificacao',
+      url: '/',
+      prioridade: prioridade || 'normal',
+      remetente: remetente || '',
+    }
+    const enviados = await enviarPushParaAgentes(agentes, payload, remetente || null)
+    res.json({ enviados })
   } catch (err) {
     res.status(500).json({ error: err.message })
   }

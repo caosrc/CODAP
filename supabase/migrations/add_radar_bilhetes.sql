@@ -8,10 +8,13 @@ CREATE TABLE IF NOT EXISTS public.radar_bilhetes (
   concluido BOOLEAN NOT NULL DEFAULT FALSE,
   criado_por TEXT NOT NULL,
   criado_em TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  tipo TEXT NOT NULL DEFAULT 'lembrete'
+  tipo TEXT NOT NULL DEFAULT 'lembrete',
+  agentes_envolvidos TEXT[] NOT NULL DEFAULT '{}'
 );
 
 ALTER TABLE public.radar_bilhetes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.radar_bilhetes
+  ADD COLUMN IF NOT EXISTS agentes_envolvidos TEXT[] NOT NULL DEFAULT '{}';
 
 DROP POLICY IF EXISTS "radar bilhetes aberto" ON public.radar_bilhetes;
 CREATE POLICY "radar bilhetes aberto"

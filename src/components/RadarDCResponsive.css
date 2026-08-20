@@ -207,6 +207,10 @@ body.radar-tv-active .radar-page {
   padding-top: .85rem;
 }
 
+.radar-agentes-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
 .radar-calendar-editor strong {
   display: block;
   color: #1e64b7;
@@ -291,6 +295,10 @@ body.radar-tv-active .radar-page {
 
   .weather-highlights {
     grid-template-columns: repeat(3, 1fr);
+  }
+
+  .radar-agentes-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .radar-bilhete-large { min-height: 390px; }

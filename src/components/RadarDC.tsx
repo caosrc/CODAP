@@ -2,13 +2,15 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import './RadarDC.css'
 import './RadarDCResponsive.css'
 import { getAgenteLogado } from './Login'
-import { wsOn } from '../wsClient'
+import { wsOn, wsSend } from '../wsClient'
 import { supabase, supabaseDisponivel } from '../supabaseClient'
+import { AGENTES } from '../types'
 
 type Prioridade = 'normal' | 'importante' | 'urgente'
 type RegistroRadar = {
   id: string; texto: string; data: string; hora: string; prioridade: Prioridade
   concluido: boolean; criadoPor: string; criadoEm: string; tipo: 'lembrete' | 'notificacao'
+  agentesEnvolvidos: string[]
 }
 type Atividade = {
   id: number; agente: string; hora: string; placa?: string; natureza?: string
@@ -72,6 +74,7 @@ export default function RadarDC() {
   const [textoNotificacao, setTextoNotificacao] = useState('')
   const [hora, setHora] = useState(horaAgora())
   const [prioridade, setPrioridade] = useState<Prioridade>('normal')
+  const [agentesEnvolvidos, setAgentesEnvolvidos] = useState<string[]>([])
   const [editorAberto, setEditorAberto] = useState(false)
   const [tv, setTv] = useState(false)
   const [notificacaoAtiva, setNotificacaoAtiva] = useState(false)
@@ -103,6 +106,7 @@ export default function RadarDC() {
         prioridade: (row.prioridade as Prioridade) || 'normal', concluido: Boolean(row.concluido),
         criadoPor: String(row.criado_por), criadoEm: String(row.criado_em),
         tipo: row.tipo === 'notificacao' ? 'notificacao' : 'lembrete',
+        agentesEnvolvidos: Array.isArray(row.agentes_envolvidos) ? row.agentes_envolvidos.map(String) : [],
       }))
       setRegistros(prev => {
         const idsRemotos = new Set(remotos.map(row => row.id))
@@ -217,6 +221,7 @@ export default function RadarDC() {
     const novo: RegistroRadar = {
       id: crypto.randomUUID(), texto: texto.trim(), data, hora: horaRegistro,
       prioridade, concluido: false, criadoPor: agente, criadoEm: new Date().toISOString(), tipo,
+      agentesEnvolvidos: tipo === 'notificacao' ? agentesEnvolvidos : [],
     }
     setSalvando(true)
     setErroSalvamento('')
@@ -224,13 +229,13 @@ export default function RadarDC() {
     try {
       let row: Record<string, unknown>
       if (supabaseDisponivel) {
-        const result = await supabase.from('radar_bilhetes').upsert({ id: novo.id, texto: novo.texto, data: novo.data, hora: novo.hora, prioridade: novo.prioridade, concluido: false, criado_por: agente, tipo }, { onConflict: 'id' }).select().single()
+        const result = await supabase.from('radar_bilhetes').upsert({ id: novo.id, texto: novo.texto, data: novo.data, hora: novo.hora, prioridade: novo.prioridade, concluido: false, criado_por: agente, tipo, agentes_envolvidos: novo.agentesEnvolvidos }, { onConflict: 'id' }).select().single()
         if (result.error || !result.data) throw new Error(result.error?.message || 'Não foi possível salvar no banco.')
         row = result.data as Record<string, unknown>
       } else {
         const res = await fetch('/api/radar-bilhetes', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ...novo, criado_por: agente, tipo }),
+          body: JSON.stringify({ ...novo, criado_por: agente, tipo, agentes_envolvidos: novo.agentesEnvolvidos }),
         })
         if (!res.ok) {
           const detalhe = await res.json().catch(() => null) as { error?: string } | null
@@ -243,11 +248,42 @@ export default function RadarDC() {
         prioridade: (row.prioridade as Prioridade) || novo.prioridade, concluido: Boolean(row.concluido),
         criadoPor: String(row.criado_por || agente), criadoEm: String(row.criado_em || novo.criadoEm),
         tipo: row.tipo === 'notificacao' ? 'notificacao' : 'lembrete',
+        agentesEnvolvidos: Array.isArray(row.agentes_envolvidos) ? row.agentes_envolvidos.map(String) : novo.agentesEnvolvidos,
       }
       setRegistros(prev => [...prev.filter(r => r.id !== salvo.id && r.id !== novo.id), salvo])
       pendentesRef.current.delete(novo.id)
       if (tipo === 'lembrete') setTextoLembrete('')
-      else { setTextoNotificacao(''); setHora(horaAgora()); setEditorAberto(false) }
+      else {
+        setTextoNotificacao('')
+        setHora(horaAgora())
+        setAgentesEnvolvidos([])
+        setEditorAberto(false)
+        if (novo.agentesEnvolvidos.length > 0) {
+          wsSend({
+            tipo: 'radar_notificacao_agente',
+            id: novo.id,
+            texto: novo.texto,
+            data: novo.data,
+            hora: novo.hora,
+            prioridade: novo.prioridade,
+            criadoPor: agente,
+            agentesEnvolvidos: novo.agentesEnvolvidos,
+          })
+          fetch('/api/push/radar', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              agentes: novo.agentesEnvolvidos,
+              texto: novo.texto,
+              data: novo.data,
+              hora: novo.hora,
+              prioridade: novo.prioridade,
+              remetente: agente,
+              notificacaoId: novo.id,
+            }),
+          }).catch(() => {})
+        }
+      }
     } catch (error) {
       pendentesRef.current.delete(novo.id)
       setErroSalvamento(error instanceof Error ? error.message : 'Não foi possível salvar o registro.')
@@ -301,6 +337,17 @@ export default function RadarDC() {
     const timer = window.setInterval(verificarNotificacoes, 15000)
     return () => window.clearInterval(timer)
   }, [proximasNotificacoes])
+
+  useEffect(() => wsOn('radar_notificacao_agente', (mensagem) => {
+    const envolvidos = Array.isArray(mensagem.agentesEnvolvidos) ? mensagem.agentesEnvolvidos.map(String) : []
+    if (!envolvidos.includes(agente) || String(mensagem.criadoPor) === agente) return
+    if ('Notification' in window && Notification.permission === 'granted') {
+      new Notification('Radar DC — você foi envolvido', {
+        body: `${String(mensagem.data || '')} às ${String(mensagem.hora || '')} · ${String(mensagem.texto || '')}`,
+        tag: `radar-envolvido-${String(mensagem.id)}`,
+      })
+    }
+  }), [agente])
 
   useEffect(() => {
     if (!editorAberto) return
@@ -366,8 +413,23 @@ export default function RadarDC() {
           {editorAberto && <form className="radar-calendar-editor" onSubmit={e => { e.preventDefault(); salvarRegistro('notificacao', textoNotificacao, dataSelecionada, hora) }}>
             <strong>Notificar em {dataBonita(dataSelecionada)}</strong>
             <textarea value={textoNotificacao} onChange={e => setTextoNotificacao(e.target.value)} placeholder="Escreva a notificação..." rows={3} />
-            <div className="radar-form-row"><label>⏰ Hora<input type="time" value={hora} onChange={e => setHora(e.target.value)} /></label><label>Nível<select value={prioridade} onChange={e => setPrioridade(e.target.value as Prioridade)}>{Object.entries(prioridadeConfig).map(([key, c]) => <option key={key} value={key}>{c.emoji} {c.label}</option>)}</select></label></div>
-            <button className="radar-add" type="submit" disabled={!textoNotificacao.trim() || salvando}>{salvando ? 'Salvando...' : '+ Colocar no Radar DC'}</button>
+             <div className="radar-form-row"><label>⏰ Hora<input type="time" value={hora} onChange={e => setHora(e.target.value)} /></label><label>Nível<select value={prioridade} onChange={e => setPrioridade(e.target.value as Prioridade)}>{Object.entries(prioridadeConfig).map(([key, c]) => <option key={key} value={key}>{c.emoji} {c.label}</option>)}</select></label></div>
+             <fieldset className="radar-agentes-fieldset">
+               <legend>Agentes envolvidos</legend>
+               <div className="radar-agentes-grid">
+                 {AGENTES.map(nome => (
+                   <label key={nome} className="radar-agente-option">
+                     <input
+                       type="checkbox"
+                       checked={agentesEnvolvidos.includes(nome)}
+                       onChange={e => setAgentesEnvolvidos(prev => e.target.checked ? [...prev, nome] : prev.filter(item => item !== nome))}
+                     />
+                     <span>{nome}</span>
+                   </label>
+                 ))}
+               </div>
+             </fieldset>
+             <button className="radar-add" type="submit" disabled={!textoNotificacao.trim() || salvando}>{salvando ? 'Salvando...' : '+ Colocar no Radar DC'}</button>
             {erroSalvamento && <p className="radar-save-error" role="alert">{erroSalvamento}</p>}
           </form>}
         </div>

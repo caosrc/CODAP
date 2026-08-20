@@ -17,18 +17,19 @@ function tocarSininho() {
     if (!window.AudioContext) return
     const contexto = new window.AudioContext()
     const agora = contexto.currentTime
-    const oscilador = contexto.createOscillator()
-    const ganho = contexto.createGain()
-    oscilador.type = 'sine'
-    oscilador.frequency.setValueAtTime(880, agora)
-    oscilador.frequency.setValueAtTime(1175, agora + 0.12)
-    ganho.gain.setValueAtTime(0.0001, agora)
-    ganho.gain.exponentialRampToValueAtTime(0.2, agora + 0.02)
-    ganho.gain.exponentialRampToValueAtTime(0.0001, agora + 0.3)
-    oscilador.connect(ganho).connect(contexto.destination)
-    oscilador.start(agora)
-    oscilador.stop(agora + 0.32)
-    window.setTimeout(() => contexto.close().catch(() => {}), 500)
+    ;[0, 0.16, 0.32].forEach((atraso, indice) => {
+      const oscilador = contexto.createOscillator()
+      const ganho = contexto.createGain()
+      oscilador.type = 'triangle'
+      oscilador.frequency.value = [659, 880, 1175][indice]
+      ganho.gain.setValueAtTime(0.0001, agora + atraso)
+      ganho.gain.exponentialRampToValueAtTime(0.16, agora + atraso + 0.025)
+      ganho.gain.exponentialRampToValueAtTime(0.0001, agora + atraso + 0.72)
+      oscilador.connect(ganho).connect(contexto.destination)
+      oscilador.start(agora + atraso)
+      oscilador.stop(agora + atraso + 0.76)
+    })
+    window.setTimeout(() => contexto.close().catch(() => {}), 1200)
   } catch { /* áudio pode estar bloqueado até interação */ }
 }
 

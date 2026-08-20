@@ -49,19 +49,19 @@ function tocarSininho() {
     if (typeof window === 'undefined' || !window.AudioContext) return
     const contexto = new window.AudioContext()
     const agora = contexto.currentTime
-    ;[0, 0.16].forEach((atraso, indice) => {
+    ;[0, 0.16, 0.32].forEach((atraso, indice) => {
       const oscilador = contexto.createOscillator()
       const ganho = contexto.createGain()
-      oscilador.type = 'sine'
-      oscilador.frequency.value = indice === 0 ? 880 : 1175
+      oscilador.type = 'triangle'
+      oscilador.frequency.value = [659, 880, 1175][indice]
       ganho.gain.setValueAtTime(0.0001, agora + atraso)
-      ganho.gain.exponentialRampToValueAtTime(0.18, agora + atraso + 0.015)
-      ganho.gain.exponentialRampToValueAtTime(0.0001, agora + atraso + 0.14)
+      ganho.gain.exponentialRampToValueAtTime(0.16, agora + atraso + 0.025)
+      ganho.gain.exponentialRampToValueAtTime(0.0001, agora + atraso + 0.72)
       oscilador.connect(ganho).connect(contexto.destination)
       oscilador.start(agora + atraso)
-      oscilador.stop(agora + atraso + 0.15)
+      oscilador.stop(agora + atraso + 0.76)
     })
-    window.setTimeout(() => contexto.close().catch(() => {}), 450)
+    window.setTimeout(() => contexto.close().catch(() => {}), 1200)
   } catch { /* áudio pode estar bloqueado até interação */ }
 }
 
@@ -229,6 +229,7 @@ export default function RadarDC() {
   }, [mes])
   const lembretes = registros.filter(r => r.tipo === 'lembrete')
   const notificacoes = registros.filter(r => r.tipo === 'notificacao')
+  const notificacoesDaData = notificacoes.filter(r => r.data === dataSelecionada)
   const proximasNotificacoes = notificacoes.filter(r => !r.concluido).sort((a, b) => `${a.data}${a.hora}`.localeCompare(`${b.data}${b.hora}`))
   const destaquesTempo = useMemo(() => {
     if (!tempo?.dias.length) return null
@@ -440,6 +441,21 @@ export default function RadarDC() {
           <div className="calendar-legend"><span><i className="legend-red" /> notificações</span></div>
           {editorAberto && <form className="radar-calendar-editor" onSubmit={e => { e.preventDefault(); salvarRegistro('notificacao', textoNotificacao, dataSelecionada, hora) }}>
             <strong>Notificar em {dataBonita(dataSelecionada)}</strong>
+             <div className="radar-date-notifications">
+               <span className="radar-date-notifications-title">Notificações desta data</span>
+               {notificacoesDaData.length === 0 ? (
+                 <span className="radar-date-notifications-empty">Nenhuma notificação cadastrada.</span>
+               ) : notificacoesDaData.map(n => (
+                 <div className="radar-date-notification" key={n.id}>
+                   <div>
+                     <b>{n.hora} · {n.prioridade}</b>
+                     <span>{n.texto}</span>
+                     <small>Por {n.criadoPor}</small>
+                   </div>
+                   {n.criadoPor === agente && <button type="button" onClick={() => remover(n.id)} aria-label={`Remover notificação: ${n.texto}`} title="Remover notificação">×</button>}
+                 </div>
+               ))}
+             </div>
             <textarea value={textoNotificacao} onChange={e => setTextoNotificacao(e.target.value)} placeholder="Escreva a notificação..." rows={3} />
              <div className="radar-form-row"><label>⏰ Hora<input type="time" value={hora} onChange={e => setHora(e.target.value)} /></label><label>Nível<select value={prioridade} onChange={e => setPrioridade(e.target.value as Prioridade)}>{Object.entries(prioridadeConfig).map(([key, c]) => <option key={key} value={key}>{c.emoji} {c.label}</option>)}</select></label></div>
              <fieldset className="radar-agentes-fieldset">

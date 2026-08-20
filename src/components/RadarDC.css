@@ -158,6 +158,17 @@
 
 .radar-calendar-editor { margin-top: .8rem; padding-top: .75rem; border-top: 1px solid #2b5676; }
 .radar-calendar-editor strong { display: block; margin-bottom: .2rem; color: var(--blue); font-size: .8rem; }
+.radar-date-notifications { display: grid; gap: .35rem; margin: .6rem 0 .7rem; }
+.radar-date-notifications-title { color: #a8c6dc; font-size: .67rem; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; }
+.radar-date-notifications-empty { padding: .5rem .6rem; border: 1px dashed #376886; border-radius: 8px; color: #8eabc2; font-size: .72rem; }
+.radar-date-notification { display: flex; align-items: center; justify-content: space-between; gap: .5rem; padding: .5rem .6rem; border: 1px solid #376886; border-radius: 8px; background: #123a59; }
+.radar-date-notification > div { min-width: 0; }
+.radar-date-notification b, .radar-date-notification span, .radar-date-notification small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.radar-date-notification b { color: #8bdcf4; font-size: .66rem; text-transform: capitalize; }
+.radar-date-notification span { margin-top: .15rem; color: #edf7ff; font-size: .75rem; }
+.radar-date-notification small { margin-top: .12rem; color: #91aec5; font-size: .62rem; }
+.radar-date-notification button { flex: 0 0 auto; width: 26px; height: 26px; border: 1px solid #557d98; border-radius: 7px; color: #ffd0cf; background: #6e3442; font-size: 1rem; line-height: 1; cursor: pointer; }
+.radar-date-notification button:hover { background: #a6444e; }
 .radar-calendar-editor .radar-form-row { display: grid; grid-template-columns: 1fr 1fr; gap: .5rem; margin-top: .5rem; }
 .radar-calendar-editor label { display: block; color: #55708d; font-size: .7rem; font-weight: 800; }
 .radar-agentes-fieldset { margin: .65rem 0 0; padding: .55rem .6rem .6rem; border: 1px solid #dbe6f1; border-radius: 9px; }

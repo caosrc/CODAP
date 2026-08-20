@@ -297,9 +297,14 @@ export function wsSend(msg: Record<string, unknown>): void {
   conectarSupabaseRealtime()
   const tipo = (msg as { tipo?: string }).tipo
   if (!tipo) return
+  // Eventos de invalidação não têm ID próprio. O timestamp diferencia
+  // alterações consecutivas e ainda permite deduplicar WS + Supabase.
+  const mensagem = msg.id == null && msg.ts == null
+    ? { ...msg, ts: Date.now() }
+    : msg
 
   if (tipo === 'sos') {
-    const { id, agente, lat, lng, bateria } = msg as Record<string, unknown>
+    const { id, agente, lat, lng, bateria } = mensagem as Record<string, unknown>
     dispararPushSos({
       id: id as string,
       agente: agente as string,
@@ -309,14 +314,14 @@ export function wsSend(msg: Record<string, unknown>): void {
     }).catch(() => {})
   }
 
-  const dedupKey = buildDedupKey(tipo, msg)
+  const dedupKey = buildDedupKey(tipo, mensagem)
   novaMsg(dedupKey)
 
   if (ws && ws.readyState === WebSocket.OPEN) {
-    ws.send(JSON.stringify(msg))
+    ws.send(JSON.stringify(mensagem))
   }
 
-  sbBroadcast(msg)
+  sbBroadcast(mensagem)
 }
 
 // Chave de deduplicação específica por tipo de mensagem

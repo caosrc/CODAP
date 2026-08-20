@@ -116,7 +116,10 @@ function emitirOnlineSync() {
 }
 
 function broadcastParaTodos(payload, excluirWs = null) {
-  const json = JSON.stringify(payload)
+  const mensagem = payload && typeof payload === 'object' && !('id' in payload) && !('ts' in payload)
+    ? { ...payload, ts: Date.now() }
+    : payload
+  const json = JSON.stringify(mensagem)
   for (const ws of todosConectados) {
     if (ws !== excluirWs && ws.readyState === 1) {
       ws.send(json)

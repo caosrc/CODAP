@@ -351,7 +351,6 @@ export default function RadarDC() {
   useEffect(() => wsOn('radar_notificacao_agente', (mensagem) => {
     const envolvidos = Array.isArray(mensagem.agentesEnvolvidos) ? mensagem.agentesEnvolvidos.map(String) : []
     if (!envolvidos.includes(agente) || String(mensagem.criadoPor) === agente) return
-    tocarSininho()
     if ('Notification' in window && Notification.permission === 'granted') {
       new Notification('Radar DC — você foi envolvido', {
         body: `${String(mensagem.data || '')} às ${String(mensagem.hora || '')} · ${String(mensagem.texto || '')}`,

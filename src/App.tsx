@@ -13,6 +13,7 @@ import AgentesOnline from './components/AgentesOnline'
 import BotaoSos from './components/BotaoSos'
 import BannerNotifSos from './components/BannerNotifSos'
 import BannerConvocacao from './components/BannerConvocacao'
+import BannerRadarNotificacao from './components/BannerRadarNotificacao'
 import { cacheOcorrencias, getCachedOcorrencias, getPending, removePending, countPending, clearAllPending } from './offline'
 import { calcularAreaM2, formatarArea } from './components/PoligonoAreaQueimada'
 
@@ -219,11 +220,16 @@ export default function App() {
       const encontrada = ocorrencias.find(o => o.id === id)
       if (encontrada) { setSelecionada(encontrada); setAba('lista') }
     }
+    function abrirRadar() {
+      setAba('planejamento')
+    }
     window.addEventListener('dc:abrir-checklist', abrirChecklist)
     window.addEventListener('dc:abrir-ocorrencia', abrirOcorrencia)
+    window.addEventListener('dc:abrir-radar', abrirRadar)
     return () => {
       window.removeEventListener('dc:abrir-checklist', abrirChecklist)
       window.removeEventListener('dc:abrir-ocorrencia', abrirOcorrencia)
+      window.removeEventListener('dc:abrir-radar', abrirRadar)
     }
   }, [ocorrencias])
 
@@ -1139,6 +1145,7 @@ export default function App() {
           <SosOverlay />
         </Suspense>
       </ErrorBoundary>
+      {logado && <BannerRadarNotificacao />}
     </div>
   )
 }

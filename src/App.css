@@ -171,6 +171,102 @@ input, select, textarea { font-family: inherit; }
 }
 @keyframes toastIn { from { opacity: 0; transform: translateX(-50%) translateY(10px); } to { opacity: 1; transform: translateX(-50%) translateY(0); } }
 
+/* ── Convocação do Radar DC — visível em qualquer aba ─────────── */
+.radar-convocacao-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9100;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 1rem;
+  pointer-events: none;
+}
+.radar-convocacao-card {
+  width: min(100%, 430px);
+  margin-top: max(0.5rem, env(safe-area-inset-top));
+  overflow: hidden;
+  pointer-events: auto;
+  border: 1px solid #93c5fd;
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 12px 35px rgba(8, 47, 73, .3);
+  animation: radarConvocacaoIn .3s cubic-bezier(.22, 1, .36, 1);
+}
+.radar-convocacao-header {
+  display: flex;
+  align-items: center;
+  gap: .7rem;
+  padding: .85rem 1rem;
+  color: #fff;
+  background: linear-gradient(120deg, #075985, #0284c7);
+}
+.radar-convocacao-sino { font-size: 1.7rem; }
+.radar-convocacao-header strong,
+.radar-convocacao-header small { display: block; }
+.radar-convocacao-header strong { font-size: .96rem; }
+.radar-convocacao-header small { margin-top: .15rem; font-size: .72rem; opacity: .85; }
+.radar-convocacao-fechar {
+  margin-left: auto;
+  padding: .1rem .3rem;
+  color: #fff;
+  background: transparent;
+  border: 0;
+  font-size: 1.5rem;
+  line-height: 1;
+  cursor: pointer;
+}
+.radar-convocacao-body { padding: .9rem 1rem .65rem; }
+.radar-convocacao-info {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .45rem 1rem;
+  color: #0f4c81;
+  font-size: .83rem;
+  font-weight: 800;
+}
+.radar-convocacao-body p {
+  margin: .7rem 0 .45rem;
+  color: #1f2937;
+  font-size: .98rem;
+  font-weight: 700;
+  line-height: 1.4;
+}
+.radar-convocacao-body > small { color: #64748b; font-size: .72rem; }
+.radar-convocacao-actions {
+  display: flex;
+  gap: .55rem;
+  padding: 0 1rem .75rem;
+}
+.radar-convocacao-actions button {
+  flex: 1;
+  padding: .6rem .7rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 9px;
+  color: #475569;
+  background: #f8fafc;
+  font-size: .8rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+.radar-convocacao-actions .radar-convocacao-abrir {
+  color: #fff;
+  background: #0f766e;
+  border-color: #0f766e;
+}
+.radar-convocacao-fila {
+  padding: .45rem 1rem;
+  color: #075985;
+  background: #e0f2fe;
+  font-size: .72rem;
+  font-weight: 700;
+  text-align: center;
+}
+@keyframes radarConvocacaoIn {
+  from { opacity: 0; transform: translateY(-16px) scale(.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
 /* ── Logo image ───────────────────────────────────────────────── */
 .logo-img {
   width: 44px;

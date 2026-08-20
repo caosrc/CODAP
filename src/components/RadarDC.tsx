@@ -71,6 +71,7 @@ export default function RadarDC() {
   const [dataSelecionada, setDataSelecionada] = useState(hoje())
   const [mes, setMes] = useState(() => new Date(`${hoje()}T12:00:00`))
   const [textoLembrete, setTextoLembrete] = useState('')
+  const [lembreteEditorAberto, setLembreteEditorAberto] = useState(false)
   const [textoNotificacao, setTextoNotificacao] = useState('')
   const [hora, setHora] = useState(horaAgora())
   const [prioridade, setPrioridade] = useState<Prioridade>('normal')
@@ -287,6 +288,7 @@ export default function RadarDC() {
       if (tipo === 'lembrete') {
         setTextoLembrete('')
         setAgentesLembrete([])
+        setLembreteEditorAberto(false)
       } else {
         setTextoNotificacao('')
         setHora(horaAgora())
@@ -435,8 +437,8 @@ export default function RadarDC() {
               </div>
             ))}
           </div>
-          <textarea value={textoLembrete} onChange={e => setTextoLembrete(e.target.value)} placeholder="Deixe um lembrete para a equipe..." rows={7} />
-           <fieldset className="radar-agentes-fieldset radar-lembrete-agentes">
+          <textarea value={textoLembrete} onFocus={() => setLembreteEditorAberto(true)} onChange={e => setTextoLembrete(e.target.value)} placeholder="Deixe um lembrete para a equipe..." rows={7} />
+           {lembreteEditorAberto && <fieldset className="radar-agentes-fieldset radar-lembrete-agentes">
              <legend>Agentes que receberão o lembrete</legend>
              <div className="radar-agentes-grid">
                {AGENTES.map(nome => (
@@ -446,7 +448,7 @@ export default function RadarDC() {
                  </label>
                ))}
              </div>
-           </fieldset>
+           </fieldset>}
            <button className="radar-add" onClick={() => salvarRegistro('lembrete', textoLembrete, hoje(), horaAgora())} disabled={!textoLembrete.trim() || agentesLembrete.length === 0 || salvando}>{salvando ? 'Salvando...' : '+ Salvar lembrete'}</button>
           {erroSalvamento && <p className="radar-save-error" role="alert">{erroSalvamento}</p>}
           <small>O lembrete fica visível até o agente que o criou removê-lo.</small>

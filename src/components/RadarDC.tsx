@@ -404,7 +404,9 @@ export default function RadarDC() {
               <div className="radar-mini-item" key={l.id}>
                 <b>{l.criadoPor}</b>
                 <span>{l.texto}</span>
-                <button onClick={() => remover(l.id)} title="Remover lembrete">×</button>
+                 {l.criadoPor === agente && (
+                   <button onClick={() => remover(l.id)} title="Apagar meu lembrete" aria-label="Apagar meu lembrete">×</button>
+                 )}
               </div>
             ))}
           </div>

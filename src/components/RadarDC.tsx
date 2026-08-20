@@ -446,7 +446,23 @@ export default function RadarDC() {
         </section>
         </div>
       </div>
-      <div className="radar-ticker"><span>RADAR DC</span><div>{(proximasNotificacoes.length ? proximasNotificacoes : notificacoes).map(n => <b key={n.id}>● {dataBonita(n.data)} · {n.texto}</b>)}</div></div>
+      <div className="radar-ticker">
+        <span>RADAR DC</span>
+        <div className="radar-ticker-viewport">
+          {(() => {
+            const filaTicker = proximasNotificacoes.length ? proximasNotificacoes : notificacoes
+            return filaTicker.length > 0 ? (
+              <div className="radar-ticker-track" style={{ '--ticker-duration': `${Math.max(16, filaTicker.length * 7)}s` } as React.CSSProperties}>
+                {[0, 1].map(copia => (
+                  <div className="radar-ticker-group" key={copia} aria-hidden={copia === 1}>
+                    {filaTicker.map(n => <b key={`${copia}-${n.id}`}>● {dataBonita(n.data)} · {n.texto}</b>)}
+                  </div>
+                ))}
+              </div>
+            ) : <b className="radar-ticker-empty">Nenhuma notificação cadastrada.</b>
+          })()}
+        </div>
+      </div>
     </section>
   )
 }

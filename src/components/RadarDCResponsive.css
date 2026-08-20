@@ -51,14 +51,13 @@ body.radar-tv-active .radar-page {
   z-index: 2;
 }
 
-.radar-ticker > div {
+.radar-ticker-viewport {
   position: relative;
   z-index: 1;
   flex: 1;
   min-width: 0;
   overflow: hidden;
   background: #0b2545;
-  animation-duration: 14s;
 }
 
 .radar-bilhete-large {
@@ -349,7 +348,7 @@ body.radar-tv-active .radar-page {
   }
   .radar-ticker { height: 44px; }
   .radar-ticker > span { font-size: .7rem; padding: 0 .75rem; }
-  .radar-ticker b { font-size: .78rem; }
+  .radar-ticker-group > b, .radar-ticker-empty { font-size: .78rem; }
 }
 
 /* O Radar atual usa o calendário e os registros na mesma coluna direita.

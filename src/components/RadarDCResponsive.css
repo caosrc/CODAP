@@ -75,6 +75,83 @@ body.radar-tv-active .radar-page {
   transform: none;
 }
 
+/* O clima deve contextualizar o Radar sem competir com os registros operacionais. */
+.radar-weather {
+  margin-bottom: .6rem;
+  padding: .55rem .8rem;
+  border-radius: 11px;
+  box-shadow: 0 4px 14px rgba(24, 69, 114, .06);
+}
+
+.radar-weather-heading {
+  align-items: center;
+}
+
+.radar-weather-heading h2 {
+  margin: .1rem 0 0;
+  font-size: .95rem;
+}
+
+.radar-weather-heading p {
+  font-size: .68rem;
+}
+
+.weather-updated {
+  font-size: .65rem;
+}
+
+.radar-weather-current {
+  gap: 1rem;
+  margin-top: .45rem;
+  padding: .45rem .6rem;
+  border-radius: 8px;
+}
+
+.weather-condition {
+  min-width: 145px;
+  gap: .45rem;
+}
+
+.weather-condition > span {
+  font-size: 1.55rem;
+}
+
+.weather-condition strong {
+  font-size: 1.2rem;
+}
+
+.weather-condition b {
+  font-size: .68rem;
+}
+
+.weather-metrics {
+  gap: .3rem .7rem;
+  font-size: .68rem;
+}
+
+.weather-highlights {
+  gap: .4rem;
+  margin-top: .4rem;
+}
+
+.weather-highlights > div {
+  padding: .4rem .5rem;
+  border-radius: 7px;
+}
+
+.weather-highlights span {
+  font-size: .62rem;
+}
+
+.weather-highlights strong {
+  margin-top: .1rem;
+  font-size: .7rem;
+}
+
+.weather-disclaimer {
+  display: none;
+}
+
 @media (min-width: 701px) {
   .radar-layout {
     grid-template-columns: minmax(0, 1.9fr) minmax(260px, .55fr);
@@ -174,6 +251,48 @@ body.radar-tv-active .radar-page {
 }
 
 @media (max-width: 700px) {
+  .radar-weather {
+    margin-bottom: .45rem;
+    padding: .55rem .65rem;
+  }
+
+  .radar-weather-heading {
+    flex-direction: row;
+  }
+
+  .radar-weather-heading p {
+    display: none;
+  }
+
+  .radar-weather-current {
+    align-items: center;
+    flex-direction: row;
+    gap: .55rem;
+    overflow: hidden;
+  }
+
+  .weather-condition {
+    min-width: 116px;
+  }
+
+  .weather-condition > span {
+    font-size: 1.35rem;
+  }
+
+  .weather-condition strong {
+    font-size: 1rem;
+  }
+
+  .weather-metrics {
+    min-width: 0;
+    gap: .2rem .45rem;
+    font-size: .62rem;
+  }
+
+  .weather-highlights {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
   .radar-bilhete-large { min-height: 390px; }
   .radar-bilhete-large textarea { min-height: 280px; }
   .radar-calendar-card { transform: none; }

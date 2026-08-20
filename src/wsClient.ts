@@ -109,7 +109,7 @@ function connect() {
       const tipo = msg.tipo as string
       if (!tipo) return
       const dedupKey = `${tipo}-${msg.id ?? msg.ts ?? JSON.stringify(msg).slice(0, 60)}`
-      novaMsg(dedupKey)
+      if (!novaMsg(dedupKey)) return
       dispatch(tipo, msg)
     } catch { /* ignore */ }
   }

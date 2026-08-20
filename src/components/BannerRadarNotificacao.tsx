@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { getAgenteLogado } from './Login'
 import { wsOn } from '../wsClient'
+import { supabase, supabaseDisponivel } from '../supabaseClient'
 
 interface NotificacaoRadar {
   id: string
@@ -42,6 +43,59 @@ export default function BannerRadarNotificacao() {
   const agente = getAgenteLogado() || ''
 
   useEffect(() => {
+    let ativo = true
+    const idsConhecidos = new Set<string>()
+    let primeiraBusca = true
+
+    const buscarPendentes = async () => {
+      try {
+        let rows: Array<Record<string, unknown>> = []
+        if (supabaseDisponivel) {
+          const result = await supabase
+            .from('radar_bilhetes')
+            .select('id,texto,data,hora,prioridade,criado_por,agentes_envolvidos')
+            .eq('tipo', 'notificacao')
+            .eq('concluido', false)
+            .order('criado_em', { ascending: false })
+          if (result.error) throw result.error
+          rows = (result.data || []) as Array<Record<string, unknown>>
+        } else {
+          const response = await fetch('/api/radar-bilhetes')
+          if (!response.ok) return
+          rows = await response.json() as Array<Record<string, unknown>>
+        }
+
+        const novas = rows
+          .filter(row => {
+            const envolvidos = Array.isArray(row.agentes_envolvidos)
+              ? row.agentes_envolvidos.map(String)
+              : Array.isArray(row.agentesEnvolvidos) ? row.agentesEnvolvidos.map(String) : []
+            return row.tipo === 'notificacao' &&
+              !Boolean(row.concluido) &&
+              Boolean(agente) &&
+              envolvidos.includes(agente)
+          })
+          .map(row => ({
+            id: String(row.id),
+            texto: String(row.texto || 'Nova convocação no Radar DC'),
+            data: String(row.data || ''),
+            hora: String(row.hora || ''),
+            prioridade: String(row.prioridade || 'normal'),
+            criadoPor: String(row.criado_por || row.criadoPor || 'Equipe Defesa Civil'),
+          }))
+
+        if (!ativo) return
+        // A primeira leitura hidrata o estado sem repetir notificações antigas.
+        if (primeiraBusca) { primeiraBusca = false; return }
+        const recemChegadas = novas.filter(nova => !idsConhecidos.has(nova.id))
+        novas.forEach(nova => idsConhecidos.add(nova.id))
+        if (recemChegadas.length) {
+          setFila(prev => [...prev, ...recemChegadas.filter(nova => !prev.some(item => item.id === nova.id))])
+          tocarSininho()
+        }
+      } catch { /* realtime/servidor pode estar temporariamente indisponível */ }
+    }
+
     const off = wsOn('radar_notificacao_agente', (mensagem) => {
       const envolvidos = Array.isArray(mensagem.agentesEnvolvidos)
         ? mensagem.agentesEnvolvidos.map(String)
@@ -56,10 +110,13 @@ export default function BannerRadarNotificacao() {
         prioridade: String(mensagem.prioridade || 'normal'),
         criadoPor: String(mensagem.criadoPor || 'Equipe Defesa Civil'),
       }
+      idsConhecidos.add(nova.id)
       setFila(prev => prev.some(item => item.id === nova.id) ? prev : [...prev, nova])
       tocarSininho()
     })
-    return off
+    buscarPendentes()
+    const timer = window.setInterval(buscarPendentes, 10000)
+    return () => { ativo = false; off(); window.clearInterval(timer) }
   }, [agente])
 
   function fecharAtual() {

@@ -190,17 +190,22 @@ export default function RadarDC() {
 
   useEffect(() => {
     carregar()
-    return wsOn('radar_bilhetes_atualizados', () => {
+    const off = wsOn('radar_bilhetes_atualizados', () => {
       tocarSininho()
       carregar()
     })
+    // Netlify não mantém um servidor WebSocket persistente. O polling mantém
+    // o Radar atualizado mesmo quando o Realtime/WS não está disponível.
+    const timer = window.setInterval(() => { carregar() }, 10000)
+    return () => { off(); window.clearInterval(timer) }
   }, [carregar])
   useEffect(() => {
     carregarAtividades()
     const avisarAtualizacao = () => { tocarSininho(); carregarAtividades(true) }
     const offChecklist = wsOn('checklist_atualizado', avisarAtualizacao)
     const offOcorrencias = wsOn('ocorrencias_atualizadas', avisarAtualizacao)
-    return () => { offChecklist(); offOcorrencias() }
+    const timer = window.setInterval(() => { carregarAtividades(false) }, 10000)
+    return () => { offChecklist(); offOcorrencias(); window.clearInterval(timer) }
   }, [carregarAtividades])
   useEffect(() => {
     if (carregadoRef.current) localStorage.setItem(STORAGE_KEY, JSON.stringify(registros))
@@ -460,7 +465,7 @@ export default function RadarDC() {
           {(() => {
             const filaTicker = proximasNotificacoes.length ? proximasNotificacoes : notificacoes
             return filaTicker.length > 0 ? (
-              <div className="radar-ticker-track" style={{ '--ticker-duration': `${Math.max(16, filaTicker.length * 7)}s` } as React.CSSProperties}>
+              <div className="radar-ticker-track" style={{ '--ticker-duration': `${Math.max(8, filaTicker.length * 2.2)}s` } as React.CSSProperties}>
                 {[0, 1].map(copia => (
                   <div className="radar-ticker-group" key={copia} aria-hidden={copia === 1}>
                     {filaTicker.map(n => <b key={`${copia}-${n.id}`}>● {dataBonita(n.data)} · {n.texto}</b>)}

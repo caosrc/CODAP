@@ -75,6 +75,7 @@ export default function RadarDC() {
   const [hora, setHora] = useState(horaAgora())
   const [prioridade, setPrioridade] = useState<Prioridade>('normal')
   const [agentesEnvolvidos, setAgentesEnvolvidos] = useState<string[]>([])
+  const [agentesLembrete, setAgentesLembrete] = useState<string[]>([])
   const [editorAberto, setEditorAberto] = useState(false)
   const [tv, setTv] = useState(false)
   const [notificacaoAtiva, setNotificacaoAtiva] = useState(false)
@@ -243,10 +244,15 @@ export default function RadarDC() {
 
   async function salvarRegistro(tipo: RegistroRadar['tipo'], texto: string, data: string, horaRegistro: string) {
     if (!texto.trim() || salvando) return
+    const agentesParaRegistro = tipo === 'lembrete' ? agentesLembrete : agentesEnvolvidos
+    if (agentesParaRegistro.length === 0) {
+      setErroSalvamento('Marque pelo menos um agente para receber este lembrete.')
+      return
+    }
     const novo: RegistroRadar = {
       id: crypto.randomUUID(), texto: texto.trim(), data, hora: horaRegistro,
       prioridade, concluido: false, criadoPor: agente, criadoEm: new Date().toISOString(), tipo,
-      agentesEnvolvidos: tipo === 'notificacao' ? agentesEnvolvidos : [],
+      agentesEnvolvidos: agentesParaRegistro,
     }
     setSalvando(true)
     setErroSalvamento('')
@@ -278,38 +284,40 @@ export default function RadarDC() {
       setRegistros(prev => [...prev.filter(r => r.id !== salvo.id && r.id !== novo.id), salvo])
       pendentesRef.current.delete(novo.id)
       if (supabaseDisponivel) wsSend({ tipo: 'radar_bilhetes_atualizados' })
-      if (tipo === 'lembrete') setTextoLembrete('')
-      else {
+      if (tipo === 'lembrete') {
+        setTextoLembrete('')
+        setAgentesLembrete([])
+      } else {
         setTextoNotificacao('')
         setHora(horaAgora())
         setAgentesEnvolvidos([])
         setEditorAberto(false)
-        if (novo.agentesEnvolvidos.length > 0) {
-          wsSend({
-            tipo: 'radar_notificacao_agente',
-            id: novo.id,
-            texto: novo.texto,
-            data: novo.data,
-            hora: novo.hora,
-            prioridade: novo.prioridade,
-            criadoPor: agente,
-            agentesEnvolvidos: novo.agentesEnvolvidos,
-          })
-          fetch('/api/push/radar', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              agentes: novo.agentesEnvolvidos,
-              texto: novo.texto,
-              data: novo.data,
-              hora: novo.hora,
-              prioridade: novo.prioridade,
-              remetente: agente,
-              notificacaoId: novo.id,
-            }),
-          }).catch(() => {})
-        }
       }
+      wsSend({
+        tipo: 'radar_notificacao_agente',
+        id: novo.id,
+        texto: novo.texto,
+        data: novo.data,
+        hora: novo.hora,
+        prioridade: novo.prioridade,
+        criadoPor: agente,
+        registroTipo: tipo,
+        agentesEnvolvidos: novo.agentesEnvolvidos,
+      })
+      fetch('/api/push/radar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          agentes: novo.agentesEnvolvidos,
+          texto: novo.texto,
+          data: novo.data,
+          hora: novo.hora,
+          prioridade: novo.prioridade,
+          remetente: agente,
+          notificacaoId: novo.id,
+          registroTipo: tipo,
+        }),
+      }).catch(() => {})
     } catch (error) {
       pendentesRef.current.delete(novo.id)
       setErroSalvamento(error instanceof Error ? error.message : 'Não foi possível salvar o registro.')
@@ -428,7 +436,18 @@ export default function RadarDC() {
             ))}
           </div>
           <textarea value={textoLembrete} onChange={e => setTextoLembrete(e.target.value)} placeholder="Deixe um lembrete para a equipe..." rows={7} />
-          <button className="radar-add" onClick={() => salvarRegistro('lembrete', textoLembrete, hoje(), horaAgora())} disabled={!textoLembrete.trim() || salvando}>{salvando ? 'Salvando...' : '+ Salvar lembrete'}</button>
+           <fieldset className="radar-agentes-fieldset radar-lembrete-agentes">
+             <legend>Agentes que receberão o lembrete</legend>
+             <div className="radar-agentes-grid">
+               {AGENTES.map(nome => (
+                 <label key={nome} className="radar-agente-option">
+                   <input type="checkbox" checked={agentesLembrete.includes(nome)} onChange={e => setAgentesLembrete(prev => e.target.checked ? [...prev, nome] : prev.filter(item => item !== nome))} />
+                   <span>{nome}</span>
+                 </label>
+               ))}
+             </div>
+           </fieldset>
+           <button className="radar-add" onClick={() => salvarRegistro('lembrete', textoLembrete, hoje(), horaAgora())} disabled={!textoLembrete.trim() || agentesLembrete.length === 0 || salvando}>{salvando ? 'Salvando...' : '+ Salvar lembrete'}</button>
           {erroSalvamento && <p className="radar-save-error" role="alert">{erroSalvamento}</p>}
           <small>O lembrete fica visível até o agente que o criou removê-lo.</small>
         </div>

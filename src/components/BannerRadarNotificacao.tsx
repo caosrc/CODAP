@@ -46,8 +46,6 @@ export default function BannerRadarNotificacao() {
   useEffect(() => {
     let ativo = true
     const idsConhecidos = new Set<string>()
-    let primeiraBusca = true
-
     const buscarPendentes = async () => {
       try {
         let rows: Array<Record<string, unknown>> = []
@@ -55,7 +53,6 @@ export default function BannerRadarNotificacao() {
           const result = await supabase
             .from('radar_bilhetes')
             .select('id,texto,data,hora,prioridade,criado_por,agentes_envolvidos')
-            .eq('tipo', 'notificacao')
             .eq('concluido', false)
             .order('criado_em', { ascending: false })
           if (result.error) throw result.error
@@ -71,8 +68,7 @@ export default function BannerRadarNotificacao() {
             const envolvidos = Array.isArray(row.agentes_envolvidos)
               ? row.agentes_envolvidos.map(String)
               : Array.isArray(row.agentesEnvolvidos) ? row.agentesEnvolvidos.map(String) : []
-            return row.tipo === 'notificacao' &&
-              !Boolean(row.concluido) &&
+            return !Boolean(row.concluido) &&
               Boolean(agente) &&
               envolvidos.includes(agente)
           })
@@ -86,8 +82,6 @@ export default function BannerRadarNotificacao() {
           }))
 
         if (!ativo) return
-        // A primeira leitura hidrata o estado sem repetir notificações antigas.
-        if (primeiraBusca) { primeiraBusca = false; return }
         const recemChegadas = novas.filter(nova => !idsConhecidos.has(nova.id))
         novas.forEach(nova => idsConhecidos.add(nova.id))
         if (recemChegadas.length) {

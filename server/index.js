@@ -1257,7 +1257,8 @@ app.post('/api/radar-bilhetes', async (req, res) => {
   try {
     const { id, texto, data, hora, prioridade, criado_por, tipo = 'lembrete', agentes_envolvidos = [] } = req.body
     if (!id || !texto?.trim() || !data || !hora || !criado_por) return res.status(400).json({ error: 'Registro incompleto' })
-    const agentes = tipo === 'notificacao' && Array.isArray(agentes_envolvidos) ? agentes_envolvidos : []
+    const agentes = Array.isArray(agentes_envolvidos) ? agentes_envolvidos.filter(Boolean) : []
+    if (agentes.length === 0) return res.status(400).json({ error: 'Marque pelo menos um agente para receber o registro.' })
     const result = await query(
       `INSERT INTO radar_bilhetes (id, texto, data, hora, prioridade, criado_por, tipo, agentes_envolvidos)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
@@ -1283,7 +1284,7 @@ app.post('/api/push/radar', async (req, res) => {
     const { agentes, texto, data, hora, prioridade, remetente, notificacaoId } = req.body || {}
     if (!Array.isArray(agentes) || agentes.length === 0 || !texto) return res.json({ enviados: 0 })
     const payload = {
-      title: '📅 Radar DC — nova notificação',
+      title: `🔔 Radar DC — novo ${req.body?.registroTipo === 'lembrete' ? 'lembrete' : 'aviso'}`,
       body: `${data || ''} às ${hora || ''} · ${texto}`,
       tag: `radar-${notificacaoId || Date.now()}`,
       tipo: 'radar_notificacao',

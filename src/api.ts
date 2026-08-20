@@ -1,6 +1,7 @@
 import type { Ocorrencia } from './types'
 import { savePending, getCachedOcorrencias } from './offline'
 import { supabase, supabaseDisponivel } from './supabaseClient'
+import { wsSend } from './wsClient'
 
 // Redimensiona e recomprime um base64 para no máximo maxW pixels de largura
 // e qualidade JPEG bem reduzida para manter as fotos leves no banco.
@@ -230,6 +231,7 @@ export async function enviarOcorrenciaServidor(
         throw new ApiError(500, detalhe)
       }
       if (!data) throw new ApiError(500, 'Supabase retornou resposta inválida')
+      wsSend({ tipo: 'ocorrencias_atualizadas' })
       return data as Ocorrencia
     } catch (e) {
       if (e instanceof ApiError) throw e
@@ -317,6 +319,7 @@ export async function atualizarOcorrencia(
     }
     if (error) throw new Error(error.message)
     if (!data) throw new Error('Ocorrência não encontrada')
+    wsSend({ tipo: 'ocorrencias_atualizadas' })
     return data as Ocorrencia
   }
 
@@ -464,6 +467,7 @@ export async function deletarOcorrencia(id: number): Promise<void> {
   if (supabaseDisponivel) {
     const { error } = await supabase.from('ocorrencias').delete().eq('id', id)
     if (error) throw new Error(error.message)
+    wsSend({ tipo: 'ocorrencias_atualizadas' })
     return
   }
 

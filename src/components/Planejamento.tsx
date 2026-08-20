@@ -2752,6 +2752,7 @@ function DetalheP({
       const { error } = await supabase.from('planejamentos')
         .update({ fotos_evento: todasFotos }).eq('id', planoLocal.id)
       if (error) throw new Error(error.message)
+      wsSend({ tipo: 'planejamentos_atualizados' })
     } else {
       const resp = await fetch(`/api/planejamentos/${planoLocal.id}/fotos`, {
         method: 'PUT',
@@ -3096,6 +3097,7 @@ function DetalheP({
           .update({ status: 'concluido', conclusao: texto })
           .eq('id', planoLocal.id)
         if (error) throw new Error(error.message)
+        wsSend({ tipo: 'planejamentos_atualizados' })
       } else {
         // Express (Replit): usa o endpoint PATCH que tem proteção CASE no banco
         const res = await fetch(`/api/planejamentos/${planoLocal.id}/status`, {
@@ -4256,6 +4258,7 @@ export default function Planejamento() {
           if (!atualizado || atualizado.length === 0) {
             await supabase.from('planejamentos').upsert(payload, { ignoreDuplicates: true })
           }
+          wsSend({ tipo: 'planejamentos_atualizados' })
         }
       } catch { /* silencioso */ }
       return
@@ -4273,7 +4276,10 @@ export default function Planejamento() {
   async function deletarServidor(id: string) {
     // Supabase (Netlify + Replit com VITE_USE_SUPABASE=true)
     if (supabaseDisponivel) {
-      try { await supabase.from('planejamentos').delete().eq('id', id) } catch { /* silencioso */ }
+      try {
+        await supabase.from('planejamentos').delete().eq('id', id)
+        wsSend({ tipo: 'planejamentos_atualizados' })
+      } catch { /* silencioso */ }
       return
     }
     // Fallback Express (Replit sem Supabase)

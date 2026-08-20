@@ -3,7 +3,7 @@ import { adicionarMarcaDagua, salvarFotoNoDispositivo } from '../utils'
 import type { ChecklistExportData } from '../exportExcel'
 import { buscarFotosChecklists } from '../api'
 import ModalSenha from './ModalSenha'
-import { wsOn } from '../wsClient'
+import { wsOn, wsSend } from '../wsClient'
 import { supabase, supabaseDisponivel } from '../supabaseClient'
 import { getSenhaAgente } from '../types'
 
@@ -814,6 +814,7 @@ export default function ChecklistViatura({ abrirId }: { abrirId?: number | null 
       if (supabaseDisponivel) {
         const { error } = await supabase.from('checklists_viatura').insert(payload)
         if (error) throw new Error(error.message)
+        wsSend({ tipo: 'checklist_atualizado' })
       } else {
         const saveRes = await fetch('/api/checklists', {
           method: 'POST',
@@ -848,6 +849,7 @@ export default function ChecklistViatura({ abrirId }: { abrirId?: number | null 
       if (supabaseDisponivel) {
         const { error } = await supabase.from('checklists_viatura').delete().eq('id', id)
         if (error) throw new Error(error.message)
+        wsSend({ tipo: 'checklist_atualizado' })
       } else {
         const r = await fetch(`/api/checklists/${id}`, { method: 'DELETE' })
         if (!r.ok) throw new Error(`HTTP ${r.status}`)

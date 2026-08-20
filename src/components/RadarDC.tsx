@@ -147,10 +147,12 @@ export default function RadarDC() {
             .order('created_at', { ascending: false }),
         ])
         if (!checklistsResult.error && !ocorrenciasResult.error) {
-          setAtividades({
+          const dados = {
             checklists: (checklistsResult.data || []).map(row => ({ ...row, agente: row.motorista || 'Agente não informado', hora: row.data_checklist?.includes('T') ? row.data_checklist.slice(11, 16) : new Date(row.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) })) as Atividade[],
             ocorrencias: (ocorrenciasResult.data || []).map(row => ({ ...row, agente: row.responsavel_registro || (Array.isArray(row.agentes) ? row.agentes[0] : null) || 'Agente não informado', hora: row.hora_inicio || new Date(row.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) })) as Atividade[],
-          })
+          }
+          setAtividades(dados)
+          notificarOcorrenciasNovas(dados.ocorrencias, avisar)
           return
         }
       }
@@ -252,6 +254,7 @@ export default function RadarDC() {
       }
       setRegistros(prev => [...prev.filter(r => r.id !== salvo.id && r.id !== novo.id), salvo])
       pendentesRef.current.delete(novo.id)
+      if (supabaseDisponivel) wsSend({ tipo: 'radar_bilhetes_atualizados' })
       if (tipo === 'lembrete') setTextoLembrete('')
       else {
         setTextoNotificacao('')
@@ -308,6 +311,7 @@ export default function RadarDC() {
         }
       }
       setRegistros(prev => prev.filter(r => r.id !== id))
+      if (supabaseDisponivel) wsSend({ tipo: 'radar_bilhetes_atualizados' })
     } catch (error) {
       setErroSalvamento(error instanceof Error ? error.message : 'Não foi possível remover o registro.')
     }

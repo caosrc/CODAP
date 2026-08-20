@@ -8,7 +8,7 @@ import { fileURLToPath } from 'url'
 import { dirname, join } from 'path'
 import { existsSync, readFileSync, readdirSync } from 'fs'
 import { createServer } from 'http'
-import { WebSocketServer } from 'ws'
+import WebSocket, { WebSocketServer } from 'ws'
 import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 import { execFile } from 'child_process'
 import { promisify } from 'util'
@@ -32,7 +32,9 @@ const pool = new pg.Pool({
 const supabasePushUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || ''
 const supabasePushKey = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || ''
 const supabasePush = supabasePushUrl && supabasePushKey
-  ? createSupabaseClient(supabasePushUrl, supabasePushKey)
+  ? createSupabaseClient(supabasePushUrl, supabasePushKey, {
+    realtime: { transport: WebSocket },
+  })
   : null
 
 async function query(sql, params = []) {

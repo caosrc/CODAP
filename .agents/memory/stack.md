@@ -26,3 +26,10 @@ description: Stack técnica, configuração do ambiente Replit, e decisões de b
 - Solução implementada: endpoint `/api/ocorrencias/fotos-supabase-lote?ids=...` no servidor busca do Supabase REST API server-side e retorna base64 pronto.
 - `buscarFotosOcorrencias` em `src/api.ts` tenta esse endpoint primeiro (sem CORS), com fallback para Supabase direto e depois PostgreSQL local.
 - Proxy de imagens também disponível em `/api/proxy-imagem?url=...` para URLs do Supabase Storage.
+
+## Atualizações do Radar em hospedagem serverless
+- O Radar mantém polling periódico como fallback para hospedagens sem WebSocket persistente, enquanto Supabase Realtime/WS permanece como caminho instantâneo quando disponível.
+
+**Why:** Netlify Functions não mantém uma conexão WebSocket de longa duração; depender apenas do WS faz mudanças e convocações parecerem congeladas.
+
+**How to apply:** Ao alterar eventos do Radar, preserve uma rota de revalidação periódica e teste a sincronização entre duas sessões publicadas.

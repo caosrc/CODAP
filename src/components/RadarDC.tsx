@@ -340,11 +340,21 @@ export default function RadarDC() {
         <div className="radar-note-card radar-bilhete-large">
           <div className="card-label"><span className="label-dot" /> LEMBRETE</div>
           <h2>Lembrete</h2>
+          <div className="radar-mini-list">
+            {lembretes.length === 0 ? (
+              <span>Nenhum lembrete cadastrado.</span>
+            ) : lembretes.map(l => (
+              <div className="radar-mini-item" key={l.id}>
+                <b>{l.criadoPor}</b>
+                <span>{l.texto}</span>
+                <button onClick={() => remover(l.id)} title="Remover lembrete">×</button>
+              </div>
+            ))}
+          </div>
           <textarea value={textoLembrete} onChange={e => setTextoLembrete(e.target.value)} placeholder="Deixe um lembrete para a equipe..." rows={7} />
           <button className="radar-add" onClick={() => salvarRegistro('lembrete', textoLembrete, hoje(), horaAgora())} disabled={!textoLembrete.trim() || salvando}>{salvando ? 'Salvando...' : '+ Salvar lembrete'}</button>
           {erroSalvamento && <p className="radar-save-error" role="alert">{erroSalvamento}</p>}
           <small>O lembrete fica visível até o agente que o criou removê-lo.</small>
-          <div className="radar-mini-list">{lembretes.length === 0 ? <span>Nenhum lembrete cadastrado.</span> : lembretes.map(l => <div className="radar-mini-item" key={l.id}><b>{l.criadoPor}</b><span>{l.texto}</span><button onClick={() => remover(l.id)} title="Remover lembrete">×</button></div>)}</div>
         </div>
 
         <div className="radar-right-column">

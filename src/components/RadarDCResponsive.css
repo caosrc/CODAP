@@ -209,7 +209,8 @@ body.radar-tv-active .radar-page {
   .radar-layout {
     grid-template-columns: minmax(0, 2.35fr) minmax(220px, .42fr);
     min-height: calc(100vh - 185px);
-    padding: 1.2rem clamp(.35rem, 1vw, 1rem) 2rem .45rem;
+    padding: .35rem clamp(.2rem, .6vw, .65rem) 2rem .3rem;
+    gap: .3rem;
     align-items: stretch;
   }
 
@@ -221,6 +222,7 @@ body.radar-tv-active .radar-page {
 
   .radar-bilhete-large {
     min-height: 0;
+    min-height: calc(100vh - 230px);
     display: flex;
     flex-direction: column;
   }
@@ -246,7 +248,16 @@ body.radar-tv-active .radar-page {
     min-height: 0;
     max-height: 560px;
     align-self: start;
-    padding: .9rem;
+    padding: .65rem;
+  }
+
+  .radar-right-column {
+    gap: .3rem;
+  }
+
+  .radar-activities {
+    min-height: 340px;
+    padding: .8rem;
   }
 
   .radar-calendar-card .calendar-grid button {

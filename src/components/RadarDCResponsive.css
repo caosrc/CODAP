@@ -90,6 +90,15 @@ body.radar-tv-active .radar-page {
   gap: .55rem;
 }
 
+.radar-weather-actions {
+  justify-content: flex-end;
+}
+
+.radar-weather-actions button {
+  padding: .4rem .5rem;
+  font-size: .62rem;
+}
+
 .radar-clock {
   min-width: 92px;
   padding: .3rem .45rem;
@@ -281,6 +290,16 @@ body.radar-tv-active .radar-page {
 
   .radar-weather-heading {
     flex-direction: row;
+  }
+
+  .radar-weather-side {
+    width: 100%;
+    justify-content: space-between;
+    flex-wrap: wrap;
+  }
+
+  .radar-weather-actions {
+    margin-left: auto;
   }
 
   .radar-weather-heading p {

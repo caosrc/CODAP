@@ -245,6 +245,8 @@
 .radar-weather-heading p { margin: 0; color: #a8c5dc; font-size: .82rem; }
 .weather-updated { color: #7cd6ef; font-size: .75rem; font-weight: 700; }
 .radar-weather-side { display: flex; align-items: center; gap: 1rem; }
+.radar-weather-actions { display: flex; flex-wrap: wrap; gap: .4rem; }
+.radar-weather-actions button { border: 0; border-radius: 8px; padding: .5rem .65rem; font: inherit; font-size: .68rem; font-weight: 800; cursor: pointer; }
 .radar-clock { min-width: 112px; padding: .45rem .65rem; border: 1px solid #367499; border-radius: 10px; background: #0b2a48; text-align: center; }
 .radar-clock span { display: block; color: #8fb4cd; font-size: .58rem; font-weight: 900; letter-spacing: .1em; }
 .radar-clock strong { display: block; margin-top: .12rem; color: #fff; font-size: 1.15rem; font-variant-numeric: tabular-nums; letter-spacing: .04em; }

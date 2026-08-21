@@ -443,17 +443,8 @@ export default function RadarDC() {
 
   return (
     <section className={`radar-page ${tv ? 'radar-tv' : ''}`}>
-      <header className="radar-header">
-        <div><div className="radar-kicker">CENTRAL DE LEMBRETES OPERACIONAIS</div><h1><img className="radar-header-icon" src="/api/radar-icon" alt="" /> Radar <b>DC</b></h1><p>Informações compartilhadas por toda a equipe.</p></div>
-        <div className="radar-actions">
-          {!notificacaoAtiva && <button className="radar-notify" onClick={pedirNotificacao}>🔔 Ativar notificações</button>}
-          <button className="radar-tv-btn" onClick={() => setTv(!tv)}>{tv ? '↙ Voltar ao app' : '▣ Modo TV'}</button>
-        </div>
-      </header>
-
-
        <section className="radar-weather" aria-labelledby="radar-weather-title">
-         <div className="radar-weather-heading"><div><span className="card-label">CONDIÇÕES METEOROLÓGICAS</span><h2 id="radar-weather-title">Ouro Branco – MG</h2><p>Previsão detalhada para os próximos 16 dias · Open-Meteo</p></div><div className="radar-weather-side"><div className="radar-clock" aria-label="Hora atual"><span>HORA ATUAL</span><strong>{horaAtual.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</strong></div>{tempo && <span className="weather-updated">Atualizado agora</span>}</div></div>
+         <div className="radar-weather-heading"><div><span className="card-label">CONDIÇÕES METEOROLÓGICAS</span><h2 id="radar-weather-title">Ouro Branco – MG</h2><p>Previsão detalhada para os próximos 16 dias · Open-Meteo</p></div><div className="radar-weather-side"><div className="radar-clock" aria-label="Hora atual"><span>HORA ATUAL</span><strong>{horaAtual.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</strong></div>{tempo && <span className="weather-updated">Atualizado agora</span>}<div className="radar-weather-actions">{!notificacaoAtiva && <button className="radar-notify" onClick={pedirNotificacao}>🔔 Ativar notificações</button>}<button className="radar-tv-btn" onClick={() => setTv(!tv)}>{tv ? '↙ Voltar ao app' : '▣ Modo TV'}</button></div></div></div>
         {erroTempo && <p className="radar-save-error" role="alert">{erroTempo}</p>}
         {!tempo && !erroTempo && <p className="radar-weather-loading">Carregando previsão...</p>}
         {tempo && <><div className="radar-weather-current"><div className="weather-condition"><span>{iconeTempo(tempo.atual.codigo)}</span><div><strong>{Math.round(tempo.atual.temperatura)}°C</strong><b>{nomesTempo[tempo.atual.codigo] || 'Condição variável'}</b></div></div><div className="weather-metrics"><span>🌧️ Chuva <b>{tempo.atual.chuva.toFixed(1)} mm</b></span><span>☔ Prob. hoje <b>{tempo.dias[0]?.probabilidade ?? 0}%</b></span><span>💨 Vento <b>{Math.round(tempo.atual.vento)} km/h</b></span><span>💨 Rajadas <b>{Math.round(tempo.atual.rajada)} km/h</b></span><span>💧 Umidade <b>{Math.round(tempo.atual.umidade)}%</b></span></div></div>{destaquesTempo && <div className="weather-highlights"><div><span>🌧️ Maior precipitação</span><strong>{dataTempo(destaquesTempo.chuva.data)} · {destaquesTempo.chuva.precipitacao.toFixed(1)} mm</strong></div><div><span>💧 Menor umidade</span><strong>{dataTempo(destaquesTempo.umidade.data)} · {Math.round(destaquesTempo.umidade.umidade)}%</strong></div><div><span>💨 Maior rajada</span><strong>{dataTempo(destaquesTempo.rajada.data)} · {Math.round(destaquesTempo.rajada.rajada)} km/h</strong></div></div>}<small className="weather-disclaimer">Os 16 dias são uma estimativa meteorológica; quanto mais distante a data, menor a precisão.</small></>}

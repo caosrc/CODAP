@@ -73,6 +73,11 @@ function sbErr(error: { message: string } | null, contexto = ''): never {
   throw new Error((contexto ? `[${contexto}] ` : '') + (error?.message ?? 'Erro desconhecido'))
 }
 
+function tabelaSupabaseAusente(error: { code?: string; message?: string } | null): boolean {
+  return error?.code === 'PGRST205' ||
+    /could not find the table|schema cache/i.test(error?.message ?? '')
+}
+
 async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(path, options)
   const ct = res.headers.get('content-type') || ''
@@ -186,8 +191,8 @@ export const matApi = {
         .select('*')
         .eq('ferramenta_id', ferramentaId)
         .order('data_checklist', { ascending: false })
-      if (error) sbErr(error, 'listarChecklistsFerramenta')
-      return (data ?? []) as MatChecklistFerramenta[]
+      if (!error) return (data ?? []) as MatChecklistFerramenta[]
+      if (!tabelaSupabaseAusente(error)) sbErr(error, 'listarChecklistsFerramenta')
     }
     return apiFetch<MatChecklistFerramenta[]>(
       `/api/ferramentas/${encodeURIComponent(ferramentaId)}/checklists`
@@ -210,8 +215,8 @@ export const matApi = {
         .insert(checklist)
         .select()
         .single()
-      if (error) sbErr(error, 'criarChecklistFerramenta')
-      return data as MatChecklistFerramenta
+      if (!error) return data as MatChecklistFerramenta
+      if (!tabelaSupabaseAusente(error)) sbErr(error, 'criarChecklistFerramenta')
     }
     return apiFetch<MatChecklistFerramenta>('/api/ferramentas/checklists', {
       method: 'POST',

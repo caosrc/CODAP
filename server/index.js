@@ -2148,7 +2148,7 @@ app.patch('/api/materiais/:id', async (req, res) => {
 app.get('/api/ferramentas/:id/checklists', async (req, res) => {
   try {
     const result = await query(
-      'SELECT * FROM checklists_ferramentas WHERE ferramenta_id=$1 ORDER BY realizado_em DESC',
+      'SELECT * FROM checklists_ferramental WHERE ferramenta_id=$1 ORDER BY data_checklist DESC',
       [req.params.id]
     )
     res.json(result.rows)

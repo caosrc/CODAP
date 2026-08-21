@@ -1142,7 +1142,7 @@ function FormMaterial({
   const [foto, setFoto] = useState<string | null>(null)
   const [fotoThumb, setFotoThumb] = useState<string | null>(materialInicial?.foto_thumb ?? null)
   const [fotoAlterada, setFotoAlterada] = useState(false)
-  const [quantidade, setQuantidade] = useState(materialInicial?.quantidade ?? 1)
+  const [quantidade, setQuantidade] = useState<number | ''>(materialInicial ? (materialInicial.quantidade ?? 1) : '')
   const [salvando, setSalvando] = useState(false)
   const [erro, setErro] = useState('')
 
@@ -1173,6 +1173,8 @@ function FormMaterial({
   async function salvar() {
     const nm = nome.trim()
     if (!nm) { setErro(`Informe o nome ${tipo === 'ferramental' ? 'da ferramenta' : 'do material'}.`); return }
+    const quantidadeValida = typeof quantidade === 'number' && Number.isInteger(quantidade) && quantidade >= 1
+    if (!quantidadeValida) { setErro('Informe uma quantidade em estoque maior que zero.'); return }
     setSalvando(true); setErro('')
     try {
       if (editando && materialInicial) {
@@ -1180,7 +1182,7 @@ function FormMaterial({
           nome: nm,
           descricao: descricao.trim() || null,
           observacoes: observacoes.trim() || null,
-          quantidade: Math.max(1, quantidade),
+           quantidade,
           tipo,
         }
         // Só inclui foto/thumb se o usuário trocou ou removeu a foto
@@ -1205,7 +1207,7 @@ function FormMaterial({
           observacoes: observacoes.trim() || null,
           foto,
           foto_thumb: fotoThumb,
-          quantidade: Math.max(1, quantidade),
+           quantidade,
         })
         onSalvo()
       }
@@ -1268,7 +1270,10 @@ function FormMaterial({
             min={1}
             max={9999}
             value={quantidade}
-            onChange={(e) => setQuantidade(Math.max(1, parseInt(e.target.value) || 1))}
+             onChange={(e) => {
+               const valor = e.target.value
+               setQuantidade(valor === '' ? '' : Math.max(1, parseInt(valor) || 1))
+             }}
           />
           <span className="campo-label-sub">Quantas unidades deste item existem no total.</span>
         </div>

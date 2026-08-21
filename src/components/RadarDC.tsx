@@ -161,11 +161,11 @@ export default function RadarDC() {
         proximoDia.setDate(proximoDia.getDate() + 1)
         const proximo = dataLocalISO(proximoDia)
         const [checklistsResult, checklistsFerramentasResult, ocorrenciasResult] = await Promise.all([
-          // Essas datas são salvas como YYYY-MM-DD no Supabase, não como timestamp.
-          supabase.from('checklists_viatura').select('id,data_checklist,km,placa,motorista,itens,created_at').like('data_checklist', `${dataSelecionada}%`).order('created_at', { ascending: false }),
-          supabase.from('checklists_ferramental').select('id,ferramenta_id,condicao,realizado_por,data_checklist,created_at').like('data_checklist', `${dataSelecionada}%`).order('created_at', { ascending: false }),
+          // Essas datas são colunas date no Supabase e são comparadas sem horário.
+          supabase.from('checklists_viatura').select('id,data_checklist,km,placa,motorista,itens,created_at').eq('data_checklist', dataSelecionada).order('created_at', { ascending: false }),
+          supabase.from('checklists_ferramental').select('id,ferramenta_id,condicao,realizado_por,data_checklist,created_at').eq('data_checklist', dataSelecionada).order('created_at', { ascending: false }),
           supabase.from('ocorrencias').select('id,natureza,endereco,agentes,responsavel_registro,created_at,hora_inicio,data_ocorrencia')
-            .or(`data_ocorrencia.eq.${dataSelecionada},and(created_at.gte.${dataSelecionada}T00:00:00,created_at.lt.${proximo}T00:00:00)`)
+            .eq('data_ocorrencia', dataSelecionada)
             .order('created_at', { ascending: false }),
         ])
         // A tabela de ferramentas pode não existir em bases Supabase antigas.

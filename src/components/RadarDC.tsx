@@ -16,6 +16,10 @@ type Atividade = {
   id: number; agente: string; hora: string; placa?: string; natureza?: string
   endereco?: string; km?: string | number; nivelCombustivel?: string; created_at: string
 }
+type AtividadeFerramenta = {
+  id: number; agente: string; ferramentaNome: string; condicao: 'boa' | 'media' | 'ruim' | string
+  data_checklist: string; created_at: string
+}
 
 type DiaPrevisao = { data: string; codigo: number; precipitacao: number; probabilidade: number; umidade: number; vento: number; rajada: number }
 type TempoDC = { atual: { codigo: number; temperatura: number; chuva: number; vento: number; rajada: number; umidade: number }; dias: DiaPrevisao[] }
@@ -80,7 +84,7 @@ export default function RadarDC() {
   const [editorAberto, setEditorAberto] = useState(false)
   const [tv, setTv] = useState(false)
   const [notificacaoAtiva, setNotificacaoAtiva] = useState(false)
-  const [atividades, setAtividades] = useState<{ checklists: Atividade[]; ocorrencias: Atividade[] }>({ checklists: [], ocorrencias: [] })
+  const [atividades, setAtividades] = useState<{ checklists: Atividade[]; checklistsFerramentas: AtividadeFerramenta[]; ocorrencias: Atividade[] }>({ checklists: [], checklistsFerramentas: [], ocorrencias: [] })
   const [tempo, setTempo] = useState<TempoDC | null>(null)
   const [erroTempo, setErroTempo] = useState('')
   const [salvando, setSalvando] = useState(false)
@@ -137,9 +141,10 @@ export default function RadarDC() {
     })
   }, [])
 
-  const atualizarAtividadesNaTela = useCallback((dados: { checklists: Atividade[]; ocorrencias: Atividade[] }, avisar: boolean) => {
+  const atualizarAtividadesNaTela = useCallback((dados: { checklists: Atividade[]; checklistsFerramentas: AtividadeFerramenta[]; ocorrencias: Atividade[] }, avisar: boolean) => {
     const assinatura = JSON.stringify({
       checklists: dados.checklists.map(item => [item.id, item.created_at, item.hora, item.placa, item.km, item.nivelCombustivel]),
+      checklistsFerramentas: dados.checklistsFerramentas.map(item => [item.id, item.created_at, item.agente, item.ferramentaNome, item.condicao]),
       ocorrencias: dados.ocorrencias.map(item => [item.id, item.created_at, item.hora, item.natureza, item.endereco]),
     })
     const mudouDesdeUmaLeituraAnterior = Boolean(atividadesAssinaturaRef.current) && atividadesAssinaturaRef.current !== assinatura
@@ -155,13 +160,21 @@ export default function RadarDC() {
         const proximoDia = new Date(`${dataSelecionada}T12:00:00`)
         proximoDia.setDate(proximoDia.getDate() + 1)
         const proximo = dataLocalISO(proximoDia)
-        const [checklistsResult, ocorrenciasResult] = await Promise.all([
+        const [checklistsResult, checklistsFerramentasResult, ocorrenciasResult] = await Promise.all([
           supabase.from('checklists_viatura').select('id,data_checklist,km,placa,motorista,itens,created_at').gte('data_checklist', dataSelecionada).lt('data_checklist', proximo).order('created_at', { ascending: false }),
+          supabase.from('checklists_ferramental').select('id,ferramenta_id,condicao,realizado_por,data_checklist,created_at').gte('data_checklist', `${dataSelecionada}T00:00:00`).lt('data_checklist', `${proximo}T00:00:00`).order('created_at', { ascending: false }),
           supabase.from('ocorrencias').select('id,natureza,endereco,agentes,responsavel_registro,created_at,hora_inicio,data_ocorrencia')
             .or(`and(data_ocorrencia.gte.${dataSelecionada}T00:00:00,data_ocorrencia.lt.${proximo}T00:00:00),and(created_at.gte.${dataSelecionada}T00:00:00,created_at.lt.${proximo}T00:00:00)`)
             .order('created_at', { ascending: false }),
         ])
-        if (!checklistsResult.error && !ocorrenciasResult.error) {
+        if (!checklistsResult.error && !checklistsFerramentasResult.error && !ocorrenciasResult.error) {
+          const checklistsFerramentas = (checklistsFerramentasResult.data || []) as Array<Record<string, unknown>>
+          const ferramentaIds = checklistsFerramentas.map(row => String(row.ferramenta_id)).filter(Boolean)
+          const materiaisResult = ferramentaIds.length > 0
+            ? await supabase.from('materiais').select('id,nome').in('id', ferramentaIds)
+            : { data: [], error: null }
+          if (materiaisResult.error) throw new Error(materiaisResult.error.message)
+          const nomesFerramentas = new Map((materiaisResult.data || []).map(row => [String(row.id), String(row.nome)]))
           const dados = {
             checklists: (checklistsResult.data || []).map(row => ({
               ...row,
@@ -171,6 +184,14 @@ export default function RadarDC() {
                 ? String(row.itens.nivelCombustivel || '')
                 : '',
             })) as Atividade[],
+            checklistsFerramentas: checklistsFerramentas.map(row => ({
+              id: Number(row.id),
+              agente: String(row.realizado_por || 'Agente não informado'),
+              ferramentaNome: nomesFerramentas.get(String(row.ferramenta_id)) || 'Ferramenta não informada',
+              condicao: String(row.condicao || ''),
+              data_checklist: String(row.data_checklist || ''),
+              created_at: String(row.created_at || row.data_checklist || ''),
+            })),
             ocorrencias: (ocorrenciasResult.data || []).map(row => ({ ...row, agente: row.responsavel_registro || (Array.isArray(row.agentes) ? row.agentes[0] : null) || 'Agente não informado', hora: row.hora_inicio || new Date(row.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) })) as Atividade[],
           }
            atualizarAtividadesNaTela(dados, avisar)
@@ -179,10 +200,10 @@ export default function RadarDC() {
       }
       const res = await fetch(`/api/atividades-dia?data=${dataSelecionada}`)
       if (res.ok) {
-        const dados = await res.json() as { checklists: Atividade[]; ocorrencias: Atividade[] }
+        const dados = await res.json() as { checklists: Atividade[]; checklistsFerramentas: AtividadeFerramenta[]; ocorrencias: Atividade[] }
          atualizarAtividadesNaTela(dados, avisar)
       }
-    } catch { setAtividades({ checklists: [], ocorrencias: [] }) }
+    } catch { setAtividades({ checklists: [], checklistsFerramentas: [], ocorrencias: [] }) }
   }, [dataSelecionada, atualizarAtividadesNaTela])
 
 
@@ -506,9 +527,10 @@ export default function RadarDC() {
           </form>}
         </div>
         <section className="radar-activities">
-        <div className="radar-list-heading"><div><span className="card-label">REGISTROS OPERACIONAIS</span><h2>Atividades de {dataBonita(dataSelecionada)}</h2></div><strong>{atividades.checklists.length + atividades.ocorrencias.length} registro(s)</strong></div>
+         <div className="radar-list-heading"><div><span className="card-label">REGISTROS OPERACIONAIS</span><h2>Atividades de {dataBonita(dataSelecionada)}</h2></div><strong>{atividades.checklists.length + atividades.checklistsFerramentas.length + atividades.ocorrencias.length} registro(s)</strong></div>
         <div className="radar-activity-columns">
-         <div><h3>🚗 Checklists do dia</h3>{atividades.checklists.length === 0 ? <div className="radar-empty">Nenhum checklist registrado.</div> : atividades.checklists.map(c => <button className="radar-activity" key={c.id} onClick={() => disparar('dc:abrir-checklist', { id: c.id })}><b>{c.agente}</b><span className="radar-checklist-resumo">{c.hora} - {c.placa || 'Placa não informada'} - KM {c.km || 'não informado'} - Combustível {c.nivelCombustivel || 'não informado'}</span><em>abrir ›</em></button>)}</div>
+         <div><h3>🚗 Checklists do dia</h3>{atividades.checklists.length === 0 ? <div className="radar-empty">Nenhum checklist de viatura registrado.</div> : atividades.checklists.map(c => <button className="radar-activity" key={c.id} onClick={() => disparar('dc:abrir-checklist', { id: c.id })}><b>{c.agente}</b><span className="radar-checklist-resumo">{c.hora} - {c.placa || 'Placa não informada'} - KM {c.km || 'não informado'} - Combustível {c.nivelCombustivel || 'não informado'}</span><em>abrir ›</em></button>)}
+         <h3 className="radar-subtitulo-ferramentas">🧰 Checklists de ferramentas</h3>{atividades.checklistsFerramentas.length === 0 ? <div className="radar-empty">Nenhum checklist de ferramenta registrado.</div> : atividades.checklistsFerramentas.map(c => <button className="radar-activity" key={`ferramenta-${c.id}`} onClick={() => disparar('dc:abrir-checklist-ferramenta', { id: c.id })}><span className="radar-checklist-resumo">{c.agente} - {c.ferramentaNome} - {c.condicao === 'boa' ? 'Boa' : c.condicao === 'media' ? 'Média' : c.condicao === 'ruim' ? 'Ruim' : c.condicao || 'não informada'}</span><em>abrir ›</em></button>)}</div>
           <div><h3>⚠️ Ocorrências do dia</h3>{atividades.ocorrencias.length === 0 ? <div className="radar-empty">Nenhuma ocorrência registrada.</div> : atividades.ocorrencias.map(o => <button className="radar-activity" key={o.id} onClick={() => disparar('dc:abrir-ocorrencia', { id: o.id })}><b>{o.agente}</b><span>{o.hora} · {o.natureza || 'Natureza não informada'}</span><small>{o.endereco || 'Endereço não informado'}</small><em>abrir ›</em></button>)}</div>
         </div>
         </section>

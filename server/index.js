@@ -1308,6 +1308,15 @@ app.get('/api/atividades-dia', async (req, res) => {
        FROM checklists_viatura WHERE data_checklist::text LIKE $1 ORDER BY created_at DESC`,
       [`${data}%`],
     )
+    const checklistsFerramentas = await query(
+      `SELECT cf.id, cf.ferramenta_id, cf.condicao, cf.realizado_por, cf.data_checklist, cf.created_at,
+              m.nome AS ferramenta_nome
+       FROM checklists_ferramental cf
+       LEFT JOIN materiais m ON m.id = cf.ferramenta_id
+       WHERE cf.data_checklist::date = $1::date
+       ORDER BY cf.created_at DESC`,
+      [data],
+    )
     const ocorrencias = await query(
       `SELECT id, natureza, endereco, agentes, responsavel_registro, created_at, hora_inicio
        FROM ocorrencias
@@ -1323,6 +1332,14 @@ app.get('/api/atividades-dia', async (req, res) => {
           ? String(row.data_checklist).slice(11, 16)
           : new Date(row.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
         nivelCombustivel: row.itens?.nivelCombustivel || '',
+      })),
+      checklistsFerramentas: checklistsFerramentas.rows.map(row => ({
+        id: row.id,
+        agente: row.realizado_por || 'Agente não informado',
+        ferramentaNome: row.ferramenta_nome || 'Ferramenta não informada',
+        condicao: row.condicao || '',
+        data_checklist: row.data_checklist,
+        created_at: row.created_at,
       })),
       ocorrencias: ocorrencias.rows.map(row => ({
         ...row,

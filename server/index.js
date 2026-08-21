@@ -1304,7 +1304,7 @@ app.get('/api/atividades-dia', async (req, res) => {
     const data = String(req.query.data || '').slice(0, 10)
     if (!/^\d{4}-\d{2}-\d{2}$/.test(data)) return res.status(400).json({ error: 'Data inválida' })
     const checklists = await query(
-      `SELECT id, data_checklist, placa, motorista, created_at
+      `SELECT id, data_checklist, km, placa, motorista, itens, created_at
        FROM checklists_viatura WHERE data_checklist::text LIKE $1 ORDER BY created_at DESC`,
       [`${data}%`],
     )
@@ -1322,6 +1322,7 @@ app.get('/api/atividades-dia', async (req, res) => {
         hora: String(row.data_checklist || '').includes('T')
           ? String(row.data_checklist).slice(11, 16)
           : new Date(row.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+        nivelCombustivel: row.itens?.nivelCombustivel || '',
       })),
       ocorrencias: ocorrencias.rows.map(row => ({
         ...row,

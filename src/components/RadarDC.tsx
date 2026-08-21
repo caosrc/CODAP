@@ -161,19 +161,23 @@ export default function RadarDC() {
         proximoDia.setDate(proximoDia.getDate() + 1)
         const proximo = dataLocalISO(proximoDia)
         const [checklistsResult, checklistsFerramentasResult, ocorrenciasResult] = await Promise.all([
-          supabase.from('checklists_viatura').select('id,data_checklist,km,placa,motorista,itens,created_at').gte('data_checklist', dataSelecionada).lt('data_checklist', proximo).order('created_at', { ascending: false }),
-          supabase.from('checklists_ferramental').select('id,ferramenta_id,condicao,realizado_por,data_checklist,created_at').gte('data_checklist', `${dataSelecionada}T00:00:00`).lt('data_checklist', `${proximo}T00:00:00`).order('created_at', { ascending: false }),
+          // Essas datas são salvas como YYYY-MM-DD no Supabase, não como timestamp.
+          supabase.from('checklists_viatura').select('id,data_checklist,km,placa,motorista,itens,created_at').like('data_checklist', `${dataSelecionada}%`).order('created_at', { ascending: false }),
+          supabase.from('checklists_ferramental').select('id,ferramenta_id,condicao,realizado_por,data_checklist,created_at').like('data_checklist', `${dataSelecionada}%`).order('created_at', { ascending: false }),
           supabase.from('ocorrencias').select('id,natureza,endereco,agentes,responsavel_registro,created_at,hora_inicio,data_ocorrencia')
-            .or(`and(data_ocorrencia.gte.${dataSelecionada}T00:00:00,data_ocorrencia.lt.${proximo}T00:00:00),and(created_at.gte.${dataSelecionada}T00:00:00,created_at.lt.${proximo}T00:00:00)`)
+            .or(`data_ocorrencia.eq.${dataSelecionada},and(created_at.gte.${dataSelecionada}T00:00:00,created_at.lt.${proximo}T00:00:00)`)
             .order('created_at', { ascending: false }),
         ])
-        if (!checklistsResult.error && !checklistsFerramentasResult.error && !ocorrenciasResult.error) {
-          const checklistsFerramentas = (checklistsFerramentasResult.data || []) as Array<Record<string, unknown>>
+        // A tabela de ferramentas pode não existir em bases Supabase antigas.
+        // Ela não deve impedir o carregamento das demais atividades do Radar.
+        if (!checklistsResult.error && !ocorrenciasResult.error) {
+          const checklistsFerramentas = checklistsFerramentasResult.error
+            ? []
+            : (checklistsFerramentasResult.data || []) as Array<Record<string, unknown>>
           const ferramentaIds = checklistsFerramentas.map(row => String(row.ferramenta_id)).filter(Boolean)
           const materiaisResult = ferramentaIds.length > 0
             ? await supabase.from('materiais').select('id,nome').in('id', ferramentaIds)
             : { data: [], error: null }
-          if (materiaisResult.error) throw new Error(materiaisResult.error.message)
           const nomesFerramentas = new Map((materiaisResult.data || []).map(row => [String(row.id), String(row.nome)]))
           const dados = {
             checklists: (checklistsResult.data || []).map(row => ({

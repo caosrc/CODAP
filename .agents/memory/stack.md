@@ -33,3 +33,11 @@ description: Stack técnica, configuração do ambiente Replit, e decisões de b
 **Why:** Netlify Functions não mantém uma conexão WebSocket de longa duração; depender apenas do WS faz mudanças e convocações parecerem congeladas.
 
 **How to apply:** Ao alterar eventos do Radar, preserve uma rota de revalidação periódica e teste a sincronização entre duas sessões publicadas.
+
+## Radar — fontes opcionais no Supabase
+- A tabela `checklists_ferramental` pode não existir no Supabase compartilhado, enquanto `ocorrencias` e `checklists_viatura` existem.
+- Filtros de datas operacionais devem considerar que `data_ocorrencia` e `data_checklist` são salvos como `YYYY-MM-DD`.
+
+**Why:** Uma consulta opcional com erro não pode impedir que as fontes principais do Radar sejam exibidas; comparar datas com horário exclui valores armazenados apenas como data.
+
+**How to apply:** Ao adicionar fontes ao Radar, trate tabelas opcionais separadamente e use igualdade/prefixo compatível com o tipo real persistido.

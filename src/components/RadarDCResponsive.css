@@ -82,6 +82,31 @@ body.radar-tv-active .radar-page {
   box-shadow: 0 4px 14px rgba(24, 69, 114, .06);
 }
 
+.radar-weather-compact {
+  padding: .35rem .55rem;
+}
+
+.radar-weather-bar {
+  gap: .5rem;
+}
+
+.radar-weather-place {
+  font-size: .72rem;
+}
+
+.radar-weather-condition > span {
+  font-size: 1.15rem;
+}
+
+.radar-weather-condition strong {
+  font-size: .88rem;
+}
+
+.radar-weather-condition b,
+.radar-weather-metrics {
+  font-size: .56rem;
+}
+
 .radar-weather-heading {
   align-items: center;
 }
@@ -286,6 +311,24 @@ body.radar-tv-active .radar-page {
   .radar-weather {
     margin-bottom: .45rem;
     padding: .55rem .65rem;
+  }
+
+  .radar-weather-compact {
+    padding: .45rem .55rem;
+  }
+
+  .radar-weather-bar {
+    flex-wrap: wrap;
+    justify-content: flex-start;
+  }
+
+  .radar-weather-metrics {
+    order: 4;
+    flex-basis: 100%;
+  }
+
+  .radar-weather-actions {
+    margin-left: auto;
   }
 
   .radar-weather-heading {

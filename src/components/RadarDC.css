@@ -240,6 +240,19 @@
 }
 
 .radar-weather { margin: 0 clamp(.65rem, 3vw, 2.6rem) 1rem; padding: 1.1rem 1.25rem; border: 1px solid #285475; border-radius: 16px; background: linear-gradient(135deg, #103a5e, #0d2947); box-shadow: 0 8px 24px rgba(1, 12, 27, .3); }
+.radar-weather-compact { padding: .38rem .55rem; }
+.radar-weather-bar { display: flex; align-items: center; gap: .8rem; min-height: 42px; }
+.radar-weather-place { flex: 0 0 auto; color: #f2f8ff; font-size: .82rem; white-space: nowrap; }
+.radar-weather-condition { display: flex; align-items: center; flex: 0 0 auto; gap: .35rem; }
+.radar-weather-condition > span { font-size: 1.35rem; }
+.radar-weather-condition strong, .radar-weather-condition b { display: block; }
+.radar-weather-condition strong { color: #fff; font-size: 1rem; }
+.radar-weather-condition b { color: #c3dced; font-size: .62rem; white-space: nowrap; }
+.radar-weather-metrics { display: flex; align-items: center; flex: 1; flex-wrap: wrap; gap: .25rem .65rem; min-width: 0; color: #c3dced; font-size: .62rem; }
+.radar-weather-metrics span { white-space: nowrap; }
+.radar-weather-metrics b { color: #fff; }
+.radar-weather-error, .radar-weather-loading { flex: 1; color: #b2cde0; font-size: .7rem; }
+.radar-weather-error { color: #ffb4ad; }
 .radar-weather-heading { display: flex; justify-content: space-between; gap: 1rem; align-items: flex-start; }
 .radar-weather-heading h2 { margin: .2rem 0 .1rem; font-size: 1.35rem; color: #f2f8ff; }
 .radar-weather-heading p { margin: 0; color: #a8c5dc; font-size: .82rem; }

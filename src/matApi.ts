@@ -81,7 +81,12 @@ function tabelaSupabaseAusente(error: { code?: string; message?: string } | null
 async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(path, options)
   const ct = res.headers.get('content-type') || ''
-  if (!res.ok || ct.includes('text/html')) throw new Error('API Express não disponível')
+  if (!res.ok || ct.includes('text/html')) {
+    const detalhe = ct.includes('application/json')
+      ? await res.json().catch(() => null) as { error?: string } | null
+      : null
+    throw new Error(detalhe?.error || (ct.includes('text/html') ? 'API Express não disponível' : `Erro HTTP ${res.status}`))
+  }
   return res.json()
 }
 
@@ -201,6 +206,7 @@ export const matApi = {
 
   async criarChecklistFerramenta(checklist: {
     ferramenta_id: string
+    ferramenta_nome?: string
     quantidade_cadastrada: number
     quantidade_conferida: number
     condicao: 'boa' | 'media' | 'ruim'

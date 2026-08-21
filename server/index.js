@@ -2198,7 +2198,7 @@ app.get('/api/ferramentas/:id/checklists', async (req, res) => {
 
 app.post('/api/ferramentas/checklists', async (req, res) => {
   const {
-    ferramenta_id, quantidade_cadastrada, quantidade_conferida,
+    ferramenta_id, ferramenta_nome, quantidade_cadastrada, quantidade_conferida,
     condicao, item_faltante, justificativa, realizado_por, data_checklist,
   } = req.body || {}
   const cadastrada = Number(quantidade_cadastrada)
@@ -2217,10 +2217,22 @@ app.post('/api/ferramentas/checklists', async (req, res) => {
     return res.status(400).json({ error: 'Justifique a quantidade faltante.' })
   }
   try {
-    const ferramenta = await query(
+    let ferramenta = await query(
       "SELECT id FROM materiais WHERE id = $1 AND categoria = 'ferramental'",
       [ferramenta_id]
     )
+    if (!ferramenta.rows[0] && ferramenta_nome) {
+      await query(
+        `INSERT INTO materiais (id, nome, categoria, tipo, quantidade)
+         VALUES ($1, $2, 'ferramental', 'ferramental', $3)
+         ON CONFLICT (id) DO NOTHING`,
+        [String(ferramenta_id), String(ferramenta_nome).trim() || String(ferramenta_id), cadastrada]
+      )
+      ferramenta = await query(
+        "SELECT id FROM materiais WHERE id = $1 AND categoria = 'ferramental'",
+        [ferramenta_id]
+      )
+    }
     if (!ferramenta.rows[0]) return res.status(404).json({ error: 'Ferramental não encontrado.' })
     const result = await query(
       `INSERT INTO checklists_ferramental

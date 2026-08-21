@@ -1372,6 +1372,7 @@ function ChecklistFerramenta({
     try {
       const checklist = await matApi.criarChecklistFerramenta({
         ferramenta_id: ferramenta.id,
+         ferramenta_nome: ferramenta.nome,
         quantidade_cadastrada: quantidadeCadastrada,
         quantidade_conferida: quantidadeConferida,
         condicao,

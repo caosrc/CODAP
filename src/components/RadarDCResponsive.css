@@ -208,7 +208,7 @@ body.radar-tv-active .radar-page {
 
   .radar-layout {
     grid-template-columns: minmax(0, 2.35fr) minmax(220px, .42fr);
-    min-height: calc(100vh - 185px);
+    min-height: calc(100vh - 155px);
     padding: .35rem clamp(.2rem, .6vw, .65rem) 2rem .3rem;
     gap: .3rem;
     align-items: stretch;
@@ -222,7 +222,7 @@ body.radar-tv-active .radar-page {
 
   .radar-bilhete-large {
     min-height: 0;
-    min-height: calc(100vh - 230px);
+    min-height: calc(100vh - 200px);
     display: flex;
     flex-direction: column;
   }
@@ -252,12 +252,16 @@ body.radar-tv-active .radar-page {
   }
 
   .radar-right-column {
+    height: 100%;
     gap: .3rem;
+    grid-template-rows: auto minmax(0, 1fr);
   }
 
   .radar-activities {
-    min-height: 340px;
+    min-height: 0;
+    height: 100%;
     padding: .8rem;
+    box-sizing: border-box;
   }
 
   .radar-calendar-card .calendar-grid button {
@@ -417,6 +421,10 @@ body.radar-tv-active .radar-page {
     grid-template-columns: 1fr;
     padding: .7rem .65rem;
     gap: .7rem;
+  }
+  .radar-right-column {
+    height: auto;
+    grid-template-rows: none;
   }
   .radar-note-card, .radar-calendar-card {
     border-radius: 12px;

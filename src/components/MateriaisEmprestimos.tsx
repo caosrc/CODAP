@@ -1643,14 +1643,25 @@ function FormNovoEmprestimo({
                 }}
               >
                 <option value="">— Escolha o item —</option>
-                {materiais.map((m) => {
-                  const disp = m.quantidade != null
-                    ? Math.max(0, (m.quantidade ?? 1)
-                        - emprestimos.filter(e2 => e2.material_id === m.id && !e2.devolvido_em).reduce((s, e2) => s + (e2.quantidade ?? 1), 0)
-                        - equipamentos.filter(c => c.material_id === m.id && c.status === 'ativo').reduce((s, c) => s + (c.quantidade ?? 1), 0))
-                    : null
-                  const label = disp != null ? `${m.id} — ${m.nome} (${disp} disp.)` : `${m.id} — ${m.nome}`
-                  return <option key={m.id} value={m.id} disabled={disp === 0}>{label}</option>
+                {([
+                  { categoria: 'escritorio' as const, label: '📋 Materiais de Escritório' },
+                  { categoria: 'ferramental' as const, label: '🧰 Ferramental' },
+                ]).map((grupo) => {
+                  const itens = materiais.filter((m) => (m.categoria ?? 'escritorio') === grupo.categoria)
+                  if (itens.length === 0) return null
+                  return (
+                    <optgroup key={grupo.categoria} label={grupo.label}>
+                      {itens.map((m) => {
+                        const disp = m.quantidade != null
+                          ? Math.max(0, (m.quantidade ?? 1)
+                              - emprestimos.filter(e2 => e2.material_id === m.id && !e2.devolvido_em).reduce((s, e2) => s + (e2.quantidade ?? 1), 0)
+                              - equipamentos.filter(c => c.material_id === m.id && c.status === 'ativo').reduce((s, c) => s + (c.quantidade ?? 1), 0))
+                          : null
+                        const label = disp != null ? `${m.id} — ${m.nome} (${disp} disp.)` : `${m.id} — ${m.nome}`
+                        return <option key={m.id} value={m.id} disabled={disp === 0}>{label}</option>
+                      })}
+                    </optgroup>
+                  )
                 })}
               </select>
             </div>
@@ -2573,9 +2584,20 @@ function FormCampo({
           <label className="campo-label">Material *</label>
           <select className="campo-select" value={materialId} onChange={(e) => { handleMaterial(e.target.value); setErro('') }}>
             <option value="">— Escolha o material —</option>
-            {materiais.map(m => (
-              <option key={m.id} value={m.id}>{m.id} — {m.nome}</option>
-            ))}
+            {([
+              { categoria: 'escritorio' as const, label: '📋 Materiais de Escritório' },
+              { categoria: 'ferramental' as const, label: '🧰 Ferramental' },
+            ]).map((grupo) => {
+              const itens = materiais.filter((m) => (m.categoria ?? 'escritorio') === grupo.categoria)
+              if (itens.length === 0) return null
+              return (
+                <optgroup key={grupo.categoria} label={grupo.label}>
+                  {itens.map((m) => (
+                    <option key={m.id} value={m.id}>{m.id} — {m.nome}</option>
+                  ))}
+                </optgroup>
+              )
+            })}
           </select>
         </div>
 

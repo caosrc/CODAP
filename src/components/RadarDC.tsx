@@ -86,6 +86,7 @@ export default function RadarDC() {
   const [notificacaoAtiva, setNotificacaoAtiva] = useState(false)
   const [atividades, setAtividades] = useState<{ checklists: Atividade[]; checklistsFerramentas: AtividadeFerramenta[]; ocorrencias: Atividade[] }>({ checklists: [], checklistsFerramentas: [], ocorrencias: [] })
   const [tempo, setTempo] = useState<TempoDC | null>(null)
+  const [horaAtual, setHoraAtual] = useState(() => new Date())
   const [erroTempo, setErroTempo] = useState('')
   const [salvando, setSalvando] = useState(false)
   const [erroSalvamento, setErroSalvamento] = useState('')
@@ -95,6 +96,11 @@ export default function RadarDC() {
   const ocorrenciasNotificadasRef = useRef(new Set<number>())
   const atividadesAssinaturaRef = useRef('')
   const calendarioRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setHoraAtual(new Date()), 1000)
+    return () => window.clearInterval(timer)
+  }, [])
 
   const carregar = useCallback(async () => {
     try {
@@ -446,8 +452,8 @@ export default function RadarDC() {
       </header>
 
 
-      <section className="radar-weather" aria-labelledby="radar-weather-title">
-        <div className="radar-weather-heading"><div><span className="card-label">CONDIÇÕES METEOROLÓGICAS</span><h2 id="radar-weather-title">Ouro Branco – MG</h2><p>Previsão detalhada para os próximos 16 dias · Open-Meteo</p></div>{tempo && <span className="weather-updated">Atualizado agora</span>}</div>
+       <section className="radar-weather" aria-labelledby="radar-weather-title">
+         <div className="radar-weather-heading"><div><span className="card-label">CONDIÇÕES METEOROLÓGICAS</span><h2 id="radar-weather-title">Ouro Branco – MG</h2><p>Previsão detalhada para os próximos 16 dias · Open-Meteo</p></div><div className="radar-weather-side"><div className="radar-clock" aria-label="Hora atual"><span>HORA ATUAL</span><strong>{horaAtual.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</strong></div>{tempo && <span className="weather-updated">Atualizado agora</span>}</div></div>
         {erroTempo && <p className="radar-save-error" role="alert">{erroTempo}</p>}
         {!tempo && !erroTempo && <p className="radar-weather-loading">Carregando previsão...</p>}
         {tempo && <><div className="radar-weather-current"><div className="weather-condition"><span>{iconeTempo(tempo.atual.codigo)}</span><div><strong>{Math.round(tempo.atual.temperatura)}°C</strong><b>{nomesTempo[tempo.atual.codigo] || 'Condição variável'}</b></div></div><div className="weather-metrics"><span>🌧️ Chuva <b>{tempo.atual.chuva.toFixed(1)} mm</b></span><span>☔ Prob. hoje <b>{tempo.dias[0]?.probabilidade ?? 0}%</b></span><span>💨 Vento <b>{Math.round(tempo.atual.vento)} km/h</b></span><span>💨 Rajadas <b>{Math.round(tempo.atual.rajada)} km/h</b></span><span>💧 Umidade <b>{Math.round(tempo.atual.umidade)}%</b></span></div></div>{destaquesTempo && <div className="weather-highlights"><div><span>🌧️ Maior precipitação</span><strong>{dataTempo(destaquesTempo.chuva.data)} · {destaquesTempo.chuva.precipitacao.toFixed(1)} mm</strong></div><div><span>💧 Menor umidade</span><strong>{dataTempo(destaquesTempo.umidade.data)} · {Math.round(destaquesTempo.umidade.umidade)}%</strong></div><div><span>💨 Maior rajada</span><strong>{dataTempo(destaquesTempo.rajada.data)} · {Math.round(destaquesTempo.rajada.rajada)} km/h</strong></div></div>}<small className="weather-disclaimer">Os 16 dias são uma estimativa meteorológica; quanto mais distante a data, menor a precisão.</small></>}

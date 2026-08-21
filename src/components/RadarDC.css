@@ -87,6 +87,21 @@
   box-shadow: 0 12px 30px #020d1d55;
 }
 
+@media (min-width: 701px) {
+  .radar-calendar-card {
+    padding: .72rem .8rem;
+  }
+
+  .radar-calendar-card .calendar-grid button {
+    min-height: 31px;
+  }
+
+  .radar-activities {
+    min-height: 410px;
+    padding: 1rem 1.1rem;
+  }
+}
+
 .card-label {
   color: #3970a8;
   font-size: .68rem;
@@ -229,6 +244,10 @@
 .radar-weather-heading h2 { margin: .2rem 0 .1rem; font-size: 1.35rem; color: #f2f8ff; }
 .radar-weather-heading p { margin: 0; color: #a8c5dc; font-size: .82rem; }
 .weather-updated { color: #7cd6ef; font-size: .75rem; font-weight: 700; }
+.radar-weather-side { display: flex; align-items: center; gap: 1rem; }
+.radar-clock { min-width: 112px; padding: .45rem .65rem; border: 1px solid #367499; border-radius: 10px; background: #0b2a48; text-align: center; }
+.radar-clock span { display: block; color: #8fb4cd; font-size: .58rem; font-weight: 900; letter-spacing: .1em; }
+.radar-clock strong { display: block; margin-top: .12rem; color: #fff; font-size: 1.15rem; font-variant-numeric: tabular-nums; letter-spacing: .04em; }
 .radar-weather-current { display: flex; align-items: center; gap: 2rem; margin-top: 1rem; padding: .9rem; border-radius: 12px; background: #17466a; }
 .weather-condition { display: flex; align-items: center; gap: .7rem; min-width: 180px; }
 .weather-condition > span { font-size: 2.3rem; }

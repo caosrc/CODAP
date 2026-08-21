@@ -86,6 +86,19 @@ body.radar-tv-active .radar-page {
   align-items: center;
 }
 
+.radar-weather-side {
+  gap: .55rem;
+}
+
+.radar-clock {
+  min-width: 92px;
+  padding: .3rem .45rem;
+}
+
+.radar-clock strong {
+  font-size: .9rem;
+}
+
 .radar-weather-heading h2 {
   margin: .1rem 0 0;
   font-size: .95rem;
@@ -336,6 +349,7 @@ body.radar-tv-active .radar-page {
     border-radius: 12px;
     padding: .85rem;
   }
+  .radar-calendar-card { padding: .65rem; }
   .radar-note-card h2, .radar-calendar-card h2 { font-size: 1.05rem; }
   .calendar-grid { gap: 2px; }
   .calendar-grid button { min-height: 38px; }

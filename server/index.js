@@ -12,6 +12,7 @@ import WebSocket, { WebSocketServer } from 'ws'
 import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 import { execFile } from 'child_process'
 import { promisify } from 'util'
+import { handler as planetFocosHandler } from '../netlify/functions/planet-focos.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
@@ -1709,6 +1710,32 @@ app.get('/api/monitoramento-incendio', async (_req, res) => {
   } catch (e) {
     console.warn('[monitoramento-incendio]', e?.message)
     res.status(502).json({ configurado: false, camadas: [], indicadores: [], erros: [e?.message || 'falha desconhecida'] })
+  }
+})
+
+// ── Planet — imagens de satélite sob demanda ────────────────────────────────
+// Reutiliza o mesmo handler do Netlify para manter os contratos idênticos nos
+// dois ambientes e manter PLANET_API_KEY exclusivamente no servidor.
+app.get('/api/planet-focos', async (req, res) => {
+  try {
+    const resultado = await planetFocosHandler({
+      httpMethod: req.method,
+      queryStringParameters: req.query,
+    })
+    res.status(resultado.statusCode || 200)
+    for (const [nome, valor] of Object.entries(resultado.headers || {})) {
+      res.setHeader(nome, valor)
+    }
+    res.send(resultado.body || '')
+  } catch (e) {
+    console.warn('[planet-focos]', e?.message || e)
+    res.status(502).json({
+      configurado: true,
+      fonte: 'PLANET',
+      imagens: [],
+      quantidade: 0,
+      erro: e?.message || 'Falha na Planet API',
+    })
   }
 })
 

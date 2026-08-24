@@ -16,6 +16,8 @@ Required env vars (all set in Replit shared env / secrets):
 - `NODE_ENV` — set to `production`
 - `EARTH_ENGINE_SERVICE_ACCOUNT_JSON` — Secret containing the complete Google Cloud service-account JSON key
 - `EARTH_ENGINE_PROJECT` — optional Earth Engine/Google Cloud project ID; when omitted, uses the `project_id` from the JSON key
+- `FIRMS_MAP_KEY` — Secret for NASA FIRMS active-fire data
+- `PLANET_API_KEY` — Secret for Planet satellite imagery queries
 
 ## Stack
 - **Frontend**: React 19 + TypeScript + Vite
@@ -24,6 +26,7 @@ Required env vars (all set in Replit shared env / secrets):
 - **Push Notifications**: Web Push (VAPID) via `web-push` on Express server
 - **Maps**: Leaflet + react-leaflet (tiles proxied via `/api/tiles`)
 - **Incêndios ativos**: NASA FIRMS + Google Earth Engine (MODIS Terra, MODIS Aqua e VIIRS), exibidos como focos no mapa
+- **Imagens Planet**: consulta protegida pelo servidor em `/api/planet-focos`
 
 ## Where things live
 - `server/index.js` — Express API + WebSocket server + DB init (`initDb`)

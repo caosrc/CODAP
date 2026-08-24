@@ -13,7 +13,7 @@ No Replit, a autenticação por conta de serviço usa o Secret `EARTH_ENGINE_SER
 
 **Why:** A chave pode estar válida e ainda assim a API retornar “Caller does not have required permission to use project” antes de consultar o catálogo.
 
-**How to apply:** Se a biblioteca e o Secret estiverem funcionando, conferir IAM do projeto e habilitação/acesso do Earth Engine no Google Cloud antes de alterar o código.
+**How to apply:** Se a biblioteca e o Secret estiverem funcionando, conferir IAM do projeto e habilitação/acesso do Earth Engine no Google Cloud antes de alterar o código. Após adicionar ou alterar Secrets, reiniciar o workflow para o processo receber o novo ambiente.
 
 O painel do mapa deve continuar exibindo ECOSTRESS, Sentinel-2, Landsat 8/9, Sentinel-1 e MODIS Fire mesmo quando o Earth Engine estiver sem autenticação; nesse estado, as ferramentas ficam sinalizadas como aguardando configuração e os focos FIRMS continuam disponíveis.
 

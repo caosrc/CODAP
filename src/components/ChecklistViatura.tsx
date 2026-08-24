@@ -63,6 +63,8 @@ async function sincronizarChecklistsPendentes(): Promise<number> {
 type Opc3 = 'bom' | 'medio' | 'ruim' | ''
 type OpcSN = 'sim' | 'nao' | 'na' | ''
 type NivelCombustivel = '' | 'E' | '1/4' | '1/2' | '3/4' | 'F'
+type FotoOrigem = 'camera' | 'carregada'
+type FotoVeiculo = 'frontal' | 'traseira' | 'direita' | 'esquerda'
 
 const NIVEIS_COMBUSTIVEL: { v: Exclude<NivelCombustivel, ''>; label: string }[] = [
   { v: 'E', label: 'E' },
@@ -86,6 +88,7 @@ interface Itens {
   motEmbreagem: OpcSN; motFreio: OpcSN; motFreioMao: OpcSN
   motOleoFreio: OpcSN; motOleoMoto: OpcSN; motTanquePartida: OpcSN
   nivelCombustivel?: NivelCombustivel
+  _fotosCarregadas?: FotoVeiculo[]
 }
 
 function itensIniciais(): Itens {
@@ -260,7 +263,7 @@ function redimensionarImagem(dataUrl: string, maxW: number, maxH: number): Promi
 interface FotoSlotHProps {
   label: string
   foto: string | null
-  onFoto: (b64: string) => void
+  onFoto: (b64: string, origem: FotoOrigem) => void
   children: React.ReactNode
 }
 
@@ -268,14 +271,14 @@ function FotoSlotH({ label, foto, onFoto, children }: FotoSlotHProps) {
   const cameraRef = useRef<HTMLInputElement>(null)
   const galeriaRef = useRef<HTMLInputElement>(null)
 
-  async function processarArquivo(file: File) {
+  async function processarArquivo(file: File, origem: FotoOrigem) {
     return new Promise<void>((resolve) => {
       const reader = new FileReader()
       reader.onload = async (ev) => {
         if (ev.target?.result) {
           const redim = await redimensionarImagem(ev.target.result as string, 800, 600)
           const comMarca = await adicionarMarcaDagua(redim, null, null, 800, 0.45)
-          onFoto(comMarca)
+          onFoto(comMarca, origem)
           salvarFotoNoDispositivo(comMarca)
         }
         resolve()
@@ -286,13 +289,13 @@ function FotoSlotH({ label, foto, onFoto, children }: FotoSlotHProps) {
 
   function handleCamera(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
-    if (file) processarArquivo(file)
+    if (file) processarArquivo(file, 'camera')
     e.target.value = ''
   }
 
   function handleGaleria(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
-    if (file) processarArquivo(file)
+    if (file) processarArquivo(file, 'carregada')
     e.target.value = ''
   }
 
@@ -447,6 +450,19 @@ export default function ChecklistViatura({ abrirId }: { abrirId?: number | null 
 
   function setItem(k: keyof Itens, v: string) {
     setItens(prev => ({ ...prev, [k]: v }))
+  }
+
+  function atualizarFotoVeiculo(campo: FotoVeiculo, setFoto: (foto: string) => void) {
+    return (foto: string, origem: FotoOrigem) => {
+      setFoto(foto)
+      setItens(prev => {
+        const atuais = prev._fotosCarregadas || []
+        const atualizados = origem === 'carregada'
+          ? [...new Set([...atuais, campo])]
+          : atuais.filter(item => item !== campo)
+        return { ...prev, _fotosCarregadas: atualizados.length > 0 ? atualizados : undefined }
+      })
+    }
   }
 
   function respostaExpressValida(res: Response): boolean {
@@ -967,10 +983,10 @@ export default function ChecklistViatura({ abrirId }: { abrirId?: number | null 
             {/* ── Fotos do Veículo ── */}
             <div className="ck-section-title">FOTOS DO VEÍCULO</div>
             <div className="ck-fotos-4col">
-              <FotoSlotH label="Esquerda" foto={fotoEsquerda} onFoto={setFotoEsquerda}><CarSide /></FotoSlotH>
-              <FotoSlotH label="Frontal" foto={fotoFrontal} onFoto={setFotoFrontal}><CarFront /></FotoSlotH>
-              <FotoSlotH label="Traseira" foto={fotoTraseira} onFoto={setFotoTraseira}><CarRear /></FotoSlotH>
-              <FotoSlotH label="Direita" foto={fotoDireita} onFoto={setFotoDireita}><CarSide flip /></FotoSlotH>
+              <FotoSlotH label="Esquerda" foto={fotoEsquerda} onFoto={atualizarFotoVeiculo('esquerda', setFotoEsquerda)}><CarSide /></FotoSlotH>
+              <FotoSlotH label="Frontal" foto={fotoFrontal} onFoto={atualizarFotoVeiculo('frontal', setFotoFrontal)}><CarFront /></FotoSlotH>
+              <FotoSlotH label="Traseira" foto={fotoTraseira} onFoto={atualizarFotoVeiculo('traseira', setFotoTraseira)}><CarRear /></FotoSlotH>
+              <FotoSlotH label="Direita" foto={fotoDireita} onFoto={atualizarFotoVeiculo('direita', setFotoDireita)}><CarSide flip /></FotoSlotH>
             </div>
 
             {/* ── Fotos de Avaria ── */}

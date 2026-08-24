@@ -1483,7 +1483,10 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
         <div className="mapa-incendios-wrap">
           <button
             className={`mapa-camada-btn mapa-fogo-btn ${mostrarFocos || painelMonitoramentoAberto ? 'ativo' : ''} ${focosIncendio.length > 0 ? 'tem-focos' : ''}`}
-            onClick={() => setMostrarFocos(v => !v)}
+            onClick={() => {
+              setMostrarFocos(true)
+              setPainelMonitoramentoAberto(v => !v)
+            }}
             title={
               focosConfigurado === false && !focosMonitoramento?.earthEngine?.configurado
                 ? 'Configure FIRMS_MAP_KEY ou autentique o Google Earth Engine para ativar'
@@ -1493,14 +1496,6 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
             }
           >
             🔥 Incêndios{focosIncendio.length > 0 ? ` (${focosIncendio.length})` : ''}{focosConfigurado === false && !focosMonitoramento?.earthEngine?.configurado ? ' ⚠️' : ''}
-          </button>
-
-          <button
-            className={`mapa-camada-btn mapa-monitoramento-btn ${painelMonitoramentoAberto ? 'ativo' : ''} ${camadaMonitoramento ? 'camada-ativa' : ''}`}
-            onClick={() => setPainelMonitoramentoAberto(v => !v)}
-            title="Camadas de fogo ativo: MODIS Terra, MODIS Aqua e VIIRS"
-          >
-            🛰️ Satélites{monitoramentoCarregando ? ' …' : ''}
           </button>
         </div>
       </div>

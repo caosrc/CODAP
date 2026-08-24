@@ -126,6 +126,76 @@ function extrairRuaExcel(endereco: string | null): string {
   return primeiraParte.replace(/\s+\d{1,5}\s*$/, '').trim() || 'Não informada'
 }
 
+function definirLinkInterno(cell: any, sheetName: string, row: number, tooltip: string) {
+  cell.hyperlink = {
+    target: `#'${sheetName.replace(/'/g, "''")}'!A${row}`,
+    tooltip,
+  }
+  cell.font = { ...(cell.font || {}), color: { argb: '2563EB' }, underline: true }
+}
+
+function adicionarAbaDetalhamento(wb: ExcelWorkbook, ocorrencias: Ocorrencia[]): Map<string, number> {
+  const ws = wb.addWorksheet('🔎 Detalhamento')
+  const links = new Map<string, number>()
+  ws.columns = [
+    { width: 10 }, { width: 18 }, { width: 18 }, { width: 28 }, { width: 28 },
+    { width: 16 }, { width: 14 }, { width: 42 }, { width: 30 },
+  ]
+  ws.mergeCells('A1:I1')
+  ws.getCell('A1').value = '🔎 OCORRÊNCIAS POR CATEGORIA'
+  ws.getCell('A1').font = { bold: true, size: 15, color: { argb: BRANCO } }
+  ws.getCell('A1').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: AZUL } }
+  ws.getCell('A1').alignment = { horizontal: 'center' }
+  ws.getCell('A2').value = 'Clique nos itens do Dashboard para abrir diretamente o grupo correspondente.'
+  ws.getCell('A2').font = { italic: true, color: { argb: '64748b' } }
+  ws.mergeCells('A2:I2')
+  let row = 4
+  const groups: Array<[string, string, (o: Ocorrencia) => string]> = [
+    ['🏷️ Atividade / tipo', 'tipo', o => o.tipo || 'Não informado'],
+    ['📋 Natureza', 'natureza', o => o.natureza || 'Não informado'],
+    ['🏘️ Bairro', 'bairro', o => extrairBairroExcel(o.endereco)],
+    ['🛣️ Rua', 'rua', o => extrairRuaExcel(o.endereco)],
+    ['📌 Status', 'status', o => statusLabel(o.status_oc)],
+    ['⚠️ Risco', 'risco', o => nivelLabel(o.nivel_risco)],
+  ]
+  for (const [title, kind, keyFor] of groups) {
+    const values = [...new Set(ocorrencias.map(keyFor))].sort()
+    for (const value of values) {
+      const key = `${kind}:${value}`
+      ws.mergeCells(`A${row}:I${row}`)
+      ws.getCell(`A${row}`).value = `${title} — ${value}`
+      ws.getCell(`A${row}`).font = { bold: true, color: { argb: BRANCO } }
+      ws.getCell(`A${row}`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: '0f766e' } }
+      links.set(key, row)
+      row++
+      const headers = ['ID', 'Data', 'Tipo', 'Natureza', 'Bairro', 'Rua', 'Status', 'Endereço', 'Situação']
+      headers.forEach((header, index) => {
+        const cell = ws.getCell(row, index + 1)
+        cell.value = header
+        cell.font = { bold: true, color: { argb: '475569' } }
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: CINZA_CLARO } }
+      })
+      row++
+      ocorrencias.filter(o => keyFor(o) === value).forEach(o => {
+        const bairro = extrairBairroExcel(o.endereco)
+        const rua = extrairRuaExcel(o.endereco)
+        ;[o.id, parseDateLocal(o.data_ocorrencia)?.toLocaleDateString('pt-BR') ?? '—',
+          o.tipo || 'Não informado', o.natureza || 'Não informado', bairro, rua,
+          statusLabel(o.status_oc), o.endereco || '—', o.situacao || '—',
+        ].forEach((v, index) => ws.getCell(row, index + 1).value = v as ExcelCellValue)
+        ws.getRow(row).eachCell({ includeEmpty: true }, (cell, columnNumber) => {
+          cell.alignment = { vertical: 'top', wrapText: columnNumber >= 8 } as any
+        })
+        row++
+      })
+      row++
+    }
+  }
+  ws.autoFilter = { from: { row: 5, column: 1 }, to: { row: 5, column: 9 } }
+  ws.views = [{ state: 'frozen', ySplit: 2 }]
+  return links
+}
+
 // ── Export single occurrence with photos ──────────────────────────────────────
 export async function exportarOcorrenciaExcel(o: Ocorrencia): Promise<void> {
   const { default: ExcelJS } = await import('exceljs')
@@ -352,7 +422,7 @@ export async function exportarOcorrenciaExcel(o: Ocorrencia): Promise<void> {
 
 
 // ── Dashboard Analytics Sheet (100% editável e orientado por fórmulas) ────────
-async function adicionarAbaDashboard(wb: ExcelWorkbook, ocorrencias: Ocorrencia[]): Promise<void> {
+async function adicionarAbaDashboard(wb: ExcelWorkbook, ocorrencias: Ocorrencia[], detalheLinks: Map<string, number>): Promise<void> {
   const ws = wb.addWorksheet('📊 Dashboard', {
     views: [{ showGridLines: false }],
     pageSetup: { orientation: 'landscape', fitToPage: true, fitToWidth: 1 },
@@ -455,9 +525,11 @@ async function adicionarAbaDashboard(wb: ExcelWorkbook, ocorrencias: Ocorrencia[
     cell.font = { bold: true, color: { argb: '475569' } }
     cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: CINZA_CLARO } }
   })
-  const linha = (row: number, label: string, formula: string, result: number, columns = ['A', 'B', 'C'], totalRef = '$D$7') => {
+  const linha = (row: number, label: string, formula: string, result: number, columns = ['A', 'B', 'C'], totalRef = '$D$7', linkKey?: string) => {
     const [labelCol, countCol, pctCol, graphCol] = columns
     ws.getCell(`${labelCol}${row}`).value = label
+    const detailRow = linkKey ? detalheLinks.get(linkKey) : undefined
+    if (detailRow) definirLinkInterno(ws.getCell(`${labelCol}${row}`), '🔎 Detalhamento', detailRow, `Abrir ocorrências: ${label}`)
     ws.getCell(`${countCol}${row}`).value = { formula, result } as any
     ws.getCell(`${pctCol}${row}`).value = { formula: `IFERROR(${countCol}${row}/${totalRef},0)`, result: result / Math.max(baseTotal, 1) } as any
     ws.getCell(`${pctCol}${row}`).numFmt = '0.0%'
@@ -476,7 +548,7 @@ async function adicionarAbaDashboard(wb: ExcelWorkbook, ocorrencias: Ocorrencia[
   cabecalho(11, ['Atividade', 'Quantidade', '% do filtro', 'Gráfico'])
   tipos.forEach((tipo, i) => linha(12 + i, tipo,
     `IF($B$5="Todos",COUNTIF(${dataSheet}!$D$3:$D$${ultimaLinha},A${12 + i}),COUNTIFS(${dataSheet}!$D$3:$D$${ultimaLinha},A${12 + i},${dataSheet}!$T$3:$T$${ultimaLinha},$B$5))`,
-    countFor('D', tipo), ['A', 'B', 'C', 'D']))
+    countFor('D', tipo), ['A', 'B', 'C', 'D'], '$D$7', `tipo:${tipo}`))
 
   const bairroInicio = 10
   // A tabela de bairros ocupa E:G, para ficar lado a lado com atividades.
@@ -491,7 +563,7 @@ async function adicionarAbaDashboard(wb: ExcelWorkbook, ocorrencias: Ocorrencia[
   })
   bairros.forEach((bairro, i) => {
     const row = 12 + i
-    linha(row, bairro, `IF($B$4="Todos",COUNTIF(${dataSheet}!$T$3:$T$${ultimaLinha},E${row}),COUNTIFS(${dataSheet}!$T$3:$T$${ultimaLinha},E${row},${dataSheet}!$D$3:$D$${ultimaLinha},$B$4))`, countFor('T', bairro), ['E', 'F', 'G', 'H'])
+    linha(row, bairro, `IF($B$4="Todos",COUNTIF(${dataSheet}!$T$3:$T$${ultimaLinha},E${row}),COUNTIFS(${dataSheet}!$T$3:$T$${ultimaLinha},E${row},${dataSheet}!$D$3:$D$${ultimaLinha},$B$4))`, countFor('T', bairro), ['E', 'F', 'G', 'H'], '$D$7', `bairro:${bairro}`)
   })
 
   const detalhesRow = Math.max(12 + tipos.length, 12 + bairros.length) + 2
@@ -508,11 +580,11 @@ async function adicionarAbaDashboard(wb: ExcelWorkbook, ocorrencias: Ocorrencia[
   })
   naturezas.forEach((natureza, i) => {
     const row = detalhesRow + 2 + i
-    linha(row, natureza, `IF($B$5="Todos",COUNTIF(${dataSheet}!$E$3:$E$${ultimaLinha},A${row}),COUNTIFS(${dataSheet}!$E$3:$E$${ultimaLinha},A${row},${dataSheet}!$T$3:$T$${ultimaLinha},$B$5))`, countFor('E', natureza), ['A', 'B', 'C', 'D'])
+    linha(row, natureza, `IF($B$5="Todos",COUNTIF(${dataSheet}!$E$3:$E$${ultimaLinha},A${row}),COUNTIFS(${dataSheet}!$E$3:$E$${ultimaLinha},A${row},${dataSheet}!$T$3:$T$${ultimaLinha},$B$5))`, countFor('E', natureza), ['A', 'B', 'C', 'D'], '$D$7', `natureza:${natureza}`)
   })
   ruas.forEach((rua, i) => {
     const row = detalhesRow + 2 + i
-    linha(row, rua, `IF($B$4="Todos",COUNTIF(${dataSheet}!$U$3:$U$${ultimaLinha},E${row}),COUNTIFS(${dataSheet}!$U$3:$U$${ultimaLinha},E${row},${dataSheet}!$D$3:$D$${ultimaLinha},$B$4))`, countFor('U', rua), ['E', 'F', 'G', 'H'])
+    linha(row, rua, `IF($B$4="Todos",COUNTIF(${dataSheet}!$U$3:$U$${ultimaLinha},E${row}),COUNTIFS(${dataSheet}!$U$3:$U$${ultimaLinha},E${row},${dataSheet}!$D$3:$D$${ultimaLinha},$B$4))`, countFor('U', rua), ['E', 'F', 'G', 'H'], '$D$7', `rua:${rua}`)
   })
 
   const statusRow = Math.max(detalhesRow + 2 + naturezas.length, detalhesRow + 2 + ruas.length) + 2
@@ -521,7 +593,7 @@ async function adicionarAbaDashboard(wb: ExcelWorkbook, ocorrencias: Ocorrencia[
   ;['Ativo', 'Resolvido'].forEach((status, i) => {
     const row = statusRow + 2 + i
     linha(row, status, `IF(AND($B$4="Todos",$B$5="Todos"),COUNTIF(${dataSheet}!$H$3:$H$${ultimaLinha},A${row}),IF($B$4="Todos",COUNTIFS(${dataSheet}!$H$3:$H$${ultimaLinha},A${row},${dataSheet}!$T$3:$T$${ultimaLinha},$B$5),IF($B$5="Todos",COUNTIFS(${dataSheet}!$H$3:$H$${ultimaLinha},A${row},${dataSheet}!$D$3:$D$${ultimaLinha},$B$4),COUNTIFS(${dataSheet}!$H$3:$H$${ultimaLinha},A${row},${dataSheet}!$D$3:$D$${ultimaLinha},$B$4,${dataSheet}!$T$3:$T$${ultimaLinha},$B$5))))`,
-      status === 'Resolvido' ? resolvidos : ativos, ['A', 'B', 'C', 'D'])
+       status === 'Resolvido' ? resolvidos : ativos, ['A', 'B', 'C', 'D'], '$D$7', `status:${status}`)
   })
   ws.mergeCells(`E${statusRow}:H${statusRow}`)
   ws.getCell(`E${statusRow}`).value = '⚠️ Nível de risco'
@@ -534,7 +606,7 @@ async function adicionarAbaDashboard(wb: ExcelWorkbook, ocorrencias: Ocorrencia[
   })
   ;[['Baixo 🟢', '059669'], ['Médio 🟡', 'd97706'], ['Alto 🔴', 'dc2626']].forEach(([risco, cor], i) => {
     const row = statusRow + 2 + i
-    linha(row, risco, formulaComFiltros('G', risco), ocorrencias.filter(o => nivelLabel(o.nivel_risco) === risco).length, ['E', 'F', 'G', 'H'])
+    linha(row, risco, formulaComFiltros('G', risco), ocorrencias.filter(o => nivelLabel(o.nivel_risco) === risco).length, ['E', 'F', 'G', 'H'], '$D$7', `risco:${risco}`)
     ws.getCell(`E${row}`).font = { bold: true, color: { argb: cor } }
   })
 
@@ -711,8 +783,9 @@ export async function exportarTodasExcel(
     }
   }
 
-  // ── Aba de Dashboard Analítico ────────────────────────────────────
-  await adicionarAbaDashboard(wb, ocorrencias)
+  // ── Abas analíticas e de detalhamento ─────────────────────────────
+  const detalheLinks = adicionarAbaDetalhamento(wb, ocorrencias)
+  await adicionarAbaDashboard(wb, ocorrencias, detalheLinks)
 
   // Ativa a aba de dados como padrão ao abrir
   ws.state = 'visible'

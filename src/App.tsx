@@ -4,7 +4,7 @@ import './App.css'
 import Login, { estaLogado, agenteEscolhido, getAgenteLogado } from './components/Login'
 import type { Ocorrencia, NivelRisco } from './types'
 import { NATUREZA_ICONE } from './types'
-import { listarOcorrencias, criarOcorrencia, enviarOcorrenciaServidor, ApiError, buscarFotosOcorrencias } from './api'
+import { listarOcorrencias, criarOcorrencia, enviarOcorrenciaServidor, ApiError } from './api'
 import { wsOn, wsAnunciarOnline } from './wsClient'
 import { supabase, supabaseDisponivel } from './supabaseClient'
 import { EVT_ROTA_RESGATE } from './sos'
@@ -701,17 +701,11 @@ export default function App() {
         showToast('⚠️ Não há ocorrências para exportar.')
         return
       }
-      const ids = ocorrenciasFiltradas.map(o => o.id).filter(id => id > 0)
-      const total = ids.length
-      setExcelProgresso(`⏳ Buscando fotos… 0/${total}`)
-      const fotosMap = await buscarFotosOcorrencias(ids)
-      setExcelProgresso(`⏳ Gerando planilha… 0/${total}`)
-      const ocorrenciasCompletas = ocorrenciasFiltradas.map(o => ({
-        ...o,
-        fotos: fotosMap[o.id]?.fotos ?? (Array.isArray(o.fotos) ? o.fotos : []),
-        vistorias: fotosMap[o.id]?.vistorias ?? (Array.isArray(o.vistorias) ? o.vistorias : []),
-      }))
-      await exportarTodasExcel(ocorrenciasCompletas, (atual, tot) => {
+      setExcelProgresso(`⏳ Gerando planilha… 0/${ocorrenciasFiltradas.length}`)
+      // O Excel de ocorrências é deliberadamente gerado sem fotos para não
+      // bloquear o download por tempo limite ou volume de imagens.
+      const ocorrenciasSemFotos = ocorrenciasFiltradas.map(o => ({ ...o, fotos: [] }))
+      await exportarTodasExcel(ocorrenciasSemFotos, (atual, tot) => {
         setExcelProgresso(`⏳ Gerando planilha… ${atual}/${tot}`)
       })
     } catch (error) {

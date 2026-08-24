@@ -631,7 +631,9 @@ export async function exportarTodasExcel(
 
   const ws = wb.addWorksheet('Ocorrências')
 
-  const maxFotos = ocorrencias.reduce((max, o) => Math.max(max, o.fotos?.length ?? 0), 0)
+  // A exportação em massa não incorpora imagens; isso mantém o arquivo leve
+  // e evita que fotos grandes impeçam a geração do Excel.
+  const maxFotos = 0
    // Colunas extras: 15 base + bairro/rua editáveis + 3 vistorias + 1 área queimada
    const COLS_BASE = 15 + 2 + 3 + 1
   const totalCols = COLS_BASE + maxFotos
@@ -684,13 +686,11 @@ export async function exportarTodasExcel(
   ws.views = [{ state: 'frozen', ySplit: 2 }]
 
   // ── Linhas de dados (começam na linha 3) ─────────────────────────────────
-  const ROW_H_PT = Math.round(FOTO_H / ROW_H_PX_TO_PT)
   const LINHA_INICIO = 3  // primeira linha de dados (1-indexed)
 
   for (let idx = 0; idx < ocorrencias.length; idx++) {
     const o = ocorrencias[idx]
     onProgresso?.(idx + 1, ocorrencias.length)
-    const temFotos = o.fotos && o.fotos.length > 0
     const linhaNum = LINHA_INICIO + idx
     const r = ws.getRow(linhaNum)
 
@@ -739,7 +739,7 @@ export async function exportarTodasExcel(
 
     valores.forEach((v, i) => { r.getCell(i + 1).value = v as ExcelCellValue })
 
-    r.height = temFotos ? ROW_H_PT : 18
+    r.height = 18
 
     const isEven = idx % 2 === 1
     r.eachCell({ includeEmpty: true }, (cell) => {
@@ -763,24 +763,6 @@ export async function exportarTodasExcel(
     else if (o.nivel_risco === 'medio') nivelCell.font = { bold: true, size: 10, color: { argb: 'd97706' } }
     else nivelCell.font = { bold: true, size: 10, color: { argb: '059669' } }
 
-    // Incorpora fotos — linha 0-indexed = linhaNum - 1
-    if (temFotos) {
-      for (let fotoIdx = 0; fotoIdx < o.fotos!.length; fotoIdx++) {
-        const foto = o.fotos![fotoIdx]
-        const normalizada = await normalizarFoto(foto)
-        if (!normalizada) continue
-       const colIdx = 21 + fotoIdx  // 0-indexed: coluna 22 em diante (após Rua)
-        try {
-          const imageId = wb.addImage({ base64: normalizada.base64, extension: normalizada.ext })
-          ws.addImage(imageId, {
-            tl: { col: colIdx, row: linhaNum - 1 },
-            ext: { width: FOTO_W, height: FOTO_H },
-          })
-        } catch {
-          // ignora imagem inválida
-        }
-      }
-    }
   }
 
   // ── Abas analíticas e de detalhamento ─────────────────────────────

@@ -50,13 +50,14 @@ exports.handler = async () => {
       .geometry();
 
     const hoje = new Date();
-    const inicio = hoje.toISOString().slice(0, 10);
+    const fim = hoje.toISOString().slice(0, 10);
+    const inicioDate = new Date(hoje);
+    inicioDate.setUTCDate(inicioDate.getUTCDate() - 60);
+    const inicio = inicioDate.toISOString().slice(0, 10);
 
-    // Earth Engine usa intervalo [inicio, fim).
-    // Usamos amanhã como limite para incluir todo o dia de hoje.
-    const amanha = new Date(hoje);
-    amanha.setUTCDate(amanha.getUTCDate() + 1);
-    const fim = amanha.toISOString().slice(0, 10);
+    // Earth Engine usa intervalo [inicio, fim). Mantemos o mesmo período
+    // usado pelo servidor do Replit para que o painel seja consistente
+    // entre os dois ambientes.
 
     const colecoes = [
       {
@@ -151,7 +152,7 @@ exports.handler = async () => {
         nome: config.nome,
         descricao: `Focos de fogo ativo detectados pelo ${config.nome}.`,
         url: mapa.urlFormat,
-        periodo: `Somente hoje — ${fim}`,
+        periodo: `Últimos 60 dias até ${fim}`,
         imagens: quantidade,
       });
 

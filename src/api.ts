@@ -356,36 +356,44 @@ export async function buscarFotosOcorrencias(
 ): Promise<Record<number, { fotos: string[]; vistorias: unknown[] }>> {
   if (ids.length === 0) return {}
 
+  // Evita URLs/respostas grandes demais quando o filtro "Todas as datas"
+  // reúne muitas ocorrências.
+  const lotes: number[][] = []
+  for (let i = 0; i < ids.length; i += 50) lotes.push(ids.slice(i, i + 50))
+
   // Endpoint servidor busca do Supabase server-side (sem CORS) — primeira opção sempre
   try {
-    const res = await fetch(`/api/ocorrencias/fotos-supabase-lote?ids=${ids.join(',')}`)
-    if (res.ok) {
+    const result: Record<number, { fotos: string[]; vistorias: unknown[] }> = {}
+    for (const lote of lotes) {
+      const res = await fetch(`/api/ocorrencias/fotos-supabase-lote?ids=${lote.join(',')}`)
+      if (!res.ok) throw new Error(`Falha ao buscar fotos (${res.status})`)
       const rows: { id: number; fotos: string[] | null; vistorias: unknown[] | null }[] = await res.json()
-      if (rows.length > 0) {
-        const result: Record<number, { fotos: string[]; vistorias: unknown[] }> = {}
-        for (const row of rows) {
-          result[row.id] = {
-            fotos: Array.isArray(row.fotos) ? row.fotos : [],
-            vistorias: Array.isArray(row.vistorias) ? row.vistorias : [],
-          }
+      for (const row of rows) {
+        result[row.id] = {
+          fotos: Array.isArray(row.fotos) ? row.fotos : [],
+          vistorias: Array.isArray(row.vistorias) ? row.vistorias : [],
         }
-        return result
       }
+    }
+    if (Object.keys(result).length > 0) {
+      return result
     }
   } catch { /* cai para fallbacks abaixo */ }
 
   // Fallback: Supabase direto pelo browser (pode ter CORS para Storage URLs)
   if (supabaseDisponivel) {
     try {
-      const { data } = await supabase
-        .from('ocorrencias')
-        .select('id,fotos,vistorias')
-        .in('id', ids)
       const result: Record<number, { fotos: string[]; vistorias: unknown[] }> = {}
-      for (const row of data ?? []) {
-        result[row.id] = {
-          fotos: Array.isArray(row.fotos) ? row.fotos : [],
-          vistorias: Array.isArray(row.vistorias) ? row.vistorias : [],
+      for (const lote of lotes) {
+        const { data } = await supabase
+          .from('ocorrencias')
+          .select('id,fotos,vistorias')
+          .in('id', lote)
+        for (const row of data ?? []) {
+          result[row.id] = {
+            fotos: Array.isArray(row.fotos) ? row.fotos : [],
+            vistorias: Array.isArray(row.vistorias) ? row.vistorias : [],
+          }
         }
       }
       return result
@@ -394,20 +402,21 @@ export async function buscarFotosOcorrencias(
     }
   }
 
-  // Fallback: PostgreSQL local via Express
+  // Fallback: PostgreSQL local via Express, também em lotes
   try {
-    const res = await fetch(`/api/ocorrencias/fotos-lote?ids=${ids.join(',')}`)
-    if (res.ok) {
+    const result: Record<number, { fotos: string[]; vistorias: unknown[] }> = {}
+    for (const lote of lotes) {
+      const res = await fetch(`/api/ocorrencias/fotos-lote?ids=${lote.join(',')}`)
+      if (!res.ok) continue
       const rows: { id: number; fotos: string[] | null; vistorias: unknown[] | null }[] = await res.json()
-      const result: Record<number, { fotos: string[]; vistorias: unknown[] }> = {}
       for (const row of rows) {
         result[row.id] = {
           fotos: Array.isArray(row.fotos) ? row.fotos : [],
           vistorias: Array.isArray(row.vistorias) ? row.vistorias : [],
         }
       }
-      return result
     }
+    return result
   } catch { /* segue com vazio */ }
   return {}
 }

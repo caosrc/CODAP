@@ -695,8 +695,12 @@ export default function App() {
 
   async function exportarExcel() {
     if (excelProgresso !== null) return
-    const { exportarTodasExcel } = await import('./exportExcel')
     try {
+      const { exportarTodasExcel } = await import('./exportExcel')
+      if (ocorrenciasFiltradas.length === 0) {
+        showToast('⚠️ Não há ocorrências para exportar.')
+        return
+      }
       const ids = ocorrenciasFiltradas.map(o => o.id).filter(id => id > 0)
       const total = ids.length
       setExcelProgresso(`⏳ Buscando fotos… 0/${total}`)
@@ -710,6 +714,9 @@ export default function App() {
       await exportarTodasExcel(ocorrenciasCompletas, (atual, tot) => {
         setExcelProgresso(`⏳ Gerando planilha… ${atual}/${tot}`)
       })
+    } catch (error) {
+      console.error('[Excel] falha ao exportar ocorrências:', error)
+      showToast('⚠️ Não foi possível gerar o Excel. Tente novamente.')
     } finally {
       setExcelProgresso(null)
     }

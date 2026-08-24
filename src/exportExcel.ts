@@ -798,8 +798,13 @@ export async function exportarTodasExcel(
   const a = document.createElement('a')
   a.href = url
   a.download = `defesacivil_ourobranco_${new Date().toLocaleDateString('pt-BR').replace(/\//g, '-')}.xlsx`
+  a.style.display = 'none'
+  document.body.appendChild(a)
   a.click()
-  URL.revokeObjectURL(url)
+  a.remove()
+  // Em listas grandes a criação do Blob pode terminar no mesmo ciclo do
+  // clique; revogar imediatamente pode cancelar o download em alguns browsers.
+  setTimeout(() => URL.revokeObjectURL(url), 1000)
 }
 
 // ── Export checklists da viatura ──────────────────────────────────────────────

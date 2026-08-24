@@ -710,7 +710,8 @@ export default function App() {
       })
     } catch (error) {
       console.error('[Excel] falha ao exportar ocorrências:', error)
-      showToast('⚠️ Não foi possível gerar o Excel. Tente novamente.')
+      const detalhe = error instanceof Error && error.message ? ` ${error.message}` : ''
+      showToast(`⚠️ Não foi possível gerar o Excel.${detalhe}`, 8000)
     } finally {
       setExcelProgresso(null)
     }

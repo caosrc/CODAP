@@ -628,6 +628,120 @@ function textoExcel(valor: unknown, padrao = '—'): string | number {
   return limpo || padrao
 }
 
+function criarImagemDashboard(
+  risco: { label: string; quantidade: number; cor: string }[],
+  status: { label: string; quantidade: number; cor: string }[],
+  tipos: { label: string; quantidade: number; cor: string }[],
+  ultimosDias: { label: string; quantidade: number }[],
+): string | null {
+  if (typeof document === 'undefined') return null
+  const canvas = document.createElement('canvas')
+  canvas.width = 1100
+  canvas.height = 900
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return null
+  const totalRisco = Math.max(risco.reduce((s, i) => s + i.quantidade, 0), 1)
+  const totalStatus = Math.max(status.reduce((s, i) => s + i.quantidade, 0), 1)
+
+  ctx.fillStyle = '#f8fafc'
+  ctx.fillRect(0, 0, canvas.width, canvas.height)
+  ctx.fillStyle = '#1a4b8c'
+  ctx.fillRect(0, 0, canvas.width, 64)
+  ctx.fillStyle = '#ffffff'
+  ctx.font = 'bold 26px Arial'
+  ctx.fillText('Dashboard de Ocorrências', 28, 40)
+
+  const card = (x: number, y: number, w: number, h: number, title: string) => {
+    ctx.fillStyle = '#ffffff'
+    ctx.strokeStyle = '#e2e8f0'
+    ctx.lineWidth = 2
+    ctx.beginPath()
+    ctx.roundRect(x, y, w, h, 14)
+    ctx.fill()
+    ctx.stroke()
+    ctx.fillStyle = '#0f172a'
+    ctx.font = 'bold 18px Arial'
+    ctx.fillText(title, x + 18, y + 30)
+  }
+  const donut = (x: number, y: number, radius: number, dados: { label: string; quantidade: number; cor: string }[], total: number) => {
+    let inicio = -Math.PI / 2
+    dados.forEach(item => {
+      const fatia = (item.quantidade / total) * Math.PI * 2
+      ctx.beginPath()
+      ctx.moveTo(x, y)
+      ctx.arc(x, y, radius, inicio, inicio + fatia)
+      ctx.closePath()
+      ctx.fillStyle = `#${item.cor}`
+      ctx.fill()
+      inicio += fatia
+    })
+    ctx.beginPath()
+    ctx.arc(x, y, radius * 0.58, 0, Math.PI * 2)
+    ctx.fillStyle = '#ffffff'
+    ctx.fill()
+    ctx.fillStyle = '#0f172a'
+    ctx.font = 'bold 30px Arial'
+    ctx.textAlign = 'center'
+    ctx.fillText(String(dados.reduce((s, i) => s + i.quantidade, 0)), x, y + 8)
+    ctx.font = '14px Arial'
+    ctx.fillStyle = '#64748b'
+    ctx.fillText('ocorrências', x, y + 30)
+    ctx.textAlign = 'left'
+  }
+  const legenda = (x: number, y: number, dados: { label: string; quantidade: number; cor: string }[], total: number) => {
+    ctx.font = '14px Arial'
+    dados.forEach((item, i) => {
+      const yy = y + i * 24
+      ctx.fillStyle = `#${item.cor}`
+      ctx.beginPath()
+      ctx.arc(x + 6, yy - 5, 6, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.fillStyle = '#475569'
+      ctx.fillText(item.label, x + 20, yy)
+      ctx.textAlign = 'right'
+      ctx.fillText(`${item.quantidade} (${((item.quantidade / total) * 100).toFixed(1)}%)`, x + 220, yy)
+      ctx.textAlign = 'left'
+    })
+  }
+
+  card(20, 84, 520, 300, 'Por nível de risco')
+  donut(175, 235, 112, risco, totalRisco)
+  legenda(300, 180, risco, totalRisco)
+  card(560, 84, 520, 300, 'Status')
+  donut(715, 235, 112, status, totalStatus)
+  legenda(840, 180, status, totalStatus)
+
+  card(20, 408, 1060, 250, 'Tipos de ocorrência mais frequentes')
+  const maxTipo = Math.max(...tipos.map(i => i.quantidade), 1)
+  tipos.slice(0, 8).forEach((item, i) => {
+    const yy = 455 + i * 24
+    ctx.fillStyle = '#334155'
+    ctx.font = '14px Arial'
+    ctx.fillText(item.label.slice(0, 28), 38, yy + 14)
+    ctx.fillStyle = `#${item.cor}`
+    ctx.fillRect(250, yy, Math.max(4, (item.quantidade / maxTipo) * 700), 18)
+    ctx.fillStyle = '#334155'
+    ctx.fillText(String(item.quantidade), 965, yy + 14)
+  })
+
+  card(20, 682, 1060, 190, 'Últimos 14 dias')
+  const maxDia = Math.max(...ultimosDias.map(i => i.quantidade), 1)
+  ultimosDias.forEach((item, i) => {
+    const barW = 48
+    const gap = 20
+    const h = Math.max(item.quantidade > 0 ? 8 : 2, (item.quantidade / maxDia) * 100)
+    const x = 45 + i * (barW + gap)
+    ctx.fillStyle = '#2563eb'
+    ctx.fillRect(x, 735 + 100 - h, barW, h)
+    ctx.fillStyle = '#64748b'
+    ctx.font = '12px Arial'
+    ctx.textAlign = 'center'
+    ctx.fillText(item.label, x + barW / 2, 855)
+    ctx.textAlign = 'left'
+  })
+  return canvas.toDataURL('image/png').split(',')[1] ?? null
+}
+
 async function exportarOcorrenciasSemFotos(
   ocorrencias: Ocorrencia[],
   onProgresso?: (atual: number, total: number) => void,
@@ -794,6 +908,40 @@ async function exportarOcorrenciasSemFotos(
     dash.getCell(`H${row}`).value = { formula: `IFERROR(REPT("█",ROUND(G${row}/MAX($A$5,1)*24,0)),"")`, result: '█'.repeat(Math.min(24, Math.round(qtd / Math.max(ocorrencias.length, 1) * 24))) } as any
     dash.getCell(`H${row}`).font = { bold: true, color: { argb: '2563EB' } }
   })
+  const riscoGrafico = [
+    { label: 'Alto', quantidade: porNivel[0].quantidade, cor: 'dc2626' },
+    { label: 'Médio', quantidade: porNivel[1].quantidade, cor: 'f59e0b' },
+    { label: 'Baixo', quantidade: porNivel[2].quantidade, cor: '16a34a' },
+  ]
+  const statusGrafico = [
+    { label: 'Ativos', quantidade: porStatus[0].quantidade, cor: 'ef4444' },
+    { label: 'Resolvidos', quantidade: porStatus[1].quantidade, cor: '10b981' },
+  ]
+  const diasGrafico: { label: string; quantidade: number }[] = []
+  for (let i = 13; i >= 0; i--) {
+    const data = new Date()
+    data.setHours(0, 0, 0, 0)
+    data.setDate(data.getDate() - i)
+    const iso = data.toISOString().slice(0, 10)
+    diasGrafico.push({
+      label: String(data.getDate()).padStart(2, '0'),
+      quantidade: ocorrencias.filter(o => o.created_at?.slice(0, 10) === iso).length,
+    })
+  }
+  const imagemDashboard = criarImagemDashboard(
+    riscoGrafico,
+    statusGrafico,
+    tipos.map((tipo, index) => ({
+      label: tipo,
+      quantidade: ocorrencias.filter(o => (o.tipo || 'Não informado') === tipo).length,
+      cor: ['2563eb', '0f766e', '7c3aed', 'dc2626', 'd97706'][index % 5],
+    })),
+    diasGrafico,
+  )
+  if (imagemDashboard) {
+    const imageId = wb.addImage({ base64: imagemDashboard, extension: 'png' })
+    dash.addImage(imageId, { tl: { col: 9, row: 0 }, ext: { width: 550, height: 450 } })
+  }
   dash.views = [{ state: 'frozen', ySplit: 5 }]
 
   const buffer = await wb.xlsx.writeBuffer()

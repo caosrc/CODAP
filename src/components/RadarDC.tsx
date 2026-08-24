@@ -50,8 +50,13 @@ function disparar(nome: string, detail: unknown) {
 }
 
 function temFotoCarregada(itens: unknown) {
-  if (!itens || typeof itens !== 'object') return false
-  const fotos = (itens as Record<string, unknown>)._fotosCarregadas
+  let dados = itens
+  if (typeof dados === 'string') {
+    try { dados = JSON.parse(dados) } catch { return false }
+  }
+  if (!dados || typeof dados !== 'object') return false
+  const registro = dados as Record<string, unknown>
+  const fotos = registro._fotosCarregadas ?? registro.fotosCarregadas
   return Array.isArray(fotos) && fotos.length > 0
 }
 
@@ -539,7 +544,7 @@ export default function RadarDC() {
         <section className="radar-activities">
          <div className="radar-list-heading"><div><span className="card-label">REGISTROS OPERACIONAIS</span><h2>Atividades de {dataBonita(dataSelecionada)}</h2></div><strong>{atividades.checklists.length + atividades.checklistsFerramentas.length + atividades.ocorrencias.length} registro(s)</strong></div>
         <div className="radar-activity-columns">
-          <div><h3>🚗 Checklists do dia</h3>{atividades.checklists.length === 0 ? <div className="radar-empty">Nenhum checklist de viatura registrado.</div> : atividades.checklists.map(c => <button className="radar-activity" key={c.id} onClick={() => disparar('dc:abrir-checklist', { id: c.id })}><b>{c.agente}</b><span className="radar-checklist-resumo">{c.hora} - {c.placa || 'Placa não informada'} - KM {c.km || 'não informado'} - Combustível {c.nivelCombustivel || 'não informado'}{c.fotoCarregada && <strong className="radar-foto-carregada">Foto Carregada</strong>}</span><em>abrir ›</em></button>)}
+          <div><h3>🚗 Checklists do dia</h3>{atividades.checklists.length === 0 ? <div className="radar-empty">Nenhum checklist de viatura registrado.</div> : atividades.checklists.map(c => <button className="radar-activity" key={c.id} onClick={() => disparar('dc:abrir-checklist', { id: c.id })}><b>{c.agente}</b><span className="radar-checklist-resumo">{c.hora} - {c.placa || 'Placa não informada'} - KM {c.km || 'não informado'} - Combustível {c.nivelCombustivel || 'não informado'}</span>{c.fotoCarregada && <strong className="radar-foto-carregada">Foto Carregada</strong>}<em>abrir ›</em></button>)}
          <h3 className="radar-subtitulo-ferramentas">🧰 Checklists de ferramentas</h3>{atividades.checklistsFerramentas.length === 0 ? <div className="radar-empty">Nenhum checklist de ferramenta registrado.</div> : atividades.checklistsFerramentas.map(c => <button className="radar-activity" key={`ferramenta-${c.id}`} onClick={() => disparar('dc:abrir-checklist-ferramenta', { id: c.id })}><span className="radar-checklist-resumo">{c.agente} - {c.ferramentaNome} - {c.condicao === 'boa' ? 'Boa' : c.condicao === 'media' ? 'Média' : c.condicao === 'ruim' ? 'Ruim' : c.condicao || 'não informada'}</span><em>abrir ›</em></button>)}</div>
           <div><h3>⚠️ Ocorrências do dia</h3>{atividades.ocorrencias.length === 0 ? <div className="radar-empty">Nenhuma ocorrência registrada.</div> : atividades.ocorrencias.map(o => <button className="radar-activity" key={o.id} onClick={() => disparar('dc:abrir-ocorrencia', { id: o.id })}><b>{o.agente}</b><span>{o.hora} · {o.natureza || 'Natureza não informada'}</span><small>{o.endereco || 'Endereço não informado'}</small><em>abrir ›</em></button>)}</div>
         </div>

@@ -700,6 +700,102 @@ async function exportarOcorrenciasSemFotos(
     onProgresso?.(index + 1, ocorrencias.length)
   })
 
+  // Dashboard editável: os números são fórmulas para recalcular quando o
+  // usuário filtrar/editar a aba Ocorrências no Excel.
+  const dash = wb.addWorksheet('📊 Dashboard')
+  dash.columns = [30, 16, 16, 42, 30, 16, 16, 42].map(width => ({ width }))
+  dash.mergeCells('A1:H1')
+  dash.getCell('A1').value = '📊 DASHBOARD DE OCORRÊNCIAS'
+  dash.getCell('A1').font = { bold: true, size: 16, color: { argb: BRANCO } }
+  dash.getCell('A1').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: AZUL } }
+  dash.getCell('A1').alignment = { horizontal: 'center' }
+  dash.getCell('A2').value = 'Edite os dados na aba Ocorrências e pressione F9 para atualizar as fórmulas.'
+  dash.mergeCells('A2:H2')
+  dash.getCell('A2').font = { italic: true, color: { argb: '64748b' } }
+  const ultimaLinha = Math.max(3, ocorrencias.length + 2)
+  const base = `'Ocorrências'!$A$3:$R$${ultimaLinha}`
+  const coluna = (letra: string) => `'Ocorrências'!$${letra}$3:$${letra}$${ultimaLinha}`
+  const criterio = (valor: string) => `"${valor.replace(/"/g, '""')}"`
+  const formula = (ref: string, valor: string, result: number) => {
+    const cell = dash.getCell(ref)
+    cell.value = { formula: valor, result } as any
+    cell.font = { bold: true, size: 16, color: { argb: AZUL } }
+    cell.alignment = { horizontal: 'center', vertical: 'middle' }
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'EFF6FF' } }
+  }
+  dash.getCell('A4').value = 'Total'
+  dash.getCell('B4').value = 'Ativas'
+  dash.getCell('C4').value = 'Resolvidas'
+  dash.getCell('D4').value = 'Risco alto'
+  ;['A4', 'B4', 'C4', 'D4'].forEach(ref => {
+    dash.getCell(ref).font = { bold: true, color: { argb: '64748b' } }
+    dash.getCell(ref).alignment = { horizontal: 'center' }
+  })
+  formula('A5', `COUNTA(${coluna('A')})`, ocorrencias.length)
+  formula('B5', `COUNTIF(${coluna('H')},${criterio('Ativo')})`, ocorrencias.filter(o => o.status_oc === 'ativo').length)
+  formula('C5', `COUNTIF(${coluna('H')},${criterio('Resolvido')})`, ocorrencias.filter(o => o.status_oc === 'resolvido').length)
+  formula('D5', `COUNTIF(${coluna('G')},${criterio('Alto 🔴')})`, ocorrencias.filter(o => o.nivel_risco === 'alto').length)
+  dash.getRow(5).height = 30
+
+  const tabela = (
+    titulo: string,
+    inicio: number,
+    itens: { label: string; quantidade: number; cor: string }[],
+    colunaDados: string,
+  ) => {
+    dash.mergeCells(`A${inicio}:D${inicio}`)
+    dash.getCell(`A${inicio}`).value = titulo
+    dash.getCell(`A${inicio}`).font = { bold: true, color: { argb: BRANCO } }
+    dash.getCell(`A${inicio}`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: AZUL } }
+    ;['Categoria', 'Quantidade', '% do total', 'Gráfico'].forEach((label, i) => {
+      const cell = dash.getCell(inicio + 1, i + 1)
+      cell.value = label
+      cell.font = { bold: true, color: { argb: '475569' } }
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: CINZA_CLARO } }
+    })
+    itens.forEach((item, index) => {
+      const row = inicio + 2 + index
+      dash.getCell(`A${row}`).value = item.label
+      dash.getCell(`B${row}`).value = { formula: `COUNTIF(${coluna(colunaDados)},${criterio(item.label)})`, result: item.quantidade } as any
+      dash.getCell(`C${row}`).value = { formula: `IFERROR(B${row}/$A$5,0)`, result: item.quantidade / Math.max(ocorrencias.length, 1) } as any
+      dash.getCell(`C${row}`).numFmt = '0.0%'
+      dash.getCell(`D${row}`).value = { formula: `IFERROR(REPT("█",ROUND(B${row}/MAX($A$5,1)*24,0)),"")`, result: '█'.repeat(Math.min(24, Math.round(item.quantidade / Math.max(ocorrencias.length, 1) * 24))) } as any
+      dash.getCell(`D${row}`).font = { bold: true, color: { argb: item.cor } }
+    })
+  }
+
+  const porNivel = [
+    { label: 'Alto 🔴', quantidade: ocorrencias.filter(o => o.nivel_risco === 'alto').length, cor: 'dc2626' },
+    { label: 'Médio 🟡', quantidade: ocorrencias.filter(o => o.nivel_risco === 'medio').length, cor: 'd97706' },
+    { label: 'Baixo 🟢', quantidade: ocorrencias.filter(o => o.nivel_risco === 'baixo').length, cor: '059669' },
+  ]
+  const porStatus = [
+    { label: 'Ativo', quantidade: ocorrencias.filter(o => o.status_oc === 'ativo').length, cor: 'dc2626' },
+    { label: 'Resolvido', quantidade: ocorrencias.filter(o => o.status_oc === 'resolvido').length, cor: '059669' },
+  ]
+  tabela('⚠️ Por nível de risco', 8, porNivel, 'G')
+  tabela('📌 Por status', 15, porStatus, 'H')
+
+  dash.mergeCells('F8:H8')
+  dash.getCell('F8').value = '🏷️ Por atividade / tipo'
+  dash.getCell('F8').font = { bold: true, color: { argb: BRANCO } }
+  dash.getCell('F8').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: '0f766e' } }
+  ;['Tipo', 'Quantidade', 'Gráfico'].forEach((label, i) => {
+    dash.getCell(9, i + 6).value = label
+    dash.getCell(9, i + 6).font = { bold: true, color: { argb: '475569' } }
+    dash.getCell(9, i + 6).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: CINZA_CLARO } }
+  })
+  const tipos = [...new Set(ocorrencias.map(o => o.tipo || 'Não informado'))].sort()
+  tipos.forEach((tipo, index) => {
+    const row = 10 + index
+    const qtd = ocorrencias.filter(o => (o.tipo || 'Não informado') === tipo).length
+    dash.getCell(`F${row}`).value = tipo
+    dash.getCell(`G${row}`).value = { formula: `COUNTIF(${coluna('D')},${criterio(tipo)})`, result: qtd } as any
+    dash.getCell(`H${row}`).value = { formula: `IFERROR(REPT("█",ROUND(G${row}/MAX($A$5,1)*24,0)),"")`, result: '█'.repeat(Math.min(24, Math.round(qtd / Math.max(ocorrencias.length, 1) * 24))) } as any
+    dash.getCell(`H${row}`).font = { bold: true, color: { argb: '2563EB' } }
+  })
+  dash.views = [{ state: 'frozen', ySplit: 5 }]
+
   const buffer = await wb.xlsx.writeBuffer()
   const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
   const url = URL.createObjectURL(blob)
@@ -717,6 +813,9 @@ export async function exportarTodasExcel(
   ocorrencias: Ocorrencia[],
   onProgresso?: (atual: number, total: number) => void,
 ): Promise<void> {
+  return exportarOcorrenciasSemFotos(ocorrencias, onProgresso)
+
+  /* Implementação analítica anterior mantida temporariamente para referência. */
   const { default: ExcelJS } = await import('exceljs')
   const wb = new ExcelJS.Workbook()
   wb.creator = 'Defesa Civil Ouro Branco'

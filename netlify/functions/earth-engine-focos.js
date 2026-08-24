@@ -31,7 +31,10 @@ async function autenticar() {
   });
 
   await new Promise((resolve, reject) => {
-    ee.initialize(null, null, resolve, reject, project);
+    // A assinatura do SDK Node é (baseUrl, tileUrl, success, error, xsrfToken, project).
+    // O projeto precisa ir no sexto argumento; no quinto era tratado como token XSRF
+    // e a autenticação falhava silenciosamente no ambiente publicado.
+    ee.initialize(null, null, resolve, reject, null, project);
   });
 
   return project;

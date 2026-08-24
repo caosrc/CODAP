@@ -717,10 +717,6 @@ export async function exportarTodasExcel(
   ocorrencias: Ocorrencia[],
   onProgresso?: (atual: number, total: number) => void,
 ): Promise<void> {
-  return exportarOcorrenciasSemFotos(ocorrencias, onProgresso)
-
-  /* Caminho analítico antigo mantido abaixo para referência até a remoção
-     definitiva; o exportador ativo acima é o caminho sem fotos. */
   const { default: ExcelJS } = await import('exceljs')
   const wb = new ExcelJS.Workbook()
   wb.creator = 'Defesa Civil Ouro Branco'

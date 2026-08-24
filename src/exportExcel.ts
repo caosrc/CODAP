@@ -619,10 +619,108 @@ async function adicionarAbaDashboard(wb: ExcelWorkbook, ocorrencias: Ocorrencia[
 }
 
 // ── Export all occurrences (tabular) with embedded photo thumbnails ───────────
+function textoExcel(valor: unknown, padrao = '—'): string | number {
+  if (typeof valor === 'number' && Number.isFinite(valor)) return valor
+  if (typeof valor !== 'string') return padrao
+  // Excel não aceita alguns caracteres de controle presentes em textos
+  // antigos e isso pode fazer o writeBuffer falhar.
+  const limpo = valor.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '').trim()
+  return limpo || padrao
+}
+
+async function exportarOcorrenciasSemFotos(
+  ocorrencias: Ocorrencia[],
+  onProgresso?: (atual: number, total: number) => void,
+): Promise<void> {
+  const { default: ExcelJS } = await import('exceljs')
+  const wb = new ExcelJS.Workbook()
+  wb.creator = 'Defesa Civil Ouro Branco'
+  wb.created = new Date()
+
+  const ws = wb.addWorksheet('Ocorrências')
+  const cabecalhos = [
+    'ID', 'Data Ocorrência', 'Registrado em', 'Tipo', 'Natureza', 'Detalhe',
+    'Nível de Risco', 'Status', 'Endereço', 'Latitude', 'Longitude',
+    'Proprietário', 'Situação', 'Recomendação', 'Conclusão',
+    'Vistorias Adicionais (qtd)', 'Última Vistoria', 'Observações das Vistorias',
+  ]
+  ws.columns = [6, 16, 20, 24, 28, 22, 16, 14, 36, 14, 14, 28, 44, 44, 44, 18, 18, 60]
+    .map(width => ({ width }))
+
+  const titulo = ws.getCell('A1')
+  ws.mergeCells(1, 1, 1, cabecalhos.length)
+  titulo.value = `DEFESA CIVIL OURO BRANCO — OCORRÊNCIAS — Gerado em ${new Date().toLocaleString('pt-BR')}`
+  titulo.font = { bold: true, size: 12, color: { argb: BRANCO } }
+  titulo.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: LARANJA } }
+  titulo.alignment = { horizontal: 'center', vertical: 'middle' }
+  ws.getRow(1).height = 26
+
+  const header = ws.getRow(2)
+  cabecalhos.forEach((valor, index) => {
+    const cell = header.getCell(index + 1)
+    cell.value = valor
+    cell.font = { bold: true, size: 10, color: { argb: BRANCO } }
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: AZUL } }
+    cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true }
+  })
+  header.height = 24
+  ws.autoFilter = { from: { row: 2, column: 1 }, to: { row: 2, column: cabecalhos.length } }
+  ws.views = [{ state: 'frozen', ySplit: 2 }]
+
+  ocorrencias.forEach((o, index) => {
+    const vistorias = Array.isArray(o.vistorias) ? o.vistorias : []
+    const ultima = vistorias[vistorias.length - 1] as { data?: unknown } | undefined
+    const ultimaData = ultima?.data ? new Date(String(ultima.data)) : null
+    const ultimaVistoria = ultimaData && !Number.isNaN(ultimaData.getTime())
+      ? ultimaData.toLocaleDateString('pt-BR')
+      : '—'
+    const observacoes = vistorias.map((v, i) => {
+      const item = v as { data?: unknown; agente?: unknown; observacao?: unknown }
+      const data = item.data ? new Date(String(item.data)) : null
+      const dataTexto = data && !Number.isNaN(data.getTime()) ? data.toLocaleDateString('pt-BR') : '—'
+      const agente = item.agente ? ` [${textoExcel(item.agente)}]` : ''
+      return `#${i + 1} ${dataTexto}${agente}: ${textoExcel(item.observacao)}`
+    }).join('\n') || '—'
+    const row = ws.getRow(index + 3)
+    ;[
+      textoExcel(o.id, ''),
+      textoExcel(parseDateLocal(o.data_ocorrencia)?.toLocaleDateString('pt-BR')),
+      textoExcel(o.created_at ? new Date(o.created_at).toLocaleString('pt-BR') : ''),
+      textoExcel(o.tipo), textoExcel(o.natureza), textoExcel(o.subnatureza),
+      textoExcel(nivelLabel(o.nivel_risco)), textoExcel(statusLabel(o.status_oc)),
+      textoExcel(o.endereco), textoExcel(o.lat), textoExcel(o.lng),
+      textoExcel(o.proprietario), textoExcel(o.situacao), textoExcel(o.recomendacao),
+      textoExcel(o.conclusao), vistorias.length, ultimaVistoria, observacoes,
+    ].forEach((valor, column) => { row.getCell(column + 1).value = valor as ExcelCellValue })
+    row.height = 18
+    row.eachCell({ includeEmpty: true }, cell => {
+      cell.alignment = { vertical: 'top', wrapText: cell.column === 13 || cell.column === 14 || cell.column === 15 || cell.column === 18 }
+      if (index % 2 === 1) cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'f0f4ff' } }
+    })
+    onProgresso?.(index + 1, ocorrencias.length)
+  })
+
+  const buffer = await wb.xlsx.writeBuffer()
+  const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = `defesacivil_ourobranco_${new Date().toLocaleDateString('pt-BR').replace(/\//g, '-')}.xlsx`
+  link.style.display = 'none'
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+  setTimeout(() => URL.revokeObjectURL(url), 1000)
+}
+
 export async function exportarTodasExcel(
   ocorrencias: Ocorrencia[],
   onProgresso?: (atual: number, total: number) => void,
 ): Promise<void> {
+  return exportarOcorrenciasSemFotos(ocorrencias, onProgresso)
+
+  /* Caminho analítico antigo mantido abaixo para referência até a remoção
+     definitiva; o exportador ativo acima é o caminho sem fotos. */
   const { default: ExcelJS } = await import('exceljs')
   const wb = new ExcelJS.Workbook()
   wb.creator = 'Defesa Civil Ouro Branco'

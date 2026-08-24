@@ -1518,27 +1518,30 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
               aria-label="Fechar análise ambiental"
             >✕</button>
           </div>
-          {!monitoramentoEE?.configurado && (
+            {!monitoramentoEE?.configurado && (
             <div className="mapa-monitoramento-vazio">
               Earth Engine ainda não está autenticado neste ambiente. As ferramentas aparecem abaixo,
               mas as sobreposições precisam do Secret <strong>EARTH_ENGINE_SERVICE_ACCOUNT_JSON</strong>.
-              Os focos NASA FIRMS continuam ativos.
+                {focosMonitoramento?.firms
+                  ? ' Os focos NASA FIRMS continuam ativos e são exibidos no mapa.'
+                  : ' A detecção NASA FIRMS também não está disponível neste momento.'}
               {monitoramentoEE?.erros?.[0] && <small>{monitoramentoEE.erros[0]}</small>}
             </div>
           )}
           <>
-            {monitoramentoEE?.configurado && (
+            {(monitoramentoEE?.configurado || focosMonitoramento?.firms) && (
               <p className="mapa-monitoramento-ajuda">
-                 Selecione uma camada para sobrepor ao mapa. Todas as camadas abaixo
-                 representam somente detecções de fogo ativo no município.
+                 {monitoramentoEE?.configurado
+                   ? 'Selecione uma camada para sobrepor ao mapa. Todas as camadas abaixo representam somente detecções de fogo ativo no município.'
+                   : 'Os focos ativos da NASA FIRMS já estão exibidos no mapa. As camadas de sobreposição aguardam a autenticação do Earth Engine.'}
               </p>
             )}
-            {monitoramentoEE?.configurado && (
+            {(monitoramentoEE?.configurado || focosMonitoramento?.firms) && (
               <div className="mapa-monitoramento-fontes">
                 <span>🔥 Focos ativos</span>
                 <strong>
-                  {focosConfigurado
-                    ? `${focosFontes.join(' + ')} · NASA FIRMS`
+                  {focosMonitoramento?.firms || focosConfigurado
+                    ? `${focosIncendio.length} foco(s) · ${focosFontes.join(' + ') || 'NASA FIRMS'}`
                     : 'MODIS + VIIRS · Earth Engine'}
                 </strong>
               </div>

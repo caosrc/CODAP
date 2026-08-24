@@ -366,7 +366,12 @@ export async function buscarFotosOcorrencias(
     const result: Record<number, { fotos: string[]; vistorias: unknown[] }> = {}
     for (const lote of lotes) {
       const res = await fetch(`/api/ocorrencias/fotos-supabase-lote?ids=${lote.join(',')}`)
-      if (!res.ok) throw new Error(`Falha ao buscar fotos (${res.status})`)
+      if (!res.ok) {
+        // O Supabase pode cancelar consultas grandes por timeout. Nesse caso,
+        // não bloqueia o Excel: exporta os dados e mantém as fotos já obtidas.
+        if (res.status >= 500) return result
+        throw new Error(`Falha ao buscar fotos (${res.status})`)
+      }
       const rows: { id: number; fotos: string[] | null; vistorias: unknown[] | null }[] = await res.json()
       for (const row of rows) {
         result[row.id] = {
@@ -375,9 +380,7 @@ export async function buscarFotosOcorrencias(
         }
       }
     }
-    if (Object.keys(result).length > 0) {
-      return result
-    }
+    return result
   } catch { /* cai para fallbacks abaixo */ }
 
   // Fallback: Supabase direto pelo browser (pode ter CORS para Storage URLs)

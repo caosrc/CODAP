@@ -272,7 +272,7 @@ def consultar_monitoramento():
 
     fim = hoje.strftime("%Y-%m-%d")
     inicio = (
-        hoje - datetime.timedelta(days=60)
+        hoje - datetime.timedelta(days=3)
     ).strftime("%Y-%m-%d")
 
     camadas = []
@@ -354,7 +354,7 @@ def consultar_monitoramento():
                     ),
                     "url": url,
                     "periodo": (
-                        f"Últimos 60 dias até {fim}"
+                        f"Últimos 3 dias até {fim}"
                     ),
                     "imagens": quantidade,
                 }

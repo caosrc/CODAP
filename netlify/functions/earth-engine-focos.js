@@ -52,7 +52,7 @@ exports.handler = async () => {
     const hoje = new Date();
     const fim = hoje.toISOString().slice(0, 10);
     const inicioDate = new Date(hoje);
-    inicioDate.setUTCDate(inicioDate.getUTCDate() - 60);
+    inicioDate.setUTCDate(inicioDate.getUTCDate() - 3);
     const inicio = inicioDate.toISOString().slice(0, 10);
 
     // Earth Engine usa intervalo [inicio, fim). Mantemos o mesmo período
@@ -152,7 +152,7 @@ exports.handler = async () => {
         nome: config.nome,
         descricao: `Focos de fogo ativo detectados pelo ${config.nome}.`,
         url: mapa.urlFormat,
-        periodo: `Últimos 60 dias até ${fim}`,
+        periodo: `Últimos 3 dias até ${fim}`,
         imagens: quantidade,
       });
 

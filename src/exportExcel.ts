@@ -119,6 +119,13 @@ function extrairBairroExcel(endereco: string | null): string {
   return s || 'Não informado'
 }
 
+function extrairRuaExcel(endereco: string | null): string {
+  if (!endereco) return 'Não informada'
+  const limpo = endereco.trim().replace(/,?\s*Ouro Branco.*$/i, '').replace(/\s*-\s*MG.*$/i, '')
+  const primeiraParte = limpo.split(',')[0]?.trim() || limpo.split(' - ')[0]?.trim() || limpo
+  return primeiraParte.replace(/\s+\d{1,5}\s*$/, '').trim() || 'Não informada'
+}
+
 // ── Export single occurrence with photos ──────────────────────────────────────
 export async function exportarOcorrenciaExcel(o: Ocorrencia): Promise<void> {
   const { default: ExcelJS } = await import('exceljs')
@@ -353,7 +360,9 @@ async function adicionarAbaDashboard(wb: ExcelWorkbook, ocorrencias: Ocorrencia[
   const dataSheet = "'Ocorrências'"
   const ultimaLinha = Math.max(3, ocorrencias.length + 2)
   const tipos = [...new Set(ocorrencias.map(o => o.tipo || 'Não informado'))].sort()
+  const naturezas = [...new Set(ocorrencias.map(o => o.natureza || 'Não informado'))].sort()
   const bairros = [...new Set(ocorrencias.map(o => extrairBairroExcel(o.endereco)))].sort()
+  const ruas = [...new Set(ocorrencias.map(o => extrairRuaExcel(o.endereco)))].sort()
 
   ws.columns = [
     { width: 30 }, { width: 16 }, { width: 16 }, { width: 18 },
@@ -367,7 +376,7 @@ async function adicionarAbaDashboard(wb: ExcelWorkbook, ocorrencias: Ocorrencia[
   ws.getRow(1).height = 30
 
   ws.mergeCells('A2:H2')
-  ws.getCell('A2').value = 'Altere as células amarelas para filtrar por atividade ou bairro. As fórmulas recalculam ao abrir o arquivo.'
+  ws.getCell('A2').value = 'Altere as células amarelas para filtrar por atividade ou bairro. As tabelas e os gráficos recalculam ao abrir o arquivo.'
   ws.getCell('A2').font = { italic: true, size: 10, color: { argb: '475569' } }
   ws.getCell('A2').alignment = { horizontal: 'center' }
 
@@ -393,7 +402,12 @@ async function adicionarAbaDashboard(wb: ExcelWorkbook, ocorrencias: Ocorrencia[
   const countFor = (column: string, value: string, extraFilter = true) => {
     const matching = ocorrencias.filter(o => {
       const bairro = extrairBairroExcel(o.endereco)
-      const columnValue = column === 'D' ? (o.tipo || 'Não informado') : column === 'E' ? (o.natureza || 'Não informado') : column === 'H' ? statusLabel(o.status_oc) : bairro
+      const rua = extrairRuaExcel(o.endereco)
+      const columnValue = column === 'D' ? (o.tipo || 'Não informado')
+        : column === 'E' ? (o.natureza || 'Não informado')
+          : column === 'H' ? statusLabel(o.status_oc)
+            : column === 'T' ? bairro
+              : rua
       return columnValue === value &&
         (!extraFilter || (ws.getCell('B4').value === 'Todos' || o.tipo === ws.getCell('B4').value) &&
           (ws.getCell('B5').value === 'Todos' || bairro === ws.getCell('B5').value))
@@ -442,11 +456,16 @@ async function adicionarAbaDashboard(wb: ExcelWorkbook, ocorrencias: Ocorrencia[
     cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: CINZA_CLARO } }
   })
   const linha = (row: number, label: string, formula: string, result: number, columns = ['A', 'B', 'C'], totalRef = '$D$7') => {
-    const [labelCol, countCol, pctCol] = columns
+    const [labelCol, countCol, pctCol, graphCol] = columns
     ws.getCell(`${labelCol}${row}`).value = label
     ws.getCell(`${countCol}${row}`).value = { formula, result } as any
     ws.getCell(`${pctCol}${row}`).value = { formula: `IFERROR(${countCol}${row}/${totalRef},0)`, result: result / Math.max(baseTotal, 1) } as any
     ws.getCell(`${pctCol}${row}`).numFmt = '0.0%'
+    if (graphCol) {
+      ws.getCell(`${graphCol}${row}`).value = { formula: `IFERROR(REPT("█",ROUND(${countCol}${row}/MAX(${totalRef},1)*24,0)),"")`, result: result > 0 ? '█'.repeat(Math.min(24, Math.round(result / Math.max(baseTotal, 1) * 24))) : '' } as any
+      ws.getCell(`${graphCol}${row}`).font = { color: { argb: '2563EB' }, size: 10 }
+      ws.getCell(`${graphCol}${row}`).alignment = { horizontal: 'left' }
+    }
     columns.forEach(col => {
       ws.getCell(`${col}${row}`).border = { bottom: { style: 'hair', color: { argb: 'dbeafe' } } }
       if (col !== labelCol) ws.getCell(`${col}${row}`).alignment = { horizontal: 'center' }
@@ -454,10 +473,10 @@ async function adicionarAbaDashboard(wb: ExcelWorkbook, ocorrencias: Ocorrencia[
   }
 
   secao(10, '🏷️ Por atividade / tipo')
-  cabecalho(11, ['Atividade', 'Quantidade', '% do filtro'])
+  cabecalho(11, ['Atividade', 'Quantidade', '% do filtro', 'Gráfico'])
   tipos.forEach((tipo, i) => linha(12 + i, tipo,
     `IF($B$5="Todos",COUNTIF(${dataSheet}!$D$3:$D$${ultimaLinha},A${12 + i}),COUNTIFS(${dataSheet}!$D$3:$D$${ultimaLinha},A${12 + i},${dataSheet}!$T$3:$T$${ultimaLinha},$B$5))`,
-    countFor('D', tipo)))
+    countFor('D', tipo), ['A', 'B', 'C', 'D']))
 
   const bairroInicio = 10
   // A tabela de bairros ocupa E:G, para ficar lado a lado com atividades.
@@ -465,29 +484,64 @@ async function adicionarAbaDashboard(wb: ExcelWorkbook, ocorrencias: Ocorrencia[
   ws.getCell(`E${bairroInicio}`).value = '🏘️ Por bairro'
   ws.getCell(`E${bairroInicio}`).font = { bold: true, color: { argb: BRANCO } }
   ws.getCell(`E${bairroInicio}`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: '0f766e' } }
-  ;['E', 'F', 'G'].forEach((col, i) => {
-    ws.getCell(`${col}11`).value = ['Bairro', 'Quantidade', '% do filtro'][i]
+  ;['E', 'F', 'G', 'H'].forEach((col, i) => {
+    ws.getCell(`${col}11`).value = ['Bairro', 'Quantidade', '% do filtro', 'Gráfico'][i]
     ws.getCell(`${col}11`).font = { bold: true, color: { argb: '475569' } }
     ws.getCell(`${col}11`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: CINZA_CLARO } }
   })
   bairros.forEach((bairro, i) => {
     const row = 12 + i
-    linha(row, bairro, `IF($B$4="Todos",COUNTIF(${dataSheet}!$T$3:$T$${ultimaLinha},E${row}),COUNTIFS(${dataSheet}!$T$3:$T$${ultimaLinha},E${row},${dataSheet}!$D$3:$D$${ultimaLinha},$B$4))`, countFor('T', bairro), ['E', 'F', 'G'])
+    linha(row, bairro, `IF($B$4="Todos",COUNTIF(${dataSheet}!$T$3:$T$${ultimaLinha},E${row}),COUNTIFS(${dataSheet}!$T$3:$T$${ultimaLinha},E${row},${dataSheet}!$D$3:$D$${ultimaLinha},$B$4))`, countFor('T', bairro), ['E', 'F', 'G', 'H'])
   })
 
-  const statusRow = Math.max(12 + tipos.length, 12 + bairros.length) + 2
+  const detalhesRow = Math.max(12 + tipos.length, 12 + bairros.length) + 2
+  secao(detalhesRow, '📋 Por natureza', '7c3aed')
+  ws.mergeCells(`E${detalhesRow}:G${detalhesRow}`)
+  ws.getCell(`E${detalhesRow}`).value = '🛣️ Por rua'
+  ws.getCell(`E${detalhesRow}`).font = { bold: true, color: { argb: BRANCO } }
+  ws.getCell(`E${detalhesRow}`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'b45309' } }
+  cabecalho(detalhesRow + 1, ['Natureza', 'Quantidade', '% do filtro', 'Gráfico'])
+  ;['E', 'F', 'G', 'H'].forEach((col, i) => {
+    ws.getCell(`${col}${detalhesRow + 1}`).value = ['Rua', 'Quantidade', '% do filtro', 'Gráfico'][i]
+    ws.getCell(`${col}${detalhesRow + 1}`).font = { bold: true, color: { argb: '475569' } }
+    ws.getCell(`${col}${detalhesRow + 1}`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: CINZA_CLARO } }
+  })
+  naturezas.forEach((natureza, i) => {
+    const row = detalhesRow + 2 + i
+    linha(row, natureza, `IF($B$5="Todos",COUNTIF(${dataSheet}!$E$3:$E$${ultimaLinha},A${row}),COUNTIFS(${dataSheet}!$E$3:$E$${ultimaLinha},A${row},${dataSheet}!$T$3:$T$${ultimaLinha},$B$5))`, countFor('E', natureza), ['A', 'B', 'C', 'D'])
+  })
+  ruas.forEach((rua, i) => {
+    const row = detalhesRow + 2 + i
+    linha(row, rua, `IF($B$4="Todos",COUNTIF(${dataSheet}!$U$3:$U$${ultimaLinha},E${row}),COUNTIFS(${dataSheet}!$U$3:$U$${ultimaLinha},E${row},${dataSheet}!$D$3:$D$${ultimaLinha},$B$4))`, countFor('U', rua), ['E', 'F', 'G', 'H'])
+  })
+
+  const statusRow = Math.max(detalhesRow + 2 + naturezas.length, detalhesRow + 2 + ruas.length) + 2
   secao(statusRow, '📌 Status no filtro')
-  cabecalho(statusRow + 1, ['Status', 'Quantidade', '% do filtro'])
+  cabecalho(statusRow + 1, ['Status', 'Quantidade', '% do filtro', 'Gráfico'])
   ;['Ativo', 'Resolvido'].forEach((status, i) => {
     const row = statusRow + 2 + i
     linha(row, status, `IF(AND($B$4="Todos",$B$5="Todos"),COUNTIF(${dataSheet}!$H$3:$H$${ultimaLinha},A${row}),IF($B$4="Todos",COUNTIFS(${dataSheet}!$H$3:$H$${ultimaLinha},A${row},${dataSheet}!$T$3:$T$${ultimaLinha},$B$5),IF($B$5="Todos",COUNTIFS(${dataSheet}!$H$3:$H$${ultimaLinha},A${row},${dataSheet}!$D$3:$D$${ultimaLinha},$B$4),COUNTIFS(${dataSheet}!$H$3:$H$${ultimaLinha},A${row},${dataSheet}!$D$3:$D$${ultimaLinha},$B$4,${dataSheet}!$T$3:$T$${ultimaLinha},$B$5))))`,
-      status === 'Resolvido' ? resolvidos : ativos)
+      status === 'Resolvido' ? resolvidos : ativos, ['A', 'B', 'C', 'D'])
+  })
+  ws.mergeCells(`E${statusRow}:H${statusRow}`)
+  ws.getCell(`E${statusRow}`).value = '⚠️ Nível de risco'
+  ws.getCell(`E${statusRow}`).font = { bold: true, color: { argb: BRANCO } }
+  ws.getCell(`E${statusRow}`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'dc2626' } }
+  ;['E', 'F', 'G', 'H'].forEach((col, i) => {
+    ws.getCell(`${col}${statusRow + 1}`).value = ['Risco', 'Quantidade', '% do filtro', 'Gráfico'][i]
+    ws.getCell(`${col}${statusRow + 1}`).font = { bold: true, color: { argb: '475569' } }
+    ws.getCell(`${col}${statusRow + 1}`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: CINZA_CLARO } }
+  })
+  ;[['Baixo 🟢', '059669'], ['Médio 🟡', 'd97706'], ['Alto 🔴', 'dc2626']].forEach(([risco, cor], i) => {
+    const row = statusRow + 2 + i
+    linha(row, risco, formulaComFiltros('G', risco), ocorrencias.filter(o => nivelLabel(o.nivel_risco) === risco).length, ['E', 'F', 'G', 'H'])
+    ws.getCell(`E${row}`).font = { bold: true, color: { argb: cor } }
   })
 
-  ws.mergeCells(`A${statusRow + 5}:H${statusRow + 5}`)
-  ws.getCell(`A${statusRow + 5}`).value = 'As fórmulas usam a aba Ocorrências como fonte. Edite Tipo, Endereço/Bairro ou os filtros amarelos e pressione F9 para recalcular.'
-  ws.getCell(`A${statusRow + 5}`).font = { italic: true, size: 9, color: { argb: '64748b' } }
-  ws.getCell(`A${statusRow + 5}`).alignment = { wrapText: true }
+  ws.mergeCells(`A${statusRow + 6}:H${statusRow + 6}`)
+  ws.getCell(`A${statusRow + 6}`).value = 'Os gráficos são barras proporcionais geradas por fórmula. Edite Tipo, Natureza, Endereço/Bairro, Rua ou os filtros amarelos na aba Ocorrências e pressione F9 para recalcular.'
+  ws.getCell(`A${statusRow + 6}`).font = { italic: true, size: 9, color: { argb: '64748b' } }
+  ws.getCell(`A${statusRow + 6}`).alignment = { wrapText: true }
   ws.views = [{ state: 'frozen', ySplit: 5 }]
   ws.autoFilter = { from: { row: 11, column: 1 }, to: { row: 11, column: 7 } }
 }
@@ -506,8 +560,8 @@ export async function exportarTodasExcel(
   const ws = wb.addWorksheet('Ocorrências')
 
   const maxFotos = ocorrencias.reduce((max, o) => Math.max(max, o.fotos?.length ?? 0), 0)
-   // Colunas extras: 15 base + bairro editável + 3 vistorias + 1 área queimada
-   const COLS_BASE = 15 + 1 + 3 + 1
+   // Colunas extras: 15 base + bairro/rua editáveis + 3 vistorias + 1 área queimada
+   const COLS_BASE = 15 + 2 + 3 + 1
   const totalCols = COLS_BASE + maxFotos
 
   // ── Linha 1: título ───────────────────────────────────────────────────────
@@ -525,12 +579,12 @@ export async function exportarTodasExcel(
      'Nível de Risco', 'Status', 'Endereço', 'Latitude', 'Longitude',
     'Proprietário', 'Situação', 'Recomendação', 'Conclusão',
     'Vistorias Adicionais (qtd)', 'Última Vistoria', 'Observações das Vistorias',
-     'Área Queimada', 'Bairro (editável)',
+     'Área Queimada', 'Bairro (editável)', 'Rua (editável)',
     ...Array.from({ length: maxFotos }, (_, i) => `Foto ${i + 1}`),
   ]
 
   const larguras = [6, 16, 20, 14, 26, 20, 14, 12, 32, 12, 12, 26, 40, 40, 40,
-     14, 18, 50, 20, 24,
+     14, 18, 50, 20, 24, 30,
     ...Array(maxFotos).fill(FOTO_COL_W)]
 
   ws.columns = larguras.map((w) => ({ width: w }))
@@ -540,12 +594,13 @@ export async function exportarTodasExcel(
     const cell = headerRow.getCell(i + 1)
     cell.value = h
     cell.font = { bold: true, size: 10, color: { argb: BRANCO } }
-     // Cols 16-18 = Vistorias (vermelho); 19 = Área Queimada; 20 = Bairro; >= 21 = Fotos
+     // Cols 16-18 = Vistorias; 19 = Área Queimada; 20/21 = Bairro/Rua; >= 22 = Fotos
     let bg = AZUL
     if (i >= 15 && i < 18) bg = 'B91C1C'
     else if (i === 18) bg = 'D97706'
-     else if (i === 19) bg = '0f766e'
-     else if (i >= 20) bg = LARANJA
+     else if (i === 19) bg = 'D97706'
+     else if (i === 20 || i === 21) bg = '0f766e'
+     else if (i >= 22) bg = LARANJA
     cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bg } }
     cell.alignment = { horizontal: 'center', vertical: 'middle' }
     cell.border = { bottom: { style: 'thin', color: { argb: BRANCO } } }
@@ -607,6 +662,7 @@ export async function exportarTodasExcel(
       obsVistoriasTxt,
       areaQueimadaTxt,
       extrairBairroExcel(o.endereco),
+      extrairRuaExcel(o.endereco),
     ]
 
     valores.forEach((v, i) => { r.getCell(i + 1).value = v as ExcelCellValue })
@@ -641,7 +697,7 @@ export async function exportarTodasExcel(
         const foto = o.fotos![fotoIdx]
         const normalizada = await normalizarFoto(foto)
         if (!normalizada) continue
-       const colIdx = 20 + fotoIdx  // 0-indexed: coluna 21 em diante (após Bairro)
+       const colIdx = 21 + fotoIdx  // 0-indexed: coluna 22 em diante (após Rua)
         try {
           const imageId = wb.addImage({ base64: normalizada.base64, extension: normalizada.ext })
           ws.addImage(imageId, {

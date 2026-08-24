@@ -5,9 +5,6 @@ const FERIADOS_FIXOS_SET = new Set([
   '11-02', '11-15', '11-20', '12-25',
 ])
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-const AGENTES_SEM_SOBREAVISO = new Set(['Talita', 'Cristiane', 'Sócrates'])
-
 function chaveDataDt(dt: Date): string {
   const y = dt.getFullYear()
   const m = String(dt.getMonth() + 1).padStart(2, '0')

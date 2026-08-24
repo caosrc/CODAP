@@ -1,7 +1,6 @@
 import type { CellValue as ExcelCellValue, Workbook as ExcelWorkbook } from 'exceljs'
 import type { Ocorrencia } from './types'
 import { parseDateLocal } from './utils'
-import { gerarDashboardImagem } from './exportDashboardImage'
 
 export interface ChecklistExportData {
   id: number
@@ -97,6 +96,27 @@ function formatarAreaExcel(m2: number): string {
   if (m2 < 10000) return `${Math.round(m2).toLocaleString('pt-BR')} m²`
   const ha = m2 / 10000
   return `${ha.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ha`
+}
+
+function extrairBairroExcel(endereco: string | null): string {
+  if (!endereco) return 'Não informado'
+  let s = endereco.trim()
+  s = s.replace(/,?\s*Ouro Branco.*$/i, '')
+  s = s.replace(/\s*-\s*MG.*$/i, '')
+  s = s.replace(/\s*\d{5}-?\d{3}.*$/, '')
+  if (s.includes(' - ')) {
+    const partes = s.split(' - ').map(p => p.trim()).filter(Boolean)
+    if (partes.length >= 2) return partes[partes.length - 1]
+  }
+  if (s.includes(',')) {
+    const partes = s.split(',').map(p => p.trim()).filter(Boolean)
+    if (partes.length >= 2) {
+      const ultimo = partes[partes.length - 1]
+      if (!/^\d+$/.test(ultimo)) return ultimo
+      if (partes.length >= 3) return partes[partes.length - 2]
+    }
+  }
+  return s || 'Não informado'
 }
 
 // ── Export single occurrence with photos ──────────────────────────────────────
@@ -324,194 +344,152 @@ export async function exportarOcorrenciaExcel(o: Ocorrencia): Promise<void> {
 }
 
 
-// ── Dashboard Analytics Sheet (visual, com gráficos) ──────────────────────────
+// ── Dashboard Analytics Sheet (100% editável e orientado por fórmulas) ────────
 async function adicionarAbaDashboard(wb: ExcelWorkbook, ocorrencias: Ocorrencia[]): Promise<void> {
   const ws = wb.addWorksheet('📊 Dashboard', {
     views: [{ showGridLines: false }],
-    pageSetup: { orientation: 'portrait', fitToPage: true, fitToWidth: 1, fitToHeight: 1 },
+    pageSetup: { orientation: 'landscape', fitToPage: true, fitToWidth: 1 },
+  })
+  const dataSheet = "'Ocorrências'"
+  const ultimaLinha = Math.max(3, ocorrencias.length + 2)
+  const tipos = [...new Set(ocorrencias.map(o => o.tipo || 'Não informado'))].sort()
+  const bairros = [...new Set(ocorrencias.map(o => extrairBairroExcel(o.endereco)))].sort()
+
+  ws.columns = [
+    { width: 30 }, { width: 16 }, { width: 16 }, { width: 18 },
+    { width: 18 }, { width: 18 }, { width: 18 }, { width: 18 },
+  ]
+  ws.mergeCells('A1:H1')
+  ws.getCell('A1').value = '📊 DASHBOARD DE OCORRÊNCIAS — PAINEL EDITÁVEL'
+  ws.getCell('A1').font = { bold: true, size: 16, color: { argb: BRANCO } }
+  ws.getCell('A1').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: AZUL } }
+  ws.getCell('A1').alignment = { horizontal: 'center', vertical: 'middle' }
+  ws.getRow(1).height = 30
+
+  ws.mergeCells('A2:H2')
+  ws.getCell('A2').value = 'Altere as células amarelas para filtrar por atividade ou bairro. As fórmulas recalculam ao abrir o arquivo.'
+  ws.getCell('A2').font = { italic: true, size: 10, color: { argb: '475569' } }
+  ws.getCell('A2').alignment = { horizontal: 'center' }
+
+  ws.getCell('A4').value = 'Atividade / tipo'
+  ws.getCell('A5').value = 'Bairro'
+  ;['A4', 'A5'].forEach(ref => {
+    ws.getCell(ref).font = { bold: true, color: { argb: AZUL } }
+  })
+  ws.getCell('B4').value = 'Todos'
+  ws.getCell('B5').value = 'Todos'
+  ;['B4', 'B5'].forEach(ref => {
+    ws.getCell(ref).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF2CC' } }
+    ws.getCell(ref).font = { bold: true, color: { argb: '7c4a03' } }
+    ws.getCell(ref).alignment = { horizontal: 'center' }
+  })
+  ws.getCell('D4').value = 'Opções de atividade: Todos ou um tipo existente na aba Ocorrências'
+  ws.getCell('D5').value = 'Opções de bairro: Todos ou edite a coluna Bairro na aba Ocorrências'
+  ;['D4', 'D5'].forEach(ref => {
+    ws.getCell(ref).font = { italic: true, size: 9, color: { argb: '64748b' } }
   })
 
-  // Renderiza o painel como imagem PNG (mesmo visual do app: KPIs, donuts, barras, sparkline)
-  let imagem: { base64: string; largura: number; altura: number } | null = null
-  try {
-    imagem = await gerarDashboardImagem(ocorrencias)
-  } catch {
-    imagem = null
+  const totalFormula = `IF(AND($B$4="Todos",$B$5="Todos"),COUNTA(${dataSheet}!$A$3:$A$${ultimaLinha}),IF($B$4="Todos",COUNTIF(${dataSheet}!$T$3:$T$${ultimaLinha},$B$5),IF($B$5="Todos",COUNTIF(${dataSheet}!$D$3:$D$${ultimaLinha},$B$4),COUNTIFS(${dataSheet}!$D$3:$D$${ultimaLinha},$B$4,${dataSheet}!$T$3:$T$${ultimaLinha},$B$5))))`
+  const countFor = (column: string, value: string, extraFilter = true) => {
+    const matching = ocorrencias.filter(o => {
+      const bairro = extrairBairroExcel(o.endereco)
+      const columnValue = column === 'D' ? (o.tipo || 'Não informado') : column === 'E' ? (o.natureza || 'Não informado') : column === 'H' ? statusLabel(o.status_oc) : bairro
+      return columnValue === value &&
+        (!extraFilter || (ws.getCell('B4').value === 'Todos' || o.tipo === ws.getCell('B4').value) &&
+          (ws.getCell('B5').value === 'Todos' || bairro === ws.getCell('B5').value))
+    }).length
+    return matching
   }
-
-  // Configuração das colunas: 1 grid largo para acomodar a imagem (~1400px)
-  // Excel: 1 unidade de largura ≈ 7px. 1400px ÷ 7 ≈ 200 unidades. Vamos usar 14 colunas de ~14.5.
-  ws.columns = Array.from({ length: 14 }, () => ({ width: 14.5 }))
-
-  if (imagem && imagem.base64) {
-    try {
-      const imageId = wb.addImage({ base64: imagem.base64, extension: 'png' })
-      // Posiciona a imagem ocupando toda a largura útil. Tamanho proporcional ao SVG original (1400×1620).
-      const larguraDestinoPx = 1280
-      const proporcao = imagem.altura / imagem.largura
-      const alturaDestinoPx = Math.round(larguraDestinoPx * proporcao)
-      ws.addImage(imageId, {
-        tl: { col: 0.2, row: 0.2 },
-        ext: { width: larguraDestinoPx, height: alturaDestinoPx },
-      })
-
-      // Reserva linhas embaixo da imagem para que o conteúdo seguinte não sobreponha.
-      // 1 linha padrão ≈ 20px. Para alturaDestinoPx px → ~ alturaDestinoPx/20 linhas.
-      const linhasReservadas = Math.ceil(alturaDestinoPx / 20) + 2
-      for (let i = 1; i <= linhasReservadas; i++) ws.getRow(i).height = 20
-    } catch {
-      // Se falhar a imagem, segue só com o resumo textual abaixo
-    }
+  const formulaCell = (ref: string, formula: string, result: number) => {
+    ws.getCell(ref).value = { formula, result } as any
+    ws.getCell(ref).numFmt = '0'
+    ws.getCell(ref).font = { bold: true, size: 18, color: { argb: AZUL } }
+    ws.getCell(ref).alignment = { horizontal: 'center', vertical: 'middle' }
   }
+  const baseTotal = ocorrencias.length
+  const resolvidos = ocorrencias.filter(o => o.status_oc === 'resolvido').length
+  const ativos = baseTotal - resolvidos
+  const altos = ocorrencias.filter(o => o.nivel_risco === 'alto').length
+  const formulaComFiltros = (column: string, value: string) =>
+    `IF(AND($B$4="Todos",$B$5="Todos"),COUNTIF(${dataSheet}!$${column}$3:$${column}$${ultimaLinha},"${value}"),IF($B$4="Todos",COUNTIFS(${dataSheet}!$${column}$3:$${column}$${ultimaLinha},"${value}",${dataSheet}!$T$3:$T$${ultimaLinha},$B$5),IF($B$5="Todos",COUNTIFS(${dataSheet}!$${column}$3:$${column}$${ultimaLinha},"${value}",${dataSheet}!$D$3:$D$${ultimaLinha},$B$4),COUNTIFS(${dataSheet}!$${column}$3:$${column}$${ultimaLinha},"${value}",${dataSheet}!$D$3:$D$${ultimaLinha},$B$4,${dataSheet}!$T$3:$T$${ultimaLinha},$B$5))))`
+  const kpis: [string, string, string, number][] = [
+    ['D7', 'Total', totalFormula, baseTotal],
+    ['E7', 'Ativas', formulaComFiltros('H', 'Ativo'), ativos],
+    ['F7', 'Resolvidas', formulaComFiltros('H', 'Resolvido'), resolvidos],
+    ['G7', 'Risco alto', formulaComFiltros('G', 'Alto 🔴'), altos],
+  ]
+  kpis.forEach(([ref, label, formula, result]) => {
+    const labelCell = ws.getCell(ref.replace('7', '6'))
+    labelCell.value = label
+    labelCell.font = { bold: true, color: { argb: '64748b' } }
+    labelCell.alignment = { horizontal: 'center' }
+    formulaCell(ref, formula, result)
+    ws.getCell(ref).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'EFF6FF' } }
+  })
+  ws.getRow(6).height = 20
+  ws.getRow(7).height = 32
 
-  // ── Tabela compacta complementar (logo abaixo da imagem) ──────────────────
-  // Permite filtrar/ordenar dados que a imagem não permite.
-  const inicioTabela = imagem ? Math.ceil((Math.round(1280 * (imagem.altura / imagem.largura))) / 20) + 4 : 2
-  let r = inicioTabela
-
-  const total = ocorrencias.length
-  const fmtPct = (n: number, t: number) => (t === 0 ? '0%' : `${((n / t) * 100).toFixed(1)}%`)
-
-  function tituloSecao(texto: string, cor: string) {
-    ws.mergeCells(`A${r}:N${r}`)
-    const c = ws.getCell(`A${r}`)
-    c.value = texto
-    c.font = { bold: true, size: 11, color: { argb: BRANCO } }
-    c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: cor } }
-    c.alignment = { horizontal: 'left', vertical: 'middle', indent: 1 }
-    ws.getRow(r).height = 22
-    r++
+  const secao = (row: number, title: string, color = AZUL) => {
+    ws.mergeCells(`A${row}:C${row}`)
+    ws.getCell(`A${row}`).value = title
+    ws.getCell(`A${row}`).font = { bold: true, color: { argb: BRANCO } }
+    ws.getCell(`A${row}`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: color } }
   }
-
-  function colunasTabela() {
-    const titulos = ['Categoria', 'Qtd', '%', 'Detalhe']
-    // Categoria: A:G (7 cols), Qtd: H, %: I, Detalhe: J:N (5 cols)
-    ws.mergeCells(`A${r}:G${r}`); ws.getCell(`A${r}`).value = titulos[0]
-    ws.getCell(`H${r}`).value = titulos[1]
-    ws.getCell(`I${r}`).value = titulos[2]
-    ws.mergeCells(`J${r}:N${r}`); ws.getCell(`J${r}`).value = titulos[3]
-    ;['A','H','I','J'].forEach((col) => {
-      const c = ws.getCell(`${col}${r}`)
-      c.font = { bold: true, size: 9, color: { argb: '6b7280' } }
-      c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'f3f4f6' } }
-      c.alignment = { horizontal: col === 'A' || col === 'J' ? 'left' : 'center', vertical: 'middle', indent: 1 }
-      c.border = { bottom: { style: 'thin', color: { argb: 'd1d5db' } } }
+  const cabecalho = (row: number, labels: string[]) => labels.forEach((label, i) => {
+    const cell = ws.getCell(row, i + 1)
+    cell.value = label
+    cell.font = { bold: true, color: { argb: '475569' } }
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: CINZA_CLARO } }
+  })
+  const linha = (row: number, label: string, formula: string, result: number, columns = ['A', 'B', 'C'], totalRef = '$D$7') => {
+    const [labelCol, countCol, pctCol] = columns
+    ws.getCell(`${labelCol}${row}`).value = label
+    ws.getCell(`${countCol}${row}`).value = { formula, result } as any
+    ws.getCell(`${pctCol}${row}`).value = { formula: `IFERROR(${countCol}${row}/${totalRef},0)`, result: result / Math.max(baseTotal, 1) } as any
+    ws.getCell(`${pctCol}${row}`).numFmt = '0.0%'
+    columns.forEach(col => {
+      ws.getCell(`${col}${row}`).border = { bottom: { style: 'hair', color: { argb: 'dbeafe' } } }
+      if (col !== labelCol) ws.getCell(`${col}${row}`).alignment = { horizontal: 'center' }
     })
-    ws.getRow(r).height = 18
-    r++
   }
 
-  function linhaTabela(label: string, qtd: number, totalDiv: number, detalhe: string, cor: string) {
-    const isEven = (r % 2 === 0)
-    const fundo = isEven ? 'f8fafc' : BRANCO
-    ws.mergeCells(`A${r}:G${r}`)
-    const a = ws.getCell(`A${r}`)
-    a.value = label
-    a.font = { size: 10, color: { argb: '1e293b' } }
-    a.alignment = { vertical: 'middle', indent: 1 }
-    a.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: fundo } }
+  secao(10, '🏷️ Por atividade / tipo')
+  cabecalho(11, ['Atividade', 'Quantidade', '% do filtro'])
+  tipos.forEach((tipo, i) => linha(12 + i, tipo,
+    `IF($B$5="Todos",COUNTIF(${dataSheet}!$D$3:$D$${ultimaLinha},A${12 + i}),COUNTIFS(${dataSheet}!$D$3:$D$${ultimaLinha},A${12 + i},${dataSheet}!$T$3:$T$${ultimaLinha},$B$5))`,
+    countFor('D', tipo)))
 
-    const h = ws.getCell(`H${r}`)
-    h.value = qtd
-    h.font = { size: 10, bold: true, color: { argb: cor.replace('#', '') } }
-    h.alignment = { horizontal: 'center', vertical: 'middle' }
-    h.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: fundo } }
-
-    const i = ws.getCell(`I${r}`)
-    i.value = fmtPct(qtd, totalDiv)
-    i.font = { size: 10, italic: true, color: { argb: '6b7280' } }
-    i.alignment = { horizontal: 'center', vertical: 'middle' }
-    i.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: fundo } }
-
-    ws.mergeCells(`J${r}:N${r}`)
-    const j = ws.getCell(`J${r}`)
-    j.value = detalhe
-    j.font = { size: 9, color: { argb: '64748b' } }
-    j.alignment = { vertical: 'middle', indent: 1 }
-    j.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: fundo } }
-
-    ;['A','H','I','J'].forEach(col => {
-      ws.getCell(`${col}${r}`).border = { bottom: { style: 'hair', color: { argb: 'e5e7eb' } } }
-    })
-    ws.getRow(r).height = 16
-    r++
-  }
-
-  // — Por tipo
-  const freq = <T,>(arr: T[]): Map<T, number> => {
-    const m = new Map<T, number>()
-    arr.forEach(v => m.set(v, (m.get(v) ?? 0) + 1))
-    return m
-  }
-  const tipoMap = freq(ocorrencias.map(o => o.tipo || 'Não informado'))
-  const sortedTipo = [...tipoMap.entries()].sort((a, b) => b[1] - a[1])
-
-  const statusPorTipo = new Map<string, { ativo: number; resolvido: number }>()
-  ocorrencias.forEach(o => {
-    const t = o.tipo || 'Não informado'
-    const cur = statusPorTipo.get(t) ?? { ativo: 0, resolvido: 0 }
-    if (o.status_oc === 'ativo') cur.ativo++; else cur.resolvido++
-    statusPorTipo.set(t, cur)
+  const bairroInicio = 10
+  // A tabela de bairros ocupa E:G, para ficar lado a lado com atividades.
+  ws.mergeCells(`E${bairroInicio}:G${bairroInicio}`)
+  ws.getCell(`E${bairroInicio}`).value = '🏘️ Por bairro'
+  ws.getCell(`E${bairroInicio}`).font = { bold: true, color: { argb: BRANCO } }
+  ws.getCell(`E${bairroInicio}`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: '0f766e' } }
+  ;['E', 'F', 'G'].forEach((col, i) => {
+    ws.getCell(`${col}11`).value = ['Bairro', 'Quantidade', '% do filtro'][i]
+    ws.getCell(`${col}11`).font = { bold: true, color: { argb: '475569' } }
+    ws.getCell(`${col}11`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: CINZA_CLARO } }
+  })
+  bairros.forEach((bairro, i) => {
+    const row = 12 + i
+    linha(row, bairro, `IF($B$4="Todos",COUNTIF(${dataSheet}!$T$3:$T$${ultimaLinha},E${row}),COUNTIFS(${dataSheet}!$T$3:$T$${ultimaLinha},E${row},${dataSheet}!$D$3:$D$${ultimaLinha},$B$4))`, countFor('T', bairro), ['E', 'F', 'G'])
   })
 
-  tituloSecao('🏷️  Tipos de Ocorrência', AZUL)
-  colunasTabela()
-  sortedTipo.forEach(([tipo, cnt]) => {
-    const { ativo: a, resolvido: res } = statusPorTipo.get(tipo) ?? { ativo: 0, resolvido: 0 }
-    linhaTabela(tipo, cnt, total, `${res} resolvidas · ${a} em aberto`, AZUL)
+  const statusRow = Math.max(12 + tipos.length, 12 + bairros.length) + 2
+  secao(statusRow, '📌 Status no filtro')
+  cabecalho(statusRow + 1, ['Status', 'Quantidade', '% do filtro'])
+  ;['Ativo', 'Resolvido'].forEach((status, i) => {
+    const row = statusRow + 2 + i
+    linha(row, status, `IF(AND($B$4="Todos",$B$5="Todos"),COUNTIF(${dataSheet}!$H$3:$H$${ultimaLinha},A${row}),IF($B$4="Todos",COUNTIFS(${dataSheet}!$H$3:$H$${ultimaLinha},A${row},${dataSheet}!$T$3:$T$${ultimaLinha},$B$5),IF($B$5="Todos",COUNTIFS(${dataSheet}!$H$3:$H$${ultimaLinha},A${row},${dataSheet}!$D$3:$D$${ultimaLinha},$B$4),COUNTIFS(${dataSheet}!$H$3:$H$${ultimaLinha},A${row},${dataSheet}!$D$3:$D$${ultimaLinha},$B$4,${dataSheet}!$T$3:$T$${ultimaLinha},$B$5))))`,
+      status === 'Resolvido' ? resolvidos : ativos)
   })
 
-  r++
-
-  // — Por agente registrador
-  const agenteMap = freq(ocorrencias.map(o => o.responsavel_registro || 'Não informado'))
-  const sortedAgente = [...agenteMap.entries()].sort((a, b) => b[1] - a[1])
-
-  tituloSecao('👤  Ocorrências por Agente Registrador', LARANJA)
-  colunasTabela()
-  sortedAgente.forEach(([ag, cnt]) => {
-    const resAg = ocorrencias.filter(o => (o.responsavel_registro || 'Não informado') === ag && o.status_oc === 'resolvido').length
-    linhaTabela(ag, cnt, total, `${fmtPct(resAg, cnt)} resolvidas`, LARANJA)
-  })
-
-  r++
-
-  // — Evolução mensal (últimos 12 meses)
-  const mesMap = new Map<string, number>()
-  const MESES_PT = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez']
-  ocorrencias.forEach(o => {
-    const raw = o.data_ocorrencia || o.created_at
-    if (!raw) return
-    const parts = raw.split(/[-T]/)
-    if (parts.length < 2) return
-    const [y, m] = parts
-    const key = `${y}-${m.padStart(2,'0')}`
-    mesMap.set(key, (mesMap.get(key) ?? 0) + 1)
-  })
-  const sortedMes = [...mesMap.entries()].sort((a,b) => a[0].localeCompare(b[0])).slice(-12)
-  const totalMes = sortedMes.reduce((s, [, c]) => s + c, 0) || 1
-
-  tituloSecao('📅  Evolução Mensal (últimos 12 meses)', '0f4c75')
-  colunasTabela()
-  sortedMes.forEach(([key, cnt]) => {
-    const [y, m] = key.split('-')
-    const mi = parseInt(m, 10) - 1
-    const label = `${MESES_PT[mi] ?? m}/${y}`
-    linhaTabela(label, cnt, totalMes, '', '0f4c75')
-  })
-
-  // Rodapé
-  r++
-  ws.mergeCells(`A${r}:N${r}`)
-  const footer = ws.getCell(`A${r}`)
-  footer.value = `🛡️ Defesa Civil de Ouro Branco — MG  ·  Relatório automático  ·  ${new Date().toLocaleDateString('pt-BR')}`
-  footer.font = { size: 9, italic: true, color: { argb: 'BRANCO' === BRANCO ? 'cbd5e1' : 'cbd5e1' } }
-  footer.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: AZUL } }
-  footer.alignment = { horizontal: 'center', vertical: 'middle' }
-  ws.getRow(r).height = 22
-
-  // Imprime cabeçalho da imagem na primeira linha (caso a imagem falhe, fica vazio)
-  ws.getRow(1).height = imagem ? 20 : 22
+  ws.mergeCells(`A${statusRow + 5}:H${statusRow + 5}`)
+  ws.getCell(`A${statusRow + 5}`).value = 'As fórmulas usam a aba Ocorrências como fonte. Edite Tipo, Endereço/Bairro ou os filtros amarelos e pressione F9 para recalcular.'
+  ws.getCell(`A${statusRow + 5}`).font = { italic: true, size: 9, color: { argb: '64748b' } }
+  ws.getCell(`A${statusRow + 5}`).alignment = { wrapText: true }
+  ws.views = [{ state: 'frozen', ySplit: 5 }]
+  ws.autoFilter = { from: { row: 11, column: 1 }, to: { row: 11, column: 7 } }
 }
 
 // ── Export all occurrences (tabular) with embedded photo thumbnails ───────────
@@ -523,12 +501,13 @@ export async function exportarTodasExcel(
   const wb = new ExcelJS.Workbook()
   wb.creator = 'Defesa Civil Ouro Branco'
   wb.created = new Date()
+  wb.calcProperties = { calcMode: 'auto', fullCalcOnLoad: true, forceFullCalc: true }
 
   const ws = wb.addWorksheet('Ocorrências')
 
   const maxFotos = ocorrencias.reduce((max, o) => Math.max(max, o.fotos?.length ?? 0), 0)
-  // Colunas extras: 15 base + 3 vistorias + 1 área queimada
-  const COLS_BASE = 15 + 3 + 1
+   // Colunas extras: 15 base + bairro editável + 3 vistorias + 1 área queimada
+   const COLS_BASE = 15 + 1 + 3 + 1
   const totalCols = COLS_BASE + maxFotos
 
   // ── Linha 1: título ───────────────────────────────────────────────────────
@@ -543,15 +522,15 @@ export async function exportarTodasExcel(
   // ── Linha 2: cabeçalhos das colunas ──────────────────────────────────────
   const cabecalhos = [
     'ID', 'Data Ocorrência', 'Registrado em', 'Tipo', 'Natureza', 'Detalhe',
-    'Nível de Risco', 'Status', 'Endereço', 'Latitude', 'Longitude',
+     'Nível de Risco', 'Status', 'Endereço', 'Latitude', 'Longitude',
     'Proprietário', 'Situação', 'Recomendação', 'Conclusão',
     'Vistorias Adicionais (qtd)', 'Última Vistoria', 'Observações das Vistorias',
-    'Área Queimada',
+     'Área Queimada', 'Bairro (editável)',
     ...Array.from({ length: maxFotos }, (_, i) => `Foto ${i + 1}`),
   ]
 
   const larguras = [6, 16, 20, 14, 26, 20, 14, 12, 32, 12, 12, 26, 40, 40, 40,
-    14, 18, 50, 20,
+     14, 18, 50, 20, 24,
     ...Array(maxFotos).fill(FOTO_COL_W)]
 
   ws.columns = larguras.map((w) => ({ width: w }))
@@ -561,11 +540,12 @@ export async function exportarTodasExcel(
     const cell = headerRow.getCell(i + 1)
     cell.value = h
     cell.font = { bold: true, size: 10, color: { argb: BRANCO } }
-    // Cols 16-18 = Vistorias (vermelho); 19 = Área Queimada (âmbar); >= 20 = Fotos (laranja)
+     // Cols 16-18 = Vistorias (vermelho); 19 = Área Queimada; 20 = Bairro; >= 21 = Fotos
     let bg = AZUL
     if (i >= 15 && i < 18) bg = 'B91C1C'
     else if (i === 18) bg = 'D97706'
-    else if (i >= 19) bg = LARANJA
+     else if (i === 19) bg = '0f766e'
+     else if (i >= 20) bg = LARANJA
     cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bg } }
     cell.alignment = { horizontal: 'center', vertical: 'middle' }
     cell.border = { bottom: { style: 'thin', color: { argb: BRANCO } } }
@@ -626,6 +606,7 @@ export async function exportarTodasExcel(
       ultimaVistoriaTxt,
       obsVistoriasTxt,
       areaQueimadaTxt,
+      extrairBairroExcel(o.endereco),
     ]
 
     valores.forEach((v, i) => { r.getCell(i + 1).value = v as ExcelCellValue })
@@ -660,7 +641,7 @@ export async function exportarTodasExcel(
         const foto = o.fotos![fotoIdx]
         const normalizada = await normalizarFoto(foto)
         if (!normalizada) continue
-        const colIdx = 19 + fotoIdx  // 0-indexed: coluna 20 em diante (após Área Queimada)
+       const colIdx = 20 + fotoIdx  // 0-indexed: coluna 21 em diante (após Bairro)
         try {
           const imageId = wb.addImage({ base64: normalizada.base64, extension: normalizada.ext })
           ws.addImage(imageId, {

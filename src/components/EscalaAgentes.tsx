@@ -23,7 +23,8 @@ const AGENTES_ESCALA = [
 ]
 
 // Quem NÃO faz sobreaviso (mas registra horas extras 1:1, sem multiplicador)
-const AGENTES_SEM_SOBREAVISO = new Set(['Talita', 'Cristiane', 'Sócrates'])
+// Sócrates permanece neste grupo; Talita e Cristiane fazem sobreaviso normalmente.
+const AGENTES_SEM_SOBREAVISO = new Set(['Sócrates'])
 
 // Quem pode ser escalado para sobreaviso = agentes operacionais
 const AGENTES_SOBREAVISO = AGENTES_ESCALA.filter(ag => !AGENTES_SEM_SOBREAVISO.has(ag.nome))
@@ -2773,7 +2774,7 @@ function PainelFeriadosCustom({ feriados, onChange }: PainelFeriadosCustomProps)
 // estará de sobreaviso ou de folga.
 //   • Para agentes que fazem sobreaviso: cada toque no dia cicla
 //       nada → 📟 sobreaviso → 🏠 folga → nada
-//   • Para Talita / Cristiane / Sócrates (sem sobreaviso): toggle só de folga.
+//   • Para agentes sem sobreaviso (Sócrates): toggle só de folga.
 interface ModalAgenteCalendarioProps {
   agente: { nome: string; cor: string; iniciais: string }
   podeSobreaviso: boolean
@@ -3726,7 +3727,7 @@ export default function EscalaAgentes({ ocorrencias = [] }: EscalaAgentesProps) 
         />
       )}
 
-      {/* Banco de Horas de Ocorrências — Talita / Cristiane / Sócrates (sábado ×1,5 · domingo ×2) */}
+      {/* Banco de Horas de Ocorrências — agentes com sobreaviso (sábado ×1,5 · domingo ×2) */}
       {!isGestor && isHorasExtras && (
         <BancoHorasAgente
           agente={agenteLogado}
@@ -3748,7 +3749,7 @@ export default function EscalaAgentes({ ocorrencias = [] }: EscalaAgentesProps) 
         />
       )}
 
-      {/* Banco de Horas Extras Manuais — Talita / Cristiane / Sócrates */}
+      {/* Banco de Horas Extras Manuais — agentes sem sobreaviso */}
       {!isGestor && isHorasExtras && (() => {
         const horasOc = calcularBancoHoras(
           agenteLogado, dados.sobreaviso, dados.horasTrabalhadasSobreaviso,

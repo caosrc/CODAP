@@ -280,7 +280,7 @@
 .weather-highlights strong { margin-top: .25rem; color: #eef8ff; font-size: .86rem; }
 .weather-disclaimer { display: block; margin-top: .75rem; color: #89a9c0; font-size: .7rem; }
 .radar-weather-loading { margin: 1rem 0 0; color: #b2cde0; font-size: .85rem; }
-.radar-weather-detail { display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(320px, 1fr); gap: 0 1rem; margin-top: .45rem; padding-top: .45rem; border-top: 1px solid #2c5d7c; }
+.radar-weather-detail { display: grid; grid-template-columns: minmax(0, 1.75fr) minmax(0, 1fr); gap: 0 .75rem; margin-top: .45rem; padding-top: .45rem; border-top: 1px solid #2c5d7c; }
 .weather-section-title { display: flex; align-items: baseline; justify-content: space-between; gap: .75rem; color: #f2f8ff; font-size: .8rem; font-weight: 800; }
 .weather-section-title span { color: #91b7cf; font-size: .65rem; font-weight: 500; }
 .weather-section-title:not(.weather-days-title), .weather-hourly { grid-column: 1; }

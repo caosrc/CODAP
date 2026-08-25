@@ -475,7 +475,7 @@ export default function RadarDC() {
         {erroTempo && <p className="radar-save-error" role="alert">{erroTempo}</p>}
         {tempo && (
           <div className="radar-weather-detail">
-            <div className="weather-section-title">Previsão nas próximas horas <span>probabilidade de chuva</span></div>
+             <div className="weather-section-title">Previsão nas próximas horas</div>
             <div className="weather-hourly" aria-label="Previsão do tempo nas próximas horas">
               {tempo.horas.map(hora => (
                 <div className="weather-hour" key={hora.time} title={`${nomesTempo[hora.codigo] || 'Condição variável'} · ${hora.probabilidade}% de chuva`}>

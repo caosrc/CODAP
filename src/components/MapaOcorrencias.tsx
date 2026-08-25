@@ -1077,15 +1077,15 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
   const totalOnline = dispositivosArray.length + (statusGps === 'ativo' ? 1 : 0)
 
   // ── Viewport culling ─────────────────────────────────────────────
-  // Só renderiza marcadores dentro da área visível do mapa + 40% de margem.
+  // Só renderiza marcadores dentro da área visível do mapa + 15% de margem.
   // Ocorrências sem GPS ficam sempre visíveis (posição virtual perto do centro).
   const ocorrenciasVisiveis = useMemo(() => {
     const filtradas = ocorrencias.filter(o => !naturezasOcultas.has(o.natureza))
     if (!mapaBounds) return filtradas
     const ne = mapaBounds.getNorthEast()
     const sw = mapaBounds.getSouthWest()
-    const latPad = (ne.lat - sw.lat) * 0.4
-    const lngPad = (ne.lng - sw.lng) * 0.4
+    const latPad = (ne.lat - sw.lat) * 0.15
+    const lngPad = (ne.lng - sw.lng) * 0.15
     return filtradas.filter(o => {
       if (!(o.lat && o.lng)) return true  // sem GPS → sempre mostra
       return (
@@ -1115,7 +1115,9 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
             subdomains={['a', 'b', 'c']}
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
             maxZoom={19}
-            keepBuffer={4}
+            keepBuffer={2}
+            updateWhenZooming={false}
+            updateWhenIdle={true}
           />
         ) : (
           <TileLayer
@@ -1123,7 +1125,9 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
             url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
             attribution='Tiles &copy; Esri — Source: Esri, Maxar, Earthstar Geographics'
             maxZoom={19}
-            keepBuffer={4}
+            keepBuffer={2}
+            updateWhenZooming={false}
+            updateWhenIdle={true}
           />
         )}
         {camadaMonitoramento && camadasMonitoramento.find(c => c.id === camadaMonitoramento)?.url && (

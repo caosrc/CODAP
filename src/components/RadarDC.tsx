@@ -495,7 +495,6 @@ export default function RadarDC() {
                   <span>{iconeTempo(dia.codigo)}</span>
                   <strong>{Math.round(dia.temperaturaMax)}° <small>{Math.round(dia.temperaturaMin)}°</small></strong>
                   <em>☔ {Math.round(dia.probabilidade)}%</em>
-                  <small>{nomesTempo[dia.codigo] || 'Condição variável'}</small>
                 </div>
               ))}
             </div>

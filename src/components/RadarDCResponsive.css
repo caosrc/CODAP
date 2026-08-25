@@ -497,9 +497,13 @@ body.radar-tv-active .radar-page {
    coluna estreita e esticavam o cartão de lembretes até a tela inteira. */
 @media (min-width: 701px) {
   .radar-weather {
-    width: auto;
-    max-width: none;
+    width: min(calc(100% - 2rem), 1080px);
+    max-width: 1080px;
     box-sizing: border-box;
+  }
+
+  .radar-weather-detail {
+    gap: 0 .35rem;
   }
 
   .radar-layout {

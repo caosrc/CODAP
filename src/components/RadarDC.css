@@ -280,11 +280,13 @@
 .weather-highlights strong { margin-top: .25rem; color: #eef8ff; font-size: .86rem; }
 .weather-disclaimer { display: block; margin-top: .75rem; color: #89a9c0; font-size: .7rem; }
 .radar-weather-loading { margin: 1rem 0 0; color: #b2cde0; font-size: .85rem; }
-.radar-weather-detail { display: grid; grid-template-columns: minmax(0, 1.75fr) minmax(0, 1fr); gap: 0 .75rem; margin-top: .45rem; padding-top: .45rem; border-top: 1px solid #2c5d7c; }
+.radar-weather-detail { display: grid; grid-template-columns: minmax(0, 1.75fr) minmax(0, 1fr); grid-template-areas: "hours-title days-title" "hourly days"; gap: 0 .75rem; margin-top: .45rem; padding-top: .45rem; border-top: 1px solid #2c5d7c; }
 .weather-section-title { display: flex; align-items: baseline; justify-content: space-between; gap: .75rem; color: #f2f8ff; font-size: .8rem; font-weight: 800; }
 .weather-section-title span { color: #91b7cf; font-size: .65rem; font-weight: 500; }
-.weather-section-title:not(.weather-days-title), .weather-hourly { grid-column: 1; }
-.weather-days-title, .weather-days { grid-column: 2; }
+.weather-section-title:not(.weather-days-title) { grid-area: hours-title; }
+.weather-hourly { grid-area: hourly; }
+.weather-days-title { grid-area: days-title; }
+.weather-days { grid-area: days; }
 .weather-hourly, .weather-days { display: flex; gap: .3rem; overflow: visible; padding: .35rem 0 .15rem; }
 .weather-hour { position: relative; display: flex; flex: 1 1 0; min-width: 0; min-height: 88px; flex-direction: column; align-items: center; gap: .08rem; padding: .2rem .12rem; border-radius: 7px; background: rgba(10, 39, 68, .55); color: #c3dced; font-size: .56rem; }
 .weather-hour > b { color: #dcefff; font-size: .63rem; }

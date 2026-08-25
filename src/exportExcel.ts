@@ -429,10 +429,16 @@ async function adicionarAbaDashboard(wb: ExcelWorkbook, ocorrencias: Ocorrencia[
   })
   const dataSheet = "'Ocorrências'"
   const ultimaLinha = Math.max(3, ocorrencias.length + 2)
-  const tipos = [...new Set(ocorrencias.map(o => o.tipo || 'Não informado'))].sort()
-  const naturezas = [...new Set(ocorrencias.map(o => o.natureza || 'Não informado'))].sort()
-  const bairros = [...new Set(ocorrencias.map(o => extrairBairroExcel(o.endereco)))].sort()
-  const ruas = [...new Set(ocorrencias.map(o => extrairRuaExcel(o.endereco)))].sort()
+  const ordenarPorFrequencia = (valores: string[]) => {
+    const frequencias = new Map<string, number>()
+    valores.forEach(valor => frequencias.set(valor, (frequencias.get(valor) ?? 0) + 1))
+    return [...frequencias.keys()].sort((a, b) =>
+      (frequencias.get(b) ?? 0) - (frequencias.get(a) ?? 0) || a.localeCompare(b, 'pt-BR'))
+  }
+  const tipos = ordenarPorFrequencia(ocorrencias.map(o => o.tipo || 'Não informado'))
+  const naturezas = ordenarPorFrequencia(ocorrencias.map(o => o.natureza || 'Não informado'))
+  const bairros = ordenarPorFrequencia(ocorrencias.map(o => extrairBairroExcel(o.endereco)))
+  const ruas = ordenarPorFrequencia(ocorrencias.map(o => extrairRuaExcel(o.endereco)))
 
   ws.columns = [
     { width: 30 }, { width: 16 }, { width: 16 }, { width: 18 },
@@ -553,7 +559,7 @@ async function adicionarAbaDashboard(wb: ExcelWorkbook, ocorrencias: Ocorrencia[
   const bairroInicio = 10
   // A tabela de bairros ocupa E:G, para ficar lado a lado com atividades.
   ws.mergeCells(`E${bairroInicio}:G${bairroInicio}`)
-  ws.getCell(`E${bairroInicio}`).value = '🏘️ Por bairro'
+  ws.getCell(`E${bairroInicio}`).value = '🏘️ Bairros com mais ocorrências'
   ws.getCell(`E${bairroInicio}`).font = { bold: true, color: { argb: BRANCO } }
   ws.getCell(`E${bairroInicio}`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: '0f766e' } }
   ;['E', 'F', 'G', 'H'].forEach((col, i) => {
@@ -567,7 +573,7 @@ async function adicionarAbaDashboard(wb: ExcelWorkbook, ocorrencias: Ocorrencia[
   })
 
   const detalhesRow = Math.max(12 + tipos.length, 12 + bairros.length) + 2
-  secao(detalhesRow, '📋 Por natureza', '7c3aed')
+  secao(detalhesRow, '📋 Naturezas mais frequentes', '7c3aed')
   ws.mergeCells(`E${detalhesRow}:G${detalhesRow}`)
   ws.getCell(`E${detalhesRow}`).value = '🛣️ Por rua'
   ws.getCell(`E${detalhesRow}`).font = { bold: true, color: { argb: BRANCO } }

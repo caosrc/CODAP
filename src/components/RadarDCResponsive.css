@@ -200,11 +200,20 @@ body.radar-tv-active .radar-page {
 
 @media (min-width: 701px) {
   .radar-weather {
-    width: 70%;
-    max-width: 740px;
+    width: min(86%, 900px);
+    max-width: 900px;
     margin-right: auto;
     margin-left: auto;
     box-sizing: border-box;
+  }
+
+  .radar-weather-compact {
+    padding-top: .25rem;
+    padding-bottom: .25rem;
+  }
+
+  .radar-weather-bar {
+    min-height: 36px;
   }
 
   .radar-layout {

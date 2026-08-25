@@ -390,6 +390,7 @@ body.radar-tv-active .radar-page {
   }
 
   .radar-weather-detail {
+    display: block;
     margin-top: .65rem;
     padding-top: .65rem;
   }

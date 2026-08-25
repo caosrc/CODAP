@@ -395,6 +395,11 @@ body.radar-tv-active .radar-page {
     padding-top: .65rem;
   }
 
+  .weather-hourly,
+  .weather-days {
+    overflow: visible;
+  }
+
   .weather-section-title {
     font-size: .72rem;
   }
@@ -404,12 +409,12 @@ body.radar-tv-active .radar-page {
   }
 
   .weather-hour {
-    flex-basis: 50px;
+    flex: 1 1 0;
     min-height: 96px;
   }
 
   .weather-day {
-    flex-basis: 64px;
+    flex: 1 1 0;
     min-height: 88px;
   }
 

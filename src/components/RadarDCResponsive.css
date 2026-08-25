@@ -496,6 +496,12 @@ body.radar-tv-active .radar-page {
    Estas regras substituem os limites do layout antigo, que deixavam essa
    coluna estreita e esticavam o cartão de lembretes até a tela inteira. */
 @media (min-width: 701px) {
+  .radar-weather {
+    width: auto;
+    max-width: none;
+    box-sizing: border-box;
+  }
+
   .radar-layout {
     grid-template-columns: minmax(420px, 1.18fr) minmax(430px, 1fr);
     min-height: 0;

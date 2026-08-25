@@ -527,6 +527,11 @@ body.radar-tv-active .radar-page {
     line-height: 1.6;
   }
 
+  .weather-hour {
+    flex: 0 0 44px;
+    min-height: 76px;
+  }
+
   .radar-calendar-card {
     max-height: none;
     padding: .75rem;

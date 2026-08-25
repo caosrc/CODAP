@@ -22,8 +22,9 @@ type AtividadeFerramenta = {
   data_checklist: string; created_at: string
 }
 
-type DiaPrevisao = { data: string; codigo: number; precipitacao: number; probabilidade: number; umidade: number; vento: number; rajada: number }
-type TempoDC = { atual: { codigo: number; temperatura: number; chuva: number; vento: number; rajada: number; umidade: number }; dias: DiaPrevisao[] }
+type DiaPrevisao = { data: string; codigo: number; temperaturaMax: number; temperaturaMin: number; precipitacao: number; probabilidade: number; umidade: number; vento: number; rajada: number }
+type HoraPrevisao = { time: string; codigo: number; temperatura: number; probabilidade: number; precipitacao: number; vento: number }
+type TempoDC = { atual: { codigo: number; temperatura: number; chuva: number; vento: number; rajada: number; umidade: number }; horas: HoraPrevisao[]; dias: DiaPrevisao[] }
 
 const OURO_BRANCO = { latitude: -20.5236, longitude: -43.6949 }
 const nomesTempo: Record<number, string> = { 0: 'Céu limpo', 1: 'Predominantemente limpo', 2: 'Parcialmente nublado', 3: 'Nublado', 45: 'Neblina', 48: 'Neblina com gelo', 51: 'Garoa leve', 53: 'Garoa moderada', 55: 'Garoa intensa', 61: 'Chuva leve', 63: 'Chuva moderada', 65: 'Chuva forte', 71: 'Neve leve', 73: 'Neve moderada', 75: 'Neve forte', 80: 'Pancadas leves', 81: 'Pancadas moderadas', 82: 'Pancadas fortes', 95: 'Trovoada', 96: 'Trovoada com granizo', 99: 'Trovoada forte' }
@@ -236,14 +237,24 @@ export default function RadarDC() {
     let ativo = true
     const carregarTempo = async () => {
       try {
-        const params = new URLSearchParams({ latitude: String(OURO_BRANCO.latitude), longitude: String(OURO_BRANCO.longitude), current: 'temperature_2m,weather_code,precipitation,relative_humidity_2m,wind_speed_10m,wind_gusts_10m', daily: 'weather_code,precipitation_sum,precipitation_probability_max,relative_humidity_2m_min,wind_speed_10m_max,wind_gusts_10m_max', timezone: 'America/Sao_Paulo', forecast_days: '16', wind_speed_unit: 'kmh', precipitation_unit: 'mm' })
+        const params = new URLSearchParams({ latitude: String(OURO_BRANCO.latitude), longitude: String(OURO_BRANCO.longitude), current: 'temperature_2m,weather_code,precipitation,relative_humidity_2m,wind_speed_10m,wind_gusts_10m', hourly: 'temperature_2m,weather_code,precipitation_probability,precipitation,wind_speed_10m', daily: 'weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max,relative_humidity_2m_min,wind_speed_10m_max,wind_gusts_10m_max', timezone: 'America/Sao_Paulo', forecast_days: '7', wind_speed_unit: 'kmh', precipitation_unit: 'mm' })
         const res = await fetch('https://api.open-meteo.com/v1/forecast?' + params)
         if (!res.ok) throw new Error('Serviço meteorológico indisponível.')
-        const json = await res.json() as { current: Record<string, number>; daily: Record<string, Array<string | number>> }
+        const json = await res.json() as { current: Record<string, number>; hourly: Record<string, Array<string | number>>; daily: Record<string, Array<string | number>> }
         if (!ativo) return
+        const hourly = json.hourly || {}
+        const horas = (hourly.time || []).map((time, i) => ({
+          time: String(time),
+          codigo: Number(hourly.weather_code?.[i] ?? 0),
+          temperatura: Number(hourly.temperature_2m?.[i] ?? 0),
+          probabilidade: Number(hourly.precipitation_probability?.[i] ?? 0),
+          precipitacao: Number(hourly.precipitation?.[i] ?? 0),
+          vento: Number(hourly.wind_speed_10m?.[i] ?? 0),
+        })).filter(h => new Date(h.time).getTime() >= Date.now()).slice(0, 12)
         setTempo({
           atual: { codigo: json.current.weather_code, temperatura: json.current.temperature_2m, chuva: json.current.precipitation, vento: json.current.wind_speed_10m, rajada: json.current.wind_gusts_10m, umidade: json.current.relative_humidity_2m },
-          dias: json.daily.time.map((data, i) => ({ data: String(data), codigo: Number(json.daily.weather_code[i]), precipitacao: Number(json.daily.precipitation_sum[i]), probabilidade: Number(json.daily.precipitation_probability_max[i]), umidade: Number(json.daily.relative_humidity_2m_min[i]), vento: Number(json.daily.wind_speed_10m_max[i]), rajada: Number(json.daily.wind_gusts_10m_max[i]) }))
+          horas,
+          dias: json.daily.time.map((data, i) => ({ data: String(data), codigo: Number(json.daily.weather_code[i]), temperaturaMax: Number(json.daily.temperature_2m_max[i]), temperaturaMin: Number(json.daily.temperature_2m_min[i]), precipitacao: Number(json.daily.precipitation_sum[i]), probabilidade: Number(json.daily.precipitation_probability_max[i]), umidade: Number(json.daily.relative_humidity_2m_min[i]), vento: Number(json.daily.wind_speed_10m_max[i]), rajada: Number(json.daily.wind_gusts_10m_max[i]) }))
         })
         setErroTempo('')
       } catch (error) {
@@ -462,6 +473,34 @@ export default function RadarDC() {
            <div className="radar-weather-actions"><button className="radar-tv-btn" onClick={() => setTv(!tv)}>{tv ? '↙ Voltar ao app' : '▣ Modo TV'}</button></div>
          </div>
         {erroTempo && <p className="radar-save-error" role="alert">{erroTempo}</p>}
+        {tempo && (
+          <div className="radar-weather-detail">
+            <div className="weather-section-title">Previsão nas próximas horas <span>probabilidade de chuva</span></div>
+            <div className="weather-hourly" aria-label="Previsão do tempo nas próximas horas">
+              {tempo.horas.map(hora => (
+                <div className="weather-hour" key={hora.time} title={`${nomesTempo[hora.codigo] || 'Condição variável'} · ${hora.probabilidade}% de chuva`}>
+                  <b>{new Date(hora.time).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</b>
+                  <span className="weather-hour-icon">{iconeTempo(hora.codigo)}</span>
+                  <strong>{Math.round(hora.probabilidade)}%</strong>
+                  <div className="weather-probability"><i style={{ height: `${Math.max(3, hora.probabilidade)}%` }} /></div>
+                  <small>{Math.round(hora.temperatura)}° · {hora.precipitacao.toFixed(1)} mm</small>
+                </div>
+              ))}
+            </div>
+            <div className="weather-section-title weather-days-title">Previsão para os próximos dias</div>
+            <div className="weather-days" aria-label="Previsão do tempo para os próximos dias">
+              {tempo.dias.map((dia, indice) => (
+                <div className="weather-day" key={dia.data}>
+                  <b>{indice === 0 ? 'Hoje' : new Date(`${dia.data}T12:00:00`).toLocaleDateString('pt-BR', { weekday: 'short' }).replace('.', '')}</b>
+                  <span>{iconeTempo(dia.codigo)}</span>
+                  <strong>{Math.round(dia.temperaturaMax)}° <small>{Math.round(dia.temperaturaMin)}°</small></strong>
+                  <em>☔ {Math.round(dia.probabilidade)}%</em>
+                  <small>{nomesTempo[dia.codigo] || 'Condição variável'}</small>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </section>
       <div className="radar-layout">
         <div className="radar-note-card radar-bilhete-large">

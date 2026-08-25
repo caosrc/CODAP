@@ -389,6 +389,28 @@ body.radar-tv-active .radar-page {
     font-size: .62rem;
   }
 
+  .radar-weather-detail {
+    margin-top: .65rem;
+    padding-top: .65rem;
+  }
+
+  .weather-section-title {
+    font-size: .72rem;
+  }
+
+  .weather-section-title span {
+    font-size: .56rem;
+  }
+
+  .weather-hour {
+    flex-basis: 54px;
+    min-height: 118px;
+  }
+
+  .weather-day {
+    flex-basis: 70px;
+  }
+
   .weather-highlights {
     grid-template-columns: repeat(3, 1fr);
   }

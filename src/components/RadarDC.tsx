@@ -238,7 +238,7 @@ export default function RadarDC() {
     const carregarTempo = async () => {
       try {
         const params = new URLSearchParams({ latitude: String(OURO_BRANCO.latitude), longitude: String(OURO_BRANCO.longitude), current: 'temperature_2m,weather_code,precipitation,relative_humidity_2m,wind_speed_10m,wind_gusts_10m', hourly: 'temperature_2m,weather_code,precipitation_probability,precipitation,wind_speed_10m', daily: 'weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max,relative_humidity_2m_min,wind_speed_10m_max,wind_gusts_10m_max', timezone: 'America/Sao_Paulo', forecast_days: '7', wind_speed_unit: 'kmh', precipitation_unit: 'mm' })
-        const res = await fetch('https://api.open-meteo.com/v1/forecast?' + params)
+         const res = await fetch('https://api.open-meteo.com/v1/forecast?' + params, { cache: 'no-store' })
         if (!res.ok) throw new Error('Serviço meteorológico indisponível.')
         const json = await res.json() as { current: Record<string, number>; hourly: Record<string, Array<string | number>>; daily: Record<string, Array<string | number>> }
         if (!ativo) return
@@ -261,8 +261,17 @@ export default function RadarDC() {
         if (ativo) setErroTempo(error instanceof Error ? error.message : 'Não foi possível carregar o tempo.')
       }
     }
-    carregarTempo()
-    return () => { ativo = false }
+     carregarTempo()
+     const timer = window.setInterval(carregarTempo, 5 * 60 * 1000)
+     const atualizarAoVoltar = () => {
+       if (document.visibilityState === 'visible') carregarTempo()
+     }
+     document.addEventListener('visibilitychange', atualizarAoVoltar)
+     return () => {
+       ativo = false
+       window.clearInterval(timer)
+       document.removeEventListener('visibilitychange', atualizarAoVoltar)
+     }
   }, [])
 
   useEffect(() => {

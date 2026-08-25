@@ -403,12 +403,13 @@ body.radar-tv-active .radar-page {
   }
 
   .weather-hour {
-    flex-basis: 54px;
-    min-height: 118px;
+    flex-basis: 50px;
+    min-height: 96px;
   }
 
   .weather-day {
-    flex-basis: 70px;
+    flex-basis: 64px;
+    min-height: 88px;
   }
 
   .weather-highlights {

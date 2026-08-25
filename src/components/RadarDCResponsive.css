@@ -527,7 +527,8 @@ body.radar-tv-active .radar-page {
     line-height: 1.6;
   }
 
-  .weather-hour {
+  .weather-hour,
+  .weather-day {
     flex: 0 0 44px;
     min-height: 76px;
   }

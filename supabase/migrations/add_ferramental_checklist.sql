@@ -26,3 +26,21 @@ CREATE TABLE IF NOT EXISTS public.checklists_ferramental (
 
 CREATE INDEX IF NOT EXISTS checklists_ferramental_ferramenta_idx
   ON public.checklists_ferramental (ferramenta_id, data_checklist DESC);
+
+-- Permite que o app web leia e registre checklists usando a chave anon.
+ALTER TABLE public.checklists_ferramental ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "checklists ferramental leitura" ON public.checklists_ferramental;
+CREATE POLICY "checklists ferramental leitura"
+  ON public.checklists_ferramental
+  FOR SELECT
+  USING (true);
+
+DROP POLICY IF EXISTS "checklists ferramental inserção" ON public.checklists_ferramental;
+CREATE POLICY "checklists ferramental inserção"
+  ON public.checklists_ferramental
+  FOR INSERT
+  WITH CHECK (true);
+
+GRANT SELECT, INSERT ON TABLE public.checklists_ferramental TO anon, authenticated;
+GRANT USAGE, SELECT ON SEQUENCE public.checklists_ferramental_id_seq TO anon, authenticated;

@@ -190,18 +190,16 @@ export const matApi = {
   },
 
   async listarChecklistsFerramenta(ferramentaId: string): Promise<MatChecklistFerramenta[]> {
-    if (supabaseDisponivel) {
-      const { data, error } = await supabase
-        .from('checklists_ferramental')
-        .select('*')
-        .eq('ferramenta_id', ferramentaId)
-        .order('data_checklist', { ascending: false })
-      if (!error) return (data ?? []) as MatChecklistFerramenta[]
-      if (!tabelaSupabaseAusente(error)) sbErr(error, 'listarChecklistsFerramenta')
+    if (!supabaseDisponivel) {
+      throw new Error('Supabase não configurado para salvar o checklist.')
     }
-    return apiFetch<MatChecklistFerramenta[]>(
-      `/api/ferramentas/${encodeURIComponent(ferramentaId)}/checklists`
-    )
+    const { data, error } = await supabase
+      .from('checklists_ferramental')
+      .select('*')
+      .eq('ferramenta_id', ferramentaId)
+      .order('data_checklist', { ascending: false })
+    if (error) sbErr(error, 'listarChecklistsFerramenta')
+    return (data ?? []) as MatChecklistFerramenta[]
   },
 
   async criarChecklistFerramenta(checklist: {
@@ -215,26 +213,21 @@ export const matApi = {
     realizado_por?: string | null
     data_checklist?: string
   }): Promise<MatChecklistFerramenta> {
-    if (supabaseDisponivel) {
-      // `ferramenta_nome` é usado apenas pelo fallback Express para
-      // identificar/criar a ferramenta. Ele não existe na tabela do Supabase.
-      const {
-        ferramenta_nome: _ferramentaNome,
-        ...checklistSupabase
-      } = checklist
-      const { data, error } = await supabase
-        .from('checklists_ferramental')
-        .insert(checklistSupabase)
-        .select()
-        .single()
-      if (!error) return data as MatChecklistFerramenta
-      if (!tabelaSupabaseAusente(error)) sbErr(error, 'criarChecklistFerramenta')
+    if (!supabaseDisponivel) {
+      throw new Error('Supabase não configurado para salvar o checklist.')
     }
-    return apiFetch<MatChecklistFerramenta>('/api/ferramentas/checklists', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(checklist),
-    })
+    // `ferramenta_nome` é um campo auxiliar da tela e não existe na tabela.
+    const {
+      ferramenta_nome: _ferramentaNome,
+      ...checklistSupabase
+    } = checklist
+    const { data, error } = await supabase
+      .from('checklists_ferramental')
+      .insert(checklistSupabase)
+      .select()
+      .single()
+    if (error) sbErr(error, 'criarChecklistFerramenta')
+    return data as MatChecklistFerramenta
   },
 
   async listarEmprestimos(): Promise<MatEmprestimo[]> {

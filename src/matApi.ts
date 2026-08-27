@@ -216,9 +216,15 @@ export const matApi = {
     data_checklist?: string
   }): Promise<MatChecklistFerramenta> {
     if (supabaseDisponivel) {
+      // `ferramenta_nome` é usado apenas pelo fallback Express para
+      // identificar/criar a ferramenta. Ele não existe na tabela do Supabase.
+      const {
+        ferramenta_nome: _ferramentaNome,
+        ...checklistSupabase
+      } = checklist
       const { data, error } = await supabase
         .from('checklists_ferramental')
-        .insert(checklist)
+        .insert(checklistSupabase)
         .select()
         .single()
       if (!error) return data as MatChecklistFerramenta

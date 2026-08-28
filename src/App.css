@@ -1927,11 +1927,51 @@ input, select, textarea { font-family: inherit; }
   font-size: 0.71rem;
   line-height: 1.2;
 }
+.mapa-monitoramento-camadas button.indisponivel {
+  cursor: default;
+  opacity: 0.86;
+}
+.mapa-monitoramento-camadas button.indisponivel.disponivel {
+  opacity: 1;
+  cursor: default;
+}
 .mapa-monitoramento-camadas button small {
   margin-top: 0.2rem;
   color: #6b7280;
   font-size: 0.59rem;
   line-height: 1.2;
+}
+.mapa-monitoramento-camada-icone {
+  flex: 0 0 auto;
+}
+.mapa-monitoramento-camada-conteudo {
+  min-width: 0;
+  flex: 1;
+}
+.mapa-monitoramento-camadas button em {
+  display: block;
+  margin-top: 0.18rem;
+  color: #9a3412;
+  font-size: 0.56rem;
+  font-style: normal;
+  line-height: 1.15;
+}
+.mapa-monitoramento-camada-status {
+  flex: 0 0 auto;
+  width: 7px;
+  height: 7px;
+  margin-top: 0.18rem;
+  border-radius: 50%;
+  background: #f59e0b;
+  box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.14);
+}
+.mapa-monitoramento-camada-status.status-disponivel {
+  background: #16a34a;
+  box-shadow: 0 0 0 2px rgba(22, 163, 74, 0.14);
+}
+.mapa-monitoramento-camada-status.status-sem-dados {
+  background: #64748b;
+  box-shadow: 0 0 0 2px rgba(100, 116, 139, 0.14);
 }
 .mapa-monitoramento-camadas button b {
   position: absolute;
@@ -1995,6 +2035,14 @@ input, select, textarea { font-family: inherit; }
   border-top: 1px solid #e5e7eb;
   color: #9ca3af;
   font-size: 0.62rem;
+}
+.mapa-monitoramento-rodape > span {
+  min-width: 0;
+}
+.mapa-monitoramento-acoes {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 0.25rem;
 }
 .mapa-monitoramento-rodape button {
   border: 0;

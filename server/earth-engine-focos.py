@@ -142,30 +142,92 @@ def estatistica_media(
 # VIIRS:
 #   VNP14A1.002 = Suomi-NPP
 #
-# O antigo NOAA/VIIRS/001/VNP14A1 foi depreciado.
+# GOES:
+#   FDCF = Fire/Hot Spot Characterization, com atualização de 10 minutos.
 SATELITES_FOGO = [
+    {
+        "id": "goes-19-fire",
+        "nome": "GOES-R / GOES-19 ABI",
+        "satelite": "GOES-19 ABI",
+        "colecao": "NOAA/GOES/19/FDCF",
+        "banda": "Area",
+        "tipo_mascara": "area",
+        "limiar": 0,
+        "escala": 2000,
+        "dias": 1,
+        "periodo": "Últimas 24 horas · atualização a cada 10 min",
+    },
     {
         "id": "modis-terra-fire",
         "nome": "MODIS Terra",
         "satelite": "MODIS Terra",
         "colecao": "MODIS/061/MOD14A1",
+        "banda": "FireMask",
+        "tipo_mascara": "firemask",
+        "limiar": 7,
         "escala": 1000,
+        "dias": 3,
+        "periodo": "Últimos 3 dias",
     },
     {
         "id": "modis-aqua-fire",
         "nome": "MODIS Aqua",
         "satelite": "MODIS Aqua",
         "colecao": "MODIS/061/MYD14A1",
+        "banda": "FireMask",
+        "tipo_mascara": "firemask",
+        "limiar": 7,
         "escala": 1000,
+        "dias": 3,
+        "periodo": "Últimos 3 dias",
     },
     {
-        "id": "viirs-fire",
+        "id": "viirs-snpp-fire",
         "nome": "VIIRS Suomi-NPP",
         "satelite": "VIIRS Suomi-NPP",
         "colecao": "NASA/VIIRS/002/VNP14A1",
+        "banda": "FireMask",
+        "tipo_mascara": "firemask",
+        "limiar": 7,
         "escala": 1000,
+        "dias": 3,
+        "periodo": "Últimos 3 dias",
     },
 ]
+
+
+def obter_fontes_configuradas():
+    """Inclui uma coleção CT_MERG_FIRE privada somente quando configurada."""
+    fontes = list(SATELITES_FOGO)
+    colecao = os.environ.get("EARTH_ENGINE_CT_MERG_FIRE_COLLECTION", "").strip()
+    if colecao:
+        fontes.append(
+            {
+                "id": "ct-merg-fire",
+                "nome": "CT_MERG_FIRE",
+                "satelite": "CT_MERG_FIRE",
+                "colecao": colecao,
+                "banda": os.environ.get(
+                    "EARTH_ENGINE_CT_MERG_FIRE_BAND",
+                    "FireMask",
+                ).strip() or "FireMask",
+                "tipo_mascara": os.environ.get(
+                    "EARTH_ENGINE_CT_MERG_FIRE_MASK_TYPE",
+                    "firemask",
+                ).strip() or "firemask",
+                "limiar": float(
+                    os.environ.get("EARTH_ENGINE_CT_MERG_FIRE_THRESHOLD", "7")
+                ),
+                "escala": int(
+                    os.environ.get("EARTH_ENGINE_CT_MERG_FIRE_SCALE", "2000")
+                ),
+                "dias": int(
+                    os.environ.get("EARTH_ENGINE_CT_MERG_FIRE_DAYS", "3")
+                ),
+                "periodo": "Camada complementar · CT_MERG_FIRE",
+            }
+        )
+    return fontes
 
 
 def obter_colecao_fogo(config, regiao, inicio, fim):
@@ -174,7 +236,7 @@ def obter_colecao_fogo(config, regiao, inicio, fim):
         ee.ImageCollection(config["colecao"])
         .filterDate(inicio, fim)
         .filterBounds(regiao)
-        .select("FireMask")
+        .select(config["banda"])
     )
 
     quantidade = colecao.size().getInfo()
@@ -204,12 +266,20 @@ def imagem_fogo_ativo(config, regiao, inicio, fim):
     return colecao.max(), quantidade, True
 
 
+def mascara_fogo(imagem, config):
+    """Converte a banda de cada produto em uma máscara binária de fogo."""
+    banda = imagem.select(config["banda"])
+    if config.get("tipo_mascara") == "area":
+        return banda.gt(config.get("limiar", 0)).selfMask()
+    return banda.gte(config.get("limiar", 7)).selfMask()
+
+
 def extrair_focos(imagem, regiao, config, data_fim):
-    """Converte pixels FireMask >= 7 em pontos."""
+    """Converte pixels classificados como fogo em pontos."""
     if imagem is None:
         return []
 
-    mascara = imagem.gte(7).selfMask()
+    mascara = mascara_fogo(imagem, config)
 
     pontos = mascara.reduceToVectors(
         geometry=regiao,
@@ -256,6 +326,7 @@ def consultar_monitoramento():
     Consulta detecção de incêndio ativo no Earth Engine.
 
     Fontes:
+      - GOES-19 ABI;
       - MODIS Terra;
       - MODIS Aqua;
       - VIIRS Suomi-NPP.
@@ -281,13 +352,17 @@ def consultar_monitoramento():
     erros = []
     disponibilidade = []
 
-    for config in SATELITES_FOGO:
+    for config in obter_fontes_configuradas():
         try:
+            dias = max(1, int(config.get("dias", 3)))
+            inicio_config = (
+                hoje - datetime.timedelta(days=dias)
+            ).strftime("%Y-%m-%d")
             imagem, quantidade, disponivel = (
                 imagem_fogo_ativo(
                     config,
                     regiao,
-                    inicio,
+                    inicio_config,
                     fim,
                 )
             )
@@ -298,6 +373,7 @@ def consultar_monitoramento():
                     "nome": config["nome"],
                     "imagens": quantidade,
                     "disponivel": disponivel,
+                    "periodo": config.get("periodo", ""),
                 }
             )
 
@@ -305,7 +381,7 @@ def consultar_monitoramento():
                 erros.append(
                     f"{config['nome']}: "
                     f"nenhuma imagem disponível "
-                    f"no período {inicio} a {fim}"
+                    f"no período {inicio_config} a {fim}"
                 )
 
                 indicadores.append(
@@ -320,13 +396,13 @@ def consultar_monitoramento():
 
                 continue
 
-            mascara = imagem.gte(7).selfMask()
+            mascara = mascara_fogo(imagem, config)
 
             url = gerar_url_tiles(
                 mascara,
                 {
-                    "min": 7,
-                    "max": 9,
+                    "min": 1,
+                    "max": 1,
                     "palette": [
                         "fef08a",
                         "f97316",
@@ -354,9 +430,10 @@ def consultar_monitoramento():
                     ),
                     "url": url,
                     "periodo": (
-                        f"Últimos 3 dias até {fim}"
+                        config.get("periodo") or f"Últimos {dias} dias até {fim}"
                     ),
                     "imagens": quantidade,
+                    "frequencia": "10 minutos" if config["id"] == "goes-19-fire" else None,
                 }
             )
 
@@ -425,6 +502,8 @@ def main():
         json.dumps(
             {
                 "focos": resultado["focos"],
+                "camadas": resultado["camadas"],
+                "disponibilidade": resultado["disponibilidade"],
                 "fonte": (
                     "EARTH-ENGINE-MULTISATELITE"
                 ),

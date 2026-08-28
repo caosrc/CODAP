@@ -17,6 +17,8 @@ Required env vars (all set in Replit shared env / secrets):
 - `EARTH_ENGINE_SERVICE_ACCOUNT_JSON` — Secret containing the complete Google Cloud service-account JSON key
 - `EARTH_ENGINE_PROJECT` — optional Earth Engine/Google Cloud project ID; when omitted, uses the `project_id` from the JSON key
 - `FIRMS_MAP_KEY` — Secret for NASA FIRMS active-fire data
+- `EARTH_ENGINE_CT_MERG_FIRE_COLLECTION` — optional Earth Engine collection ID for the complementary CT_MERG_FIRE layer
+- `EARTH_ENGINE_CT_MERG_FIRE_BAND`, `EARTH_ENGINE_CT_MERG_FIRE_MASK_TYPE`, `EARTH_ENGINE_CT_MERG_FIRE_THRESHOLD`, `EARTH_ENGINE_CT_MERG_FIRE_SCALE`, `EARTH_ENGINE_CT_MERG_FIRE_DAYS` — optional CT_MERG_FIRE interpretation settings
 - `PLANET_API_KEY` — Secret for Planet satellite imagery queries
 
 ## Stack
@@ -25,7 +27,7 @@ Required env vars (all set in Replit shared env / secrets):
 - **Database**: Replit PostgreSQL — schema auto-created by `initDb()` on server startup
 - **Push Notifications**: Web Push (VAPID) via `web-push` on Express server
 - **Maps**: Leaflet + react-leaflet (tiles proxied via `/api/tiles`)
-- **Incêndios ativos**: NASA FIRMS + Google Earth Engine (MODIS Terra, MODIS Aqua e VIIRS), exibidos como focos no mapa
+- **Incêndios ativos**: NASA FIRMS (VIIRS NOAA-20/S-NPP, MODIS Terra/Aqua) + Google Earth Engine (GOES-19 ABI, MODIS, VIIRS e CT_MERG_FIRE opcional), exibidos como focos e camadas no mapa
 - **Chuva ao vivo**: RainViewer fornece o último quadro de radar meteorológico sobre o Leaflet; o limite oficial de Ouro Branco é desenhado sobre a camada via OpenStreetMap/Nominatim
 - **Imagens Planet**: consulta protegida pelo servidor em `/api/planet-focos`
 
@@ -70,7 +72,7 @@ Required env vars (all set in Replit shared env / secrets):
 - Push notifications require `VAPID_PRIVATE_KEY` secret to be set in Replit secrets
 - Earth Engine requires the service account to have Earth Engine access and the `Service Usage Consumer` role on the Google Cloud project
 - O botão **Chuva** mostra precipitação observada pelo radar RainViewer, atualizada automaticamente a cada 5 minutos, com legenda e limite municipal tracejado. A leitura em mm do centro é um resumo do Open-Meteo e não substitui pluviômetro local.
-- O monitoramento do Earth Engine usa apenas `FireMask >= 7` nos últimos 3 dias; não interpreta chuva, radar, vegetação ou cicatriz de queimada como incêndio ativo
+- O monitoramento do Earth Engine usa `FireMask >= 7` para MODIS/VIIRS, `Area > 0` para GOES-19 FDCF (cadência de 10 minutos) e uma configuração explícita para CT_MERG_FIRE; não interpreta chuva, radar, vegetação ou cicatriz de queimada como incêndio ativo
 
 ## Pointers
 - DB schema: `server/index.js` → `initDb()` function

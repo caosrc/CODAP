@@ -1516,20 +1516,65 @@ app.put('/api/escala', async (req, res) => {
 
 app.get('/api/health', (req, res) => res.json({ ok: true }))
 
-// ── Focos de Incêndio — NASA FIRMS ─────────────────────────────────────────
-// Satélites: VIIRS-SNPP · VIIRS-NOAA20 · VIIRS-NOAA21 · MODIS · GOES (geoest.)
+// ── Focos de Incêndio — NASA FIRMS + Earth Engine ─────────────────────────
+// Fontes: GOES-19 ABI · VIIRS-SNPP · VIIRS-NOAA20 · VIIRS-NOAA21 ·
+//          MODIS Terra · MODIS Aqua · CT_MERG_FIRE (opcional)
 //
-// Cache duplo para resposta rápida:
-//   GOES  → TTL 5 min  (satélite geoestacionário, atualiza a cada ~10 min)
+// Cache para resposta rápida:
 //   Polar → TTL 25 min (VIIRS + MODIS, sobrevoo ~2×/dia — não muda tão rápido)
-let goesCache  = { data: null, ts: 0 }
+//   GOES-19 → Earth Engine mantém a coleção com cadência de 10 min e o
+//              resultado do monitoramento fica em cache por 30 min.
 let polarCache = { data: null, ts: 0 }
 let earthEngineCache = { data: null, ts: 0 }
 let earthEngineMonitoramentoCache = { data: null, ts: 0 }
-const GOES_TTL  = 5  * 60 * 1000   //  5 min
 const POLAR_TTL = 25 * 60 * 1000   // 25 min
 const EARTH_ENGINE_TTL = 25 * 60 * 1000
 const EARTH_ENGINE_MONITORAMENTO_TTL = 30 * 60 * 1000
+
+const FONTES_FOGO_CATALOGO = [
+  {
+    id: 'goes-19-fire',
+    nome: 'GOES-R / GOES-19 ABI',
+    descricao: 'Evolução temporal do fogo pelo produto Fire/Hot Spot Characterization.',
+    frequencia: '10 min',
+    tipo: 'Earth Engine',
+  },
+  {
+    id: 'viirs-noaa20-fire',
+    nome: 'NOAA-20 VIIRS',
+    descricao: 'Focos de alta resolução espacial em passagem orbital.',
+    frequencia: 'NRT',
+    tipo: 'NASA FIRMS',
+  },
+  {
+    id: 'viirs-snpp-fire',
+    nome: 'S-NPP VIIRS',
+    descricao: 'Focos de alta resolução espacial em passagem orbital.',
+    frequencia: 'NRT',
+    tipo: 'NASA FIRMS',
+  },
+  {
+    id: 'modis-terra-fire',
+    nome: 'Terra MODIS',
+    descricao: 'Confirmação e complemento das detecções de fogo ativo.',
+    frequencia: 'NRT',
+    tipo: 'NASA FIRMS',
+  },
+  {
+    id: 'modis-aqua-fire',
+    nome: 'Aqua MODIS',
+    descricao: 'Confirmação e complemento das detecções de fogo ativo.',
+    frequencia: 'NRT',
+    tipo: 'NASA FIRMS',
+  },
+  {
+    id: 'ct-merg-fire',
+    nome: 'CT_MERG_FIRE',
+    descricao: 'Camada complementar para uma coleção Earth Engine específica.',
+    frequencia: 'Configurável',
+    tipo: 'Earth Engine',
+  },
+]
 
 // Polígono oficial do município de Ouro Branco - MG (IBGE 3145901)
 // Fonte: servicodados.ibge.gov.br — resolução 5 (29 vértices)
@@ -1578,6 +1623,19 @@ function pontoNoCidade(lat, lng) {
   return inside
 }
 
+function fonteFirmsPorSatelite(fonteNome, satelite) {
+  const nome = String(satelite || '').toLowerCase()
+  if (fonteNome === 'MODIS') {
+    if (nome.includes('aqua')) return 'MODIS-AQUA'
+    if (nome.includes('terra')) return 'MODIS-TERRA'
+    return 'MODIS'
+  }
+  if (fonteNome === 'VIIRS-N20') return 'VIIRS-NOAA20'
+  if (fonteNome === 'VIIRS-N21') return 'VIIRS-NOAA21'
+  if (fonteNome === 'VIIRS-SNPP') return 'VIIRS-SNPP'
+  return fonteNome
+}
+
 function parsearFirmsCsv(csv, fonteNome) {
   const lines = csv.trim().split('\n')
   if (lines.length < 2) return []
@@ -1600,6 +1658,7 @@ function parsearFirmsCsv(csv, fonteNome) {
       const c0 = confRaw.toLowerCase()[0]
       confidence = c0 === 'h' ? 'h' : c0 === 'l' ? 'l' : 'n'
     }
+    const satelite = cols[idx('satellite')] || fonteNome
     return {
       lat:      parseFloat(cols[idx('latitude')]),
       lng:      parseFloat(cols[idx('longitude')]),
@@ -1607,10 +1666,44 @@ function parsearFirmsCsv(csv, fonteNome) {
       frp:      parseFloat(cols[idx('frp')]) || 0,
       data:     cols[idx('acq_date')] || '',
       hora:     cols[idx('acq_time')] || '',
-      satelite: cols[idx('satellite')] || fonteNome,
-      fonte:    fonteNome,
+      satelite,
+      fonte:    fonteFirmsPorSatelite(fonteNome, satelite),
     }
   }).filter(f => !isNaN(f.lat) && !isNaN(f.lng))
+}
+
+function montarCatalogoFontesFogo(focos, earthEngine, fontesFirms = []) {
+  const fontesPresentes = new Set(fontesFirms)
+  const camadasEE = new Map((earthEngine?.camadas || []).map(camada => [camada.id, camada]))
+  const focosPorFonte = focos.reduce((acc, foco) => {
+    acc.set(foco.fonte, (acc.get(foco.fonte) || 0) + 1)
+    return acc
+  }, new Map())
+
+  return FONTES_FOGO_CATALOGO.map(fonte => {
+    const camada = camadasEE.get(fonte.id)
+    const fonteFirms = {
+      'viirs-noaa20-fire': 'VIIRS-NOAA20',
+      'viirs-snpp-fire': 'VIIRS-SNPP',
+      'modis-terra-fire': 'MODIS-TERRA',
+      'modis-aqua-fire': 'MODIS-AQUA',
+    }[fonte.id]
+    const disponivel = Boolean(
+      (fonteFirms && fontesPresentes.has(fonteFirms)) ||
+      (camada && camada.url),
+    )
+    return {
+      ...fonte,
+      disponivel,
+      quantidade: (fonteFirms
+        ? focosPorFonte.get(fonteFirms)
+        : focos.filter(foco => String(foco.fonte).includes(fonte.id.replace('-fire', '').toUpperCase())).length) || 0,
+      atualizadoEm: camada?.url ? earthEngine.atualizadoEm : null,
+      configuracaoNecessaria: fonte.id === 'ct-merg-fire' && !camada?.url
+        ? 'Defina EARTH_ENGINE_CT_MERG_FIRE_COLLECTION para habilitar esta coleção.'
+        : null,
+    }
+  })
 }
 
 // Remove focos duplicados detectados por múltiplos satélites no mesmo ponto.
@@ -1650,6 +1743,8 @@ async function buscarFocosEarthEngine() {
       focos: Array.isArray(dados.focos)
         ? dados.focos.filter(f => pontoNoCidade(f.lat, f.lng))
         : [],
+      camadas: Array.isArray(dados.camadas) ? dados.camadas : [],
+      disponibilidade: Array.isArray(dados.disponibilidade) ? dados.disponibilidade : [],
       fonte: 'EARTH-ENGINE-MULTISATELITE',
       projeto: dados.projeto || null,
       periodo: dados.periodo || null,
@@ -1744,7 +1839,11 @@ app.get('/api/focos-incendio', async (_req, res) => {
     const firmsKey = process.env.FIRMS_MAP_KEY
     const earthEngine = await buscarFocosEarthEngine()
     const earthEngineFocos = earthEngine.focos || []
-    const earthEngineFontes = earthEngine.configurado ? [earthEngine.fonte] : []
+    const earthEngineFontes = earthEngine.configurado
+      ? (earthEngine.camadas || [])
+        .filter(camada => camada.url)
+        .map(camada => camada.nome)
+      : []
 
     if (!firmsKey) {
       return res.json({
@@ -1757,37 +1856,45 @@ app.get('/api/focos-incendio', async (_req, res) => {
             configurado: earthEngine.configurado,
             erro: earthEngine.erro || null,
           },
+        catalogo: montarCatalogoFontesFogo(
+          earthEngineFocos,
+          earthEngine,
+          [],
+        ),
         },
         msg: 'FIRMS_MAP_KEY não configurada',
       })
     }
 
     const now = Date.now()
-    const goesOk  = goesCache.data  && now - goesCache.ts  < GOES_TTL
     const polarOk = polarCache.data && now - polarCache.ts < POLAR_TTL
 
-    // Cache duplo: se ambos válidos → retorna imediatamente sem chamar NASA
-    if (goesOk && polarOk) {
+    // Cache polar válido → retorna sem chamar NASA.
+    if (polarOk) {
       const focos = deduplicarFocos([
         ...polarCache.data.focos,
-        ...goesCache.data.focos,
         ...earthEngineFocos,
       ])
+      const fontesFirms = polarCache.data.fontes
       return res.json({
         focos,
         configurado: true,
         fontes: [...new Set([
-          ...polarCache.data.fontes,
-          ...goesCache.data.fontes,
+          ...fontesFirms,
           ...earthEngineFontes,
         ])],
-        atualizadoEm: goesCache.data.atualizadoEm,
+        atualizadoEm: polarCache.data.atualizadoEm,
         fontesMonitoramento: {
           firms: true,
           earthEngine: {
             configurado: earthEngine.configurado,
             erro: earthEngine.erro || null,
           },
+          catalogo: montarCatalogoFontesFogo(
+            focos,
+            earthEngine,
+            fontesFirms,
+          ),
         },
         cache: 'hit',
       })
@@ -1808,14 +1915,9 @@ app.get('/api/focos-incendio', async (_req, res) => {
         fetch(`${base}/MODIS_NRT/${bbox}/1`,          { signal: AbortSignal.timeout(SIG) }).then(r => ({ r, nome: 'MODIS',       label: 'MODIS'        })),
       )
     }
-    if (!goesOk) {
-      tarefas.push(
-        fetch(`${base}/GOES_NRT/${bbox}/1`, { signal: AbortSignal.timeout(SIG) }).then(r => ({ r, nome: 'GOES', label: 'GOES' })),
-      )
-    }
 
     const resultados = await Promise.allSettled(tarefas)
-    let novosPolar = [], novosGoes = [], fontesPolar = [], fontesGoes = []
+    let novosPolar = [], fontesPolar = []
     const brutos = {}
 
     for (const res of resultados) {
@@ -1824,35 +1926,36 @@ app.get('/api/focos-incendio', async (_req, res) => {
       if (!r.ok) continue
       const focos = parsearFirmsCsv(await r.text(), nome)
       brutos[nome] = focos.length
-      if (nome === 'GOES') { novosGoes = focos; fontesGoes.push(label) }
-      else                 { novosPolar.push(...focos); fontesPolar.push(label) }
+      novosPolar.push(...focos)
+      if (nome === 'MODIS') {
+        // O CSV combinado do FIRMS traz a coluna satellite, permitindo
+        // separar Terra e Aqua mesmo em uma única requisição.
+        fontesPolar.push('MODIS-TERRA', 'MODIS-AQUA')
+      } else {
+        fontesPolar.push(fonteFirmsPorSatelite(nome, label))
+      }
     }
 
-    // Atualiza caches seletivamente
+    // Atualiza o cache polar apenas quando a NASA respondeu a pelo menos
+    // uma das fontes. Assim, uma falha transitória não apaga a última leitura.
     if (!polarOk && fontesPolar.length > 0) {
       const fp = novosPolar.filter(f => pontoNoCidade(f.lat, f.lng))
       polarCache = { data: { focos: fp, fontes: fontesPolar }, ts: now }
     }
-    if (!goesOk) {
-      const fg = novosGoes.filter(f => pontoNoCidade(f.lat, f.lng))
-      goesCache = { data: { focos: fg, fontes: fontesGoes }, ts: now }
-    }
 
     const allFocos = [
       ...(polarCache.data?.focos || []),
-      ...(goesCache.data?.focos  || []),
       ...earthEngineFocos,
     ]
     const allFontes = [
       ...(polarCache.data?.fontes || []),
-      ...(goesCache.data?.fontes  || []),
       ...earthEngineFontes,
     ]
     const focos = deduplicarFocos(allFocos)
     const atualizadoEm = new Date().toISOString()
 
     console.log(
-      `[focos-incendio] SNPP:${brutos['VIIRS-SNPP']??'-'} N20:${brutos['VIIRS-N20']??'-'} N21:${brutos['VIIRS-N21']??'-'} MODIS:${brutos['MODIS']??'-'} GOES:${brutos['GOES']??'-'} → Ouro Branco: ${focos.length}`
+      `[focos-incendio] SNPP:${brutos['VIIRS-SNPP']??'-'} N20:${brutos['VIIRS-N20']??'-'} N21:${brutos['VIIRS-N21']??'-'} MODIS:${brutos['MODIS']??'-'} → Ouro Branco: ${focos.length}`
     )
     res.json({
       focos,
@@ -1865,6 +1968,11 @@ app.get('/api/focos-incendio', async (_req, res) => {
           configurado: earthEngine.configurado,
           erro: earthEngine.erro || null,
         },
+        catalogo: montarCatalogoFontesFogo(
+          focos,
+          earthEngine,
+          allFontes,
+        ),
       },
     })
   } catch (e) {

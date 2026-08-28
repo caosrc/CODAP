@@ -47,29 +47,80 @@ interface CamadaMonitoramento {
   descricao: string
   url: string | null
   periodo: string
+  frequencia?: string
+  tipo?: string
+  quantidade?: number
+  disponivel?: boolean
+  configuracaoNecessaria?: string | null
+  status?: 'disponivel' | 'sem-dados' | 'aguardando'
+}
+
+interface FonteMonitoramento {
+  id: string
+  nome: string
+  descricao: string
+  frequencia: string
+  tipo: string
+  disponivel: boolean
+  quantidade: number
+  atualizadoEm?: string | null
+  configuracaoNecessaria?: string | null
 }
 
 const FERRAMENTAS_SATELITE: CamadaMonitoramento[] = [
   {
-    id: 'modis-terra-fire',
-    nome: 'MODIS Terra',
-    descricao: 'Focos de fogo ativo detectados pelo MODIS Terra.',
+    id: 'goes-19-fire',
+    nome: 'GOES-R / GOES-19 ABI',
+    descricao: 'Evolução temporal do fogo pelo produto Fire/Hot Spot Characterization.',
+    periodo: 'Últimas 24 horas',
+    url: null,
+    frequencia: '10 min',
+    tipo: 'Earth Engine',
+  },
+  {
+    id: 'viirs-noaa20-fire',
+    nome: 'NOAA-20 VIIRS',
+    descricao: 'Focos de alta resolução espacial em passagem orbital.',
     periodo: 'Últimos 3 dias',
     url: null,
+    frequencia: 'NRT',
+    tipo: 'NASA FIRMS',
+  },
+  {
+    id: 'viirs-snpp-fire',
+    nome: 'S-NPP VIIRS',
+    descricao: 'Focos de alta resolução espacial em passagem orbital.',
+    periodo: 'Últimos 3 dias',
+    url: null,
+    frequencia: 'NRT',
+    tipo: 'NASA FIRMS',
+  },
+  {
+    id: 'modis-terra-fire',
+    nome: 'Terra MODIS',
+    descricao: 'Confirmação e complemento das detecções de fogo ativo.',
+    periodo: 'Últimos 3 dias',
+    url: null,
+    frequencia: 'NRT',
+    tipo: 'NASA FIRMS',
   },
   {
     id: 'modis-aqua-fire',
-    nome: 'MODIS Aqua',
-    descricao: 'Focos de fogo ativo detectados pelo MODIS Aqua.',
+    nome: 'Aqua MODIS',
+    descricao: 'Confirmação e complemento das detecções de fogo ativo.',
     periodo: 'Últimos 3 dias',
     url: null,
+    frequencia: 'NRT',
+    tipo: 'NASA FIRMS',
   },
   {
-    id: 'viirs-fire',
-    nome: 'VIIRS Suomi-NPP',
-    descricao: 'Focos de fogo ativo detectados pelo VIIRS, com maior resolução espacial.',
-    periodo: 'Últimos 3 dias',
+    id: 'ct-merg-fire',
+    nome: 'CT_MERG_FIRE',
+    descricao: 'Camada complementar para uma coleção Earth Engine específica.',
+    periodo: 'Coleção configurável',
     url: null,
+    frequencia: 'Configurável',
+    tipo: 'Earth Engine',
   },
 ]
 
@@ -486,9 +537,11 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
   const [focosConfigurado, setFocosConfigurado] = useState<boolean | null>(null)
   const [focosFontes, setFocosFontes] = useState<string[]>([])
   const [focosAtualizadoEm, setFocosAtualizadoEm] = useState<string | null>(null)
+  const [focosCarregando, setFocosCarregando] = useState(false)
   const [focosMonitoramento, setFocosMonitoramento] = useState<{
     firms: boolean
     earthEngine?: { configurado?: boolean; erro?: string | null }
+    catalogo?: FonteMonitoramento[]
   } | null>(null)
   const [alertaFocosVisto, setAlertaFocosVisto] = useState(false)
   const [monitoramentoEE, setMonitoramentoEE] = useState<{
@@ -611,6 +664,7 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
 
   // ── Focos de Incêndio (NASA FIRMS + Earth Engine) ─────────────
   const buscarFocos = useCallback(async () => {
+    setFocosCarregando(true)
     try {
       const focosUrl = import.meta.env.VITE_FOCOS_API_URL || '/api/focos-incendio'
       const separador = focosUrl.includes('?') ? '&' : '?'
@@ -628,6 +682,9 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
         if (data.focos.length > 0) setAlertaFocosVisto(false)
       }
     } catch { /* ignora */ }
+    finally {
+      setFocosCarregando(false)
+    }
   }, [])
 
   useEffect(() => {
@@ -676,7 +733,7 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
 
   useEffect(() => {
     buscarMonitoramento()
-    const intervalo = setInterval(buscarMonitoramento, 30 * 60 * 1000)
+    const intervalo = setInterval(buscarMonitoramento, 10 * 60 * 1000)
     return () => clearInterval(intervalo)
   }, [buscarMonitoramento])
 
@@ -688,9 +745,16 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
   // assim que o endpoint retorna as camadas assinadas.
   const camadasMonitoramento = useMemo(() => {
     const reais = new Map((monitoramentoEE?.camadas ?? []).map(camada => [camada.id, camada]))
+    const catalogo = new Map((focosMonitoramento?.catalogo ?? []).map(fonte => [fonte.id, fonte]))
     const principais = FERRAMENTAS_SATELITE.map(camada => ({
       ...camada,
       ...(reais.get(camada.id) ?? {}),
+      ...(catalogo.get(camada.id) ?? {}),
+      status: (reais.get(camada.id)?.url || catalogo.get(camada.id)?.disponivel)
+        ? 'disponivel'
+        : catalogo.has(camada.id) && !catalogo.get(camada.id)?.configuracaoNecessaria
+          ? 'sem-dados'
+          : 'aguardando',
     }))
     const extras = (monitoramentoEE?.camadas ?? []).filter(
       camada => !FERRAMENTAS_SATELITE.some(principal => principal.id === camada.id),
@@ -1826,23 +1890,41 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
               </div>
             )}
               <div className="mapa-monitoramento-camadas">
-                {camadasMonitoramento.map(camada => (
-                  <button
-                    key={camada.id}
-                    className={`${camadaMonitoramento === camada.id ? 'selecionada' : ''} ${camada.url ? '' : 'indisponivel'}`}
-                    onClick={() => camada.url && setCamadaMonitoramento(prev => prev === camada.id ? null : camada.id)}
-                    title={camada.descricao}
-                  >
-                    <span>{
-                      camada.id.includes('modis') || camada.id.includes('viirs') ? '🔥' : '🛰️'
-                    }</span>
-                    <span>
-                      <strong>{camada.nome}</strong>
-                      <small>{camada.url ? camada.periodo : 'Aguardando Earth Engine'}</small>
-                    </span>
-                    {camadaMonitoramento === camada.id && <b>✓</b>}
-                  </button>
-                ))}
+                {camadasMonitoramento.map(camada => {
+                  const status = camada.status
+                  const statusTexto = camada.url
+                    ? `${camada.periodo}${camada.frequencia ? ` · ${camada.frequencia}` : ''}`
+                    : camada.configuracaoNecessaria
+                      ? 'Aguardando configuração'
+                      : status === 'sem-dados'
+                        ? `Sem detecções agora · ${camada.tipo || 'fonte'}`
+                        : camada.tipo === 'NASA FIRMS'
+                          ? `Focos pontuais · ${camada.frequencia || 'NRT'}`
+                          : 'Aguardando Earth Engine'
+                  return (
+                    <button
+                      key={camada.id}
+                      className={`${camadaMonitoramento === camada.id ? 'selecionada' : ''} ${camada.url ? '' : 'indisponivel'} ${status === 'disponivel' ? 'disponivel' : ''}`}
+                      onClick={() => camada.url && setCamadaMonitoramento(prev => prev === camada.id ? null : camada.id)}
+                      title={camada.configuracaoNecessaria || camada.descricao}
+                    >
+                      <span className="mapa-monitoramento-camada-icone">{
+                        camada.id.includes('modis') || camada.id.includes('viirs') || camada.id.includes('goes') || camada.id.includes('ct-')
+                          ? '🔥'
+                          : '🛰️'
+                      }</span>
+                      <span className="mapa-monitoramento-camada-conteudo">
+                        <strong>{camada.nome}</strong>
+                        <small>{statusTexto}</small>
+                        {typeof camada.quantidade === 'number' && (
+                          <em>{camada.quantidade} detecção{camada.quantidade === 1 ? '' : 'ões'} no mapa</em>
+                        )}
+                      </span>
+                      <i className={`mapa-monitoramento-camada-status status-${status || 'aguardando'}`} aria-label={status || 'aguardando'} />
+                      {camadaMonitoramento === camada.id && <b>✓</b>}
+                    </button>
+                  )
+                })}
               </div>
               {monitoramentoEE?.configurado && (monitoramentoEE.indicadores ?? []).length > 0 && (
                 <div className="mapa-monitoramento-indicadores">
@@ -1861,8 +1943,19 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
                 </div>
               )}
               <div className="mapa-monitoramento-rodape">
-                {monitoramentoEE?.atualizadoEm ? `Atualizado ${new Date(monitoramentoEE.atualizadoEm).toLocaleString('pt-BR')}` : 'Atualização automática a cada 30 min'}
-                <button onClick={buscarMonitoramento} disabled={monitoramentoCarregando}>↻ Atualizar</button>
+                <span>
+                  {monitoramentoEE?.atualizadoEm || focosAtualizadoEm
+                    ? `Atualizado ${new Date(monitoramentoEE?.atualizadoEm || focosAtualizadoEm || '').toLocaleString('pt-BR')}`
+                    : 'Atualização automática'}
+                </span>
+                <div className="mapa-monitoramento-acoes">
+                  <button onClick={buscarFocos} disabled={focosCarregando}>
+                    {focosCarregando ? '⏳' : '🔥'} Focos
+                  </button>
+                  <button onClick={buscarMonitoramento} disabled={monitoramentoCarregando}>
+                    {monitoramentoCarregando ? '⏳' : '🛰️'} Camadas
+                  </button>
+                </div>
               </div>
           </>
         </div>

@@ -20,3 +20,9 @@ O painel do mapa deve continuar exibindo ECOSTRESS, Sentinel-2, Landsat 8/9, Sen
 **Why:** A equipe precisa reconhecer as ferramentas disponíveis sem confundir a ausência temporária de credenciais com a ausência do recurso no aplicativo.
 
 **How to apply:** Ao adicionar novas fontes de incêndio, preserve esse estado de catálogo visível e só habilite a sobreposição quando o servidor retornar uma URL de tiles válida.
+
+O produto oficial GOES-19 para fogo no Earth Engine é `NOAA/GOES/19/FDCF`, com banda `Area > 0` e cadência de 10 minutos. `CT_MERG_FIRE` deve ser tratado como coleção complementar configurável, pois o nome sozinho não identifica uma coleção pública única.
+
+**Why:** GOES-19 tem uma máscara e uma cadência diferentes de MODIS/VIIRS; aplicar `FireMask >= 7` nele produziria uma camada inválida. A coleção CT pode ser um asset específico da equipe.
+
+**How to apply:** Usar `Area > 0` para o FDCF e configurar CT_MERG_FIRE por `EARTH_ENGINE_CT_MERG_FIRE_COLLECTION`, com banda, limiar, escala e período explícitos.

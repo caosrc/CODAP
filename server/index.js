@@ -2854,6 +2854,35 @@ app.get('/api/radar-chuva', async (_req, res) => {
   }
 })
 
+// ── RRQPE do GOES-16 ────────────────────────────────────────────────────────
+// O produto ABI-L2-RRQPEF original da NOAA é um NetCDF georreferenciado, não
+// um tile que o Leaflet consiga desenhar diretamente. O processamento desse
+// arquivo precisa acontecer em um serviço de rasterização separado. Quando
+// esse serviço for configurado, ele publica um template XYZ em
+// RRQPE_TILES_URL (com {z}, {x} e {y}); o app então sobrepõe a camada no mapa.
+app.get('/api/rrqpe', (_req, res) => {
+  const tileUrl = String(process.env.RRQPE_TILES_URL || '').trim()
+
+  if (!tileUrl) {
+    return res.json({
+      disponivel: false,
+      fonte: 'GOES-16 RRQPE / NOAA',
+      mensagem: 'A camada RRQPE precisa de um serviço de tiles georreferenciados; ele ainda não está configurado neste ambiente.',
+    })
+  }
+
+  if (!/^https:\/\//i.test(tileUrl) || !tileUrl.includes('{z}') || !tileUrl.includes('{x}') || !tileUrl.includes('{y}')) {
+    return res.status(503).json({ erro: 'RRQPE_TILES_URL deve ser um template HTTPS com {z}, {x} e {y}.' })
+  }
+
+  return res.json({
+    disponivel: true,
+    tileUrl,
+    atualizadoEm: new Date().toISOString(),
+    fonte: 'GOES-16 RRQPE / NOAA',
+  })
+})
+
 // Limite oficial do município, usado para destacar a área de Ouro Branco sobre
 // o radar. Mantemos cache longo para não sobrecarregar o Nominatim.
 let limiteOuroBrancoCache = null

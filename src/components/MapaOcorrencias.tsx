@@ -90,6 +90,14 @@ interface DadosRadarChuva {
   erroAtualizacao?: boolean
 }
 
+interface DadosRRQPE {
+  disponivel: boolean
+  tileUrl?: string
+  atualizadoEm?: string
+  fonte: string
+  mensagem?: string
+}
+
 interface ChuvaNoPonto {
   precipitacao: number | null
 }
@@ -425,6 +433,10 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
   const [chuvaNoPonto, setChuvaNoPonto] = useState<ChuvaNoPonto | null>(null)
   const [radarChuvaCarregando, setRadarChuvaCarregando] = useState(false)
   const [radarChuvaErro, setRadarChuvaErro] = useState<string | null>(null)
+  const [mostrarRRQPE, setMostrarRRQPE] = useState(false)
+  const [rrqpe, setRRQPE] = useState<DadosRRQPE | null>(null)
+  const [rrqpeCarregando, setRRQPECarregando] = useState(false)
+  const [rrqpeErro, setRRQPEErro] = useState<string | null>(null)
   const [limiteMunicipio, setLimiteMunicipio] = useState<Record<string, unknown> | null>(null)
   const [mostrarOcorrencias, setMostrarOcorrencias] = useState(false)
   const [mostrarMateriais, setMostrarMateriais] = useState(false)
@@ -538,6 +550,34 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
       document.removeEventListener('visibilitychange', atualizarAoVoltar)
     }
   }, [mostrarChuva, buscarRadarChuva])
+
+  const buscarRRQPE = useCallback(async () => {
+    setRRQPECarregando(true)
+    setRRQPEErro(null)
+    try {
+      const resposta = await fetch(`/api/rrqpe?_ts=${Date.now()}`, { cache: 'no-store' })
+      if (!resposta.ok) throw new Error('RRQPE indisponível')
+      const dados = await resposta.json()
+      setRRQPE({
+        disponivel: dados?.disponivel === true,
+        tileUrl: typeof dados?.tileUrl === 'string' ? dados.tileUrl : undefined,
+        atualizadoEm: typeof dados?.atualizadoEm === 'string' ? dados.atualizadoEm : undefined,
+        fonte: typeof dados?.fonte === 'string' ? dados.fonte : 'GOES-16 RRQPE / NOAA',
+        mensagem: typeof dados?.mensagem === 'string' ? dados.mensagem : undefined,
+      })
+    } catch {
+      setRRQPEErro('Não foi possível consultar o RRQPE agora.')
+    } finally {
+      setRRQPECarregando(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!mostrarRRQPE) return
+    buscarRRQPE()
+    const intervalo = setInterval(buscarRRQPE, 10 * 60 * 1000)
+    return () => clearInterval(intervalo)
+  }, [mostrarRRQPE, buscarRRQPE])
 
   useEffect(() => {
     if (!mostrarChuva || limiteMunicipio) return
@@ -1246,6 +1286,20 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
             updateWhenIdle={true}
           />
         )}
+        {mostrarChuva && mostrarRRQPE && rrqpe?.disponivel && rrqpe.tileUrl && (
+          <TileLayer
+            key={`rrqpe-${rrqpe.atualizadoEm || rrqpe.tileUrl}`}
+            url={rrqpe.tileUrl}
+            opacity={0.5}
+            attribution='RRQPE: <a href="https://www.noaa.gov/" target="_blank" rel="noreferrer">NOAA / GOES-16</a>'
+            maxNativeZoom={8}
+            maxZoom={19}
+            tileSize={256}
+            zIndex={21}
+            updateWhenZooming={false}
+            updateWhenIdle={true}
+          />
+        )}
         {mostrarChuva && limiteMunicipio && (
           <GeoJSON
             key="limite-municipio-ouro-branco"
@@ -1538,6 +1592,7 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
               const proximoEstado = !mostrarChuva
               setMostrarChuva(proximoEstado)
               setPainelChuvaAberto(proximoEstado)
+              if (!proximoEstado) setMostrarRRQPE(false)
             }}
             aria-pressed={mostrarChuva}
             title="Mostrar radar de chuva ao vivo em Ouro Branco"
@@ -1555,6 +1610,18 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
                   onClick={() => setPainelChuvaAberto(false)}
                   aria-label="Fechar painel de chuva"
                 >✕</button>
+              </div>
+              <div className="mapa-chuva-fontes">
+                <button
+                  className={`mapa-chuva-fonte-btn ${mostrarRRQPE ? 'ativo' : ''}`}
+                  onClick={() => setMostrarRRQPE(v => !v)}
+                  aria-pressed={mostrarRRQPE}
+                  disabled={rrqpeCarregando}
+                  title="Sobrepor a estimativa de precipitação do satélite GOES-16"
+                >
+                  ☁️ RRQPE
+                </button>
+                <span>Estimativa por satélite · GOES-16</span>
               </div>
               {radarChuvaCarregando && !radarChuva && (
                 <div className="mapa-chuva-status">⏳ Carregando o último quadro do radar…</div>
@@ -1587,10 +1654,28 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
                     <span><i className="chuva-cor chuva-cor--intensa" /> intensa</span>
                   </div>
                   <p className="mapa-chuva-ajuda">
-                    As manchas coloridas mostram precipitação detectada pelo radar. A camada é atualizada automaticamente a cada 5 minutos.
+                    As manchas coloridas mostram a chuva detectada pelo radar. O RRQPE acrescenta uma estimativa por satélite quando a camada estiver disponível.
                   </p>
+                  {mostrarRRQPE && (
+                    <div className={`mapa-rrqpe-status ${rrqpe?.disponivel ? 'disponivel' : ''}`}>
+                      <strong>☁️ RRQPE · GOES-16</strong>
+                      {rrqpeCarregando && <span>Consultando a última imagem…</span>}
+                      {!rrqpeCarregando && rrqpe?.disponivel && (
+                        <span>
+                          Camada ativa
+                          {rrqpe.atualizadoEm
+                            ? ` · ${new Date(rrqpe.atualizadoEm).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`
+                            : ''}
+                        </span>
+                      )}
+                      {!rrqpeCarregando && !rrqpe?.disponivel && (
+                        <span>{rrqpe?.mensagem || rrqpeErro || 'A camada RRQPE não está publicada neste ambiente.'}</span>
+                      )}
+                      {rrqpeErro && rrqpe?.disponivel !== true && <small>{rrqpeErro}</small>}
+                    </div>
+                  )}
                   <div className="mapa-chuva-rodape">
-                    <span>{radarChuva.erroAtualizacao ? 'Exibindo último dado salvo' : 'RainViewer · radar ao vivo'}</span>
+                    <span>{radarChuva.erroAtualizacao ? 'Último radar salvo' : 'RainViewer · ao vivo'}</span>
                     <button onClick={buscarRadarChuva} disabled={radarChuvaCarregando}>
                       {radarChuvaCarregando ? '⏳' : '↻'} Atualizar
                     </button>

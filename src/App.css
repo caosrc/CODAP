@@ -871,7 +871,15 @@ input, select, textarea { font-family: inherit; }
   box-shadow: 0 2px 12px rgba(0,0,0,0.2);
   padding: 0.22rem;
   display: flex;
-  gap: 0.2rem;
+  gap: 0.08rem;
+  max-width: calc(100% - 16px);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.mapa-camadas::-webkit-scrollbar { display: none; }
+.mapa-camadas .mapa-camada-btn {
+  padding: 0.28rem 0.46rem;
+  font-size: 0.68rem;
 }
 
 /* ─── Submenu de filtro de tipos de ocorrências ─── */
@@ -1117,9 +1125,9 @@ input, select, textarea { font-family: inherit; }
   top: calc(100% + 8px);
   left: 50%;
   transform: translateX(-50%);
-  width: min(320px, calc(100vw - 20px));
+  width: min(242px, calc(100vw - 18px));
   background: white;
-  border-radius: 14px;
+  border-radius: 11px;
   box-shadow: 0 8px 28px rgba(0,0,0,0.25);
   overflow: hidden;
   color: #1f2937;
@@ -1130,7 +1138,7 @@ input, select, textarea { font-family: inherit; }
   align-items: flex-start;
   justify-content: space-between;
   gap: 0.6rem;
-  padding: 0.7rem 0.8rem;
+  padding: 0.48rem 0.58rem;
   color: white;
   background: linear-gradient(135deg, #075985, #0284c7);
 }
@@ -1139,11 +1147,11 @@ input, select, textarea { font-family: inherit; }
   display: block;
 }
 .mapa-chuva-painel-header strong {
-  font-size: 0.85rem;
+  font-size: 0.72rem;
 }
 .mapa-chuva-painel-header span {
   margin-top: 2px;
-  font-size: 0.62rem;
+  font-size: 0.5rem;
   opacity: 0.88;
 }
 .mapa-chuva-painel-header button {
@@ -1155,9 +1163,43 @@ input, select, textarea { font-family: inherit; }
   padding: 0.2rem 0.4rem;
   cursor: pointer;
 }
+.mapa-chuva-fontes {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.5rem;
+  border-bottom: 1px solid #e5e7eb;
+  background: #f8fafc;
+}
+.mapa-chuva-fonte-btn {
+  border: 1px solid #bae6fd;
+  border-radius: 5px;
+  padding: 0.2rem 0.35rem;
+  background: white;
+  color: #075985;
+  font-size: 0.58rem;
+  font-weight: 800;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.mapa-chuva-fonte-btn.ativo {
+  background: #075985;
+  color: white;
+}
+.mapa-chuva-fonte-btn:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+.mapa-chuva-fontes > span {
+  overflow: hidden;
+  color: #64748b;
+  font-size: 0.52rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .mapa-chuva-status {
-  padding: 0.8rem;
-  font-size: 0.76rem;
+  padding: 0.58rem;
+  font-size: 0.62rem;
   color: #475569;
   text-align: center;
 }
@@ -1175,16 +1217,16 @@ input, select, textarea { font-family: inherit; }
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
-  padding: 0.65rem 0.75rem;
+  padding: 0.48rem 0.5rem;
   background: white;
 }
 .mapa-chuva-resumo-label {
   color: #64748b;
-  font-size: 0.62rem;
+  font-size: 0.52rem;
 }
 .mapa-chuva-resumo strong {
   color: #334155;
-  font-size: 0.78rem;
+  font-size: 0.65rem;
 }
 .mapa-chuva-resumo strong.chovendo {
   color: #0369a1;
@@ -1192,9 +1234,9 @@ input, select, textarea { font-family: inherit; }
 .mapa-chuva-legenda {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.35rem 0.65rem;
-  padding: 0.6rem 0.75rem 0.3rem;
-  font-size: 0.65rem;
+  gap: 0.25rem 0.4rem;
+  padding: 0.38rem 0.5rem 0.2rem;
+  font-size: 0.54rem;
   color: #475569;
 }
 .mapa-chuva-legenda span {
@@ -1204,8 +1246,8 @@ input, select, textarea { font-family: inherit; }
 }
 .chuva-cor {
   display: inline-block;
-  width: 11px;
-  height: 11px;
+  width: 8px;
+  height: 8px;
   border-radius: 3px;
 }
 .chuva-cor--fraca { background: #67e8f9; }
@@ -1213,28 +1255,48 @@ input, select, textarea { font-family: inherit; }
 .chuva-cor--forte { background: #facc15; }
 .chuva-cor--intensa { background: #ef4444; }
 .mapa-chuva-ajuda {
-  margin: 0.35rem 0.75rem 0.55rem;
+  margin: 0.25rem 0.5rem 0.35rem;
   color: #64748b;
-  font-size: 0.65rem;
+  font-size: 0.54rem;
   line-height: 1.35;
 }
+.mapa-rrqpe-status {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  margin: 0 0.5rem 0.35rem;
+  padding: 0.35rem 0.4rem;
+  border: 1px solid #fde68a;
+  border-radius: 6px;
+  background: #fffbeb;
+  color: #92400e;
+  font-size: 0.52rem;
+  line-height: 1.3;
+}
+.mapa-rrqpe-status.disponivel {
+  border-color: #a7f3d0;
+  background: #ecfdf5;
+  color: #047857;
+}
+.mapa-rrqpe-status strong { font-size: 0.56rem; }
+.mapa-rrqpe-status small { color: #b45309; font-size: 0.48rem; }
 .mapa-chuva-rodape {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 0.5rem;
-  padding: 0.5rem 0.75rem;
+  padding: 0.35rem 0.5rem;
   border-top: 1px solid #e5e7eb;
   color: #94a3b8;
-  font-size: 0.6rem;
+  font-size: 0.5rem;
 }
 .mapa-chuva-rodape button {
   border: 1px solid #cbd5e1;
   border-radius: 6px;
-  padding: 0.25rem 0.45rem;
+  padding: 0.2rem 0.32rem;
   background: white;
   color: #0369a1;
-  font-size: 0.65rem;
+  font-size: 0.54rem;
   font-weight: 700;
   cursor: pointer;
 }
@@ -1271,12 +1333,12 @@ input, select, textarea { font-family: inherit; }
     padding: 0.18rem;
   }
   .mapa-camada-btn {
-    padding: 0.3rem 0.42rem;
-    font-size: 0.68rem;
+    padding: 0.24rem 0.34rem;
+    font-size: 0.61rem;
   }
   .mapa-chuva-painel {
     left: auto;
-    right: -8px;
+    right: -4px;
     transform: none;
   }
   .mapa-legenda {

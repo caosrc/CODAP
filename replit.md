@@ -26,6 +26,7 @@ Required env vars (all set in Replit shared env / secrets):
 - **Push Notifications**: Web Push (VAPID) via `web-push` on Express server
 - **Maps**: Leaflet + react-leaflet (tiles proxied via `/api/tiles`)
 - **Incêndios ativos**: NASA FIRMS + Google Earth Engine (MODIS Terra, MODIS Aqua e VIIRS), exibidos como focos no mapa
+- **Chuva ao vivo**: RainViewer fornece o último quadro de radar meteorológico sobre o Leaflet; o limite oficial de Ouro Branco é desenhado sobre a camada via OpenStreetMap/Nominatim
 - **Imagens Planet**: consulta protegida pelo servidor em `/api/planet-focos`
 
 ## Where things live
@@ -68,6 +69,7 @@ Required env vars (all set in Replit shared env / secrets):
 - Production: `npm run build && node server/index.js` — Express serves built `/dist`
 - Push notifications require `VAPID_PRIVATE_KEY` secret to be set in Replit secrets
 - Earth Engine requires the service account to have Earth Engine access and the `Service Usage Consumer` role on the Google Cloud project
+- O botão **Chuva** mostra precipitação observada pelo radar RainViewer, atualizada automaticamente a cada 5 minutos, com legenda e limite municipal tracejado. A leitura em mm do centro é um resumo do Open-Meteo e não substitui pluviômetro local.
 - O monitoramento do Earth Engine usa apenas `FireMask >= 7` nos últimos 3 dias; não interpreta chuva, radar, vegetação ou cicatriz de queimada como incêndio ativo
 
 ## Pointers

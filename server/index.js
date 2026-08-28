@@ -2798,6 +2798,109 @@ app.get('/api/tempo', async (_req, res) => {
   }
 })
 
+// ── Radar de chuva ao vivo (RainViewer) ─────────────────────────────────────
+// O RainViewer fornece os tiles de radar sem chave. O servidor busca apenas os
+// metadados e o navegador solicita os tiles diretamente ao host informado pela
+// própria API, sempre usando o último quadro disponível.
+let radarChuvaCache = null
+let radarChuvaCacheTs = 0
+const RADAR_CHUVA_TTL_MS = 2 * 60 * 1000
+
+app.get('/api/radar-chuva', async (_req, res) => {
+  try {
+    const agora = Date.now()
+    if (radarChuvaCache && (agora - radarChuvaCacheTs) < RADAR_CHUVA_TTL_MS) {
+      return res.json({ ...radarChuvaCache, cache: true })
+    }
+
+    const resposta = await fetch('https://api.rainviewer.com/public/weather-maps.json', {
+      headers: { Accept: 'application/json' },
+      signal: AbortSignal.timeout(10000),
+    })
+    if (!resposta.ok) throw new Error(`RainViewer: ${resposta.status}`)
+
+    const dados = await resposta.json()
+    const host = typeof dados?.host === 'string' ? dados.host.replace(/\/$/, '') : ''
+    const validarQuadro = quadro => (
+      Number.isFinite(Number(quadro?.time)) &&
+      typeof quadro?.path === 'string' &&
+      quadro.path.startsWith('/v2/')
+    )
+    const quadrosObservados = (Array.isArray(dados?.radar?.past) ? dados.radar.past : [])
+      .filter(validarQuadro)
+    const quadrosPrevisao = (Array.isArray(dados?.radar?.nowcast) ? dados.radar.nowcast : [])
+      .filter(validarQuadro)
+    // A imagem observada é preferível ao nowcast para representar chuva atual.
+    const quadros = quadrosObservados.length > 0 ? quadrosObservados : quadrosPrevisao
+    const ultimo = quadros.at(-1)
+
+    if (!host || !ultimo) throw new Error('RainViewer não retornou quadros de radar')
+
+    radarChuvaCache = {
+      host,
+      path: ultimo.path,
+      frameTime: Number(ultimo.time),
+      atualizadoEm: new Date(Number(ultimo.time) * 1000).toISOString(),
+      fonte: 'RainViewer',
+    }
+    radarChuvaCacheTs = agora
+    return res.json(radarChuvaCache)
+  } catch (err) {
+    console.error('Erro no radar de chuva:', err?.message || err)
+    if (radarChuvaCache) {
+      return res.json({ ...radarChuvaCache, cache: true, erroAtualizacao: true })
+    }
+    return res.status(503).json({ erro: 'Radar de chuva indisponível' })
+  }
+})
+
+// Limite oficial do município, usado para destacar a área de Ouro Branco sobre
+// o radar. Mantemos cache longo para não sobrecarregar o Nominatim.
+let limiteOuroBrancoCache = null
+let limiteOuroBrancoCacheTs = 0
+const LIMITE_OURO_BRANCO_TTL_MS = 24 * 60 * 60 * 1000
+
+app.get('/api/limite-ouro-branco', async (_req, res) => {
+  try {
+    const agora = Date.now()
+    if (limiteOuroBrancoCache && (agora - limiteOuroBrancoCacheTs) < LIMITE_OURO_BRANCO_TTL_MS) {
+      return res.json(limiteOuroBrancoCache)
+    }
+
+    const params = new URLSearchParams({
+      format: 'jsonv2',
+      polygon_geojson: '1',
+      limit: '1',
+      country: 'Brazil',
+      state: 'Minas Gerais',
+      city: 'Ouro Branco',
+    })
+    const resposta = await fetch(`https://nominatim.openstreetmap.org/search?${params}`, {
+      headers: {
+        'User-Agent': 'DefesaCivilOuroBranco/1.0',
+        'Accept-Language': 'pt-BR',
+        Accept: 'application/json',
+      },
+      signal: AbortSignal.timeout(10000),
+    })
+    if (!resposta.ok) throw new Error(`Nominatim: ${resposta.status}`)
+
+    const locais = await resposta.json()
+    const geojson = locais?.[0]?.geojson
+    if (!geojson || !['Polygon', 'MultiPolygon'].includes(geojson.type)) {
+      throw new Error('Limite municipal não encontrado')
+    }
+
+    limiteOuroBrancoCache = geojson
+    limiteOuroBrancoCacheTs = agora
+    return res.json(geojson)
+  } catch (err) {
+    console.error('Erro no limite de Ouro Branco:', err?.message || err)
+    if (limiteOuroBrancoCache) return res.json(limiteOuroBrancoCache)
+    return res.status(503).json({ erro: 'Limite municipal indisponível' })
+  }
+})
+
 // ── Proxy de imagens do Supabase Storage (evita CORS no browser) ─────────────
 // Usado pela exportação Excel para baixar fotos do Supabase Storage no servidor
 app.get('/api/proxy-imagem', async (req, res) => {

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
-import { MapContainer, TileLayer, Marker, Popup, useMapEvents, useMap, Circle, Polyline, CircleMarker } from 'react-leaflet'
+import { MapContainer, TileLayer, Marker, Popup, useMapEvents, useMap, Circle, Polyline, CircleMarker, GeoJSON } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import type { Ocorrencia } from '../types'
@@ -78,6 +78,20 @@ interface IndicadorMonitoramento {
   nome: string
   valor: number
   unidade: string
+}
+
+interface DadosRadarChuva {
+  host: string
+  path: string
+  frameTime: number
+  atualizadoEm: string
+  fonte: string
+  cache?: boolean
+  erroAtualizacao?: boolean
+}
+
+interface ChuvaNoPonto {
+  precipitacao: number | null
 }
 
 // ── Cache de ícones no nível do módulo ──────────────────────────
@@ -405,6 +419,13 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
   const [camadaMapa, setCamadaMapa] = useState<CamadaMapa>('padrao')
   const [camadaMonitoramento, setCamadaMonitoramento] = useState<CamadaMonitoramentoId>(null)
   const [painelMonitoramentoAberto, setPainelMonitoramentoAberto] = useState(false)
+  const [mostrarChuva, setMostrarChuva] = useState(false)
+  const [painelChuvaAberto, setPainelChuvaAberto] = useState(false)
+  const [radarChuva, setRadarChuva] = useState<DadosRadarChuva | null>(null)
+  const [chuvaNoPonto, setChuvaNoPonto] = useState<ChuvaNoPonto | null>(null)
+  const [radarChuvaCarregando, setRadarChuvaCarregando] = useState(false)
+  const [radarChuvaErro, setRadarChuvaErro] = useState<string | null>(null)
+  const [limiteMunicipio, setLimiteMunicipio] = useState<Record<string, unknown> | null>(null)
   const [mostrarOcorrencias, setMostrarOcorrencias] = useState(false)
   const [mostrarMateriais, setMostrarMateriais] = useState(false)
   const [painelMaterialAberto, setPainelMaterialAberto] = useState(false)
@@ -467,6 +488,64 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
     periodo?: { inicio: string; fim: string }
   } | null>(null)
   const [monitoramentoCarregando, setMonitoramentoCarregando] = useState(false)
+
+  // ── Chuva ao vivo — RainViewer + resumo do ponto central ─────────
+  const buscarRadarChuva = useCallback(async () => {
+    setRadarChuvaCarregando(true)
+    setRadarChuvaErro(null)
+    try {
+      const [respostaRadar, respostaTempo] = await Promise.all([
+        fetch(`/api/radar-chuva?_ts=${Date.now()}`, { cache: 'no-store' }),
+        fetch(`/api/tempo?_ts=${Date.now()}`, { cache: 'no-store' }),
+      ])
+      if (!respostaRadar.ok) throw new Error('Radar indisponível')
+
+      const dadosRadar = await respostaRadar.json()
+      setRadarChuva(dadosRadar)
+
+      if (respostaTempo.ok) {
+        const dadosTempo = await respostaTempo.json()
+        const agora = Date.now()
+        const horas = Array.isArray(dadosTempo?.horas) ? dadosTempo.horas : []
+        const maisProxima = horas
+          .filter((hora: { time?: string }) => hora?.time)
+          .sort((a: { time: string }, b: { time: string }) => (
+            Math.abs(new Date(a.time).getTime() - agora) - Math.abs(new Date(b.time).getTime() - agora)
+          ))[0]
+        setChuvaNoPonto({
+          precipitacao: Number.isFinite(Number(maisProxima?.precipitacao))
+            ? Number(maisProxima.precipitacao)
+            : null,
+        })
+      }
+    } catch {
+      setRadarChuvaErro('Não foi possível atualizar o radar agora.')
+    } finally {
+      setRadarChuvaCarregando(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!mostrarChuva) return
+    buscarRadarChuva()
+    const intervalo = setInterval(buscarRadarChuva, 5 * 60 * 1000)
+    const atualizarAoVoltar = () => {
+      if (document.visibilityState === 'visible') buscarRadarChuva()
+    }
+    document.addEventListener('visibilitychange', atualizarAoVoltar)
+    return () => {
+      clearInterval(intervalo)
+      document.removeEventListener('visibilitychange', atualizarAoVoltar)
+    }
+  }, [mostrarChuva, buscarRadarChuva])
+
+  useEffect(() => {
+    if (!mostrarChuva || limiteMunicipio) return
+    fetch('/api/limite-ouro-branco', { cache: 'force-cache' })
+      .then(res => res.ok ? res.json() : null)
+      .then(geojson => { if (geojson) setLimiteMunicipio(geojson) })
+      .catch(() => {})
+  }, [mostrarChuva, limiteMunicipio])
 
   // Mapa offline — inicializa tiles do localStorage para mostrar status imediatamente
   const [statusOffline, setStatusOffline] = useState<StatusOffline>('idle')
@@ -1153,6 +1232,34 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
             zIndex={10}
           />
         )}
+        {mostrarChuva && radarChuva && (
+          <TileLayer
+            key={`radar-chuva-${radarChuva.frameTime}`}
+            url={`${radarChuva.host}${radarChuva.path}/256/{z}/{x}/{y}/2/1_1.png`}
+            opacity={0.72}
+            attribution='Radar meteorológico: <a href="https://www.rainviewer.com/" target="_blank" rel="noreferrer">RainViewer</a>'
+            maxNativeZoom={7}
+            maxZoom={19}
+            tileSize={256}
+            zIndex={20}
+            updateWhenZooming={false}
+            updateWhenIdle={true}
+          />
+        )}
+        {mostrarChuva && limiteMunicipio && (
+          <GeoJSON
+            key="limite-municipio-ouro-branco"
+            data={limiteMunicipio as never}
+            style={() => ({
+              color: '#1d4ed8',
+              weight: 2,
+              opacity: 0.95,
+              dashArray: '7 5',
+              fillColor: '#60a5fa',
+              fillOpacity: 0.04,
+            })}
+          />
+        )}
 
         <MapClickHandler onMapClick={() => setSelecionada(null)} />
         <BoundsTracker onChange={setMapaBounds} />
@@ -1424,6 +1531,75 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
         >
           🛰️ Satélite
         </button>
+        <div className="mapa-chuva-wrap">
+          <button
+            className={`mapa-camada-btn mapa-chuva-btn ${mostrarChuva ? 'ativo' : ''}`}
+            onClick={() => {
+              const proximoEstado = !mostrarChuva
+              setMostrarChuva(proximoEstado)
+              setPainelChuvaAberto(proximoEstado)
+            }}
+            aria-pressed={mostrarChuva}
+            title="Mostrar radar de chuva ao vivo em Ouro Branco"
+          >
+            🌧️ Chuva
+          </button>
+          {painelChuvaAberto && (
+            <div className="mapa-chuva-painel">
+              <div className="mapa-chuva-painel-header">
+                <div>
+                  <strong>🌧️ Chuva ao vivo</strong>
+                  <span>Ouro Branco, MG · área tracejada = limite municipal</span>
+                </div>
+                <button
+                  onClick={() => setPainelChuvaAberto(false)}
+                  aria-label="Fechar painel de chuva"
+                >✕</button>
+              </div>
+              {radarChuvaCarregando && !radarChuva && (
+                <div className="mapa-chuva-status">⏳ Carregando o último quadro do radar…</div>
+              )}
+              {radarChuvaErro && (
+                <div className="mapa-chuva-status mapa-chuva-status--erro">{radarChuvaErro}</div>
+              )}
+              {radarChuva && (
+                <>
+                  <div className="mapa-chuva-resumo">
+                    <div>
+                      <span className="mapa-chuva-resumo-label">No centro de Ouro Branco</span>
+                      <strong className={chuvaNoPonto?.precipitacao && chuvaNoPonto.precipitacao > 0 ? 'chovendo' : ''}>
+                        {chuvaNoPonto?.precipitacao != null
+                          ? chuvaNoPonto.precipitacao > 0
+                            ? `🌧️ ${chuvaNoPonto.precipitacao.toFixed(1)} mm`
+                            : '☀️ Sem chuva no ponto'
+                          : '–'}
+                      </strong>
+                    </div>
+                    <div>
+                      <span className="mapa-chuva-resumo-label">Quadro do radar</span>
+                      <strong>{new Date(radarChuva.frameTime * 1000).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</strong>
+                    </div>
+                  </div>
+                  <div className="mapa-chuva-legenda">
+                    <span><i className="chuva-cor chuva-cor--fraca" /> fraca</span>
+                    <span><i className="chuva-cor chuva-cor--moderada" /> moderada</span>
+                    <span><i className="chuva-cor chuva-cor--forte" /> forte</span>
+                    <span><i className="chuva-cor chuva-cor--intensa" /> intensa</span>
+                  </div>
+                  <p className="mapa-chuva-ajuda">
+                    As manchas coloridas mostram precipitação detectada pelo radar. A camada é atualizada automaticamente a cada 5 minutos.
+                  </p>
+                  <div className="mapa-chuva-rodape">
+                    <span>{radarChuva.erroAtualizacao ? 'Exibindo último dado salvo' : 'RainViewer · radar ao vivo'}</span>
+                    <button onClick={buscarRadarChuva} disabled={radarChuvaCarregando}>
+                      {radarChuvaCarregando ? '⏳' : '↻'} Atualizar
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+        </div>
         <button
           className={`mapa-camada-btn ${mostrarMateriais ? 'ativo' : ''}`}
           onClick={() => {

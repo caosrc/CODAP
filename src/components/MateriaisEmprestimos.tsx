@@ -596,20 +596,6 @@ export default function MateriaisEmprestimos({ onIrParaMapa, abrirCampoId, onAbr
     )
   }
 
-  if (modo === 'checklistFerramenta' && materialSelecionado) {
-    return (
-      <ChecklistFerramenta
-        ferramenta={materialSelecionado}
-        onVoltar={() => setModo('detalheMaterial')}
-        onSalvo={async () => {
-          showToast('✅ Checklist registrado!')
-          await carregar()
-          setModo('detalheMaterial')
-        }}
-      />
-    )
-  }
-
   // ─── FORMULÁRIO DE NOVO MATERIAL ─────────────────────────────────────────
   if (modo === 'formMaterial') {
     return (
@@ -1071,7 +1057,7 @@ function DetalheMaterial({
   )
 }
 
-function HistoricoChecklists({ ferramentaId, quantidadeCadastrada }: {
+function HistoricoChecklists({ ferramentaId, ferramentaNome, quantidadeCadastrada }: {
   ferramentaId: string
   ferramentaNome: string
   quantidadeCadastrada: number

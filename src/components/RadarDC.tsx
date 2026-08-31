@@ -21,7 +21,7 @@ type Atividade = {
 type AtividadeFerramenta = {
   id: number; ferramentaId: string; agente: string; ferramentaNome: string
   quantidadeCadastrada?: number; quantidadeConferida?: number
-  condicao: 'boa' | 'media' | 'ruim' | string; itemFaltante?: string
+  condicao: 'boa' | 'media' | 'ruim' | string; itemFaltante?: string; justificativa?: string
   data_checklist: string; created_at: string
 }
 type FerramentaCatalogo = { id: string; nome: string; quantidade: number }
@@ -30,7 +30,6 @@ type ResumoFerramental = {
   itensConferidos: number; itensCadastrados: number
   boa: number; media: number; ruim: number
   ferramentasRuins: string[]; faltantes: string[]; semChecklist: string[]
-  registros: AtividadeFerramenta[]
 }
 
 type DiaPrevisao = { data: string; codigo: number; temperaturaMax: number; temperaturaMin: number; precipitacao: number; probabilidade: number; umidade: number; vento: number; rajada: number }
@@ -119,7 +118,11 @@ function resumirFerramental(
       if (registro.condicao === 'ruim') ferramentasRuins.push(registro.ferramentaNome)
       if (quantidadeFaltante > 0) {
         const descricao = String(registro.itemFaltante || registro.ferramentaNome || 'ferramental').trim()
-        faltantes.push(/^\d/.test(descricao) ? descricao : `${quantidadeFaltante} ${descricao}`)
+        const itemComQuantidade = /^\d/.test(descricao) ? descricao : `${quantidadeFaltante} ${descricao}`
+        const justificativa = String(registro.justificativa || '').trim()
+        faltantes.push(justificativa
+          ? `${itemComQuantidade} — Justificativa: ${justificativa}`
+          : itemComQuantidade)
       }
     })
 
@@ -129,7 +132,7 @@ function resumirFerramental(
     return {
       agente, tiposVerificados: idsVerificados.size, totalTipos, itensConferidos, itensCadastrados,
       boa, media, ruim, ferramentasRuins: [...new Set(ferramentasRuins)],
-      faltantes, semChecklist, registros: registrosAgente,
+      faltantes, semChecklist,
     }
   }).sort((a, b) => a.agente.localeCompare(b.agente))
 }
@@ -258,7 +261,7 @@ export default function RadarDC() {
       checklists: dados.checklists.map(item => [item.id, item.created_at, item.hora, item.placa, item.km, item.nivelCombustivel]),
       checklistsFerramentas: dados.checklistsFerramentas.map(item => [
         item.id, item.created_at, item.agente, item.ferramentaNome, item.condicao,
-        item.quantidadeCadastrada, item.quantidadeConferida, item.itemFaltante,
+        item.quantidadeCadastrada, item.quantidadeConferida, item.itemFaltante, item.justificativa,
       ]),
       ocorrencias: dados.ocorrencias.map(item => [item.id, item.created_at, item.hora, item.natureza, item.endereco]),
     })
@@ -313,6 +316,7 @@ export default function RadarDC() {
               quantidadeConferida: Number(row.quantidade_conferida || 0),
               condicao: String(row.condicao || ''),
               itemFaltante: String(row.item_faltante || ''),
+              justificativa: String(row.justificativa || ''),
               data_checklist: String(row.data_checklist || ''),
               created_at: String(row.created_at || row.data_checklist || ''),
             })),
@@ -742,17 +746,6 @@ export default function RadarDC() {
                       {resumo.semChecklist.length > 3 ? ` e mais ${resumo.semChecklist.length - 3}` : ''}
                     </div>
                   )}
-                  <div className="radar-ferramental-registros">
-                    {resumo.registros.map(registro => (
-                      <button
-                        className="radar-ferramental-registro"
-                        key={registro.id}
-                        onClick={() => disparar('dc:abrir-checklist-ferramenta', { id: registro.id })}
-                      >
-                        {registro.ferramentaNome} · {registro.condicao === 'boa' ? 'Boa' : registro.condicao === 'media' ? 'Média' : 'Ruim'} <em>abrir ›</em>
-                      </button>
-                    ))}
-                  </div>
                 </article>
               ))}
             </div>

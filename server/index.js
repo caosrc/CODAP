@@ -1433,7 +1433,7 @@ app.get('/api/atividades-dia', async (req, res) => {
     )
     const checklistsFerramentas = await query(
       `SELECT cf.id, cf.ferramenta_id, cf.quantidade_cadastrada, cf.quantidade_conferida,
-              cf.condicao, cf.item_faltante, cf.realizado_por, cf.data_checklist, cf.created_at,
+              cf.condicao, cf.item_faltante, cf.justificativa, cf.realizado_por, cf.data_checklist, cf.created_at,
               m.nome AS ferramenta_nome
        FROM checklists_ferramental cf
        LEFT JOIN materiais m ON m.id = cf.ferramenta_id
@@ -1472,6 +1472,7 @@ app.get('/api/atividades-dia', async (req, res) => {
         quantidadeConferida: Number(row.quantidade_conferida || 0),
         condicao: row.condicao || '',
         itemFaltante: row.item_faltante || '',
+        justificativa: row.justificativa || '',
         data_checklist: row.data_checklist,
         created_at: row.created_at,
       })),

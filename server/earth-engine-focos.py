@@ -350,6 +350,7 @@ def consultar_monitoramento():
     indicadores = []
     focos = []
     erros = []
+    sem_dados = []
     disponibilidade = []
 
     for config in obter_fontes_configuradas():
@@ -378,10 +379,12 @@ def consultar_monitoramento():
             )
 
             if not disponivel:
-                erros.append(
-                    f"{config['nome']}: "
-                    f"nenhuma imagem disponível "
-                    f"no período {inicio_config} a {fim}"
+                sem_dados.append(
+                    {
+                        "id": config["id"],
+                        "nome": config["nome"],
+                        "periodo": f"{inicio_config} a {fim}",
+                    }
                 )
 
                 indicadores.append(
@@ -459,6 +462,7 @@ def consultar_monitoramento():
         "indicadores": indicadores,
         "disponibilidade": disponibilidade,
         "erros": erros,
+        "semDados": sem_dados,
         "projeto": project_id,
         "atualizadoEm": (
             datetime.datetime.now(

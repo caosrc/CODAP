@@ -137,6 +137,7 @@ interface DadosRadarChuva {
   frameTime: number
   atualizadoEm: string
   fonte: string
+  tipoQuadro?: 'observado' | 'nowcast'
   cache?: boolean
   erroAtualizacao?: boolean
 }
@@ -151,6 +152,7 @@ interface DadosRRQPE {
 
 interface ChuvaNoPonto {
   precipitacao: number | null
+  fonte?: string
 }
 
 // ── Cache de ícones no nível do módulo ──────────────────────────
@@ -549,6 +551,7 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
     camadas: CamadaMonitoramento[]
     indicadores: IndicadorMonitoramento[]
     erros: string[]
+    semDados?: Array<{ id: string; nome: string; periodo?: string }>
     atualizadoEm?: string
     periodo?: { inicio: string; fim: string }
   } | null>(null)
@@ -571,17 +574,24 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
       if (respostaTempo.ok) {
         const dadosTempo = await respostaTempo.json()
         const agora = Date.now()
+        const precipitacaoAtual = Number(dadosTempo?.atual?.precipitacao)
         const horas = Array.isArray(dadosTempo?.horas) ? dadosTempo.horas : []
         const maisProxima = horas
           .filter((hora: { time?: string }) => hora?.time)
           .sort((a: { time: string }, b: { time: string }) => (
             Math.abs(new Date(a.time).getTime() - agora) - Math.abs(new Date(b.time).getTime() - agora)
           ))[0]
-        setChuvaNoPonto({
-          precipitacao: Number.isFinite(Number(maisProxima?.precipitacao))
-            ? Number(maisProxima.precipitacao)
-            : null,
-        })
+        setChuvaNoPonto(Number.isFinite(precipitacaoAtual)
+          ? {
+              precipitacao: precipitacaoAtual,
+              fonte: 'condição atual no ponto central',
+            }
+          : {
+              precipitacao: Number.isFinite(Number(maisProxima?.precipitacao))
+                ? Number(maisProxima.precipitacao)
+                : null,
+              fonte: 'previsão horária mais próxima',
+            })
       }
     } catch {
       setRadarChuvaErro('Não foi possível atualizar o radar agora.')
@@ -762,7 +772,7 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
       camada => !FERRAMENTAS_SATELITE.some(principal => principal.id === camada.id),
     )
     return [...principais, ...extras]
-  }, [monitoramentoEE])
+  }, [monitoramentoEE, focosMonitoramento])
 
   // Persiste contagem de tiles no localStorage para mostrar status entre recargas
   useEffect(() => {
@@ -1380,6 +1390,24 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
             })}
           />
         )}
+        {mostrarChuva && (
+          <CircleMarker
+            center={OURO_BRANCO}
+            radius={5}
+            pathOptions={{
+              color: '#0f172a',
+              weight: 2,
+              fillColor: '#f8fafc',
+              fillOpacity: 1,
+            }}
+          >
+            <Popup>
+              <strong>Centro de Ouro Branco</strong>
+              <br />
+              Ponto usado para consultar a precipitação local.
+            </Popup>
+          </CircleMarker>
+        )}
 
         <MapClickHandler onMapClick={() => setSelecionada(null)} />
         <BoundsTracker onChange={setMapaBounds} />
@@ -1699,7 +1727,7 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
                 <>
                   <div className="mapa-chuva-resumo">
                     <div>
-                      <span className="mapa-chuva-resumo-label">No centro de Ouro Branco</span>
+                        <span className="mapa-chuva-resumo-label">Ponto central · Ouro Branco</span>
                       <strong className={chuvaNoPonto?.precipitacao && chuvaNoPonto.precipitacao > 0 ? 'chovendo' : ''}>
                         {chuvaNoPonto?.precipitacao != null
                           ? chuvaNoPonto.precipitacao > 0
@@ -1707,20 +1735,30 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
                             : '☀️ Sem chuva no ponto'
                           : '–'}
                       </strong>
+                      <small className="mapa-chuva-ponto-fonte">
+                        {chuvaNoPonto?.fonte || 'consulta local'}
+                      </small>
                     </div>
                     <div>
                       <span className="mapa-chuva-resumo-label">Quadro do radar</span>
-                      <strong>{new Date(radarChuva.frameTime * 1000).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</strong>
+                      <strong>
+                        {new Date(radarChuva.frameTime * 1000).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                        <small className="mapa-chuva-quadro-tipo">
+                          {radarChuva.tipoQuadro === 'nowcast' ? 'estimativa' : 'observado'}
+                        </small>
+                      </strong>
                     </div>
                   </div>
                   <div className="mapa-chuva-legenda">
                     <span><i className="chuva-cor chuva-cor--fraca" /> fraca</span>
                     <span><i className="chuva-cor chuva-cor--moderada" /> moderada</span>
                     <span><i className="chuva-cor chuva-cor--forte" /> forte</span>
+                    <span><i className="chuva-cor chuva-cor--muito-forte" /> muito forte</span>
                     <span><i className="chuva-cor chuva-cor--intensa" /> intensa</span>
+                    <span><i className="chuva-cor chuva-cor--extrema" /> extrema</span>
                   </div>
                   <p className="mapa-chuva-ajuda">
-                    As manchas coloridas mostram a chuva detectada pelo radar. O RRQPE acrescenta uma estimativa por satélite quando a camada estiver disponível.
+                    As manchas coloridas mostram os núcleos e a área da precipitação no radar. O contorno azul tracejado é o polígono do município; o ponto escuro marca a consulta local.
                   </p>
                   {mostrarRRQPE && (
                     <div className={`mapa-rrqpe-status ${rrqpe?.disponivel ? 'disponivel' : ''}`}>
@@ -1897,7 +1935,7 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
                   const statusTexto = camada.url
                     ? `${camada.periodo}${camada.frequencia ? ` · ${camada.frequencia}` : ''}`
                     : camada.configuracaoNecessaria
-                      ? 'Aguardando configuração'
+                      ? 'Coleção não configurada'
                       : status === 'sem-dados'
                         ? `Sem detecções agora · ${camada.tipo || 'fonte'}`
                         : camada.tipo === 'NASA FIRMS'
@@ -1941,7 +1979,7 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
               )}
               {monitoramentoEE?.configurado && (monitoramentoEE.erros ?? []).length > 0 && (
                 <div className="mapa-monitoramento-aviso">
-                  Algumas fontes indisponíveis: {(monitoramentoEE.erros ?? []).length}. As demais camadas permanecem disponíveis.
+                  Falha temporária em {(monitoramentoEE.erros ?? []).length} fonte{monitoramentoEE.erros.length === 1 ? '' : 's'}. As demais detecções continuam sendo combinadas.
                 </div>
               )}
               <div className="mapa-monitoramento-rodape">

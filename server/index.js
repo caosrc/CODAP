@@ -1933,6 +1933,8 @@ async function buscarMonitoramentoEarthEngine() {
       camadas: Array.isArray(dados.camadas) ? dados.camadas : [],
       indicadores: Array.isArray(dados.indicadores) ? dados.indicadores : [],
       erros: Array.isArray(dados.erros) ? dados.erros : [],
+      semDados: Array.isArray(dados.semDados) ? dados.semDados : [],
+      disponibilidade: Array.isArray(dados.disponibilidade) ? dados.disponibilidade : [],
       projeto: dados.projeto || null,
       periodo: dados.periodo || null,
       atualizadoEm: dados.atualizadoEm || new Date().toISOString(),
@@ -2916,6 +2918,17 @@ async function buscarPrevisaoOpenMeteo() {
       'wind_gusts_10m'
     ].join(','),
 
+    current: [
+      'temperature_2m',
+      'relative_humidity_2m',
+      'precipitation',
+      'rain',
+      'showers',
+      'weather_code',
+      'wind_speed_10m',
+      'wind_gusts_10m'
+    ].join(','),
+
     daily: [
       'temperature_2m_max',
       'temperature_2m_min',
@@ -2949,6 +2962,7 @@ async function buscarPrevisaoOpenMeteo() {
   }
 
   const h = json.hourly
+  const atual = json.current
 
   const horas = h.time.map((time, i) => ({
     time,
@@ -3014,6 +3028,18 @@ async function buscarPrevisaoOpenMeteo() {
     timezone: json.timezone,
 
     atualizadoEm: new Date().toISOString(),
+
+    atual: atual ? {
+      time: atual.time ?? null,
+      temperatura: atual.temperature_2m ?? null,
+      umidade: atual.relative_humidity_2m ?? null,
+      precipitacao: atual.precipitation ?? null,
+      chuva: atual.rain ?? null,
+      pancadas: atual.showers ?? null,
+      codigoTempo: atual.weather_code ?? null,
+      vento: atual.wind_speed_10m ?? null,
+      rajada: atual.wind_gusts_10m ?? null,
+    } : null,
 
     horas,
 
@@ -3116,6 +3142,7 @@ app.get('/api/radar-chuva', async (_req, res) => {
       frameTime: Number(ultimo.time),
       atualizadoEm: new Date(Number(ultimo.time) * 1000).toISOString(),
       fonte: 'RainViewer',
+      tipoQuadro: quadrosObservados.length > 0 ? 'observado' : 'nowcast',
     }
     radarChuvaCacheTs = agora
     return res.json(radarChuvaCache)

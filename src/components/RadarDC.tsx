@@ -5,6 +5,7 @@ import { getAgenteLogado } from './Login'
 import { wsOn, wsSend } from '../wsClient'
 import { supabase, supabaseDisponivel } from '../supabaseClient'
 import { AGENTES } from '../types'
+import { ehFerramentalPorLitro } from '../ferramentalUtils'
 
 type Prioridade = 'normal' | 'importante' | 'urgente'
 type ConfirmacaoRadar = { agente: string; confirmado: boolean; confirmedAt?: string }
@@ -29,7 +30,7 @@ type ResumoFerramental = {
   agente: string; tiposVerificados: number; totalTipos: number
   itensConferidos: number; itensCadastrados: number
   boa: number; media: number; ruim: number
-  ferramentasRuins: string[]; faltantes: string[]; semChecklist: string[]; serragemAlertas: string[]
+  ferramentasRuins: string[]; faltantes: string[]; semChecklist: string[]; serragemAlertas: string[]; litrosAlertas: string[]
 }
 
 type DiaPrevisao = { data: string; codigo: number; temperaturaMax: number; temperaturaMin: number; precipitacao: number; probabilidade: number; umidade: number; vento: number; rajada: number }
@@ -78,13 +79,17 @@ function eSerragem(nome: string) {
   return /serragem/i.test(nome)
 }
 
+function eControlePorQuantidade(nome: string) {
+  return eSerragem(nome) || ehFerramentalPorLitro(nome)
+}
+
 function resumirFerramental(
   registros: AtividadeFerramenta[],
   catalogo: FerramentaCatalogo[],
 ): ResumoFerramental[] {
-  const catalogoSemSerragem = catalogo.filter(item => !eSerragem(item.nome))
-  const totalTipos = catalogoSemSerragem.length || new Set(
-    registros.filter(item => !eSerragem(item.ferramentaNome)).map(item => item.ferramentaId).filter(Boolean),
+  const catalogoComCondicao = catalogo.filter(item => !eControlePorQuantidade(item.nome))
+  const totalTipos = catalogoComCondicao.length || new Set(
+    registros.filter(item => !eControlePorQuantidade(item.ferramentaNome)).map(item => item.ferramentaId).filter(Boolean),
   ).size
   const catalogoPorId = new Map(catalogo.map(item => [item.id, item]))
   const porAgente = new Map<string, Map<string, AtividadeFerramenta>>()
@@ -102,15 +107,16 @@ function resumirFerramental(
 
   return Array.from(porAgente.entries()).map(([agente, registrosMap]) => {
     const registrosAgente = Array.from(registrosMap.values())
-    const idsVerificados = new Set(registrosAgente.filter(item => !eSerragem(item.ferramentaNome)).map(item => item.ferramentaId))
-    const boa = registrosAgente.filter(item => !eSerragem(item.ferramentaNome) && item.condicao === 'boa').length
-    const media = registrosAgente.filter(item => !eSerragem(item.ferramentaNome) && item.condicao === 'media').length
-    const ruim = registrosAgente.filter(item => !eSerragem(item.ferramentaNome) && item.condicao === 'ruim').length
+    const idsVerificados = new Set(registrosAgente.filter(item => !eControlePorQuantidade(item.ferramentaNome)).map(item => item.ferramentaId))
+    const boa = registrosAgente.filter(item => !eControlePorQuantidade(item.ferramentaNome) && item.condicao === 'boa').length
+    const media = registrosAgente.filter(item => !eControlePorQuantidade(item.ferramentaNome) && item.condicao === 'media').length
+    const ruim = registrosAgente.filter(item => !eControlePorQuantidade(item.ferramentaNome) && item.condicao === 'ruim').length
     let itensCadastrados = 0
     let itensConferidos = 0
     const ferramentasRuins: string[] = []
     const faltantes: string[] = []
     const serragemAlertas: string[] = []
+    const litrosAlertas: string[] = []
 
     registrosAgente.forEach(registro => {
       const catalogoItem = catalogoPorId.get(registro.ferramentaId)
@@ -123,6 +129,12 @@ function resumirFerramental(
       const quantidadeFaltante = Math.max(0, cadastrada - conferida)
       itensCadastrados += cadastrada
       itensConferidos += Math.min(cadastrada, conferida)
+      if (ehFerramentalPorLitro(registro.ferramentaNome)) {
+        if (conferida <= 10) {
+          litrosAlertas.push(`${conferida} litro(s) de ${registro.ferramentaNome} — Repor estoque`)
+        }
+        return
+      }
       if (eSerragem(registro.ferramentaNome)) {
         if (conferida <= 2) serragemAlertas.push(`${conferida} saco(s) de serragem — Repor serragem`)
         return
@@ -141,13 +153,14 @@ function resumirFerramental(
       }
     })
 
-    const semChecklist = catalogoSemSerragem
+    const semChecklist = catalogoComCondicao
       .filter(item => !idsVerificados.has(item.id))
       .map(item => item.nome)
     return {
       agente, tiposVerificados: idsVerificados.size, totalTipos, itensConferidos, itensCadastrados,
       boa, media, ruim, ferramentasRuins: [...new Set(ferramentasRuins)],
       faltantes, semChecklist, serragemAlertas: [...new Set(serragemAlertas)],
+      litrosAlertas: [...new Set(litrosAlertas)],
     }
   }).sort((a, b) => a.agente.localeCompare(b.agente))
 }
@@ -738,13 +751,15 @@ export default function RadarDC() {
                     <strong>{resumo.agente}</strong>
                     <b>Ferramental {resumo.tiposVerificados}/{resumo.totalTipos}</b>
                   </div>
-                  <div className="radar-ferramental-itens">
-                    <span className="radar-ferramental-boa">Boa - {percentual(resumo.boa, resumo.totalTipos)}%</span>
-                    <span className="radar-ferramental-media">Média - {percentual(resumo.media, resumo.totalTipos)}%</span>
-                    <span className="radar-ferramental-ruim">Ruim - {percentual(resumo.ruim, resumo.totalTipos)}%</span>
-                  </div>
+                   {(resumo.boa + resumo.media + resumo.ruim) > 0 && (
+                     <div className="radar-ferramental-itens">
+                       <span className="radar-ferramental-boa">Boa - {percentual(resumo.boa, resumo.totalTipos)}%</span>
+                       <span className="radar-ferramental-media">Média - {percentual(resumo.media, resumo.totalTipos)}%</span>
+                       <span className="radar-ferramental-ruim">Ruim - {percentual(resumo.ruim, resumo.totalTipos)}%</span>
+                     </div>
+                   )}
                   <div className="radar-ferramental-quantidade">
-                    Itens conferidos: {resumo.itensConferidos}/{resumo.itensCadastrados}
+                     Itens/litros conferidos: {resumo.itensConferidos}/{resumo.itensCadastrados}
                   </div>
                   {resumo.ferramentasRuins.length > 0 && (
                     <div className="radar-ferramental-alerta radar-ferramental-alerta-ruim">
@@ -761,6 +776,11 @@ export default function RadarDC() {
                       <strong>⚠️ Serragem:</strong> {resumo.serragemAlertas.join(', ')}
                     </div>
                   )}
+                   {resumo.litrosAlertas.length > 0 && (
+                     <div className="radar-ferramental-alerta radar-ferramental-alerta-serragem">
+                       <strong>⚠️ Estoque baixo:</strong> {resumo.litrosAlertas.join(', ')}
+                     </div>
+                   )}
                   {resumo.semChecklist.length > 0 && (
                     <div className="radar-ferramental-alerta radar-ferramental-alerta-pendente">
                       <strong>Sem checklist:</strong> {resumo.semChecklist.slice(0, 3).join(', ')}

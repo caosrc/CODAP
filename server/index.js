@@ -2524,14 +2524,22 @@ app.post('/api/ferramentas/checklists', async (req, res) => {
       )
     }
     if (!ferramenta.rows[0]) return res.status(404).json({ error: 'Ferramental não encontrado.' })
-    const ehSerragem = /serragem/i.test(String(ferramenta.rows[0].nome || ferramenta_nome || ''))
+    const nomeFerramenta = String(ferramenta.rows[0].nome || ferramenta_nome || '')
+    const nomeNormalizado = nomeFerramenta.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase()
+    const ehSerragem = /serragem/i.test(nomeFerramenta)
+    const ehPorLitro = nomeNormalizado.includes('OLEO 2 TEMPO STIHL') ||
+      nomeNormalizado.includes('DC GASOLINA') ||
+      nomeNormalizado.includes('OLEO LUBRIFICANTE')
     if (ehSerragem && condicao !== 'quantidade') {
       return res.status(400).json({ error: 'Serragem deve ser registrada somente pela quantidade de sacos.' })
     }
-    if (!ehSerragem && !['boa', 'media', 'ruim'].includes(condicao)) {
+    if (ehPorLitro && condicao !== 'quantidade') {
+      return res.status(400).json({ error: 'Este item deve ser registrado somente pela quantidade em litros.' })
+    }
+    if (!ehSerragem && !ehPorLitro && !['boa', 'media', 'ruim'].includes(condicao)) {
       return res.status(400).json({ error: 'Informe a condição da ferramenta.' })
     }
-    if (!ehSerragem && conferida < cadastrada &&
+    if (!ehSerragem && !ehPorLitro && conferida < cadastrada &&
         !String(item_faltante || '').trim() && !String(justificativa || '').trim()) {
       return res.status(400).json({ error: 'Informe onde está o item ou justifique a falta.' })
     }

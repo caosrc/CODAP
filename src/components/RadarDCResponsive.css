@@ -538,7 +538,8 @@ body.radar-tv-active .radar-page {
   }
 
   .radar-calendar-card {
-    max-height: none;
+    max-height: 390px;
+    overflow-y: auto;
     padding: .75rem;
   }
 

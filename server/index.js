@@ -2525,7 +2525,13 @@ app.post('/api/ferramentas/checklists', async (req, res) => {
     }
     if (!ferramenta.rows[0]) return res.status(404).json({ error: 'Ferramental não encontrado.' })
     const nomeFerramenta = String(ferramenta.rows[0].nome || ferramenta_nome || '')
-    const nomeNormalizado = nomeFerramenta.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase()
+    const nomeNormalizado = nomeFerramenta
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toUpperCase()
+      .replace(/[^A-Z0-9]+/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
     const ehSerragem = /serragem/i.test(nomeFerramenta)
     const ehPorLitro = nomeNormalizado.includes('OLEO 2 TEMPO STIHL') ||
       nomeNormalizado.includes('DC GASOLINA') ||

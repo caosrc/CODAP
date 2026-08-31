@@ -130,7 +130,7 @@ function resumirFerramental(
       itensCadastrados += cadastrada
       itensConferidos += Math.min(cadastrada, conferida)
       if (ehFerramentalPorLitro(registro.ferramentaNome)) {
-        if (conferida <= 10) {
+        if (conferida < 10) {
           litrosAlertas.push(`${conferida} litro(s) de ${registro.ferramentaNome} — Repor estoque`)
         }
         return

@@ -1103,7 +1103,7 @@ function HistoricoChecklists({ ferramentaId, ferramentaNome, quantidadeCadastrad
                 <div className="mat-checklist-registro-qtd">
                   {ehPorLitro ? 'Litros encontrados' : ehSerragem ? 'Sacos de serragem' : 'Quantidade'}: {checklist.quantidade_conferida}/{checklist.quantidade_cadastrada || quantidadeCadastrada}
                   {ehPorLitro
-                    ? (checklist.quantidade_conferida <= 10 ? ' · Repor estoque de óleo/combustível' : '')
+                    ? (checklist.quantidade_conferida < 10 ? ' · Repor estoque de óleo/combustível' : '')
                     : ehSerragem
                       ? (checklist.quantidade_conferida <= 2 ? ' · Repor serragem' : '')
                     : (faltantes > 0 ? ` · ${faltantes} item(ns) faltante(s)` : ' · Todos os itens encontrados')}
@@ -1498,7 +1498,7 @@ function ChecklistFerramenta({
           </div>
         </div>}
 
-        {ehPorLitro && quantidadeConferida <= 10 && (
+        {ehPorLitro && quantidadeConferida < 10 && (
           <div className="mat-checklist-alerta" role="status">
             ⚠️ Atenção: estoque baixo ({quantidadeConferida} litro{quantidadeConferida === 1 ? '' : 's'}). O Radar DC mostrará uma notificação em “Checklists de ferramentas”.
           </div>

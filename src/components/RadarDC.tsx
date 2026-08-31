@@ -21,7 +21,7 @@ type Atividade = {
 type AtividadeFerramenta = {
   id: number; ferramentaId: string; agente: string; ferramentaNome: string
   quantidadeCadastrada?: number; quantidadeConferida?: number
-  condicao: 'boa' | 'media' | 'ruim' | string; itemFaltante?: string; justificativa?: string
+  condicao: 'boa' | 'media' | 'ruim' | 'quantidade' | string; itemFaltante?: string; justificativa?: string
   data_checklist: string; created_at: string
 }
 type FerramentaCatalogo = { id: string; nome: string; quantidade: number }
@@ -29,7 +29,7 @@ type ResumoFerramental = {
   agente: string; tiposVerificados: number; totalTipos: number
   itensConferidos: number; itensCadastrados: number
   boa: number; media: number; ruim: number
-  ferramentasRuins: string[]; faltantes: string[]; semChecklist: string[]
+  ferramentasRuins: string[]; faltantes: string[]; semChecklist: string[]; serragemAlertas: string[]
 }
 
 type DiaPrevisao = { data: string; codigo: number; temperaturaMax: number; temperaturaMin: number; precipitacao: number; probabilidade: number; umidade: number; vento: number; rajada: number }
@@ -74,11 +74,18 @@ function percentual(valor: number, total: number) {
   return total > 0 ? Math.round((valor / total) * 100) : 0
 }
 
+function eSerragem(nome: string) {
+  return /serragem/i.test(nome)
+}
+
 function resumirFerramental(
   registros: AtividadeFerramenta[],
   catalogo: FerramentaCatalogo[],
 ): ResumoFerramental[] {
-  const totalTipos = catalogo.length || new Set(registros.map(item => item.ferramentaId).filter(Boolean)).size
+  const catalogoSemSerragem = catalogo.filter(item => !eSerragem(item.nome))
+  const totalTipos = catalogoSemSerragem.length || new Set(
+    registros.filter(item => !eSerragem(item.ferramentaNome)).map(item => item.ferramentaId).filter(Boolean),
+  ).size
   const catalogoPorId = new Map(catalogo.map(item => [item.id, item]))
   const porAgente = new Map<string, Map<string, AtividadeFerramenta>>()
 
@@ -95,14 +102,15 @@ function resumirFerramental(
 
   return Array.from(porAgente.entries()).map(([agente, registrosMap]) => {
     const registrosAgente = Array.from(registrosMap.values())
-    const idsVerificados = new Set(registrosAgente.map(item => item.ferramentaId))
-    const boa = registrosAgente.filter(item => item.condicao === 'boa').length
-    const media = registrosAgente.filter(item => item.condicao === 'media').length
-    const ruim = registrosAgente.filter(item => item.condicao === 'ruim').length
+    const idsVerificados = new Set(registrosAgente.filter(item => !eSerragem(item.ferramentaNome)).map(item => item.ferramentaId))
+    const boa = registrosAgente.filter(item => !eSerragem(item.ferramentaNome) && item.condicao === 'boa').length
+    const media = registrosAgente.filter(item => !eSerragem(item.ferramentaNome) && item.condicao === 'media').length
+    const ruim = registrosAgente.filter(item => !eSerragem(item.ferramentaNome) && item.condicao === 'ruim').length
     let itensCadastrados = 0
     let itensConferidos = 0
     const ferramentasRuins: string[] = []
     const faltantes: string[] = []
+    const serragemAlertas: string[] = []
 
     registrosAgente.forEach(registro => {
       const catalogoItem = catalogoPorId.get(registro.ferramentaId)
@@ -115,24 +123,28 @@ function resumirFerramental(
       const quantidadeFaltante = Math.max(0, cadastrada - conferida)
       itensCadastrados += cadastrada
       itensConferidos += Math.min(cadastrada, conferida)
+      if (eSerragem(registro.ferramentaNome)) {
+        if (conferida <= 2) serragemAlertas.push(`${conferida} saco(s) de serragem — Repor serragem`)
+        return
+      }
       if (registro.condicao === 'ruim') ferramentasRuins.push(registro.ferramentaNome)
       if (quantidadeFaltante > 0) {
-        const descricao = String(registro.itemFaltante || registro.ferramentaNome || 'ferramental').trim()
-        const itemComQuantidade = /^\d/.test(descricao) ? descricao : `${quantidadeFaltante} ${descricao}`
+        const nomeItem = String(registro.ferramentaNome || 'ferramental').trim()
+        const ondeEsta = String(registro.itemFaltante || 'local não informado').trim()
         const justificativa = String(registro.justificativa || '').trim()
-        faltantes.push(justificativa
-          ? `${itemComQuantidade} — Justificativa: ${justificativa}`
-          : itemComQuantidade)
+        faltantes.push(
+          `${quantidadeFaltante} ${nomeItem} — Onde está: ${ondeEsta} — Justificativa: ${justificativa || 'não informada'}`,
+        )
       }
     })
 
-    const semChecklist = catalogo
+    const semChecklist = catalogoSemSerragem
       .filter(item => !idsVerificados.has(item.id))
       .map(item => item.nome)
     return {
       agente, tiposVerificados: idsVerificados.size, totalTipos, itensConferidos, itensCadastrados,
       boa, media, ruim, ferramentasRuins: [...new Set(ferramentasRuins)],
-      faltantes, semChecklist,
+      faltantes, semChecklist, serragemAlertas: [...new Set(serragemAlertas)],
     }
   }).sort((a, b) => a.agente.localeCompare(b.agente))
 }
@@ -738,6 +750,11 @@ export default function RadarDC() {
                   {resumo.faltantes.length > 0 && (
                     <div className="radar-ferramental-alerta radar-ferramental-alerta-falta">
                       <strong>Faltando:</strong> {resumo.faltantes.join(', ')}
+                    </div>
+                  )}
+                  {resumo.serragemAlertas.length > 0 && (
+                    <div className="radar-ferramental-alerta radar-ferramental-alerta-serragem">
+                      <strong>⚠️ Serragem:</strong> {resumo.serragemAlertas.join(', ')}
                     </div>
                   )}
                   {resumo.semChecklist.length > 0 && (

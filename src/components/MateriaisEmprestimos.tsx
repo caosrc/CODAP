@@ -22,7 +22,7 @@ interface Material {
 interface ChecklistFerramenta {
   id: number
   quantidade_verificada: number
-  condicao: 'boa' | 'media' | 'ruim'
+  condicao: 'boa' | 'media' | 'ruim' | 'quantidade'
   justificativa_falta: string | null
   realizado_por: string | null
   realizado_em: string
@@ -1060,7 +1060,11 @@ function DetalheMaterial({
         </div>
 
         {material.categoria === 'ferramental' && (
-          <HistoricoChecklists ferramentaId={material.id} quantidadeCadastrada={material.quantidade ?? 1} />
+          <HistoricoChecklists
+            ferramentaId={material.id}
+            ferramentaNome={material.nome}
+            quantidadeCadastrada={material.quantidade ?? 1}
+          />
         )}
       </div>
     </div>
@@ -1069,6 +1073,7 @@ function DetalheMaterial({
 
 function HistoricoChecklists({ ferramentaId, quantidadeCadastrada }: {
   ferramentaId: string
+  ferramentaNome: string
   quantidadeCadastrada: number
 }) {
   const [checklists, setChecklists] = useState<MatChecklistFerramenta[]>([])
@@ -1094,19 +1099,24 @@ function HistoricoChecklists({ ferramentaId, quantidadeCadastrada }: {
         <div className="mat-checklist-lista">
           {checklists.map((checklist) => {
             const faltantes = Math.max(0, checklist.quantidade_cadastrada - checklist.quantidade_conferida)
+            const ehSerragem = checklist.condicao === 'quantidade' || /serragem/i.test(ferramentaNome)
             return (
               <div key={checklist.id} className={`mat-checklist-registro condicao-${checklist.condicao}`}>
                 <div className="mat-checklist-registro-cab">
                   <strong>{formatarDataBr(checklist.data_checklist)}</strong>
-                  <span className={`mat-condicao-pill condicao-${checklist.condicao}`}>
-                    {checklist.condicao === 'boa' ? 'Boa' : checklist.condicao === 'media' ? 'Média' : 'Ruim'}
-                  </span>
+                  {ehSerragem
+                    ? <span className="mat-condicao-pill">Por quantidade</span>
+                    : <span className={`mat-condicao-pill condicao-${checklist.condicao}`}>
+                      {checklist.condicao === 'boa' ? 'Boa' : checklist.condicao === 'media' ? 'Média' : 'Ruim'}
+                    </span>}
                 </div>
                 <div className="mat-checklist-registro-qtd">
-                  Quantidade: {checklist.quantidade_conferida}/{checklist.quantidade_cadastrada || quantidadeCadastrada}
-                  {faltantes > 0 ? ` · ${faltantes} item(ns) faltante(s)` : ' · Todos os itens encontrados'}
+                  {ehSerragem ? 'Sacos de serragem' : 'Quantidade'}: {checklist.quantidade_conferida}/{checklist.quantidade_cadastrada || quantidadeCadastrada}
+                  {ehSerragem
+                    ? (checklist.quantidade_conferida <= 2 ? ' · Repor serragem' : '')
+                    : (faltantes > 0 ? ` · ${faltantes} item(ns) faltante(s)` : ' · Todos os itens encontrados')}
                 </div>
-                {faltantes > 0 && (
+                {!ehSerragem && faltantes > 0 && (
                   <div className="mat-checklist-falta">
                     <strong>Item faltante:</strong> {checklist.item_faltante || 'Não informado'}
                     {checklist.justificativa ? <><br /><strong>Justificativa:</strong> {checklist.justificativa}</> : null}
@@ -1354,6 +1364,7 @@ function ChecklistFerramenta({
   onSalvo: (checklist: MatChecklistFerramenta) => void
 }) {
   const quantidadeCadastrada = Math.max(1, ferramenta.quantidade ?? 1)
+  const ehSerragem = /serragem/i.test(ferramenta.nome)
   const [quantidadeConferida, setQuantidadeConferida] = useState(quantidadeCadastrada)
   const [condicao, setCondicao] = useState<'boa' | 'media' | 'ruim' | ''>('')
   const [itemFaltante, setItemFaltante] = useState('')
@@ -1363,12 +1374,12 @@ function ChecklistFerramenta({
   const quantidadeFaltante = Math.max(0, quantidadeCadastrada - quantidadeConferida)
 
   async function salvar() {
-    if (!condicao) { setErro('Marque a condição da ferramenta.'); return }
-    if (quantidadeConferida < quantidadeCadastrada && !itemFaltante.trim()) {
+    if (!ehSerragem && !condicao) { setErro('Marque a condição da ferramenta.'); return }
+    if (!ehSerragem && quantidadeConferida < quantidadeCadastrada && !itemFaltante.trim()) {
       setErro('Informe onde está o item faltante.')
       return
     }
-    if (quantidadeConferida < quantidadeCadastrada && !justificativa.trim()) {
+    if (!ehSerragem && quantidadeConferida < quantidadeCadastrada && !justificativa.trim()) {
       setErro('Justifique a quantidade faltante.')
       return
     }
@@ -1380,9 +1391,9 @@ function ChecklistFerramenta({
          ferramenta_nome: ferramenta.nome,
         quantidade_cadastrada: quantidadeCadastrada,
         quantidade_conferida: quantidadeConferida,
-        condicao,
-        item_faltante: quantidadeFaltante > 0 ? itemFaltante.trim() : null,
-        justificativa: quantidadeFaltante > 0 ? justificativa.trim() : null,
+        condicao: ehSerragem ? 'quantidade' : condicao as 'boa' | 'media' | 'ruim',
+        item_faltante: !ehSerragem && quantidadeFaltante > 0 ? itemFaltante.trim() : null,
+        justificativa: !ehSerragem && quantidadeFaltante > 0 ? justificativa.trim() : null,
         realizado_por: getAgenteLogado() || null,
       })
       onSalvo(checklist)
@@ -1405,7 +1416,9 @@ function ChecklistFerramenta({
         <div className="mat-checklist-identificacao">
           <span className="mat-card-codigo">{ferramenta.id}</span>
           <strong>{ferramenta.nome}</strong>
-          <span className="campo-label-sub">Conferência de estoque e condição</span>
+          <span className="campo-label-sub">
+            {ehSerragem ? 'Informe a quantidade de sacos em estoque' : 'Conferência de estoque e condição'}
+          </span>
         </div>
 
         <div className="campo">
@@ -1414,7 +1427,9 @@ function ChecklistFerramenta({
         </div>
 
         <div className="campo">
-          <label className="campo-label">Quantidade de itens encontrada *</label>
+          <label className="campo-label">
+            {ehSerragem ? 'Quantidade de sacos de serragem encontrada *' : 'Quantidade de itens encontrada *'}
+          </label>
           <input
             className="campo-input"
             type="number"
@@ -1434,7 +1449,7 @@ function ChecklistFerramenta({
           </span>
         </div>
 
-        {quantidadeFaltante > 0 && (
+        {!ehSerragem && quantidadeFaltante > 0 && (
           <div className="mat-checklist-falta-form">
             <div className="mat-checklist-falta-form-titulo">⚠️ Item faltante</div>
             <div className="campo">
@@ -1459,7 +1474,7 @@ function ChecklistFerramenta({
           </div>
         )}
 
-        <div className="campo">
+        {!ehSerragem && <div className="campo">
           <label className="campo-label">Condição da ferramenta *</label>
           <div className="mat-condicao-opcoes">
             {([
@@ -1482,7 +1497,13 @@ function ChecklistFerramenta({
               </label>
             ))}
           </div>
-        </div>
+        </div>}
+
+        {ehSerragem && quantidadeConferida <= 2 && (
+          <div className="mat-checklist-alerta" role="status">
+            ⚠️ Atenção: estoque baixo. O Radar DC mostrará a mensagem “Repor serragem”.
+          </div>
+        )}
 
         {erro && <div className="login-erro" style={{ marginBottom: '0.8rem' }}>{erro}</div>}
 

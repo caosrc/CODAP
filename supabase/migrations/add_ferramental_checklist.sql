@@ -44,3 +44,11 @@ CREATE POLICY "checklists ferramental inserção"
 
 GRANT SELECT, INSERT ON TABLE public.checklists_ferramental TO anon, authenticated;
 GRANT USAGE, SELECT ON SEQUENCE public.checklists_ferramental_id_seq TO anon, authenticated;
+
+-- Serragem é controlada pela quantidade de sacos, sem condição Boa/Média/Ruim.
+ALTER TABLE public.checklists_ferramental
+  DROP CONSTRAINT IF EXISTS checklists_ferramental_condicao_check;
+
+ALTER TABLE public.checklists_ferramental
+  ADD CONSTRAINT checklists_ferramental_condicao_check
+  CHECK (condicao IN ('boa', 'media', 'ruim', 'quantidade'));

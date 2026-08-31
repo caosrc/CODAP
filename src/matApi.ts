@@ -19,7 +19,7 @@ export interface MatChecklistFerramenta {
   ferramenta_id: string
   quantidade_cadastrada: number
   quantidade_conferida: number
-  condicao: 'boa' | 'media' | 'ruim'
+  condicao: 'boa' | 'media' | 'ruim' | 'quantidade'
   item_faltante: string | null
   justificativa: string | null
   realizado_por: string | null
@@ -208,7 +208,7 @@ export const matApi = {
     ferramenta_nome?: string
     quantidade_cadastrada: number
     quantidade_conferida: number
-    condicao: 'boa' | 'media' | 'ruim'
+    condicao: 'boa' | 'media' | 'ruim' | 'quantidade'
     item_faltante?: string | null
     justificativa?: string | null
     realizado_por?: string | null
@@ -222,11 +222,21 @@ export const matApi = {
       ferramenta_nome: _ferramentaNome,
       ...checklistSupabase
     } = checklist
-    const { data, error } = await supabase
+    let { data, error } = await supabase
       .from('checklists_ferramental')
       .insert(checklistSupabase)
       .select()
       .single()
+    // Bases Supabase antigas ainda podem ter o CHECK que aceita apenas
+    // boa/media/ruim. A tela continua tratando Serragem por quantidade,
+    // mesmo que o valor legado precise ser armazenado como compatibilidade.
+    if (error?.code === '23514' && checklist.condicao === 'quantidade') {
+      ({ data, error } = await supabase
+        .from('checklists_ferramental')
+        .insert({ ...checklistSupabase, condicao: 'boa' })
+        .select()
+        .single())
+    }
     if (error) sbErr(error, 'criarChecklistFerramenta')
     wsSend({ tipo: 'checklists_ferramental_atualizados' })
     return data as MatChecklistFerramenta

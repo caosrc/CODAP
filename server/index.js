@@ -841,6 +841,9 @@ async function initDb() {
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
   `)
+  // A serragem é controlada por quantidade de sacos, sem classificação de condição.
+  await query(`ALTER TABLE checklists_ferramental DROP CONSTRAINT IF EXISTS checklists_ferramental_condicao_check`)
+  await query(`ALTER TABLE checklists_ferramental ADD CONSTRAINT checklists_ferramental_condicao_check CHECK (condicao IN ('boa', 'media', 'ruim', 'quantidade'))`)
 
   await query(`
     CREATE TABLE IF NOT EXISTS emprestimos (
@@ -2499,18 +2502,9 @@ app.post('/api/ferramentas/checklists', async (req, res) => {
       !Number.isInteger(conferida) || conferida < 0 || conferida > cadastrada) {
     return res.status(400).json({ error: 'Informe quantidades válidas para o checklist.' })
   }
-  if (!['boa', 'media', 'ruim'].includes(condicao)) {
-    return res.status(400).json({ error: 'Informe a condição da ferramenta.' })
-  }
-  if (conferida < cadastrada && !String(item_faltante || '').trim()) {
-    return res.status(400).json({ error: 'Informe onde está o item faltante.' })
-  }
-  if (conferida < cadastrada && !String(justificativa || '').trim()) {
-    return res.status(400).json({ error: 'Justifique a quantidade faltante.' })
-  }
   try {
     let ferramenta = await query(
-      "SELECT id FROM materiais WHERE id = $1 AND categoria = 'ferramental'",
+      "SELECT id, nome FROM materiais WHERE id = $1 AND categoria = 'ferramental'",
       [ferramenta_id]
     )
     if (!ferramenta.rows[0] && ferramenta_nome) {
@@ -2521,11 +2515,24 @@ app.post('/api/ferramentas/checklists', async (req, res) => {
         [String(ferramenta_id), String(ferramenta_nome).trim() || String(ferramenta_id), cadastrada]
       )
       ferramenta = await query(
-        "SELECT id FROM materiais WHERE id = $1 AND categoria = 'ferramental'",
+        "SELECT id, nome FROM materiais WHERE id = $1 AND categoria = 'ferramental'",
         [ferramenta_id]
       )
     }
     if (!ferramenta.rows[0]) return res.status(404).json({ error: 'Ferramental não encontrado.' })
+    const ehSerragem = /serragem/i.test(String(ferramenta.rows[0].nome || ferramenta_nome || ''))
+    if (ehSerragem && condicao !== 'quantidade') {
+      return res.status(400).json({ error: 'Serragem deve ser registrada somente pela quantidade de sacos.' })
+    }
+    if (!ehSerragem && !['boa', 'media', 'ruim'].includes(condicao)) {
+      return res.status(400).json({ error: 'Informe a condição da ferramenta.' })
+    }
+    if (!ehSerragem && conferida < cadastrada && !String(item_faltante || '').trim()) {
+      return res.status(400).json({ error: 'Informe onde está o item faltante.' })
+    }
+    if (!ehSerragem && conferida < cadastrada && !String(justificativa || '').trim()) {
+      return res.status(400).json({ error: 'Justifique a quantidade faltante.' })
+    }
     const result = await query(
       `INSERT INTO checklists_ferramental
         (ferramenta_id, quantidade_cadastrada, quantidade_conferida, condicao,

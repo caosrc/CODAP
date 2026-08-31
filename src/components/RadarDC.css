@@ -222,6 +222,7 @@
 .radar-ferramental-alerta strong { color: #edf7ff; }
 .radar-ferramental-alerta-ruim strong { color: #ff8f91; }
 .radar-ferramental-alerta-falta strong { color: #ffd477; }
+.radar-ferramental-alerta-serragem strong { color: #ffb86b; }
 .radar-ferramental-alerta-pendente strong { color: #b8eaff; }
 
 .radar-ticker { position: fixed; right: 0; bottom: 0; left: 0; z-index: 20; display: flex; align-items: center; height: 48px; overflow: hidden; color: #d6edff; background: #0b2545; }

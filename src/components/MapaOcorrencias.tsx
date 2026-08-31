@@ -710,7 +710,9 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
     setMonitoramentoCarregando(true)
     try {
       // Usa a rota pública para funcionar no Replit e no Netlify.
-      const resp = await fetch('/api/monitoramento-incendio')
+      const resp = await fetch(`/api/monitoramento-incendio?_ts=${Date.now()}`, {
+        cache: 'no-store',
+      })
       if (!resp.ok) return
       const data = await resp.json()
       setMonitoramentoEE({

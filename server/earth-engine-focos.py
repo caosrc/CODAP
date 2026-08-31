@@ -476,11 +476,9 @@ def consultar_focos_ativos():
     """Consulta somente os pontos de fogo ativo."""
     resultado = consultar_monitoramento()
 
-    return {
-        "focos": resultado["focos"],
-        "projeto": resultado["projeto"],
-        "periodo": resultado["periodo"],
-    }
+    # A rota principal combina estes focos com o NASA FIRMS e também usa
+    # camadas/disponibilidade para montar o catálogo exibido no mapa.
+    return resultado
 
 
 def main():

@@ -1674,8 +1674,11 @@ let polarCache = { data: null, ts: 0 }
 let earthEngineCache = { data: null, ts: 0 }
 let earthEngineMonitoramentoCache = { data: null, ts: 0 }
 const POLAR_TTL = 25 * 60 * 1000   // 25 min
-const EARTH_ENGINE_TTL = 25 * 60 * 1000
-const EARTH_ENGINE_MONITORAMENTO_TTL = 30 * 60 * 1000
+// O GOES-19 atualiza o produto de fogo a cada ~10 minutos. O cache não
+// pode ser maior que essa cadência, senão o mapa continua mostrando dados
+// antigos mesmo com a autenticação do Earth Engine funcionando.
+const EARTH_ENGINE_TTL = 10 * 60 * 1000
+const EARTH_ENGINE_MONITORAMENTO_TTL = 10 * 60 * 1000
 
 const FONTES_FOGO_CATALOGO = [
   {
@@ -2533,7 +2536,8 @@ app.post('/api/ferramentas/checklists', async (req, res) => {
       .replace(/\s+/g, ' ')
       .trim()
     const ehSerragem = /serragem/i.test(nomeFerramenta)
-    const ehPorLitro = nomeNormalizado.includes('OLEO 2 TEMPO STIHL') ||
+    const ehPorLitro = nomeNormalizado === 'OLEO' ||
+      nomeNormalizado.includes('OLEO 2 TEMPO STIHL') ||
       nomeNormalizado.includes('DC GASOLINA') ||
       nomeNormalizado.includes('OLEO LUBRIFICANTE')
     if (ehSerragem && condicao !== 'quantidade') {

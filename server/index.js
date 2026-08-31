@@ -387,6 +387,10 @@ wss.on('connection', (ws) => {
         broadcastChecklistsFerramentalAtualizados()
       }
 
+      if (msg.tipo === 'materiais_atualizados') {
+        broadcastMateriaisAtualizados()
+      }
+
       if (msg.tipo === 'online') {
         const id = String(msg.id || '')
         const nome = String(msg.nome || `Equipe ${id.slice(0, 4)}`)
@@ -2527,11 +2531,9 @@ app.post('/api/ferramentas/checklists', async (req, res) => {
     if (!ehSerragem && !['boa', 'media', 'ruim'].includes(condicao)) {
       return res.status(400).json({ error: 'Informe a condição da ferramenta.' })
     }
-    if (!ehSerragem && conferida < cadastrada && !String(item_faltante || '').trim()) {
-      return res.status(400).json({ error: 'Informe onde está o item faltante.' })
-    }
-    if (!ehSerragem && conferida < cadastrada && !String(justificativa || '').trim()) {
-      return res.status(400).json({ error: 'Justifique a quantidade faltante.' })
+    if (!ehSerragem && conferida < cadastrada &&
+        !String(item_faltante || '').trim() && !String(justificativa || '').trim()) {
+      return res.status(400).json({ error: 'Informe onde está o item ou justifique a falta.' })
     }
     const result = await query(
       `INSERT INTO checklists_ferramental

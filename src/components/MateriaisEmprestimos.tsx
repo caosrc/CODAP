@@ -1375,12 +1375,9 @@ function ChecklistFerramenta({
 
   async function salvar() {
     if (!ehSerragem && !condicao) { setErro('Marque a condição da ferramenta.'); return }
-    if (!ehSerragem && quantidadeConferida < quantidadeCadastrada && !itemFaltante.trim()) {
-      setErro('Informe onde está o item faltante.')
-      return
-    }
-    if (!ehSerragem && quantidadeConferida < quantidadeCadastrada && !justificativa.trim()) {
-      setErro('Justifique a quantidade faltante.')
+    if (!ehSerragem && quantidadeConferida < quantidadeCadastrada &&
+        !itemFaltante.trim() && !justificativa.trim()) {
+      setErro('Informe onde está o item ou justifique a falta.')
       return
     }
     setSalvando(true)
@@ -1453,7 +1450,7 @@ function ChecklistFerramenta({
           <div className="mat-checklist-falta-form">
             <div className="mat-checklist-falta-form-titulo">⚠️ Item faltante</div>
             <div className="campo">
-              <label className="campo-label">Onde está o item faltante? *</label>
+              <label className="campo-label">Onde está o item faltante?</label>
               <input
                 className="campo-input"
                 type="text"
@@ -1463,7 +1460,7 @@ function ChecklistFerramenta({
               />
             </div>
             <div className="campo">
-              <label className="campo-label">Justificativa *</label>
+              <label className="campo-label">Justificativa (se não souber onde está)</label>
               <textarea
                 className="campo-textarea"
                 placeholder="Explique o motivo da falta."

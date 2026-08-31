@@ -130,10 +130,13 @@ function resumirFerramental(
       if (registro.condicao === 'ruim') ferramentasRuins.push(registro.ferramentaNome)
       if (quantidadeFaltante > 0) {
         const nomeItem = String(registro.ferramentaNome || 'ferramental').trim()
-        const ondeEsta = String(registro.itemFaltante || 'local não informado').trim()
+        const ondeEsta = String(registro.itemFaltante || '').trim()
         const justificativa = String(registro.justificativa || '').trim()
+        const explicacao = ondeEsta
+          ? `Onde está: ${ondeEsta}`
+          : `Justificativa: ${justificativa || 'não informada'}`
         faltantes.push(
-          `${quantidadeFaltante} ${nomeItem} — Onde está: ${ondeEsta} — Justificativa: ${justificativa || 'não informada'}`,
+          `${quantidadeFaltante} ${nomeItem} — ${explicacao}`,
         )
       }
     })
@@ -417,9 +420,10 @@ export default function RadarDC() {
     const avisarAtualizacao = () => carregarAtividades(true)
     const offChecklist = wsOn('checklist_atualizado', avisarAtualizacao)
     const offFerramental = wsOn('checklists_ferramental_atualizados', avisarAtualizacao)
+    const offMateriais = wsOn('materiais_atualizados', avisarAtualizacao)
     const offOcorrencias = wsOn('ocorrencias_atualizadas', avisarAtualizacao)
     const timer = window.setInterval(() => { carregarAtividades(false) }, 10000)
-    return () => { offChecklist(); offFerramental(); offOcorrencias(); window.clearInterval(timer) }
+    return () => { offChecklist(); offFerramental(); offMateriais(); offOcorrencias(); window.clearInterval(timer) }
   }, [carregarAtividades])
   useEffect(() => {
     if (carregadoRef.current) localStorage.setItem(STORAGE_KEY, JSON.stringify(registros))

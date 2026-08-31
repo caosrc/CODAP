@@ -142,6 +142,7 @@ export const matApi = {
         }
         sbErr(error, 'criarMaterial')
       }
+      wsSend({ tipo: 'materiais_atualizados' })
       return data as MatMaterial
     }
     return apiFetch<MatMaterial>('/api/materiais', {
@@ -172,6 +173,7 @@ export const matApi = {
         .select()
         .single()
       if (error) sbErr(error, 'atualizarMaterial')
+      wsSend({ tipo: 'materiais_atualizados' })
       return data as MatMaterial
     }
     return apiFetch<MatMaterial>(`/api/materiais/${encodeURIComponent(id)}`, {
@@ -185,6 +187,7 @@ export const matApi = {
     if (supabaseDisponivel) {
       const { error } = await supabase.from('materiais').delete().eq('id', id)
       if (error) sbErr(error, 'excluirMaterial')
+      wsSend({ tipo: 'materiais_atualizados' })
       return
     }
     await apiFetch<unknown>(`/api/materiais/${encodeURIComponent(id)}`, { method: 'DELETE' })

@@ -94,6 +94,7 @@ const agentesOnline = new Map()
 const prontidaoAtivos = new Map() // id → { nome, planoId, ts }
 const ONLINE_TTL_MS = 60 * 1000
 const PRONTIDAO_TTL_MS = 5 * 60 * 1000 // 5 min sem renovar → expirar
+const radarEventosNotificados = new Set()
 
 // Endpoint REST para leitura inicial da lista de agentes online
 // (independente de timing do WebSocket)
@@ -223,7 +224,7 @@ async function enviarPushParaAgentes(agentesAlvo, payloadJson, excluirAgente = n
 async function notificarEventosDoDia() {
   if (!vapidConfigured) return
   try {
-    const hoje = new Date().toISOString().split('T')[0]
+    const hoje = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date())
     const result = await query(
       "SELECT id, nome, agentes_defesa_civil FROM planejamentos WHERE data_inicio = $1 AND tipo = 'evento' AND status NOT IN ('cancelado', 'concluido')",
       [hoje]
@@ -240,6 +241,30 @@ async function notificarEventosDoDia() {
       })
       const n = await enviarPushParaAgentes(agentes, payload)
       console.log(`[scheduler] evento-dia "${p.nome}": ${n} notificação(ões) enviada(s)`)
+    }
+
+    const radar = await query(
+      `SELECT id, texto, data, hora, agentes_envolvidos, confirmacoes_agentes
+       FROM radar_bilhetes
+       WHERE data = $1 AND tipo = 'notificacao' AND concluido = FALSE`,
+      [hoje]
+    )
+    for (const registro of radar.rows) {
+      const confirmacoes = Array.isArray(registro.confirmacoes_agentes) ? registro.confirmacoes_agentes : []
+      const agentes = (Array.isArray(registro.agentes_envolvidos) ? registro.agentes_envolvidos : [])
+        .filter((nome) => confirmacoes.some((item) => item?.agente === nome && item?.confirmado === true))
+      const chave = `${registro.id}-${hoje}`
+      if (!agentes.length || radarEventosNotificados.has(chave)) continue
+      const payload = JSON.stringify({
+        title: '📅 Radar DC — evento hoje',
+        body: `${registro.hora || 'Horário não informado'} · ${registro.texto}`,
+        tag: `radar-evento-dia-${chave}`,
+        tipo: 'radar_evento_dia',
+        url: '/',
+      })
+      const n = await enviarPushParaAgentes(agentes, payload)
+      radarEventosNotificados.add(chave)
+      console.log(`[scheduler] Radar DC "${registro.texto}": ${n} notificação(ões) enviada(s)`)
     }
   } catch (e) {
     console.warn('[scheduler] notificarEventosDoDia:', e?.message)
@@ -356,6 +381,10 @@ wss.on('connection', (ws) => {
 
       if (msg.tipo === 'ping') {
         ws.send(JSON.stringify({ tipo: 'pong' }))
+      }
+
+      if (msg.tipo === 'checklists_ferramental_atualizados') {
+        broadcastChecklistsFerramentalAtualizados()
       }
 
       if (msg.tipo === 'online') {
@@ -933,6 +962,7 @@ async function initDb() {
   `)
   await query(`ALTER TABLE radar_bilhetes ADD COLUMN IF NOT EXISTS tipo TEXT NOT NULL DEFAULT 'lembrete'`)
   await query(`ALTER TABLE radar_bilhetes ADD COLUMN IF NOT EXISTS agentes_envolvidos TEXT[] NOT NULL DEFAULT '{}'`)
+  await query(`ALTER TABLE radar_bilhetes ADD COLUMN IF NOT EXISTS confirmacoes_agentes JSONB NOT NULL DEFAULT '[]'`)
 
   console.log('[DB] Tabelas verificadas/criadas com sucesso')
 
@@ -1280,6 +1310,98 @@ app.post('/api/radar-bilhetes', async (req, res) => {
   }
 })
 
+app.post('/api/radar-bilhetes/:id/confirmar', async (req, res) => {
+  try {
+    const agente = typeof req.body?.agente === 'string' ? req.body.agente.trim() : ''
+    const confirmado = req.body?.confirmado === true
+    if (!agente) return res.status(400).json({ error: 'Agente obrigatório' })
+
+    let registro
+    let armazenamento = 'local'
+    if (supabasePush) {
+      const existente = await supabasePush
+        .from('radar_bilhetes')
+        .select('*')
+        .eq('id', req.params.id)
+        .maybeSingle()
+      if (existente.error) throw new Error(existente.error.message)
+      registro = existente.data
+      if (registro) armazenamento = 'supabase'
+    }
+    if (!registro) {
+      const existente = await query(
+        'SELECT * FROM radar_bilhetes WHERE id = $1',
+        [req.params.id],
+      )
+      registro = existente.rows[0]
+    }
+    if (!registro) return res.status(404).json({ error: 'Notificação não encontrada' })
+
+    const envolvidos = Array.isArray(registro.agentes_envolvidos) ? registro.agentes_envolvidos : []
+    if (!envolvidos.includes(agente)) {
+      return res.status(403).json({ error: 'Este agente não foi marcado na notificação' })
+    }
+
+    const confirmacoesAtuais = Array.isArray(registro.confirmacoes_agentes)
+      ? registro.confirmacoes_agentes
+      : []
+    const entrada = { agente, confirmado, confirmedAt: new Date().toISOString() }
+    const indice = confirmacoesAtuais.findIndex((item) => item?.agente === agente)
+    const confirmacoes = [...confirmacoesAtuais]
+    if (indice >= 0) confirmacoes[indice] = entrada
+    else confirmacoes.push(entrada)
+
+    let registroAtualizado
+    if (armazenamento === 'supabase') {
+      const atualizado = await supabasePush
+        .from('radar_bilhetes')
+        .update({ confirmacoes_agentes: confirmacoes })
+        .eq('id', req.params.id)
+        .select('*')
+        .single()
+      if (atualizado.error || !atualizado.data) {
+        throw new Error(atualizado.error?.message || 'Não foi possível salvar a confirmação')
+      }
+      registroAtualizado = atualizado.data
+    } else {
+      const atualizado = await query(
+        `UPDATE radar_bilhetes
+         SET confirmacoes_agentes = $1::jsonb
+         WHERE id = $2
+         RETURNING *`,
+        [JSON.stringify(confirmacoes), req.params.id],
+      )
+      registroAtualizado = atualizado.rows[0]
+    }
+
+    broadcastParaTodos({
+      tipo: 'radar_confirmacao',
+      id: req.params.id,
+      agente,
+      confirmado,
+      criadoPor: registro.criado_por,
+      confirmacoesAgentes: confirmacoes,
+    })
+
+    if (registro.criado_por && registro.criado_por !== agente) {
+      const payload = {
+        title: confirmado ? '✅ Radar DC — presença confirmada' : '❌ Radar DC — presença recusada',
+        body: confirmado
+          ? `${agente} confirmou presença: ${registro.texto}`
+          : `${agente} informou que não poderá ir: ${registro.texto}`,
+        tag: `radar-confirmacao-${req.params.id}-${agente.replace(/\s+/g, '-')}`,
+        tipo: 'radar_confirmacao',
+        url: '/',
+      }
+      enviarPushParaAgentes([registro.criado_por], payload, agente).catch(() => {})
+    }
+
+    res.json(registroAtualizado)
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
 app.post('/api/push/radar', async (req, res) => {
   try {
     const { agentes, texto, data, hora, prioridade, remetente, notificacaoId } = req.body || {}
@@ -1310,13 +1432,20 @@ app.get('/api/atividades-dia', async (req, res) => {
       [`${data}%`],
     )
     const checklistsFerramentas = await query(
-      `SELECT cf.id, cf.ferramenta_id, cf.condicao, cf.realizado_por, cf.data_checklist, cf.created_at,
+      `SELECT cf.id, cf.ferramenta_id, cf.quantidade_cadastrada, cf.quantidade_conferida,
+              cf.condicao, cf.item_faltante, cf.realizado_por, cf.data_checklist, cf.created_at,
               m.nome AS ferramenta_nome
        FROM checklists_ferramental cf
        LEFT JOIN materiais m ON m.id = cf.ferramenta_id
        WHERE cf.data_checklist::date = $1::date
        ORDER BY cf.created_at DESC`,
       [data],
+    )
+    const ferramentasCatalogo = await query(
+      `SELECT id, nome, quantidade
+       FROM materiais
+       WHERE categoria = 'ferramental'
+       ORDER BY nome ASC`,
     )
     const ocorrencias = await query(
       `SELECT id, natureza, endereco, agentes, responsavel_registro, created_at, hora_inicio
@@ -1336,11 +1465,20 @@ app.get('/api/atividades-dia', async (req, res) => {
       })),
       checklistsFerramentas: checklistsFerramentas.rows.map(row => ({
         id: row.id,
+        ferramentaId: row.ferramenta_id,
         agente: row.realizado_por || 'Agente não informado',
         ferramentaNome: row.ferramenta_nome || 'Ferramenta não informada',
+        quantidadeCadastrada: Number(row.quantidade_cadastrada || 0),
+        quantidadeConferida: Number(row.quantidade_conferida || 0),
         condicao: row.condicao || '',
+        itemFaltante: row.item_faltante || '',
         data_checklist: row.data_checklist,
         created_at: row.created_at,
+      })),
+      ferramentasCatalogo: ferramentasCatalogo.rows.map(row => ({
+        id: row.id,
+        nome: row.nome,
+        quantidade: Number(row.quantidade || 1),
       })),
       ocorrencias: ocorrencias.rows.map(row => ({
         ...row,

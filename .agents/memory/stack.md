@@ -41,3 +41,10 @@ description: Stack técnica, configuração do ambiente Replit, e decisões de b
 **Why:** Uma consulta opcional com erro não pode impedir que as fontes principais do Radar sejam exibidas; comparar datas com horário exclui valores armazenados apenas como data.
 
 **How to apply:** Ao adicionar fontes ao Radar, trate tabelas opcionais separadamente e use igualdade/prefixo compatível com o tipo real persistido.
+
+## Confirmações do Radar
+- Operações de confirmação devem identificar onde o registro do Radar realmente existe antes de atualizar: Supabase compartilhado quando usado pelo frontend, com fallback ao PostgreSQL local.
+
+**Why:** O ambiente pode servir leituras e gravações do Radar por armazenamentos diferentes conforme as variáveis disponíveis; escolher um único banco pode retornar sucesso sem atualizar a fila exibida aos agentes.
+
+**How to apply:** Ao alterar mutações ou notificações do Radar, preserve a coerência entre criação, confirmação, polling, WebSocket e push nos dois caminhos de persistência.

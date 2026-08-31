@@ -254,6 +254,20 @@ input, select, textarea { font-family: inherit; }
   background: #0f766e;
   border-color: #0f766e;
 }
+.radar-convocacao-confirmacao .radar-convocacao-recusar {
+  color: #9f1239;
+  border-color: #fda4af;
+  background: #fff1f2;
+}
+.radar-convocacao-confirmacao .radar-convocacao-aceitar {
+  color: #fff;
+  border-color: #0f766e;
+  background: #0f766e;
+}
+.radar-convocacao-actions button:disabled {
+  cursor: wait;
+  opacity: .65;
+}
 .radar-convocacao-fila {
   padding: .45rem 1rem;
   color: #075985;

@@ -1,4 +1,5 @@
 import { supabase, supabaseDisponivel } from './supabaseClient'
+import { wsSend } from './wsClient'
 
 export interface MatMaterial {
   id: string
@@ -227,6 +228,7 @@ export const matApi = {
       .select()
       .single()
     if (error) sbErr(error, 'criarChecklistFerramenta')
+    wsSend({ tipo: 'checklists_ferramental_atualizados' })
     return data as MatChecklistFerramenta
   },
 

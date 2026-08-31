@@ -7,10 +7,11 @@ import { supabase, supabaseDisponivel } from '../supabaseClient'
 import { AGENTES } from '../types'
 
 type Prioridade = 'normal' | 'importante' | 'urgente'
+type ConfirmacaoRadar = { agente: string; confirmado: boolean; confirmedAt?: string }
 type RegistroRadar = {
   id: string; texto: string; data: string; hora: string; prioridade: Prioridade
   concluido: boolean; criadoPor: string; criadoEm: string; tipo: 'lembrete' | 'notificacao'
-  agentesEnvolvidos: string[]
+  agentesEnvolvidos: string[]; confirmacoesAgentes: ConfirmacaoRadar[]
 }
 type Atividade = {
   id: number; agente: string; hora: string; placa?: string; natureza?: string
@@ -18,8 +19,18 @@ type Atividade = {
   itens?: unknown; fotoCarregada?: boolean; created_at: string
 }
 type AtividadeFerramenta = {
-  id: number; agente: string; ferramentaNome: string; condicao: 'boa' | 'media' | 'ruim' | string
+  id: number; ferramentaId: string; agente: string; ferramentaNome: string
+  quantidadeCadastrada?: number; quantidadeConferida?: number
+  condicao: 'boa' | 'media' | 'ruim' | string; itemFaltante?: string
   data_checklist: string; created_at: string
+}
+type FerramentaCatalogo = { id: string; nome: string; quantidade: number }
+type ResumoFerramental = {
+  agente: string; tiposVerificados: number; totalTipos: number
+  itensConferidos: number; itensCadastrados: number
+  boa: number; media: number; ruim: number
+  ferramentasRuins: string[]; faltantes: string[]; semChecklist: string[]
+  registros: AtividadeFerramenta[]
 }
 
 type DiaPrevisao = { data: string; codigo: number; temperaturaMax: number; temperaturaMin: number; precipitacao: number; probabilidade: number; umidade: number; vento: number; rajada: number }
@@ -46,8 +57,81 @@ function horaAgora() { return new Date().toTimeString().slice(0, 5) }
 function dataBonita(data: string) {
   return data ? new Date(`${data}T12:00:00`).toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: 'short' }).replace('.', '') : 'Sem data'
 }
+function lerConfirmacoes(valor: unknown): ConfirmacaoRadar[] {
+  let dados = valor
+  if (typeof dados === 'string') {
+    try { dados = JSON.parse(dados) } catch { return [] }
+  }
+  if (!Array.isArray(dados)) return []
+  return dados
+    .filter(item => item && typeof item === 'object' && typeof item.agente === 'string')
+    .map(item => ({ agente: String(item.agente), confirmado: item.confirmado === true, confirmedAt: typeof item.confirmedAt === 'string' ? item.confirmedAt : undefined }))
+}
 function disparar(nome: string, detail: unknown) {
   window.dispatchEvent(new CustomEvent(nome, { detail }))
+}
+
+function percentual(valor: number, total: number) {
+  return total > 0 ? Math.round((valor / total) * 100) : 0
+}
+
+function resumirFerramental(
+  registros: AtividadeFerramenta[],
+  catalogo: FerramentaCatalogo[],
+): ResumoFerramental[] {
+  const totalTipos = catalogo.length || new Set(registros.map(item => item.ferramentaId).filter(Boolean)).size
+  const catalogoPorId = new Map(catalogo.map(item => [item.id, item]))
+  const porAgente = new Map<string, Map<string, AtividadeFerramenta>>()
+
+  registros.forEach(registro => {
+    const nomeAgente = registro.agente || 'Agente não informado'
+    const ferramentaId = registro.ferramentaId || `registro-${registro.id}`
+    const registrosDoAgente = porAgente.get(nomeAgente) || new Map<string, AtividadeFerramenta>()
+    const anterior = registrosDoAgente.get(ferramentaId)
+    if (!anterior || new Date(registro.created_at || registro.data_checklist).getTime() >= new Date(anterior.created_at || anterior.data_checklist).getTime()) {
+      registrosDoAgente.set(ferramentaId, registro)
+    }
+    porAgente.set(nomeAgente, registrosDoAgente)
+  })
+
+  return Array.from(porAgente.entries()).map(([agente, registrosMap]) => {
+    const registrosAgente = Array.from(registrosMap.values())
+    const idsVerificados = new Set(registrosAgente.map(item => item.ferramentaId))
+    const boa = registrosAgente.filter(item => item.condicao === 'boa').length
+    const media = registrosAgente.filter(item => item.condicao === 'media').length
+    const ruim = registrosAgente.filter(item => item.condicao === 'ruim').length
+    let itensCadastrados = 0
+    let itensConferidos = 0
+    const ferramentasRuins: string[] = []
+    const faltantes: string[] = []
+
+    registrosAgente.forEach(registro => {
+      const catalogoItem = catalogoPorId.get(registro.ferramentaId)
+      const cadastrada = Number(registro.quantidadeCadastrada) > 0
+        ? Number(registro.quantidadeCadastrada)
+        : Math.max(1, catalogoItem?.quantidade || 1)
+      const conferida = registro.quantidadeConferida == null
+        ? cadastrada
+        : Math.max(0, Number(registro.quantidadeConferida))
+      const quantidadeFaltante = Math.max(0, cadastrada - conferida)
+      itensCadastrados += cadastrada
+      itensConferidos += Math.min(cadastrada, conferida)
+      if (registro.condicao === 'ruim') ferramentasRuins.push(registro.ferramentaNome)
+      if (quantidadeFaltante > 0) {
+        const descricao = String(registro.itemFaltante || registro.ferramentaNome || 'ferramental').trim()
+        faltantes.push(/^\d/.test(descricao) ? descricao : `${quantidadeFaltante} ${descricao}`)
+      }
+    })
+
+    const semChecklist = catalogo
+      .filter(item => !idsVerificados.has(item.id))
+      .map(item => item.nome)
+    return {
+      agente, tiposVerificados: idsVerificados.size, totalTipos, itensConferidos, itensCadastrados,
+      boa, media, ruim, ferramentasRuins: [...new Set(ferramentasRuins)],
+      faltantes, semChecklist, registros: registrosAgente,
+    }
+  }).sort((a, b) => a.agente.localeCompare(b.agente))
 }
 
 function temFotoCarregada(itens: unknown) {
@@ -96,7 +180,12 @@ export default function RadarDC() {
   const [agentesLembrete, setAgentesLembrete] = useState<string[]>([])
   const [editorAberto, setEditorAberto] = useState(false)
   const [tv, setTv] = useState(false)
-  const [atividades, setAtividades] = useState<{ checklists: Atividade[]; checklistsFerramentas: AtividadeFerramenta[]; ocorrencias: Atividade[] }>({ checklists: [], checklistsFerramentas: [], ocorrencias: [] })
+  const [atividades, setAtividades] = useState<{
+    checklists: Atividade[]
+    checklistsFerramentas: AtividadeFerramenta[]
+    ferramentasCatalogo: FerramentaCatalogo[]
+    ocorrencias: Atividade[]
+  }>({ checklists: [], checklistsFerramentas: [], ferramentasCatalogo: [], ocorrencias: [] })
   const [tempo, setTempo] = useState<TempoDC | null>(null)
   const [horaAtual, setHoraAtual] = useState(() => new Date())
   const [erroTempo, setErroTempo] = useState('')
@@ -104,7 +193,6 @@ export default function RadarDC() {
   const [erroSalvamento, setErroSalvamento] = useState('')
   const carregadoRef = useRef(false)
   const pendentesRef = useRef(new Set<string>())
-  const notificacoesDisparadasRef = useRef(new Set<string>())
   const ocorrenciasNotificadasRef = useRef(new Set<number>())
   const atividadesAssinaturaRef = useRef('')
   const calendarioRef = useRef<HTMLDivElement>(null)
@@ -132,6 +220,7 @@ export default function RadarDC() {
         criadoPor: String(row.criado_por), criadoEm: String(row.criado_em),
         tipo: row.tipo === 'notificacao' ? 'notificacao' : 'lembrete',
         agentesEnvolvidos: Array.isArray(row.agentes_envolvidos) ? row.agentes_envolvidos.map(String) : [],
+        confirmacoesAgentes: lerConfirmacoes(row.confirmacoes_agentes),
       }))
       setRegistros(prev => {
         const idsRemotos = new Set(remotos.map(row => row.id))
@@ -159,10 +248,18 @@ export default function RadarDC() {
     })
   }, [])
 
-  const atualizarAtividadesNaTela = useCallback((dados: { checklists: Atividade[]; checklistsFerramentas: AtividadeFerramenta[]; ocorrencias: Atividade[] }, avisar: boolean) => {
+  const atualizarAtividadesNaTela = useCallback((dados: {
+    checklists: Atividade[]
+    checklistsFerramentas: AtividadeFerramenta[]
+    ferramentasCatalogo: FerramentaCatalogo[]
+    ocorrencias: Atividade[]
+  }, avisar: boolean) => {
     const assinatura = JSON.stringify({
       checklists: dados.checklists.map(item => [item.id, item.created_at, item.hora, item.placa, item.km, item.nivelCombustivel]),
-      checklistsFerramentas: dados.checklistsFerramentas.map(item => [item.id, item.created_at, item.agente, item.ferramentaNome, item.condicao]),
+      checklistsFerramentas: dados.checklistsFerramentas.map(item => [
+        item.id, item.created_at, item.agente, item.ferramentaNome, item.condicao,
+        item.quantidadeCadastrada, item.quantidadeConferida, item.itemFaltante,
+      ]),
       ocorrencias: dados.ocorrencias.map(item => [item.id, item.created_at, item.hora, item.natureza, item.endereco]),
     })
     const mudouDesdeUmaLeituraAnterior = Boolean(atividadesAssinaturaRef.current) && atividadesAssinaturaRef.current !== assinatura
@@ -179,9 +276,9 @@ export default function RadarDC() {
         proximoDia.setDate(proximoDia.getDate() + 1)
         const proximo = dataLocalISO(proximoDia)
         const [checklistsResult, checklistsFerramentasResult, ocorrenciasResult] = await Promise.all([
-          // Essas datas são colunas date no Supabase e são comparadas sem horário.
+          // O checklist de viatura usa data; o de ferramental usa timestamptz.
           supabase.from('checklists_viatura').select('id,data_checklist,km,placa,motorista,itens,created_at').eq('data_checklist', dataSelecionada).order('created_at', { ascending: false }),
-          supabase.from('checklists_ferramental').select('id,ferramenta_id,condicao,realizado_por,data_checklist,created_at').eq('data_checklist', dataSelecionada).order('created_at', { ascending: false }),
+          supabase.from('checklists_ferramental').select('id,ferramenta_id,quantidade_cadastrada,quantidade_conferida,condicao,item_faltante,realizado_por,data_checklist,created_at').gte('data_checklist', `${dataSelecionada}T00:00:00-03:00`).lt('data_checklist', `${proximo}T00:00:00-03:00`).order('created_at', { ascending: false }),
           supabase.from('ocorrencias').select('id,natureza,endereco,agentes,responsavel_registro,created_at,hora_inicio,data_ocorrencia')
             .eq('data_ocorrencia', dataSelecionada)
             .order('created_at', { ascending: false }),
@@ -192,10 +289,10 @@ export default function RadarDC() {
           const checklistsFerramentas = checklistsFerramentasResult.error
             ? []
             : (checklistsFerramentasResult.data || []) as Array<Record<string, unknown>>
-          const ferramentaIds = checklistsFerramentas.map(row => String(row.ferramenta_id)).filter(Boolean)
-          const materiaisResult = ferramentaIds.length > 0
-            ? await supabase.from('materiais').select('id,nome').in('id', ferramentaIds)
-            : { data: [], error: null }
+          const materiaisResult = await supabase
+            .from('materiais')
+            .select('id,nome,quantidade')
+            .eq('categoria', 'ferramental')
           const nomesFerramentas = new Map((materiaisResult.data || []).map(row => [String(row.id), String(row.nome)]))
           const dados = {
             checklists: (checklistsResult.data || []).map(row => ({
@@ -209,11 +306,20 @@ export default function RadarDC() {
             })) as Atividade[],
             checklistsFerramentas: checklistsFerramentas.map(row => ({
               id: Number(row.id),
+              ferramentaId: String(row.ferramenta_id || ''),
               agente: String(row.realizado_por || 'Agente não informado'),
               ferramentaNome: nomesFerramentas.get(String(row.ferramenta_id)) || 'Ferramenta não informada',
+              quantidadeCadastrada: Number(row.quantidade_cadastrada || 0),
+              quantidadeConferida: Number(row.quantidade_conferida || 0),
               condicao: String(row.condicao || ''),
+              itemFaltante: String(row.item_faltante || ''),
               data_checklist: String(row.data_checklist || ''),
               created_at: String(row.created_at || row.data_checklist || ''),
+            })),
+            ferramentasCatalogo: (materiaisResult.data || []).map(row => ({
+              id: String(row.id),
+              nome: String(row.nome || 'Ferramenta não informada'),
+              quantidade: Math.max(1, Number(row.quantidade || 1)),
             })),
             ocorrencias: (ocorrenciasResult.data || []).map(row => ({ ...row, agente: row.responsavel_registro || (Array.isArray(row.agentes) ? row.agentes[0] : null) || 'Agente não informado', hora: row.hora_inicio || new Date(row.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) })) as Atividade[],
           }
@@ -223,13 +329,18 @@ export default function RadarDC() {
       }
       const res = await fetch(`/api/atividades-dia?data=${dataSelecionada}`)
       if (res.ok) {
-        const dados = await res.json() as { checklists: Atividade[]; checklistsFerramentas: AtividadeFerramenta[]; ocorrencias: Atividade[] }
+        const dados = await res.json() as {
+          checklists: Atividade[]
+          checklistsFerramentas: AtividadeFerramenta[]
+          ferramentasCatalogo: FerramentaCatalogo[]
+          ocorrencias: Atividade[]
+        }
           atualizarAtividadesNaTela({
             ...dados,
             checklists: dados.checklists.map(c => ({ ...c, fotoCarregada: temFotoCarregada(c.itens) })),
           }, avisar)
       }
-    } catch { setAtividades({ checklists: [], checklistsFerramentas: [], ocorrencias: [] }) }
+    } catch { setAtividades({ checklists: [], checklistsFerramentas: [], ferramentasCatalogo: [], ocorrencias: [] }) }
   }, [dataSelecionada, atualizarAtividadesNaTela])
 
 
@@ -289,9 +400,10 @@ export default function RadarDC() {
     carregarAtividades()
     const avisarAtualizacao = () => carregarAtividades(true)
     const offChecklist = wsOn('checklist_atualizado', avisarAtualizacao)
+    const offFerramental = wsOn('checklists_ferramental_atualizados', avisarAtualizacao)
     const offOcorrencias = wsOn('ocorrencias_atualizadas', avisarAtualizacao)
     const timer = window.setInterval(() => { carregarAtividades(false) }, 10000)
-    return () => { offChecklist(); offOcorrencias(); window.clearInterval(timer) }
+    return () => { offChecklist(); offFerramental(); offOcorrencias(); window.clearInterval(timer) }
   }, [carregarAtividades])
   useEffect(() => {
     if (carregadoRef.current) localStorage.setItem(STORAGE_KEY, JSON.stringify(registros))
@@ -306,6 +418,10 @@ export default function RadarDC() {
   const notificacoes = registros.filter(r => r.tipo === 'notificacao')
   const notificacoesDaData = notificacoes.filter(r => r.data === dataSelecionada)
   const proximasNotificacoes = notificacoes.filter(r => !r.concluido).sort((a, b) => `${a.data}${a.hora}`.localeCompare(`${b.data}${b.hora}`))
+  const resumosFerramental = useMemo(
+    () => resumirFerramental(atividades.checklistsFerramentas, atividades.ferramentasCatalogo),
+    [atividades.checklistsFerramentas, atividades.ferramentasCatalogo],
+  )
   const destaquesTempo = useMemo(() => {
     if (!tempo?.dias.length) return null
     return {
@@ -326,7 +442,7 @@ export default function RadarDC() {
     const novo: RegistroRadar = {
       id: crypto.randomUUID(), texto: texto.trim(), data, hora: horaRegistro,
       prioridade, concluido: false, criadoPor: agente, criadoEm: new Date().toISOString(), tipo,
-      agentesEnvolvidos: agentesParaRegistro,
+      agentesEnvolvidos: agentesParaRegistro, confirmacoesAgentes: [],
     }
     setSalvando(true)
     setErroSalvamento('')
@@ -354,6 +470,7 @@ export default function RadarDC() {
         criadoPor: String(row.criado_por || agente), criadoEm: String(row.criado_em || novo.criadoEm),
         tipo: row.tipo === 'notificacao' ? 'notificacao' : 'lembrete',
         agentesEnvolvidos: Array.isArray(row.agentes_envolvidos) ? row.agentes_envolvidos.map(String) : novo.agentesEnvolvidos,
+        confirmacoesAgentes: lerConfirmacoes(row.confirmacoes_agentes),
       }
       setRegistros(prev => [...prev.filter(r => r.id !== salvo.id && r.id !== novo.id), salvo])
       pendentesRef.current.delete(novo.id)
@@ -423,24 +540,6 @@ export default function RadarDC() {
     }
   }
 
-  useEffect(() => {
-    if (!('Notification' in window)) return
-
-    const verificarNotificacoes = () => {
-      if (Notification.permission !== 'granted') return
-      const chave = hoje() + '|' + horaAgora()
-      proximasNotificacoes.filter(n => n.data + '|' + n.hora === chave).forEach(n => {
-        if (notificacoesDisparadasRef.current.has(n.id)) return
-        notificacoesDisparadasRef.current.add(n.id)
-        new Notification('Radar DC', { body: n.texto, tag: n.id })
-      })
-    }
-
-    verificarNotificacoes()
-    const timer = window.setInterval(verificarNotificacoes, 15000)
-    return () => window.clearInterval(timer)
-  }, [proximasNotificacoes])
-
   useEffect(() => wsOn('radar_notificacao_agente', (mensagem) => {
     const envolvidos = Array.isArray(mensagem.agentesEnvolvidos) ? mensagem.agentesEnvolvidos.map(String) : []
     if (!envolvidos.includes(agente) || String(mensagem.criadoPor) === agente) return
@@ -450,6 +549,16 @@ export default function RadarDC() {
         tag: `radar-envolvido-${String(mensagem.id)}`,
       })
     }
+  }), [agente])
+
+  useEffect(() => wsOn('radar_confirmacao', (mensagem) => {
+    if (String(mensagem.criadoPor) !== agente || !('Notification' in window) || Notification.permission !== 'granted') return
+    const nome = String(mensagem.agente || 'Agente')
+    const texto = String(mensagem.texto || 'notificação do Radar DC')
+    new Notification(mensagem.confirmado === true ? '✅ Radar DC — presença confirmada' : '❌ Radar DC — presença recusada', {
+      body: mensagem.confirmado === true ? `${nome} confirmou presença: ${texto}` : `${nome} informou que não poderá ir: ${texto}`,
+      tag: `radar-confirmacao-${String(mensagem.id)}-${nome}`,
+    })
   }), [agente])
 
   useEffect(() => {
@@ -562,6 +671,12 @@ export default function RadarDC() {
                      <b>{n.hora} · {n.prioridade}</b>
                      <span>{n.texto}</span>
                      <small>Por {n.criadoPor}</small>
+                     {n.criadoPor === agente && <small className="radar-confirmacoes-status">
+                       {n.agentesEnvolvidos.map(nome => {
+                         const confirmacao = n.confirmacoesAgentes.find(item => item.agente === nome)
+                         return `${nome}: ${confirmacao ? confirmacao.confirmado ? 'vai ✅' : 'não vai ❌' : 'aguardando…'}`
+                       }).join(' · ')}
+                     </small>}
                    </div>
                    {n.criadoPor === agente && <button type="button" onClick={() => remover(n.id)} aria-label={`Remover notificação: ${n.texto}`} title="Remover notificação">×</button>}
                  </div>
@@ -592,7 +707,57 @@ export default function RadarDC() {
          <div className="radar-list-heading"><div><span className="card-label">REGISTROS OPERACIONAIS</span><h2>Atividades de {dataBonita(dataSelecionada)}</h2></div><strong>{atividades.checklists.length + atividades.checklistsFerramentas.length + atividades.ocorrencias.length} registro(s)</strong></div>
         <div className="radar-activity-columns">
           <div><h3>🚗 Checklists do dia</h3>{atividades.checklists.length === 0 ? <div className="radar-empty">Nenhum checklist de viatura registrado.</div> : atividades.checklists.map(c => <button className="radar-activity" key={c.id} onClick={() => disparar('dc:abrir-checklist', { id: c.id })}><b>{c.agente}{c.fotoCarregada && <strong className="radar-foto-carregada">Foto Carregada</strong>}</b><span className="radar-checklist-resumo">{c.hora} - {c.placa || 'Placa não informada'} - KM {c.km || 'não informado'} - ⛽ {c.nivelCombustivel || 'não informado'}</span><em>abrir ›</em></button>)}
-         <h3 className="radar-subtitulo-ferramentas">🧰 Checklists de ferramentas</h3>{atividades.checklistsFerramentas.length === 0 ? <div className="radar-empty">Nenhum checklist de ferramenta registrado.</div> : atividades.checklistsFerramentas.map(c => <button className="radar-activity" key={`ferramenta-${c.id}`} onClick={() => disparar('dc:abrir-checklist-ferramenta', { id: c.id })}><span className="radar-checklist-resumo">{c.agente} - {c.ferramentaNome} - {c.condicao === 'boa' ? 'Boa' : c.condicao === 'media' ? 'Média' : c.condicao === 'ruim' ? 'Ruim' : c.condicao || 'não informada'}</span><em>abrir ›</em></button>)}</div>
+          <h3 className="radar-subtitulo-ferramentas">🧰 Checklists de ferramentas</h3>
+          {resumosFerramental.length === 0 ? (
+            <div className="radar-empty">Nenhum checklist de ferramenta registrado.</div>
+          ) : (
+            <div className="radar-ferramental-resumos">
+              {resumosFerramental.map(resumo => (
+                <article className="radar-ferramental-resumo" key={resumo.agente}>
+                  <div className="radar-ferramental-cabecalho">
+                    <strong>{resumo.agente}</strong>
+                    <b>Ferramental {resumo.tiposVerificados}/{resumo.totalTipos}</b>
+                  </div>
+                  <div className="radar-ferramental-itens">
+                    <span className="radar-ferramental-boa">Boa - {percentual(resumo.boa, resumo.totalTipos)}%</span>
+                    <span className="radar-ferramental-media">Média - {percentual(resumo.media, resumo.totalTipos)}%</span>
+                    <span className="radar-ferramental-ruim">Ruim - {percentual(resumo.ruim, resumo.totalTipos)}%</span>
+                  </div>
+                  <div className="radar-ferramental-quantidade">
+                    Itens conferidos: {resumo.itensConferidos}/{resumo.itensCadastrados}
+                  </div>
+                  {resumo.ferramentasRuins.length > 0 && (
+                    <div className="radar-ferramental-alerta radar-ferramental-alerta-ruim">
+                      <strong>Ruim:</strong> {resumo.ferramentasRuins.join(', ')}
+                    </div>
+                  )}
+                  {resumo.faltantes.length > 0 && (
+                    <div className="radar-ferramental-alerta radar-ferramental-alerta-falta">
+                      <strong>Faltando:</strong> {resumo.faltantes.join(', ')}
+                    </div>
+                  )}
+                  {resumo.semChecklist.length > 0 && (
+                    <div className="radar-ferramental-alerta radar-ferramental-alerta-pendente">
+                      <strong>Sem checklist:</strong> {resumo.semChecklist.slice(0, 3).join(', ')}
+                      {resumo.semChecklist.length > 3 ? ` e mais ${resumo.semChecklist.length - 3}` : ''}
+                    </div>
+                  )}
+                  <div className="radar-ferramental-registros">
+                    {resumo.registros.map(registro => (
+                      <button
+                        className="radar-ferramental-registro"
+                        key={registro.id}
+                        onClick={() => disparar('dc:abrir-checklist-ferramenta', { id: registro.id })}
+                      >
+                        {registro.ferramentaNome} · {registro.condicao === 'boa' ? 'Boa' : registro.condicao === 'media' ? 'Média' : 'Ruim'} <em>abrir ›</em>
+                      </button>
+                    ))}
+                  </div>
+                </article>
+              ))}
+            </div>
+          )}
+          </div>
           <div><h3>⚠️ Ocorrências do dia</h3>{atividades.ocorrencias.length === 0 ? <div className="radar-empty">Nenhuma ocorrência registrada.</div> : atividades.ocorrencias.map(o => <button className="radar-activity" key={o.id} onClick={() => disparar('dc:abrir-ocorrencia', { id: o.id })}><b>{o.agente}</b><span>{o.hora} · {o.natureza || 'Natureza não informada'}</span><small>{o.endereco || 'Endereço não informado'}</small><em>abrir ›</em></button>)}</div>
         </div>
         </section>

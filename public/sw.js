@@ -216,9 +216,10 @@ self.addEventListener('push', (event) => {
   const tag = data.tag || 'sos'
   const url = data.url || '/'
   const sosId = data.sosId || null
-  const tipo = data.tipo || null  // 'sos' | 'escala' | 'confirmacao' | 'evento_dia' | null
+  const tipo = data.tipo || null  // 'sos' | 'escala' | 'confirmacao' | 'evento_dia' | 'radar_notificacao' | 'radar_confirmacao' | null
 
   const ehSos = !tipo || tipo === 'sos'
+  const ehRadar = tipo === 'radar_notificacao'
 
   event.waitUntil(
     (async () => {
@@ -238,7 +239,7 @@ self.addEventListener('push', (event) => {
         badge: '/icon-192.png',
         tag,
         renotify: true,
-        requireInteraction: ehSos || tipo === 'escala',
+        requireInteraction: ehSos || tipo === 'escala' || ehRadar,
         silent: !ehSos && tipo !== 'escala',
         vibrate: ehSos
           ? [500, 200, 500, 200, 1000, 200, 500, 200, 500]

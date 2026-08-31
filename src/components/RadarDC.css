@@ -207,6 +207,26 @@
 .radar-activity small { grid-column: 1 / -1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .radar-activity em { grid-column: 2; grid-row: 1 / 4; color: var(--blue); font-size: .65rem; font-style: normal; }
 .radar-empty { padding: .7rem; border: 1px dashed #3a6988; border-radius: 8px; color: #9bb8d0; background: #0d2a46; font-size: .7rem; text-align: center; }
+.radar-ferramental-resumos { display: grid; gap: .45rem; }
+.radar-ferramental-resumo { padding: .55rem; border: 1px solid #376886; border-radius: 8px; background: #123652; }
+.radar-ferramental-cabecalho { display: flex; align-items: baseline; justify-content: space-between; gap: .5rem; color: #e9f5ff; font-size: .72rem; }
+.radar-ferramental-cabecalho strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.radar-ferramental-cabecalho b { flex-shrink: 0; color: #b8eaff; font-size: .68rem; }
+.radar-ferramental-itens { display: flex; flex-wrap: wrap; gap: .25rem .5rem; margin-top: .4rem; }
+.radar-ferramental-itens span { font-size: .64rem; font-weight: 800; }
+.radar-ferramental-boa { color: #69e6a5; }
+.radar-ferramental-media { color: #ffd477; }
+.radar-ferramental-ruim { color: #ff8f91; }
+.radar-ferramental-quantidade { margin-top: .3rem; color: #9bb8d0; font-size: .62rem; }
+.radar-ferramental-alerta { margin-top: .28rem; overflow: hidden; color: #c9dced; font-size: .62rem; line-height: 1.35; text-overflow: ellipsis; }
+.radar-ferramental-alerta strong { color: #edf7ff; }
+.radar-ferramental-alerta-ruim strong { color: #ff8f91; }
+.radar-ferramental-alerta-falta strong { color: #ffd477; }
+.radar-ferramental-alerta-pendente strong { color: #b8eaff; }
+.radar-ferramental-registros { display: grid; gap: .2rem; margin-top: .4rem; }
+.radar-ferramental-registro { display: flex; justify-content: space-between; gap: .4rem; width: 100%; padding: .28rem .35rem; border: 0; border-top: 1px solid #285675; color: #a9cae0; background: transparent; font-size: .61rem; text-align: left; cursor: pointer; }
+.radar-ferramental-registro:hover { color: #e9f5ff; background: #174765; }
+.radar-ferramental-registro em { flex-shrink: 0; color: var(--blue); font-style: normal; }
 
 .radar-ticker { position: fixed; right: 0; bottom: 0; left: 0; z-index: 20; display: flex; align-items: center; height: 48px; overflow: hidden; color: #d6edff; background: #0b2545; }
 .radar-ticker > span { display: flex; align-items: center; align-self: stretch; flex-shrink: 0; padding: 0 1rem; color: #fff; background: #0a8bc1; font-size: .78rem; font-weight: 900; letter-spacing: .08em; }

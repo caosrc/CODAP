@@ -680,11 +680,11 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
     }
   }, [])
 
-  const visualizarFocos = useCallback(() => {
+  const visualizarFocos = useCallback(async () => {
     setMostrarFocos(true)
     setAlertaFocosVisto(true)
-    if (focosIncendio.length === 0) void buscarFocos()
-  }, [buscarFocos, focosIncendio.length])
+    await buscarFocos()
+  }, [buscarFocos])
 
   useEffect(() => {
     buscarFocos()
@@ -1548,7 +1548,8 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
                     </div>
                   )}
                   <div style={{ fontSize: '0.78rem', color: '#374151', marginBottom: 3 }}>
-                    <strong>Detectado:</strong> {f.data}{f.hora ? ` às ${f.hora.slice(0,2)}:${f.hora.slice(2,4)} UTC` : ''}
+                    <strong>Data e hora do registro:</strong> {f.data || 'Não informada'}
+                    {f.hora ? ` às ${f.hora.slice(0,2)}:${f.hora.slice(2,4)} UTC` : ' · horário não informado pela fonte'}
                   </div>
                   <div style={{ fontSize: '0.78rem', color: '#6b7280', marginBottom: 2 }}>
                     <strong>Satélite:</strong> {f.satelite || f.fonte}
@@ -1895,23 +1896,6 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
               aria-label="Fechar análise ambiental"
             >✕</button>
           </div>
-          <div className="mapa-monitoramento-focos-acao">
-            <div>
-              <strong>🔥 Focos dos últimos 3 dias</strong>
-              <span>Mostra no mapa os locais detectados por satélite.</span>
-            </div>
-            <button
-              type="button"
-              onClick={visualizarFocos}
-              disabled={focosCarregando && focosIncendio.length === 0}
-            >
-              {focosCarregando && focosIncendio.length === 0
-                ? '⏳ Consultando…'
-                : mostrarFocos
-                  ? '✓ Focos visíveis'
-                  : 'Ver no mapa'}
-            </button>
-          </div>
             {!monitoramentoEE?.configurado && (
             <div className="mapa-monitoramento-vazio">
               Earth Engine ainda não está autenticado neste ambiente. As ferramentas aparecem abaixo,
@@ -1960,7 +1944,7 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
                       title={camada.configuracaoNecessaria || camada.descricao}
                     >
                       <span className="mapa-monitoramento-camada-icone">{
-                        camada.id.includes('modis') || camada.id.includes('viirs') || camada.id.includes('goes') || camada.id.includes('ct-')
+                        camada.id.includes('modis') || camada.id.includes('viirs') || camada.id.includes('goes')
                           ? '🔥'
                           : '🛰️'
                       }</span>
@@ -1993,6 +1977,27 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
                   Falha temporária em {(monitoramentoEE.erros ?? []).length} fonte{monitoramentoEE.erros.length === 1 ? '' : 's'}. As demais detecções continuam sendo combinadas.
                 </div>
               )}
+              <div className="mapa-monitoramento-focos-acao">
+                <div>
+                  <strong>🔥 Focos dos últimos 3 dias</strong>
+                  <span>
+                    {focosCarregando
+                      ? 'Consultando as fontes de incêndio...'
+                      : `${focosIncendio.length} foco${focosIncendio.length === 1 ? '' : 's'} de incêndio encontrado${focosIncendio.length === 1 ? '' : 's'}`}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={visualizarFocos}
+                  disabled={focosCarregando}
+                >
+                  {focosCarregando
+                    ? '⏳ Consultando…'
+                    : mostrarFocos
+                      ? '✓ Focos visíveis'
+                      : 'Ver no mapa'}
+                </button>
+              </div>
               <div className="mapa-monitoramento-rodape">
                 <span>
                   {monitoramentoEE?.atualizadoEm || focosAtualizadoEm

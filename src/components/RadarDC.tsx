@@ -39,7 +39,19 @@ type TempoDC = { atual: { codigo: number; temperatura: number; chuva: number; ve
 
 const OURO_BRANCO = { latitude: -20.5236, longitude: -43.6949 }
 const nomesTempo: Record<number, string> = { 0: 'Céu limpo', 1: 'Predominantemente limpo', 2: 'Parcialmente nublado', 3: 'Nublado', 45: 'Neblina', 48: 'Neblina com gelo', 51: 'Garoa leve', 53: 'Garoa moderada', 55: 'Garoa intensa', 61: 'Chuva leve', 63: 'Chuva moderada', 65: 'Chuva forte', 71: 'Neve leve', 73: 'Neve moderada', 75: 'Neve forte', 80: 'Pancadas leves', 81: 'Pancadas moderadas', 82: 'Pancadas fortes', 95: 'Trovoada', 96: 'Trovoada com granizo', 99: 'Trovoada forte' }
-function iconeTempo(codigo: number) { return codigo >= 95 ? '⛈️' : codigo >= 80 ? '🌦️' : codigo >= 51 ? '🌧️' : codigo >= 45 ? '🌫️' : codigo >= 2 ? '⛅' : '☀️' }
+function horarioNoturno(time?: string) {
+  const hora = Number(time?.slice(11, 13))
+  return Number.isFinite(hora) && (hora >= 18 || hora < 6)
+}
+function iconeTempo(codigo: number, time?: string) {
+  const noturno = horarioNoturno(time)
+  if (codigo >= 95) return '⛈️'
+  if (codigo >= 80) return '🌦️'
+  if (codigo >= 51) return '🌧️'
+  if (codigo >= 45) return '🌫️'
+  if (codigo >= 2) return noturno ? '☁️' : '⛅'
+  return noturno ? '🌙' : '☀️'
+}
 function dataTempo(data: string) { return new Date(data + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) }
 
 const STORAGE_KEY = 'defesacivil-radar-dc-v2'
@@ -631,7 +643,7 @@ export default function RadarDC() {
               {tempo.horas.map(hora => (
                 <div className="weather-hour" key={hora.time} title={`${nomesTempo[hora.codigo] || 'Condição variável'} · ${hora.probabilidade}% de chuva`}>
                   <b>{new Date(hora.time).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</b>
-                  <span className="weather-hour-icon">{iconeTempo(hora.codigo)}</span>
+                   <span className="weather-hour-icon">{iconeTempo(hora.codigo, hora.time)}</span>
                   <strong>{Math.round(hora.probabilidade)}%</strong>
                   <div className="weather-probability"><i style={{ height: `${Math.max(3, hora.probabilidade)}%` }} /></div>
                   <small>{Math.round(hora.temperatura)}° · {hora.precipitacao.toFixed(1)} mm</small>

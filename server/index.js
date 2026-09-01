@@ -1674,6 +1674,7 @@ let polarCache = { data: null, ts: 0 }
 let earthEngineCache = { data: null, ts: 0 }
 let earthEngineMonitoramentoCache = { data: null, ts: 0 }
 const POLAR_TTL = 25 * 60 * 1000   // 25 min
+const FOCOS_PERIODO_DIAS = 3
 // O GOES-19 atualiza o produto de fogo a cada ~10 minutos. O cache não
 // pode ser maior que essa cadência, senão o mapa continua mostrando dados
 // antigos mesmo com a autenticação do Earth Engine funcionando.
@@ -2060,10 +2061,10 @@ app.get('/api/focos-incendio', async (_req, res) => {
     const tarefas = []
     if (!polarOk) {
       tarefas.push(
-        fetch(`${base}/VIIRS_SNPP_NRT/${bbox}/1`,   { signal: AbortSignal.timeout(SIG) }).then(r => ({ r, nome: 'VIIRS-SNPP',  label: 'VIIRS-SNPP'  })),
-        fetch(`${base}/VIIRS_NOAA20_NRT/${bbox}/1`, { signal: AbortSignal.timeout(SIG) }).then(r => ({ r, nome: 'VIIRS-N20',   label: 'VIIRS-NOAA20' })),
-        fetch(`${base}/VIIRS_NOAA21_NRT/${bbox}/1`, { signal: AbortSignal.timeout(SIG) }).then(r => ({ r, nome: 'VIIRS-N21',   label: 'VIIRS-NOAA21' })),
-        fetch(`${base}/MODIS_NRT/${bbox}/1`,          { signal: AbortSignal.timeout(SIG) }).then(r => ({ r, nome: 'MODIS',       label: 'MODIS'        })),
+        fetch(`${base}/VIIRS_SNPP_NRT/${bbox}/${FOCOS_PERIODO_DIAS}`,   { signal: AbortSignal.timeout(SIG) }).then(r => ({ r, nome: 'VIIRS-SNPP',  label: 'VIIRS-SNPP'  })),
+        fetch(`${base}/VIIRS_NOAA20_NRT/${bbox}/${FOCOS_PERIODO_DIAS}`, { signal: AbortSignal.timeout(SIG) }).then(r => ({ r, nome: 'VIIRS-N20',   label: 'VIIRS-NOAA20' })),
+        fetch(`${base}/VIIRS_NOAA21_NRT/${bbox}/${FOCOS_PERIODO_DIAS}`, { signal: AbortSignal.timeout(SIG) }).then(r => ({ r, nome: 'VIIRS-N21',   label: 'VIIRS-NOAA21' })),
+        fetch(`${base}/MODIS_NRT/${bbox}/${FOCOS_PERIODO_DIAS}`,          { signal: AbortSignal.timeout(SIG) }).then(r => ({ r, nome: 'MODIS',       label: 'MODIS'        })),
       )
     }
 

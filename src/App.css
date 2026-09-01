@@ -1944,6 +1944,45 @@ input, select, textarea { font-family: inherit; }
   color: #c2410c;
   font-size: 0.5rem;
 }
+.mapa-monitoramento-focos-acao {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin: 0.35rem 0.6rem 0.45rem;
+  padding: 0.45rem 0.5rem;
+  border: 1px solid #fecaca;
+  border-radius: 7px;
+  background: #fff1f2;
+}
+.mapa-monitoramento-focos-acao strong,
+.mapa-monitoramento-focos-acao span {
+  display: block;
+}
+.mapa-monitoramento-focos-acao strong {
+  color: #991b1b;
+  font-size: 0.59rem;
+}
+.mapa-monitoramento-focos-acao span {
+  margin-top: 0.1rem;
+  color: #9f1239;
+  font-size: 0.5rem;
+}
+.mapa-monitoramento-focos-acao button {
+  flex: 0 0 auto;
+  border: 0;
+  border-radius: 6px;
+  padding: 0.35rem 0.45rem;
+  background: #dc2626;
+  color: #fff;
+  font-size: 0.53rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+.mapa-monitoramento-focos-acao button:disabled {
+  opacity: 0.65;
+  cursor: wait;
+}
 .mapa-monitoramento-camadas {
   display: grid;
   grid-template-columns: 1fr;

@@ -470,7 +470,7 @@ function nomeDiaSemana(dateStr: string): string {
 }
 
 const OURO_BRANCO: [number, number] = [-20.5195, -43.6983]
-const RAIO_RADAR_CHUVA_METROS = 15_000
+const RAIO_RADAR_CHUVA_METROS = 10_000
 
 const MAX_TRILHA = 300
 
@@ -535,7 +535,7 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
 
   // Focos de incêndio (NASA FIRMS + Earth Engine — somente fogo ativo)
   const [focosIncendio, setFocosIncendio] = useState<FocoIncendio[]>([])
-  const [mostrarFocos, setMostrarFocos] = useState(true)
+  const [mostrarFocos, setMostrarFocos] = useState(false)
   const [focosConfigurado, setFocosConfigurado] = useState<boolean | null>(null)
   const [focosFontes, setFocosFontes] = useState<string[]>([])
   const [focosAtualizadoEm, setFocosAtualizadoEm] = useState<string | null>(null)
@@ -688,6 +688,12 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
       setFocosCarregando(false)
     }
   }, [])
+
+  const visualizarFocos = useCallback(() => {
+    setMostrarFocos(true)
+    setAlertaFocosVisto(true)
+    if (focosIncendio.length === 0) void buscarFocos()
+  }, [buscarFocos, focosIncendio.length])
 
   useEffect(() => {
     buscarFocos()
@@ -1384,7 +1390,7 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
             <Popup>
               <strong>Área de observação da chuva</strong>
               <br />
-              Raio de 15 km a partir do centro de Ouro Branco
+              Raio de 10 km a partir do centro de Ouro Branco
             </Popup>
           </Circle>
         )}
@@ -1696,7 +1702,7 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
               <div className="mapa-chuva-painel-header">
                 <div>
                   <strong>🌧️ Chuva ao vivo</strong>
-                  <span>Ouro Branco, MG · área tracejada = raio de observação de 15 km</span>
+                  <span>Ouro Branco, MG · área tracejada = raio de observação de 10 km</span>
                 </div>
                 <button
                   onClick={() => setPainelChuvaAberto(false)}
@@ -1756,7 +1762,7 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
                     <span><i className="chuva-cor chuva-cor--extrema" /> extrema</span>
                   </div>
                   <p className="mapa-chuva-ajuda">
-                     As manchas coloridas mostram os núcleos e a área da precipitação no radar. O contorno azul tracejado indica um raio de observação de 15 km; o radar continua visível além dele. O ponto escuro marca a consulta local.
+                     As manchas coloridas mostram os núcleos e a área da precipitação no radar. O contorno azul tracejado indica um raio de observação de 10 km; o radar continua visível além dele. O ponto escuro marca a consulta local.
                   </p>
                   {mostrarRRQPE && (
                     <div className={`mapa-rrqpe-status ${rrqpe?.disponivel ? 'disponivel' : ''}`}>
@@ -1866,7 +1872,6 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
           <button
             className={`mapa-camada-btn mapa-fogo-btn ${mostrarFocos || painelMonitoramentoAberto ? 'ativo' : ''} ${focosIncendio.length > 0 ? 'tem-focos' : ''}`}
             onClick={() => {
-              setMostrarFocos(true)
               setPainelMonitoramentoAberto(v => !v)
             }}
             title={
@@ -1898,6 +1903,23 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
               onClick={() => setPainelMonitoramentoAberto(false)}
               aria-label="Fechar análise ambiental"
             >✕</button>
+          </div>
+          <div className="mapa-monitoramento-focos-acao">
+            <div>
+              <strong>🔥 Focos dos últimos 3 dias</strong>
+              <span>Mostra no mapa os locais detectados por satélite.</span>
+            </div>
+            <button
+              type="button"
+              onClick={visualizarFocos}
+              disabled={focosCarregando && focosIncendio.length === 0}
+            >
+              {focosCarregando && focosIncendio.length === 0
+                ? '⏳ Consultando…'
+                : mostrarFocos
+                  ? '✓ Focos visíveis'
+                  : 'Ver no mapa'}
+            </button>
           </div>
             {!monitoramentoEE?.configurado && (
             <div className="mapa-monitoramento-vazio">

@@ -126,7 +126,7 @@ export default function Login({ onLogin, apenasAgente = false }: Props) {
       <div className="login-tela">
         <div className="login-box">
           <div className="login-logo-wrap">
-            <img src="/logo-dc.jpg" alt="Defesa Civil Ouro Branco" className="login-logo" />
+            <img src="/cod-logo.png" alt="Símbolo do aplicativo" className="login-logo" />
           </div>
           <div className="login-titulo">Defesa Civil</div>
           <div className="login-subtitulo">Defesa Civil somos todos nós</div>
@@ -150,6 +150,7 @@ export default function Login({ onLogin, apenasAgente = false }: Props) {
                   className={`login-input${erroSenhaAgente ? ' login-input-erro' : ''}`}
                   type={mostrarSenhaAgente ? 'text' : 'password'}
                   inputMode="numeric"
+                  autoComplete="current-password"
                   placeholder="••••"
                   value={senhaAgente}
                   maxLength={20}
@@ -203,7 +204,7 @@ export default function Login({ onLogin, apenasAgente = false }: Props) {
       <div className="login-tela">
         <div className="login-box login-box--agente">
           <div className="login-logo-wrap">
-            <img src="/logo-dc.jpg" alt="Defesa Civil Ouro Branco" className="login-logo" />
+            <img src="/cod-logo.png" alt="Símbolo do aplicativo" className="login-logo" />
           </div>
           <div className="login-titulo">Defesa Civil</div>
           <div className="login-subtitulo">Defesa Civil somos todos nós</div>
@@ -233,7 +234,7 @@ export default function Login({ onLogin, apenasAgente = false }: Props) {
     <div className="login-tela">
       <div className="login-box">
         <div className="login-logo-wrap">
-          <img src="/logo-dc.jpg" alt="Defesa Civil Ouro Branco" className="login-logo" />
+            <img src="/cod-logo.png" alt="Símbolo do aplicativo" className="login-logo" />
         </div>
         <div className="login-titulo">Defesa Civil</div>
         <div className="login-subtitulo">Defesa Civil somos todos nós</div>
@@ -246,6 +247,7 @@ export default function Login({ onLogin, apenasAgente = false }: Props) {
               className={`login-input${erro ? ' login-input-erro' : ''}`}
               type="email"
               inputMode="email"
+              autoComplete="username"
               autoCapitalize="none"
               autoCorrect="off"
               placeholder="email@exemplo.com"
@@ -259,6 +261,7 @@ export default function Login({ onLogin, apenasAgente = false }: Props) {
             <input
               className={`login-input${erro ? ' login-input-erro' : ''}`}
               type="password"
+              autoComplete="current-password"
               placeholder="••••••••"
               value={senha}
               onChange={(e) => { setSenha(e.target.value); setErro('') }}

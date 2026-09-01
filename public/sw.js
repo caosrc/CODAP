@@ -18,7 +18,7 @@
  *  - LIMPAR_CACHE_MAPA               → apaga todos os tiles cacheados
  */
 
-const VERSION = 'v12-2026-05-supabase-fix'
+const VERSION = 'v13-2026-09-login-logo'
 const APP_CACHE = `defesacivil-app-${VERSION}`
 const TILES_CACHE = 'defesacivil-tiles-osm'
 const ASSETS_CACHE = `defesacivil-assets-${VERSION}`
@@ -35,6 +35,7 @@ const APP_SHELL = [
   '/icon-512-maskable.png',
   '/apple-touch-icon.png',
   '/favicon.svg',
+  '/cod-logo.png',
   '/logo-dc.jpg',
   '/logo-dc.png',
   '/icons.svg',

@@ -17,5 +17,6 @@ export function ehFerramentalPorLitro(nome: string): boolean {
 export function ehFerramentalSomenteQuantidade(nome: string): boolean {
   const nomeNormalizado = normalizarNome(nome)
   return nomeNormalizado.includes('OLEO 2 TEMPO STIHL') ||
+    nomeNormalizado.includes('OLEO STIHL') ||
     nomeNormalizado.includes('DC GASOLINA')
 }

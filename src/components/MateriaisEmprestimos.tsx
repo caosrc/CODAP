@@ -1361,6 +1361,7 @@ function ChecklistFerramenta({
   const ehPorLitro = ehFerramentalPorLitro(ferramenta.nome)
   const ehSomenteQuantidade = ehFerramentalSomenteQuantidade(ferramenta.nome)
   const ehControlePorQuantidade = ehSerragem || ehPorLitro || ehSomenteQuantidade
+  const mostrarCondicao = !ehControlePorQuantidade
   const ehEstoqueLiquido = ehPorLitro || ehSomenteQuantidade
   const [quantidadeConferida, setQuantidadeConferida] = useState(quantidadeCadastrada)
   const [condicao, setCondicao] = useState<'boa' | 'media' | 'ruim' | ''>('')
@@ -1371,8 +1372,8 @@ function ChecklistFerramenta({
   const quantidadeFaltante = Math.max(0, quantidadeCadastrada - quantidadeConferida)
 
   async function salvar() {
-    if (!ehControlePorQuantidade && !condicao) { setErro('Marque a condição da ferramenta.'); return }
-    if (!ehControlePorQuantidade && quantidadeConferida < quantidadeCadastrada &&
+    if (mostrarCondicao && !condicao) { setErro('Marque a condição da ferramenta.'); return }
+    if (mostrarCondicao && quantidadeConferida < quantidadeCadastrada &&
         !itemFaltante.trim() && !justificativa.trim()) {
       setErro('Informe onde está o item ou justifique a falta.')
       return
@@ -1386,8 +1387,8 @@ function ChecklistFerramenta({
         quantidade_cadastrada: quantidadeCadastrada,
         quantidade_conferida: quantidadeConferida,
          condicao: ehControlePorQuantidade ? 'quantidade' : condicao as 'boa' | 'media' | 'ruim',
-         item_faltante: !ehControlePorQuantidade && quantidadeFaltante > 0 ? itemFaltante.trim() : null,
-         justificativa: !ehControlePorQuantidade && quantidadeFaltante > 0 ? justificativa.trim() : null,
+         item_faltante: mostrarCondicao && quantidadeFaltante > 0 ? itemFaltante.trim() : null,
+         justificativa: mostrarCondicao && quantidadeFaltante > 0 ? justificativa.trim() : null,
         realizado_por: getAgenteLogado() || null,
       })
       onSalvo(checklist)
@@ -1455,7 +1456,7 @@ function ChecklistFerramenta({
           </span>
         </div>
 
-        {!ehControlePorQuantidade && quantidadeFaltante > 0 && (
+        {mostrarCondicao && quantidadeFaltante > 0 && (
           <div className="mat-checklist-falta-form">
             <div className="mat-checklist-falta-form-titulo">⚠️ Item faltante</div>
             <div className="campo">
@@ -1480,7 +1481,7 @@ function ChecklistFerramenta({
           </div>
         )}
 
-        {!ehControlePorQuantidade && <div className="campo">
+        {mostrarCondicao && <div className="campo">
           <label className="campo-label">Condição da ferramenta *</label>
           <div className="mat-condicao-opcoes">
             {([
@@ -1507,7 +1508,7 @@ function ChecklistFerramenta({
 
         {ehEstoqueLiquido && quantidadeConferida < 10 && (
           <div className="mat-checklist-alerta" role="status">
-            ⚠️ Atenção: estoque baixo ({quantidadeConferida} litro{quantidadeConferida === 1 ? '' : 's'}). O Radar DC mostrará uma notificação em “Checklists de ferramentas”.
+            ⚠️ Atenção: estoque baixo ({quantidadeConferida} {ehPorLitro ? `litro${quantidadeConferida === 1 ? '' : 's'}` : `item${quantidadeConferida === 1 ? '' : 'ns'}`}). O Radar DC mostrará uma notificação em “Checklists de ferramentas”.
           </div>
         )}
 

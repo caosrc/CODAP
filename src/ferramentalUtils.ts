@@ -11,7 +11,11 @@ function normalizarNome(nome: string): string {
 export function ehFerramentalPorLitro(nome: string): boolean {
   const nomeNormalizado = normalizarNome(nome)
   return nomeNormalizado === 'OLEO' ||
-    nomeNormalizado.includes('OLEO 2 TEMPO STIHL') ||
-    nomeNormalizado.includes('DC GASOLINA') ||
     nomeNormalizado.includes('OLEO LUBRIFICANTE')
+}
+
+export function ehFerramentalSomenteQuantidade(nome: string): boolean {
+  const nomeNormalizado = normalizarNome(nome)
+  return nomeNormalizado.includes('OLEO 2 TEMPO STIHL') ||
+    nomeNormalizado.includes('DC GASOLINA')
 }

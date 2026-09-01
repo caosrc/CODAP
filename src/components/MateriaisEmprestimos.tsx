@@ -3,7 +3,7 @@ import { getAgenteLogado } from './Login'
 import { parseExcelPatrimonio, type ItemImportado, type ResultadoParse } from '../importarExcelPatrimonio'
 import { matApi, type MatChecklistFerramenta } from '../matApi'
 import { supabase, supabaseDisponivel } from '../supabaseClient'
-import { ehFerramentalPorLitro } from '../ferramentalUtils'
+import { ehFerramentalPorLitro, ehFerramentalSomenteQuantidade } from '../ferramentalUtils'
 
 // ─── Tipos ─────────────────────────────────────────────────────────────────
 interface Material {
@@ -1088,27 +1088,28 @@ function HistoricoChecklists({ ferramentaId, ferramentaNome, quantidadeCadastrad
             const faltantes = Math.max(0, checklist.quantidade_cadastrada - checklist.quantidade_conferida)
             const ehSerragem = /serragem/i.test(ferramentaNome)
             const ehPorLitro = ehFerramentalPorLitro(ferramentaNome)
+            const ehSomenteQuantidade = ehFerramentalSomenteQuantidade(ferramentaNome)
             return (
               <div key={checklist.id} className={`mat-checklist-registro condicao-${checklist.condicao}`}>
                 <div className="mat-checklist-registro-cab">
                   <strong>{formatarDataBr(checklist.data_checklist)}</strong>
                   {ehPorLitro
                     ? <span className="mat-condicao-pill">Por litro</span>
-                    : ehSerragem || checklist.condicao === 'quantidade'
+                    : ehSerragem || ehSomenteQuantidade || checklist.condicao === 'quantidade'
                     ? <span className="mat-condicao-pill">Por quantidade</span>
                     : <span className={`mat-condicao-pill condicao-${checklist.condicao}`}>
                       {checklist.condicao === 'boa' ? 'Boa' : checklist.condicao === 'media' ? 'Média' : 'Ruim'}
                     </span>}
                 </div>
                 <div className="mat-checklist-registro-qtd">
-                  {ehPorLitro ? 'Litros encontrados' : ehSerragem ? 'Sacos de serragem' : 'Quantidade'}: {checklist.quantidade_conferida}/{checklist.quantidade_cadastrada || quantidadeCadastrada}
-                  {ehPorLitro
+                  {ehPorLitro ? 'Litros encontrados' : ehSerragem ? 'Sacos de serragem' : 'Quantidade de itens encontrada'}: {checklist.quantidade_conferida}/{checklist.quantidade_cadastrada || quantidadeCadastrada}
+                  {ehPorLitro || ehSomenteQuantidade
                     ? (checklist.quantidade_conferida < 10 ? ' · Repor estoque de óleo/combustível' : '')
                     : ehSerragem
                       ? (checklist.quantidade_conferida <= 2 ? ' · Repor serragem' : '')
                     : (faltantes > 0 ? ` · ${faltantes} item(ns) faltante(s)` : ' · Todos os itens encontrados')}
                 </div>
-                {!ehSerragem && !ehPorLitro && faltantes > 0 && (
+                {!ehSerragem && !ehPorLitro && !ehSomenteQuantidade && faltantes > 0 && (
                   <div className="mat-checklist-falta">
                     <strong>Item faltante:</strong> {checklist.item_faltante || 'Não informado'}
                     {checklist.justificativa ? <><br /><strong>Justificativa:</strong> {checklist.justificativa}</> : null}
@@ -1358,7 +1359,9 @@ function ChecklistFerramenta({
   const quantidadeCadastrada = Math.max(1, ferramenta.quantidade ?? 1)
   const ehSerragem = /serragem/i.test(ferramenta.nome)
   const ehPorLitro = ehFerramentalPorLitro(ferramenta.nome)
-  const ehControlePorQuantidade = ehSerragem || ehPorLitro
+  const ehSomenteQuantidade = ehFerramentalSomenteQuantidade(ferramenta.nome)
+  const ehControlePorQuantidade = ehSerragem || ehPorLitro || ehSomenteQuantidade
+  const ehEstoqueLiquido = ehPorLitro || ehSomenteQuantidade
   const [quantidadeConferida, setQuantidadeConferida] = useState(quantidadeCadastrada)
   const [condicao, setCondicao] = useState<'boa' | 'media' | 'ruim' | ''>('')
   const [itemFaltante, setItemFaltante] = useState('')
@@ -1408,7 +1411,9 @@ function ChecklistFerramenta({
           <span className="mat-card-codigo">{ferramenta.id}</span>
           <strong>{ferramenta.nome}</strong>
           <span className="campo-label-sub">
-            {ehPorLitro
+            {ehSomenteQuantidade
+              ? 'Informe a quantidade de itens encontrada'
+              : ehPorLitro
               ? 'Informe a quantidade disponível em litros'
               : ehSerragem
                 ? 'Informe a quantidade de sacos em estoque'
@@ -1423,7 +1428,9 @@ function ChecklistFerramenta({
 
         <div className="campo">
           <label className="campo-label">
-            {ehPorLitro
+            {ehSomenteQuantidade
+              ? 'Quantidade de itens encontrada *'
+              : ehPorLitro
               ? 'Quantidade em litros encontrada *'
               : ehSerragem
                 ? 'Quantidade de sacos de serragem encontrada *'
@@ -1498,7 +1505,7 @@ function ChecklistFerramenta({
           </div>
         </div>}
 
-        {ehPorLitro && quantidadeConferida < 10 && (
+        {ehEstoqueLiquido && quantidadeConferida < 10 && (
           <div className="mat-checklist-alerta" role="status">
             ⚠️ Atenção: estoque baixo ({quantidadeConferida} litro{quantidadeConferida === 1 ? '' : 's'}). O Radar DC mostrará uma notificação em “Checklists de ferramentas”.
           </div>

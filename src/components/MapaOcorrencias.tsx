@@ -470,7 +470,7 @@ function nomeDiaSemana(dateStr: string): string {
 }
 
 const OURO_BRANCO: [number, number] = [-20.5195, -43.6983]
-const RAIO_RADAR_CHUVA_METROS = 20_000
+const RAIO_RADAR_CHUVA_METROS = 15_000
 
 const MAX_TRILHA = 300
 
@@ -1384,7 +1384,7 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
             <Popup>
               <strong>Área de observação da chuva</strong>
               <br />
-              Raio de 20 km a partir do centro de Ouro Branco
+              Raio de 15 km a partir do centro de Ouro Branco
             </Popup>
           </Circle>
         )}
@@ -1696,7 +1696,7 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
               <div className="mapa-chuva-painel-header">
                 <div>
                   <strong>🌧️ Chuva ao vivo</strong>
-                  <span>Ouro Branco, MG · área tracejada = raio de observação de 20 km</span>
+                  <span>Ouro Branco, MG · área tracejada = raio de observação de 15 km</span>
                 </div>
                 <button
                   onClick={() => setPainelChuvaAberto(false)}
@@ -1756,7 +1756,7 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
                     <span><i className="chuva-cor chuva-cor--extrema" /> extrema</span>
                   </div>
                   <p className="mapa-chuva-ajuda">
-                     As manchas coloridas mostram os núcleos e a área da precipitação no radar. O contorno azul tracejado indica um raio de observação de 20 km; o radar continua visível além dele. O ponto escuro marca a consulta local.
+                     As manchas coloridas mostram os núcleos e a área da precipitação no radar. O contorno azul tracejado indica um raio de observação de 15 km; o radar continua visível além dele. O ponto escuro marca a consulta local.
                   </p>
                   {mostrarRRQPE && (
                     <div className={`mapa-rrqpe-status ${rrqpe?.disponivel ? 'disponivel' : ''}`}>

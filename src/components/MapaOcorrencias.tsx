@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
-import { MapContainer, TileLayer, Marker, Popup, useMapEvents, useMap, Circle, Polyline, CircleMarker, GeoJSON } from 'react-leaflet'
+import { MapContainer, TileLayer, Marker, Popup, useMapEvents, useMap, Circle, Polyline, CircleMarker } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import type { Ocorrencia } from '../types'
@@ -470,6 +470,7 @@ function nomeDiaSemana(dateStr: string): string {
 }
 
 const OURO_BRANCO: [number, number] = [-20.5195, -43.6983]
+const RAIO_RADAR_CHUVA_METROS = 20_000
 
 const MAX_TRILHA = 300
 
@@ -490,7 +491,6 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
   const [rrqpe, setRRQPE] = useState<DadosRRQPE | null>(null)
   const [rrqpeCarregando, setRRQPECarregando] = useState(false)
   const [rrqpeErro, setRRQPEErro] = useState<string | null>(null)
-  const [limiteMunicipio, setLimiteMunicipio] = useState<Record<string, unknown> | null>(null)
   const [mostrarOcorrencias, setMostrarOcorrencias] = useState(false)
   const [mostrarMateriais, setMostrarMateriais] = useState(false)
   const [painelMaterialAberto, setPainelMaterialAberto] = useState(false)
@@ -641,14 +641,6 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
     const intervalo = setInterval(buscarRRQPE, 10 * 60 * 1000)
     return () => clearInterval(intervalo)
   }, [mostrarRRQPE, buscarRRQPE])
-
-  useEffect(() => {
-    if (!mostrarChuva || limiteMunicipio) return
-    fetch('/api/limite-ouro-branco', { cache: 'force-cache' })
-      .then(res => res.ok ? res.json() : null)
-      .then(geojson => { if (geojson) setLimiteMunicipio(geojson) })
-      .catch(() => {})
-  }, [mostrarChuva, limiteMunicipio])
 
   // Mapa offline — inicializa tiles do localStorage para mostrar status imediatamente
   const [statusOffline, setStatusOffline] = useState<StatusOffline>('idle')
@@ -1376,19 +1368,25 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
             updateWhenIdle={true}
           />
         )}
-        {mostrarChuva && limiteMunicipio && (
-          <GeoJSON
-            key="limite-municipio-ouro-branco"
-            data={limiteMunicipio as never}
-            style={() => ({
+        {mostrarChuva && (
+          <Circle
+            center={OURO_BRANCO}
+            radius={RAIO_RADAR_CHUVA_METROS}
+            pathOptions={{
               color: '#1d4ed8',
               weight: 2,
               opacity: 0.95,
               dashArray: '7 5',
               fillColor: '#60a5fa',
               fillOpacity: 0.04,
-            })}
-          />
+            }}
+          >
+            <Popup>
+              <strong>Área de observação da chuva</strong>
+              <br />
+              Raio de 20 km a partir do centro de Ouro Branco
+            </Popup>
+          </Circle>
         )}
         {mostrarChuva && (
           <CircleMarker
@@ -1698,7 +1696,7 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
               <div className="mapa-chuva-painel-header">
                 <div>
                   <strong>🌧️ Chuva ao vivo</strong>
-                  <span>Ouro Branco, MG · área tracejada = limite municipal</span>
+                  <span>Ouro Branco, MG · área tracejada = raio de observação de 20 km</span>
                 </div>
                 <button
                   onClick={() => setPainelChuvaAberto(false)}
@@ -1758,7 +1756,7 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
                     <span><i className="chuva-cor chuva-cor--extrema" /> extrema</span>
                   </div>
                   <p className="mapa-chuva-ajuda">
-                    As manchas coloridas mostram os núcleos e a área da precipitação no radar. O contorno azul tracejado é o polígono do município; o ponto escuro marca a consulta local.
+                     As manchas coloridas mostram os núcleos e a área da precipitação no radar. O contorno azul tracejado indica um raio de observação de 20 km; o radar continua visível além dele. O ponto escuro marca a consulta local.
                   </p>
                   {mostrarRRQPE && (
                     <div className={`mapa-rrqpe-status ${rrqpe?.disponivel ? 'disponivel' : ''}`}>

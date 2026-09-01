@@ -37,8 +37,9 @@ const Dashboard = lazy(() => import('./components/Dashboard'))
 const SosOverlay = lazy(() => import('./components/SosOverlay'))
 const MateriaisEmprestimos = lazy(() => import('./components/MateriaisEmprestimos'))
 const Planejamento = lazy(() => import('./components/Planejamento'))
+const MonitoramentoCNL = lazy(() => import('./components/MonitoramentoCNL'))
 
-type Aba = 'lista' | 'mapa' | 'nova' | 'viatura' | 'escala' | 'materiais' | 'planejamento'
+type Aba = 'lista' | 'mapa' | 'nova' | 'viatura' | 'escala' | 'materiais' | 'planejamento' | 'monitoramento'
 
 function dataLocal(iso: string): string {
   const d = new Date(iso)
@@ -570,6 +571,7 @@ export default function App() {
         import('./components/Dashboard'),
         import('./components/MateriaisEmprestimos'),
         import('./components/Planejamento'),
+        import('./components/MonitoramentoCNL'),
       ]).catch(() => { /* sem internet ou bloqueado, ignora */ })
     }, 1500)
     return () => window.clearTimeout(id)
@@ -1093,6 +1095,19 @@ export default function App() {
           </ErrorBoundary>
         )}
 
+        {aba === 'monitoramento' && (
+          <ErrorBoundary>
+            <Suspense fallback={<LazyFallback />}>
+              <MonitoramentoCNL
+                onAbrirMapa={(lat, lng, nome) => {
+                  setDestinoCampo({ lat, lng, nome, soMostrar: true })
+                  setAba('mapa')
+                }}
+              />
+            </Suspense>
+          </ErrorBoundary>
+        )}
+
       </div>
 
       <nav className="bottom-nav">
@@ -1103,6 +1118,10 @@ export default function App() {
         <button className={`nav-btn ${aba === 'planejamento' ? 'ativo' : ''}`} onClick={() => setAba('planejamento')}>
           <span className="nav-emoji">📐</span>
           <span>Planejamento</span>
+        </button>
+        <button className={`nav-btn nav-monitoramento ${aba === 'monitoramento' ? 'ativo' : ''}`} onClick={() => setAba('monitoramento')}>
+          <span className="nav-emoji">🌊</span>
+          <span>Monitoramento</span>
         </button>
         <button className={`nav-btn ${aba === 'lista' ? 'ativo' : ''}`} onClick={() => setAba('lista')}>
           <span className="nav-emoji">📋</span>

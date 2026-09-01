@@ -3089,6 +3089,138 @@ app.get('/api/tempo', async (_req, res) => {
   }
 })
 
+// ── Monitoramento CNL / CEMADEN ────────────────────────────────────────────
+// A página pública do CEMADEN usa dois serviços: um catálogo com os
+// acumulados mais recentes e o MapaInterativoWS para a série horária.
+const CNL_ESTACAO_ID = 6622
+const CNL_CATALOGO_URL = 'https://resources.cemaden.gov.br/graficos/interativo/getJson2.php?uf=MG'
+const CNL_RECURSOS_URL = 'https://mapservices.cemaden.gov.br/MapaInterativoWS/resources'
+const CNL_FONTE_URL = `https://resources.cemaden.gov.br/graficos/interativo/grafico_CEMADEN.php?idpcd=${CNL_ESTACAO_ID}&uf=MG`
+let monitoramentoCnlCache = null
+let monitoramentoCnlCacheTs = 0
+const MONITORAMENTO_CNL_TTL_MS = 2 * 60 * 1000
+
+function numeroCemaden(valor) {
+  if (valor == null || valor === '') return null
+  const numero = Number(valor)
+  return Number.isFinite(numero) && valor !== '-' ? numero : null
+}
+
+function normalizarEstacaoCnl(estacao) {
+  return {
+    id: Number(estacao.idestacao),
+    uf: String(estacao.uf || 'MG'),
+    cidade: String(estacao.cidade || ''),
+    nome: String(estacao.nomeestacao || ''),
+    codigo: String(estacao.codEstacao || ''),
+    ultimoValor: numeroCemaden(estacao.ultimovalor),
+    dataHora: String(estacao.datahoraUltimovalor || ''),
+    acumulados: {
+      umaHora: numeroCemaden(estacao.acc1hr),
+      seisHoras: numeroCemaden(estacao.acc6hr),
+      dozeHoras: numeroCemaden(estacao.acc12hr),
+      vinteQuatroHoras: numeroCemaden(estacao.acc24hr),
+      setentaEDuasHoras: numeroCemaden(estacao.acc72hr),
+    },
+  }
+}
+
+function montarSerieHorariaCnl(payload) {
+  const horarios = Array.isArray(payload?.horarios) ? payload.horarios : []
+  const datas = Array.isArray(payload?.datas) ? payload.datas : []
+  const acumulados = Array.isArray(payload?.acumulados) ? payload.acumulados : []
+  const serie = []
+
+  acumulados.forEach((linha, indiceData) => {
+    if (!Array.isArray(linha)) return
+    linha.forEach((valor, indiceHora) => {
+      const numero = numeroCemaden(valor)
+      if (numero == null) return
+      serie.push({
+        data: String(datas[indiceData] || ''),
+        hora: String(horarios[indiceHora] || ''),
+        valor: numero,
+      })
+    })
+  })
+  return serie.slice(-24)
+}
+
+app.get('/api/monitoramento-cnl', async (_req, res) => {
+  const agora = Date.now()
+  if (monitoramentoCnlCache && agora - monitoramentoCnlCacheTs < MONITORAMENTO_CNL_TTL_MS) {
+    return res.json({ ...monitoramentoCnlCache, cache: true })
+  }
+
+  const controlador = new AbortController()
+  const timeout = setTimeout(() => controlador.abort(), 15000)
+  try {
+    const [catalogoResposta, horarioResposta] = await Promise.all([
+      fetch(CNL_CATALOGO_URL, {
+        signal: controlador.signal,
+        headers: { 'User-Agent': 'DefesaCivilOuroBranco/1.0' },
+      }),
+      fetch(`${CNL_RECURSOS_URL}/horario/${CNL_ESTACAO_ID}/23`, {
+        signal: controlador.signal,
+        headers: { 'User-Agent': 'DefesaCivilOuroBranco/1.0' },
+      }),
+    ])
+    if (!catalogoResposta.ok || !horarioResposta.ok) {
+      throw new Error(`CEMADEN respondeu catálogo ${catalogoResposta.status} e série ${horarioResposta.status}`)
+    }
+
+    const [catalogo, horario] = await Promise.all([catalogoResposta.json(), horarioResposta.json()])
+    const estacaoCatalogo = Array.isArray(catalogo)
+      ? catalogo.find((item) => Number(item?.idestacao) === CNL_ESTACAO_ID)
+      : null
+    const estacaoHorario = horario?.estacao || {}
+    if (!estacaoCatalogo || !estacaoHorario) throw new Error('Estação Rio Bananeiras não encontrada no CEMADEN')
+
+    const estacoes = (Array.isArray(catalogo) ? catalogo : [])
+      .filter((item) => Number(item?.codibge) === Number(estacaoCatalogo.codibge))
+      .map(normalizarEstacaoCnl)
+      .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
+    const base = normalizarEstacaoCnl(estacaoCatalogo)
+    const estacao = {
+      ...base,
+      codigo: String(estacaoHorario.codEstacao || base.codigo || ''),
+      latitude: numeroCemaden(estacaoHorario.latitude),
+      longitude: numeroCemaden(estacaoHorario.longitude),
+      tipo: String(estacaoHorario.idTipoestacao?.descricao || 'Hidrológica'),
+      status: String(estacaoHorario.status || 'UNKNOWN'),
+      cotas: {
+        atencao: numeroCemaden(estacaoHorario.cotaAtencao),
+        alerta: numeroCemaden(estacaoHorario.cotaAlerta),
+        transbordamento: numeroCemaden(estacaoHorario.cotaTransbordamento),
+      },
+    }
+
+    monitoramentoCnlCache = {
+      sucesso: true,
+      estacao,
+      estacoes,
+      serie: montarSerieHorariaCnl(horario),
+      atualizadoEm: new Date().toISOString(),
+      fonte: CNL_FONTE_URL,
+      aviso: 'A cota instantânea do rio não é retornada pelo endpoint público consultado.',
+    }
+    monitoramentoCnlCacheTs = agora
+    res.set('Cache-Control', 'no-store')
+    return res.json(monitoramentoCnlCache)
+  } catch (erro) {
+    console.error('[CNL] Falha ao consultar CEMADEN:', erro?.message || erro)
+    if (monitoramentoCnlCache) {
+      return res.json({ ...monitoramentoCnlCache, cache: true, erroAtualizacao: true })
+    }
+    return res.status(503).json({
+      sucesso: false,
+      erro: 'Não foi possível consultar o monitoramento do CEMADEN.',
+    })
+  } finally {
+    clearTimeout(timeout)
+  }
+})
+
 // ── Radar de chuva ao vivo (RainViewer) ─────────────────────────────────────
 // O RainViewer fornece os tiles de radar sem chave. O servidor busca apenas os
 // metadados e o navegador solicita os tiles diretamente ao host informado pela

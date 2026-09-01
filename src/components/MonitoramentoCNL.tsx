@@ -1,0 +1,328 @@
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import './MonitoramentoCNL.css'
+
+type EstacaoCNL = {
+  id: number
+  uf: string
+  cidade: string
+  nome: string
+  codigo: string
+  ultimoValor: number | null
+  dataHora: string
+  acumulados: {
+    umaHora: number | null
+    seisHoras: number | null
+    dozeHoras: number | null
+    vinteQuatroHoras: number | null
+    setentaEDuasHoras: number | null
+  }
+}
+
+type LeituraCNL = EstacaoCNL & {
+  latitude: number | null
+  longitude: number | null
+  tipo: string
+  status: string
+  cotas: {
+    atencao: number | null
+    alerta: number | null
+    transbordamento: number | null
+  }
+}
+
+type PontoSerie = {
+  data: string
+  hora: string
+  valor: number
+}
+
+type DadosCNL = {
+  sucesso: boolean
+  estacao: LeituraCNL
+  estacoes: EstacaoCNL[]
+  serie: PontoSerie[]
+  atualizadoEm: string
+  fonte: string
+  aviso?: string
+}
+
+type Props = {
+  onAbrirMapa?: (latitude: number, longitude: number, nome: string) => void
+}
+
+const INTERVALO_ATUALIZACAO = 5 * 60 * 1000
+
+function formatarMm(valor: number | null | undefined): string {
+  return valor == null || !Number.isFinite(valor) ? '—' : `${valor.toLocaleString('pt-BR', { maximumFractionDigits: 2 })} mm`
+}
+
+function formatarCota(valor: number | null | undefined): string {
+  return valor == null || !Number.isFinite(valor) ? '—' : `${valor.toLocaleString('pt-BR', { maximumFractionDigits: 2 })} m`
+}
+
+function formatarDataHora(iso?: string): string {
+  if (!iso) return '—'
+  const data = new Date(iso)
+  return Number.isNaN(data.getTime())
+    ? iso
+    : data.toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })
+}
+
+function parseDataCemaden(valor: string): Date | null {
+  const match = valor?.match(/^(\d{2})\/(\d{2})\/(\d{2,4})\s+(\d{2}):(\d{2})$/)
+  if (!match) return null
+  const ano = Number(match[3].length === 2 ? `20${match[3]}` : match[3])
+  const data = new Date(Date.UTC(ano, Number(match[2]) - 1, Number(match[1]), Number(match[4]), Number(match[5])))
+  return Number.isNaN(data.getTime()) ? null : data
+}
+
+function estadoEstacao(dataHora: string): 'atualizada' | 'atencao' | 'sem-dados' {
+  const data = parseDataCemaden(dataHora)
+  if (!data) return 'sem-dados'
+  const horas = (Date.now() - data.getTime()) / (60 * 60 * 1000)
+  if (horas <= 3) return 'atualizada'
+  if (horas <= 24) return 'atencao'
+  return 'sem-dados'
+}
+
+function rotuloEstado(estado: ReturnType<typeof estadoEstacao>): string {
+  if (estado === 'atualizada') return 'Atualizada'
+  if (estado === 'atencao') return 'Atenção'
+  return 'Sem dados recentes'
+}
+
+function ChartaChuva({ pontos }: { pontos: PontoSerie[] }) {
+  const largura = 620
+  const altura = 190
+  const margem = { topo: 18, direita: 18, baixo: 34, esquerda: 36 }
+  const valores = pontos.map((ponto) => ponto.valor)
+  const maior = Math.max(...valores, 1)
+  const areaLargura = largura - margem.esquerda - margem.direita
+  const areaAltura = altura - margem.topo - margem.baixo
+  const pontosSvg = pontos.map((ponto, indice) => {
+    const x = margem.esquerda + (pontos.length <= 1 ? areaLargura / 2 : indice * areaLargura / (pontos.length - 1))
+    const y = margem.topo + areaAltura - (ponto.valor / maior) * areaAltura
+    return `${x.toFixed(1)},${y.toFixed(1)}`
+  }).join(' ')
+
+  if (pontos.length === 0) {
+    return <div className="cnl-grafico-vazio">A estação ainda não retornou pontos horários para o período.</div>
+  }
+
+  return (
+    <div className="cnl-grafico-wrap">
+      <svg className="cnl-grafico" viewBox={`0 0 ${largura} ${altura}`} role="img" aria-label="Chuva acumulada por hora nas últimas 24 horas">
+        {[0, 0.5, 1].map((proporcao) => {
+          const y = margem.topo + areaAltura - proporcao * areaAltura
+          return <line key={proporcao} x1={margem.esquerda} x2={largura - margem.direita} y1={y} y2={y} className="cnl-grafico-grade" />
+        })}
+        <polyline points={pontosSvg} className="cnl-grafico-linha" />
+        {pontos.map((ponto, indice) => {
+          const x = margem.esquerda + (pontos.length <= 1 ? areaLargura / 2 : indice * areaLargura / (pontos.length - 1))
+          const y = margem.topo + areaAltura - (ponto.valor / maior) * areaAltura
+          return <circle key={`${ponto.data}-${ponto.hora}-${indice}`} cx={x} cy={y} r="3.5" className="cnl-grafico-ponto" />
+        })}
+        <text x={margem.esquerda - 8} y={margem.topo + 4} textAnchor="end" className="cnl-grafico-label">{maior.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}</text>
+        <text x={margem.esquerda - 8} y={margem.topo + areaAltura + 4} textAnchor="end" className="cnl-grafico-label">0</text>
+        <text x={margem.esquerda} y={altura - 8} className="cnl-grafico-label">{pontos[0]?.hora}</text>
+        <text x={largura - margem.direita} y={altura - 8} textAnchor="end" className="cnl-grafico-label">{pontos.at(-1)?.hora}</text>
+      </svg>
+      <div className="cnl-grafico-legenda">Acumulado horário em milímetros · horário informado pelo CEMADEN</div>
+    </div>
+  )
+}
+
+function CartaoMetrica({ rotulo, valor, detalhe, classe = '' }: { rotulo: string; valor: string; detalhe: string; classe?: string }) {
+  return (
+    <div className={`cnl-metrica ${classe}`}>
+      <span className="cnl-metrica-rotulo">{rotulo}</span>
+      <strong>{valor}</strong>
+      <span className="cnl-metrica-detalhe">{detalhe}</span>
+    </div>
+  )
+}
+
+export default function MonitoramentoCNL({ onAbrirMapa }: Props) {
+  const [dados, setDados] = useState<DadosCNL | null>(null)
+  const [carregando, setCarregando] = useState(true)
+  const [atualizando, setAtualizando] = useState(false)
+  const [erro, setErro] = useState('')
+
+  const carregar = useCallback(async () => {
+    setAtualizando(true)
+    try {
+      const resposta = await fetch('/api/monitoramento-cnl', { cache: 'no-store' })
+      const corpo = await resposta.json() as DadosCNL & { erro?: string }
+      if (!resposta.ok || !corpo.sucesso) throw new Error(corpo.erro || 'O CEMADEN não retornou dados.')
+      setDados(corpo)
+      setErro('')
+    } catch (falha) {
+      setErro(falha instanceof Error ? falha.message : 'Não foi possível consultar o CEMADEN.')
+    } finally {
+      setCarregando(false)
+      setAtualizando(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    carregar()
+    const timer = window.setInterval(carregar, INTERVALO_ATUALIZACAO)
+    return () => window.clearInterval(timer)
+  }, [carregar])
+
+  const maiorAcumulado = useMemo(() => {
+    if (!dados) return null
+    return dados.estacao.acumulados.vinteQuatroHoras ?? dados.estacao.acumulados.setentaEDuasHoras
+  }, [dados])
+
+  if (carregando && !dados) {
+    return <div className="cnl-pagina"><div className="cnl-carregando">Consultando estações do CEMADEN…</div></div>
+  }
+
+  if (!dados) {
+    return (
+      <div className="cnl-pagina">
+        <div className="cnl-erro">
+          <strong>Monitoramento temporariamente indisponível</strong>
+          <span>{erro || 'Não foi possível carregar a estação Rio Bananeiras.'}</span>
+          <button className="cnl-btn-principal" onClick={carregar}>Tentar novamente</button>
+        </div>
+      </div>
+    )
+  }
+
+  const { estacao } = dados
+  const estadoPrincipal = estadoEstacao(estacao.dataHora)
+
+  return (
+    <div className="cnl-pagina">
+      <section className="cnl-cabecalho">
+        <div className="cnl-kicker"><span className="cnl-pulse" /> CNL · Centro de Monitoramento</div>
+        <div className="cnl-titulo-linha">
+          <div>
+            <h1>Monitoramento CNL</h1>
+            <p>Cheias, chuva e estações de Conselheiro Lafaiete</p>
+          </div>
+          <button className="cnl-btn-atualizar" onClick={carregar} disabled={atualizando} title="Atualizar agora">
+            {atualizando ? '⟳' : '↻'} <span>{atualizando ? 'Consultando' : 'Atualizar'}</span>
+          </button>
+        </div>
+        <div className="cnl-fonte-strip">
+          <span>Fonte oficial: CEMADEN</span>
+          <span>Última consulta: {formatarDataHora(dados.atualizadoEm)}</span>
+        </div>
+      </section>
+
+      {erro && <div className="cnl-aviso-atualizacao">Não foi possível atualizar agora. Exibindo a última leitura válida.</div>}
+
+      <section className="cnl-hero">
+        <div className="cnl-hero-identidade">
+          <div className="cnl-icone-agua">≋</div>
+          <div>
+            <span className="cnl-eyebrow">Estação hidrológica monitorada</span>
+            <h2>{estacao.nome}</h2>
+            <p>{estacao.cidade} · {estacao.codigo}</p>
+          </div>
+        </div>
+        <div className={`cnl-status-principal cnl-status-${estadoPrincipal}`}>
+          <span className="cnl-status-ponto" />
+          <div><strong>{rotuloEstado(estadoPrincipal)}</strong><small>{estacao.dataHora || 'Sem horário'}</small></div>
+        </div>
+        <div className="cnl-hero-acoes">
+          {onAbrirMapa && estacao.latitude != null && estacao.longitude != null && (
+            <button className="cnl-btn-secundario" onClick={() => onAbrirMapa(estacao.latitude!, estacao.longitude!, estacao.nome)}>
+              ⌖ Abrir no mapa
+            </button>
+          )}
+          <a className="cnl-btn-secundario" href="https://resources.cemaden.gov.br/graficos/interativo/grafico_pcds.php?idpcd=6622" target="_blank" rel="noreferrer">
+            Ver CEMADEN ↗
+          </a>
+        </div>
+      </section>
+
+      <section className="cnl-metricas">
+        <CartaoMetrica
+          rotulo="Último registro"
+          valor={formatarMm(estacao.ultimoValor)}
+          detalhe={`Leitura em ${estacao.dataHora || 'horário não informado'}`}
+          classe="cnl-metrica-azul"
+        />
+        <CartaoMetrica
+          rotulo="Acumulado em 24h"
+          valor={formatarMm(maiorAcumulado)}
+          detalhe="Indicador de atenção para chuva"
+          classe={maiorAcumulado != null && maiorAcumulado >= 30 ? 'cnl-metrica-laranja' : 'cnl-metrica-verde'}
+        />
+        <CartaoMetrica
+          rotulo="Tipo da estação"
+          valor="Hidrológica"
+          detalhe={`${estacoesAtivas(dados.estacoes)} estações com leitura recente`}
+          classe="cnl-metrica-roxa"
+        />
+      </section>
+
+      <section className="cnl-alerta">
+        <div className="cnl-alerta-icone">!</div>
+        <div>
+          <strong>Nível do rio: dado não disponível nesta consulta</strong>
+          <p>O CEMADEN retorna a chuva e as cotas de referência da estação, mas não envia uma cota instantânea do Rio Bananeiras por este endpoint. Os valores abaixo são os limites oficiais para acompanhamento.</p>
+        </div>
+      </section>
+
+      <section className="cnl-bloco">
+        <div className="cnl-bloco-cabecalho">
+          <div><span className="cnl-eyebrow">Chuva acumulada</span><h2>Últimas 24 horas</h2></div>
+          <span className="cnl-badge-fonte">Atualização automática · 5 min</span>
+        </div>
+        <ChartaChuva pontos={dados.serie} />
+      </section>
+
+      <section className="cnl-bloco">
+        <div className="cnl-bloco-cabecalho">
+          <div><span className="cnl-eyebrow">Referência hidrológica</span><h2>Cotas de acompanhamento</h2></div>
+          <span className="cnl-badge-fonte">metros</span>
+        </div>
+        <div className="cnl-cotas">
+          <div className="cnl-cota cnl-cota-atencao"><span className="cnl-cota-linha" /><span>Atenção</span><strong>{formatarCota(estacao.cotas.atencao)}</strong><small>começar a observar</small></div>
+          <div className="cnl-cota cnl-cota-alerta"><span className="cnl-cota-linha" /><span>Alerta</span><strong>{formatarCota(estacao.cotas.alerta)}</strong><small>preparar resposta</small></div>
+          <div className="cnl-cota cnl-cota-transbordamento"><span className="cnl-cota-linha" /><span>Transbordamento</span><strong>{formatarCota(estacao.cotas.transbordamento)}</strong><small>risco de cheia</small></div>
+        </div>
+      </section>
+
+      <section className="cnl-bloco">
+        <div className="cnl-bloco-cabecalho">
+          <div><span className="cnl-eyebrow">Rede local</span><h2>Estações em Conselheiro Lafaiete</h2></div>
+          <span className="cnl-contador">{dados.estacoes.length} estações</span>
+        </div>
+        <div className="cnl-estacoes">
+          {dados.estacoes.map((item) => {
+            const estado = estadoEstacao(item.dataHora)
+            const selecionada = item.id === estacao.id
+            return (
+              <div key={item.id} className={`cnl-estacao ${selecionada ? 'cnl-estacao-selecionada' : ''}`}>
+                <div className="cnl-estacao-titulo">
+                  <span className={`cnl-estacao-dot cnl-estacao-dot-${estado}`} />
+                  <strong>{item.nome}</strong>
+                  {selecionada && <span className="cnl-tag-rio">RIO</span>}
+                </div>
+                <span className="cnl-estacao-codigo">{item.codigo || `CEMADEN ${item.id}`}</span>
+                <span className="cnl-estacao-leitura">{formatarMm(item.acumulados.vinteQuatroHoras)} <small>em 24h</small></span>
+                <span className={`cnl-estacao-status cnl-estacao-status-${estado}`}>{rotuloEstado(estado)}</span>
+              </div>
+            )
+          })}
+        </div>
+      </section>
+
+      <footer className="cnl-rodape">
+        <span>Dados públicos do Centro Nacional de Monitoramento e Alertas de Desastres Naturais.</span>
+        <a href={dados.fonte} target="_blank" rel="noreferrer">Abrir fonte original ↗</a>
+        {dados.aviso && <small>{dados.aviso}</small>}
+      </footer>
+    </div>
+  )
+}
+
+function estacoesAtivas(estacoes: EstacaoCNL[]): number {
+  return estacoes.filter((estacao) => estadoEstacao(estacao.dataHora) !== 'sem-dados').length
+}

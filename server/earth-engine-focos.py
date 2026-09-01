@@ -196,40 +196,6 @@ SATELITES_FOGO = [
 ]
 
 
-def obter_fontes_configuradas():
-    """Inclui uma coleção CT_MERG_FIRE privada somente quando configurada."""
-    fontes = list(SATELITES_FOGO)
-    colecao = os.environ.get("EARTH_ENGINE_CT_MERG_FIRE_COLLECTION", "").strip()
-    if colecao:
-        fontes.append(
-            {
-                "id": "ct-merg-fire",
-                "nome": "CT_MERG_FIRE",
-                "satelite": "CT_MERG_FIRE",
-                "colecao": colecao,
-                "banda": os.environ.get(
-                    "EARTH_ENGINE_CT_MERG_FIRE_BAND",
-                    "FireMask",
-                ).strip() or "FireMask",
-                "tipo_mascara": os.environ.get(
-                    "EARTH_ENGINE_CT_MERG_FIRE_MASK_TYPE",
-                    "firemask",
-                ).strip() or "firemask",
-                "limiar": float(
-                    os.environ.get("EARTH_ENGINE_CT_MERG_FIRE_THRESHOLD", "7")
-                ),
-                "escala": int(
-                    os.environ.get("EARTH_ENGINE_CT_MERG_FIRE_SCALE", "2000")
-                ),
-                "dias": int(
-                    os.environ.get("EARTH_ENGINE_CT_MERG_FIRE_DAYS", "3")
-                ),
-                "periodo": "Camada complementar · CT_MERG_FIRE",
-            }
-        )
-    return fontes
-
-
 def obter_colecao_fogo(config, regiao, inicio, fim):
     """Retorna a coleção filtrada e a quantidade de imagens."""
     colecao = (
@@ -353,7 +319,7 @@ def consultar_monitoramento():
     sem_dados = []
     disponibilidade = []
 
-    for config in obter_fontes_configuradas():
+    for config in SATELITES_FOGO:
         try:
             dias = max(1, int(config.get("dias", 3)))
             inicio_config = (

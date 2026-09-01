@@ -113,15 +113,6 @@ const FERRAMENTAS_SATELITE: CamadaMonitoramento[] = [
     frequencia: 'NRT',
     tipo: 'NASA FIRMS',
   },
-  {
-    id: 'ct-merg-fire',
-    nome: 'CT_MERG_FIRE',
-    descricao: 'Camada complementar para uma coleção Earth Engine específica.',
-    periodo: 'Coleção configurável',
-    url: null,
-    frequencia: 'Configurável',
-    tipo: 'Earth Engine',
-  },
 ]
 
 interface IndicadorMonitoramento {

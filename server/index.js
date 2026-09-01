@@ -1664,7 +1664,7 @@ app.get('/api/health', (req, res) => res.json({ ok: true }))
 
 // ── Focos de Incêndio — NASA FIRMS + Earth Engine ─────────────────────────
 // Fontes: GOES-19 ABI · VIIRS-SNPP · VIIRS-NOAA20 · VIIRS-NOAA21 ·
-//          MODIS Terra · MODIS Aqua · CT_MERG_FIRE (opcional)
+//          MODIS Terra · MODIS Aqua
 //
 // Cache para resposta rápida:
 //   Polar → TTL 25 min (VIIRS + MODIS, sobrevoo ~2×/dia — não muda tão rápido)
@@ -1716,13 +1716,6 @@ const FONTES_FOGO_CATALOGO = [
     descricao: 'Confirmação e complemento das detecções de fogo ativo.',
     frequencia: 'NRT',
     tipo: 'NASA FIRMS',
-  },
-  {
-    id: 'ct-merg-fire',
-    nome: 'CT_MERG_FIRE',
-    descricao: 'Camada complementar para uma coleção Earth Engine específica.',
-    frequencia: 'Configurável',
-    tipo: 'Earth Engine',
   },
 ]
 
@@ -1849,9 +1842,6 @@ function montarCatalogoFontesFogo(focos, earthEngine, fontesFirms = []) {
         ? focosPorFonte.get(fonteFirms)
         : focos.filter(foco => String(foco.fonte).includes(fonte.id.replace('-fire', '').toUpperCase())).length) || 0,
       atualizadoEm: camada?.url ? earthEngine.atualizadoEm : null,
-      configuracaoNecessaria: fonte.id === 'ct-merg-fire' && !camada?.url
-        ? 'Defina EARTH_ENGINE_CT_MERG_FIRE_COLLECTION para habilitar esta coleção.'
-        : null,
     }
   })
 }

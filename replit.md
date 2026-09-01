@@ -12,7 +12,6 @@ Required env vars (all set in Replit shared env / secrets):
 - `VAPID_PRIVATE_KEY` — VAPID private key (**secret** — needed for push notifications)
 - `VAPID_SUBJECT` — mailto: contact for VAPID (already set)
 - `PORT` — Express server port (set to 5000)
-- `VITE_USE_SUPABASE` — defaults to `true` when Supabase URL and key are present; set to `false` only for an explicit local-only fallback
 - `NODE_ENV` — set to `production`
 - `EARTH_ENGINE_SERVICE_ACCOUNT_JSON` — Secret containing the complete Google Cloud service-account JSON key
 - `EARTH_ENGINE_PROJECT` — optional Earth Engine/Google Cloud project ID; when omitted, uses the `project_id` from the JSON key
@@ -33,7 +32,7 @@ Required env vars (all set in Replit shared env / secrets):
 - `server/index.js` — Express API + WebSocket server + DB init (`initDb`)
 - `src/api.ts` — CRUD for ocorrências (Express primary, Supabase disabled)
 - `src/matApi.ts` — CRUD for materiais/emprestimos/campo (Express primary)
-- `src/supabaseClient.ts` — Supabase client; `supabaseDisponivel=false` on Replit (VITE_USE_SUPABASE=false)
+- `src/supabaseClient.ts` — client desativado nesta cópia; `supabaseDisponivel=false`
 - `src/wsClient.ts` — WebSocket client (connects to /ws)
 - `src/pushNotifications.ts` — Web Push subscription via Express `/api/push-subscriptions`
 - `src/components/` — React components per feature
@@ -42,8 +41,8 @@ Required env vars (all set in Replit shared env / secrets):
 - `attached_assets/` — report template (.docx)
 
 ## Architecture on Replit
-- **Supabase** is the primary data store when configured; Express + Replit PostgreSQL remains the shared fallback for server-only features
-- Supabase code is present for Netlify fallback but completely inactive on Replit
+- **Replit PostgreSQL** is the only data store for this copy of the app
+- The Supabase project belongs exclusively to the original `dc-2026.netlify.app` app and is not read or written here
 - DB tables auto-created on server startup — no separate migration step needed
 - In production, Express serves the built `/dist` frontend directly on port 5000
 - Vite dev server (port 5000) proxies `/api` and `/ws` to Express (port 3001) in dev mode only
@@ -64,7 +63,7 @@ Required env vars (all set in Replit shared env / secrets):
 - Portuguese (pt-BR) UI
 
 ## Gotchas
-- Keep Supabase credentials configured for shared production data. Use `VITE_USE_SUPABASE=false` only when intentionally testing the local fallback.
+- Do not add Supabase credentials to this project; its database is isolated in Replit PostgreSQL
 - DB tables auto-created on server startup — no separate migration step needed on Replit
 - Production: `npm run build && node server/index.js` — Express serves built `/dist`
 - Push notifications require `VAPID_PRIVATE_KEY` secret to be set in Replit secrets

@@ -194,16 +194,9 @@ export const matApi = {
   },
 
   async listarChecklistsFerramenta(ferramentaId: string): Promise<MatChecklistFerramenta[]> {
-    if (!supabaseDisponivel) {
-      throw new Error('Supabase não configurado para salvar o checklist.')
-    }
-    const { data, error } = await supabase
-      .from('checklists_ferramental')
-      .select('*')
-      .eq('ferramenta_id', ferramentaId)
-      .order('data_checklist', { ascending: false })
-    if (error) sbErr(error, 'listarChecklistsFerramenta')
-    return (data ?? []) as MatChecklistFerramenta[]
+    return apiFetch<MatChecklistFerramenta[]>(
+      `/api/ferramentas/${encodeURIComponent(ferramentaId)}/checklists`,
+    )
   },
 
   async criarChecklistFerramenta(checklist: {
@@ -217,32 +210,11 @@ export const matApi = {
     realizado_por?: string | null
     data_checklist?: string
   }): Promise<MatChecklistFerramenta> {
-    if (!supabaseDisponivel) {
-      throw new Error('Supabase não configurado para salvar o checklist.')
-    }
-    // `ferramenta_nome` é um campo auxiliar da tela e não existe na tabela.
-    const {
-      ferramenta_nome: _ferramentaNome,
-      ...checklistSupabase
-    } = checklist
-    let { data, error } = await supabase
-      .from('checklists_ferramental')
-      .insert(checklistSupabase)
-      .select()
-      .single()
-    // Bases Supabase antigas ainda podem ter o CHECK que aceita apenas
-    // boa/media/ruim. A tela continua tratando Serragem por quantidade,
-    // mesmo que o valor legado precise ser armazenado como compatibilidade.
-    if (error?.code === '23514' && checklist.condicao === 'quantidade') {
-      ({ data, error } = await supabase
-        .from('checklists_ferramental')
-        .insert({ ...checklistSupabase, condicao: 'boa' })
-        .select()
-        .single())
-    }
-    if (error) sbErr(error, 'criarChecklistFerramenta')
-    wsSend({ tipo: 'checklists_ferramental_atualizados' })
-    return data as MatChecklistFerramenta
+    return apiFetch<MatChecklistFerramenta>('/api/ferramentas/checklists', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(checklist),
+    })
   },
 
   async listarEmprestimos(): Promise<MatEmprestimo[]> {

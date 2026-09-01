@@ -93,14 +93,12 @@ self.addEventListener('fetch', (event) => {
     return
   }
 
-  // 2. APIs dinâmicas (Open-Meteo, Nominatim, Supabase, etc.) → sempre rede.
+  // 2. APIs dinâmicas (Open-Meteo, Nominatim, etc.) → sempre rede.
   //    Não interceptamos: o navegador faz o fetch normalmente.
   if (
     url.host.endsWith('open-meteo.com') ||
     url.host.endsWith('nominatim.openstreetmap.org') ||
-    url.host.startsWith('api.') ||
-    url.host.endsWith('supabase.co') ||
-    url.host.endsWith('supabase.in')
+    url.host.startsWith('api.')
   ) {
     return
   }

@@ -9,7 +9,6 @@ import { dirname, join } from 'path'
 import { existsSync, readFileSync, readdirSync } from 'fs'
 import { createServer } from 'http'
 import WebSocket, { WebSocketServer } from 'ws'
-import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 import { execFile } from 'child_process'
 import { promisify } from 'util'
 import { handler as planetFocosHandler } from '../netlify/functions/planet-focos.js'
@@ -22,21 +21,14 @@ const pythonBin = process.env.PYTHON_BIN
     ? join(__dirname, '..', '.pythonlibs', 'bin', 'python')
     : 'python3')
 
-// ── PostgreSQL — usa Supabase se SUPABASE_DB_URL estiver definido ──────────
-const dbUrl = process.env.SUPABASE_DB_URL || process.env.DATABASE_URL
-console.log(`🗄️  Banco: ${process.env.SUPABASE_DB_URL ? 'Supabase' : 'Replit PostgreSQL'}`)
+// ── PostgreSQL local do Replit ─────────────────────────────────────────────
+// O banco do app original no Supabase não é compartilhado com esta cópia.
+const dbUrl = process.env.DATABASE_URL
+console.log('🗄️  Banco: Replit PostgreSQL')
 const pool = new pg.Pool({
   connectionString: dbUrl,
-  ssl: process.env.SUPABASE_DB_URL ? { rejectUnauthorized: false } : false,
+  ssl: false,
 })
-
-const supabasePushUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || ''
-const supabasePushKey = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || ''
-const supabasePush = supabasePushUrl && supabasePushKey
-  ? createSupabaseClient(supabasePushUrl, supabasePushKey, {
-    realtime: { transport: WebSocket },
-  })
-  : null
 
 async function query(sql, params = []) {
   const client = await pool.connect()
@@ -177,17 +169,8 @@ async function enviarPushSosServidor(msg) {
 async function enviarPushParaAgentes(agentesAlvo, payloadJson, excluirAgente = null) {
   if (!vapidConfigured || !agentesAlvo || agentesAlvo.length === 0) return 0
   try {
-    let subs = []
-    if (supabasePush) {
-      const result = await supabasePush
-        .from('push_subscriptions')
-        .select('id, endpoint, p256dh, auth, agente')
-      if (result.error) throw new Error(result.error.message)
-      subs = result.data || []
-    } else {
-      const result = await query('SELECT id, endpoint, p256dh, auth, agente FROM push_subscriptions')
-      subs = result.rows
-    }
+    const result = await query('SELECT id, endpoint, p256dh, auth, agente FROM push_subscriptions')
+    let subs = result.rows
     subs = subs.filter(s => {
       if (!s.agente) return false
       if (excluirAgente && s.agente === excluirAgente) return false
@@ -210,8 +193,7 @@ async function enviarPushParaAgentes(agentesAlvo, payloadJson, excluirAgente = n
       }
     }))
     if (removidos.length > 0) {
-      if (supabasePush) await supabasePush.from('push_subscriptions').delete().in('id', removidos)
-      else await query('DELETE FROM push_subscriptions WHERE id = ANY($1)', [removidos])
+      await query('DELETE FROM push_subscriptions WHERE id = ANY($1)', [removidos])
     }
     return enviados
   } catch (e) {
@@ -1014,72 +996,6 @@ function broadcastOcorrenciasAtualizadas() {
 
 // ── Ocorrências ─────────────────────────────────────────────────────────────
 
-// Busca fotos e vistorias do Supabase server-side (sem CORS) — para exportação Excel
-// Suporta fotos como base64 ou URLs do Supabase Storage (baixa e converte no servidor)
-app.get('/api/ocorrencias/fotos-supabase-lote', async (req, res) => {
-  const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL
-  const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY
-  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-    return res.status(503).json({ error: 'Supabase não configurado no servidor' })
-  }
-  const raw = (req.query.ids || '').toString().trim()
-  if (!raw) return res.json([])
-  const ids = raw.split(',').map(s => parseInt(s, 10)).filter(n => !isNaN(n) && n > 0)
-  if (ids.length === 0) return res.json([])
-
-  try {
-    // Consulta Supabase REST API diretamente do servidor
-    const idsParam = ids.join(',')
-    const apiUrl = `${SUPABASE_URL}/rest/v1/ocorrencias?select=id,fotos,vistorias&id=in.(${idsParam})`
-    const resp = await fetch(apiUrl, {
-      headers: {
-        'apikey': SUPABASE_ANON_KEY,
-        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-        'Accept': 'application/json',
-      }
-    })
-    if (!resp.ok) {
-      const txt = await resp.text()
-      console.error('fotos-supabase-lote Supabase error:', resp.status, txt)
-      return res.status(resp.status).json({ error: txt })
-    }
-    const rows = await resp.json()
-
-    // Processa fotos: Storage URLs → baixa e converte para base64; base64 → passa direto
-    const result = []
-    for (const row of rows) {
-      const fotosProcessadas = []
-      for (const foto of (Array.isArray(row.fotos) ? row.fotos : [])) {
-        if (typeof foto !== 'string' || !foto) continue
-        if (foto.startsWith('https://') && foto.includes('supabase.co/storage')) {
-          // URL do Supabase Storage — baixa server-side e converte para base64
-          try {
-            const imgResp = await fetch(foto, {
-              headers: { 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` }
-            })
-            if (imgResp.ok) {
-              const buf = await imgResp.arrayBuffer()
-              const ct = imgResp.headers.get('content-type') || 'image/jpeg'
-              fotosProcessadas.push(`data:${ct};base64,${Buffer.from(buf).toString('base64')}`)
-            }
-          } catch { /* pula foto que não conseguiu baixar */ }
-        } else {
-          fotosProcessadas.push(foto) // já é base64
-        }
-      }
-      result.push({
-        id: row.id,
-        fotos: fotosProcessadas,
-        vistorias: Array.isArray(row.vistorias) ? row.vistorias : [],
-      })
-    }
-    res.json(result)
-  } catch (err) {
-    console.error('fotos-supabase-lote error:', err.message)
-    res.status(500).json({ error: err.message })
-  }
-})
-
 // Busca fotos e vistorias em lote (para exportação Excel) — aceita ?ids=1,2,3
 app.get('/api/ocorrencias/fotos-lote', async (req, res) => {
   try {
@@ -1323,25 +1239,11 @@ app.post('/api/radar-bilhetes/:id/confirmar', async (req, res) => {
     const confirmado = req.body?.confirmado === true
     if (!agente) return res.status(400).json({ error: 'Agente obrigatório' })
 
-    let registro
-    let armazenamento = 'local'
-    if (supabasePush) {
-      const existente = await supabasePush
-        .from('radar_bilhetes')
-        .select('*')
-        .eq('id', req.params.id)
-        .maybeSingle()
-      if (existente.error) throw new Error(existente.error.message)
-      registro = existente.data
-      if (registro) armazenamento = 'supabase'
-    }
-    if (!registro) {
-      const existente = await query(
-        'SELECT * FROM radar_bilhetes WHERE id = $1',
-        [req.params.id],
-      )
-      registro = existente.rows[0]
-    }
+    const existente = await query(
+      'SELECT * FROM radar_bilhetes WHERE id = $1',
+      [req.params.id],
+    )
+    const registro = existente.rows[0]
     if (!registro) return res.status(404).json({ error: 'Notificação não encontrada' })
 
     const envolvidos = Array.isArray(registro.agentes_envolvidos) ? registro.agentes_envolvidos : []
@@ -1358,28 +1260,14 @@ app.post('/api/radar-bilhetes/:id/confirmar', async (req, res) => {
     if (indice >= 0) confirmacoes[indice] = entrada
     else confirmacoes.push(entrada)
 
-    let registroAtualizado
-    if (armazenamento === 'supabase') {
-      const atualizado = await supabasePush
-        .from('radar_bilhetes')
-        .update({ confirmacoes_agentes: confirmacoes })
-        .eq('id', req.params.id)
-        .select('*')
-        .single()
-      if (atualizado.error || !atualizado.data) {
-        throw new Error(atualizado.error?.message || 'Não foi possível salvar a confirmação')
-      }
-      registroAtualizado = atualizado.data
-    } else {
-      const atualizado = await query(
-        `UPDATE radar_bilhetes
-         SET confirmacoes_agentes = $1::jsonb
-         WHERE id = $2
-         RETURNING *`,
-        [JSON.stringify(confirmacoes), req.params.id],
-      )
-      registroAtualizado = atualizado.rows[0]
-    }
+    const atualizado = await query(
+      `UPDATE radar_bilhetes
+       SET confirmacoes_agentes = $1::jsonb
+       WHERE id = $2
+       RETURNING *`,
+      [JSON.stringify(confirmacoes), req.params.id],
+    )
+    const registroAtualizado = atualizado.rows[0]
 
     broadcastParaTodos({
       tipo: 'radar_confirmacao',
@@ -2340,35 +2228,6 @@ app.get('/api/materiais/fotos-lote', async (req, res) => {
     res.json(result.rows)
   } catch (err) {
     console.error('GET /api/materiais/fotos-lote error:', err)
-    res.status(500).json({ error: err.message })
-  }
-})
-
-// Busca fotos em lote direto do Supabase — fallback para quando o PostgreSQL local não tem as fotos
-app.get('/api/materiais/fotos-supabase', async (req, res) => {
-  try {
-    const sbUrl  = process.env.SUPABASE_URL  || ''
-    const sbKey  = process.env.SUPABASE_ANON_KEY || ''
-    if (!sbUrl || !sbKey) return res.status(503).json({ error: 'Supabase não configurado' })
-
-    const raw = (req.query.ids || '').toString().trim()
-    if (!raw) return res.json([])
-    const ids = raw.split(',').map(s => s.trim()).filter(Boolean)
-    if (ids.length === 0) return res.json([])
-
-    const sb = createSupabaseClient(sbUrl, sbKey)
-    const { data, error } = await sb
-      .from('materiais')
-      .select('id, foto, foto_placa, foto_thumb')
-      .in('id', ids)
-
-    if (error) {
-      console.error('Supabase fotos-lote error:', error.message)
-      return res.status(500).json({ error: error.message })
-    }
-    res.json(data ?? [])
-  } catch (err) {
-    console.error('GET /api/materiais/fotos-supabase error:', err)
     res.status(500).json({ error: err.message })
   }
 })
@@ -3351,32 +3210,6 @@ app.get('/api/limite-ouro-branco', async (_req, res) => {
     console.error('Erro no limite de Ouro Branco:', err?.message || err)
     if (limiteOuroBrancoCache) return res.json(limiteOuroBrancoCache)
     return res.status(503).json({ erro: 'Limite municipal indisponível' })
-  }
-})
-
-// ── Proxy de imagens do Supabase Storage (evita CORS no browser) ─────────────
-// Usado pela exportação Excel para baixar fotos do Supabase Storage no servidor
-app.get('/api/proxy-imagem', async (req, res) => {
-  const url = (req.query.url || '').toString().trim()
-  if (!url) return res.status(400).json({ error: 'url obrigatória' })
-  // Permite apenas URLs do Supabase Storage por segurança
-  if (!url.startsWith('https://') || !url.includes('supabase.co/storage')) {
-    return res.status(403).json({ error: 'url não permitida' })
-  }
-  try {
-    const headers = {}
-    const anonKey = process.env.SUPABASE_ANON_KEY
-    if (anonKey) headers['Authorization'] = `Bearer ${anonKey}`
-    const response = await fetch(url, { headers })
-    if (!response.ok) return res.status(response.status).end()
-    const contentType = response.headers.get('content-type') || 'image/jpeg'
-    res.set('Content-Type', contentType)
-    res.set('Cache-Control', 'private, max-age=3600')
-    const buffer = await response.arrayBuffer()
-    res.send(Buffer.from(buffer))
-  } catch (err) {
-    console.error('proxy-imagem error:', err.message)
-    res.status(500).json({ error: err.message })
   }
 })
 

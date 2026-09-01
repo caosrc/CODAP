@@ -350,7 +350,7 @@ export async function atualizarOcorrencia(
 }
 
 // Busca fotos e vistorias em lote para exportação (evita N chamadas individuais)
-// Usa sempre o endpoint servidor como primeira opção (sem CORS, suporta Supabase Storage)
+// Usa o endpoint do PostgreSQL local para manter os dados isolados do app original.
 export async function buscarFotosOcorrencias(
   ids: number[]
 ): Promise<Record<number, { fotos: string[]; vistorias: unknown[] }>> {
@@ -361,17 +361,12 @@ export async function buscarFotosOcorrencias(
   const lotes: number[][] = []
   for (let i = 0; i < ids.length; i += 50) lotes.push(ids.slice(i, i + 50))
 
-  // Endpoint servidor busca do Supabase server-side (sem CORS) — primeira opção sempre
+  // Endpoint servidor do PostgreSQL local.
   try {
     const result: Record<number, { fotos: string[]; vistorias: unknown[] }> = {}
     for (const lote of lotes) {
-      const res = await fetch(`/api/ocorrencias/fotos-supabase-lote?ids=${lote.join(',')}`)
-      if (!res.ok) {
-        // O Supabase pode cancelar consultas grandes por timeout. Nesse caso,
-        // não bloqueia o Excel: exporta os dados e mantém as fotos já obtidas.
-        if (res.status >= 500) return result
-        throw new Error(`Falha ao buscar fotos (${res.status})`)
-      }
+      const res = await fetch(`/api/ocorrencias/fotos-lote?ids=${lote.join(',')}`)
+      if (!res.ok) throw new Error(`Falha ao buscar fotos (${res.status})`)
       const rows: { id: number; fotos: string[] | null; vistorias: unknown[] | null }[] = await res.json()
       for (const row of rows) {
         result[row.id] = {
@@ -383,44 +378,6 @@ export async function buscarFotosOcorrencias(
     return result
   } catch { /* cai para fallbacks abaixo */ }
 
-  // Fallback: Supabase direto pelo browser (pode ter CORS para Storage URLs)
-  if (supabaseDisponivel) {
-    try {
-      const result: Record<number, { fotos: string[]; vistorias: unknown[] }> = {}
-      for (const lote of lotes) {
-        const { data } = await supabase
-          .from('ocorrencias')
-          .select('id,fotos,vistorias')
-          .in('id', lote)
-        for (const row of data ?? []) {
-          result[row.id] = {
-            fotos: Array.isArray(row.fotos) ? row.fotos : [],
-            vistorias: Array.isArray(row.vistorias) ? row.vistorias : [],
-          }
-        }
-      }
-      return result
-    } catch {
-      return {}
-    }
-  }
-
-  // Fallback: PostgreSQL local via Express, também em lotes
-  try {
-    const result: Record<number, { fotos: string[]; vistorias: unknown[] }> = {}
-    for (const lote of lotes) {
-      const res = await fetch(`/api/ocorrencias/fotos-lote?ids=${lote.join(',')}`)
-      if (!res.ok) continue
-      const rows: { id: number; fotos: string[] | null; vistorias: unknown[] | null }[] = await res.json()
-      for (const row of rows) {
-        result[row.id] = {
-          fotos: Array.isArray(row.fotos) ? row.fotos : [],
-          vistorias: Array.isArray(row.vistorias) ? row.vistorias : [],
-        }
-      }
-    }
-    return result
-  } catch { /* segue com vazio */ }
   return {}
 }
 
@@ -429,29 +386,6 @@ export async function buscarFotosChecklists(
   ids: number[]
 ): Promise<Record<number, { foto_frontal: string | null; foto_traseira: string | null; foto_direita: string | null; foto_esquerda: string | null; fotos_avarias: string[] }>> {
   if (ids.length === 0) return {}
-
-  // Supabase
-  if (supabaseDisponivel) {
-    try {
-      const { data } = await supabase
-        .from('checklists_viatura')
-        .select('id,foto_frontal,foto_traseira,foto_direita,foto_esquerda,fotos_avarias')
-        .in('id', ids)
-      const result: Record<number, { foto_frontal: string | null; foto_traseira: string | null; foto_direita: string | null; foto_esquerda: string | null; fotos_avarias: string[] }> = {}
-      for (const row of data ?? []) {
-        result[row.id] = {
-          foto_frontal: row.foto_frontal ?? null,
-          foto_traseira: row.foto_traseira ?? null,
-          foto_direita: row.foto_direita ?? null,
-          foto_esquerda: row.foto_esquerda ?? null,
-          fotos_avarias: Array.isArray(row.fotos_avarias) ? row.fotos_avarias : [],
-        }
-      }
-      return result
-    } catch {
-      return {}
-    }
-  }
 
   // Express (Replit)
   try {

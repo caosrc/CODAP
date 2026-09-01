@@ -3,7 +3,6 @@
   "version": "1.0.0",
   "dependencies": {
     "@google/earthengine": "^1.7.40",
-    "@supabase/supabase-js": "^2.108.1",
     "web-push": "^3.6.7"
   }
 }

@@ -29,15 +29,10 @@ const FOTO_H = 90   // altura da miniatura em pixels
 const FOTO_COL_W = 17  // largura da coluna em caracteres (≈ 120px)
 const ROW_H_PX_TO_PT = 0.75  // 1pt ≈ 1.33px
 
-// Converte uma URL de imagem (ex: Supabase Storage) em data URL base64
-// URLs do Supabase são buscadas via proxy do servidor para evitar CORS
+// Converte uma URL de imagem em data URL base64.
 async function urlParaBase64(url: string): Promise<string | null> {
   try {
-    // Roteia URLs do Supabase Storage pelo proxy Express (evita bloqueio CORS)
-    const fetchUrl = url.includes('supabase.co/storage')
-      ? `/api/proxy-imagem?url=${encodeURIComponent(url)}`
-      : url
-    const res = await fetch(fetchUrl)
+    const res = await fetch(url)
     if (!res.ok) return null
     const blob = await res.blob()
     return new Promise<string>((resolve, reject) => {

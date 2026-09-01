@@ -1972,46 +1972,22 @@ async function exportarMateriaisExcel(materiais: Material[], emprestimos: Empres
   wb.created = new Date()
 
   // ── Busca fotos em lote ──────────────────────────────────────────────────
-  // Prioridade: 1) Supabase direto (cliente frontend)  2) servidor fallback
-  // fallback final: foto_thumb já carregada na listagem (sempre em memória)
+  // Busca no PostgreSQL local; foto_thumb carregada na listagem é o fallback.
   type FotoLote = { id: string; foto: string | null; foto_placa: string | null; foto_thumb?: string | null }
   let fotosMap = new Map<string, FotoLote>()
   const ids = materiais.map(m => m.id)
   try {
-    if (supabaseDisponivel) {
-      // Busca direta: sem passar pelo servidor, uma query para todos os 52 itens
-      const { data } = await supabase
-        .from('materiais')
-        .select('id, foto, foto_placa, foto_thumb')
-        .in('id', ids)
-      if (data) {
-        for (const f of data) {
-          fotosMap.set(String(f.id), {
-            id:         String(f.id),
-            foto:       (f.foto       as string | null) ?? null,
-            foto_placa: (f.foto_placa as string | null) ?? null,
-            foto_thumb: (f.foto_thumb as string | null) ?? null,
-          })
-        }
-      }
-    } else {
-      // Fallback: endpoints do servidor (PostgreSQL local + Supabase via proxy)
-      const idsStr = ids.join(',')
-      const mesclar = (existente: FotoLote | undefined, novo: FotoLote): FotoLote => ({
-        id:         novo.id,
-        foto:       existente?.foto       || novo.foto       || null,
-        foto_placa: existente?.foto_placa || novo.foto_placa || null,
-        foto_thumb: existente?.foto_thumb || novo.foto_thumb || null,
-      })
-      const [resLocal, resSb] = await Promise.allSettled([
-        fetch(`/api/materiais/fotos-lote?ids=${encodeURIComponent(idsStr)}`),
-        fetch(`/api/materiais/fotos-supabase?ids=${encodeURIComponent(idsStr)}`),
-      ])
-      for (const r of [resLocal, resSb]) {
-        if (r.status === 'fulfilled' && r.value.ok) {
-          const dados: FotoLote[] = await r.value.json()
-          for (const f of dados) fotosMap.set(f.id, mesclar(fotosMap.get(f.id), f))
-        }
+    const idsStr = ids.join(',')
+    const resLocal = await fetch(`/api/materiais/fotos-lote?ids=${encodeURIComponent(idsStr)}`)
+    if (resLocal.ok) {
+      const dados: FotoLote[] = await resLocal.json()
+      for (const f of dados) {
+        fotosMap.set(f.id, {
+          id: f.id,
+          foto: f.foto || null,
+          foto_placa: f.foto_placa || null,
+          foto_thumb: f.foto_thumb || null,
+        })
       }
     }
   } catch { /* continua com foto_thumb em memória se falhar */ }

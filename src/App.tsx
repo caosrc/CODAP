@@ -18,6 +18,7 @@ import { cacheOcorrencias, getCachedOcorrencias, getPending, removePending, coun
 import { calcularAreaM2, formatarArea } from './components/PoligonoAreaQueimada'
 import type { CurralDados, CurralRegistro } from './components/Curral'
 import type { ProconDados, ProconRegistro } from './components/Procon'
+import ExportacaoFiscalizacao from './components/ExportacaoFiscalizacao'
 
 interface EquipamentoCampoMapa {
   id: number
@@ -327,10 +328,20 @@ export default function App() {
   }, [aba, carregarCurral])
 
   useEffect(() => {
+    if (aba === 'procon') carregarProcon()
+  }, [aba, carregarProcon])
+
+  useEffect(() => {
     return wsOn('curral_atualizado', () => {
       if (aba === 'curral') carregarCurral()
     })
   }, [aba, carregarCurral])
+
+  useEffect(() => {
+    return wsOn('procon_atualizado', () => {
+      if (aba === 'procon') carregarProcon()
+    })
+  }, [aba, carregarProcon])
 
   const salvarCurral = useCallback(async (dados: CurralDados, ocorrenciaId?: number | null) => {
     const agente = getAgenteLogado()
@@ -1082,6 +1093,12 @@ export default function App() {
       )}
 
       <div className="conteudo">
+        {(aba === 'curral' || aba === 'procon') && (
+          <ExportacaoFiscalizacao
+            registrosCurral={registrosCurral}
+            relatoriosProcon={relatoriosProcon}
+          />
+        )}
         {aba === 'lista' && (
           <>
             <div className="filtros-box">

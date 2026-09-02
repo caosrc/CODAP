@@ -1977,17 +1977,28 @@ async function exportarMateriaisExcel(materiais: Material[], emprestimos: Empres
   let fotosMap = new Map<string, FotoLote>()
   const ids = materiais.map(m => m.id)
   try {
-    const idsStr = ids.join(',')
-    const resLocal = await fetch(`/api/materiais/fotos-lote?ids=${encodeURIComponent(idsStr)}`)
-    if (resLocal.ok) {
-      const dados: FotoLote[] = await resLocal.json()
-      for (const f of dados) {
-        fotosMap.set(f.id, {
-          id: f.id,
-          foto: f.foto || null,
-          foto_placa: f.foto_placa || null,
-          foto_thumb: f.foto_thumb || null,
-        })
+    if (supabaseDisponivel) {
+      const { data, error } = await supabase
+        .from('materiais')
+        .select('id,foto,foto_placa,foto_thumb')
+        .in('id', ids)
+      if (error) throw new Error(error.message)
+      for (const f of (data ?? []) as FotoLote[]) {
+        fotosMap.set(f.id, { id: f.id, foto: f.foto || null, foto_placa: f.foto_placa || null, foto_thumb: f.foto_thumb || null })
+      }
+    } else {
+      const idsStr = ids.join(',')
+      const resLocal = await fetch(`/api/materiais/fotos-lote?ids=${encodeURIComponent(idsStr)}`)
+      if (resLocal.ok) {
+        const dados: FotoLote[] = await resLocal.json()
+        for (const f of dados) {
+          fotosMap.set(f.id, {
+            id: f.id,
+            foto: f.foto || null,
+            foto_placa: f.foto_placa || null,
+            foto_thumb: f.foto_thumb || null,
+          })
+        }
       }
     }
   } catch { /* continua com foto_thumb em memória se falhar */ }

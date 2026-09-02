@@ -173,14 +173,33 @@ export default function BannerRadarNotificacao() {
     if (!atual || atual.tipo !== 'confirmacao' || !agente || respondendo) return
     setRespondendo(true)
     try {
-      const response = await fetch(`/api/radar-bilhetes/${encodeURIComponent(atual.id)}/confirmar`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ agente, confirmado }),
-      })
-      if (!response.ok) {
-        const detalhe = await response.json().catch(() => null) as { error?: string } | null
-        throw new Error(detalhe?.error || 'Não foi possível registrar sua resposta.')
+      if (supabaseDisponivel) {
+        const { data, error } = await supabase
+          .from('radar_bilhetes')
+          .select('confirmacoes_agentes')
+          .eq('id', atual.id)
+          .single()
+        if (error) throw new Error(error.message)
+        const confirmacoes = Array.isArray(data?.confirmacoes_agentes)
+          ? data.confirmacoes_agentes as Array<{ agente: string; confirmado: boolean }>
+          : []
+        const novas = confirmacoes.filter(item => item.agente !== agente)
+        novas.push({ agente, confirmado })
+        const { error: updateError } = await supabase
+          .from('radar_bilhetes')
+          .update({ confirmacoes_agentes: novas })
+          .eq('id', atual.id)
+        if (updateError) throw new Error(updateError.message)
+      } else {
+        const response = await fetch(`/api/radar-bilhetes/${encodeURIComponent(atual.id)}/confirmar`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ agente, confirmado }),
+        })
+        if (!response.ok) {
+          const detalhe = await response.json().catch(() => null) as { error?: string } | null
+          throw new Error(detalhe?.error || 'Não foi possível registrar sua resposta.')
+        }
       }
       if (confirmado && atual.data === dataLocalISO()) {
         localStorage.setItem(`defesacivil-radar-evento-dia-${atual.id}-${dataLocalISO()}`, '1')

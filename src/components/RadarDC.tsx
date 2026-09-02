@@ -371,18 +371,21 @@ export default function RadarDC() {
           return
         }
       }
-      const res = await fetch(`/api/atividades-dia?data=${dataSelecionada}`)
-      if (res.ok) {
-        const dados = await res.json() as {
-          checklists: Atividade[]
-          checklistsFerramentas: AtividadeFerramenta[]
-          ferramentasCatalogo: FerramentaCatalogo[]
-          ocorrencias: Atividade[]
-        }
+      if (!supabaseDisponivel) {
+        const res = await fetch(`/api/atividades-dia?data=${dataSelecionada}`)
+        const ct = res.headers.get('content-type') || ''
+        if (res.ok && ct.includes('application/json')) {
+          const dados = await res.json() as {
+            checklists: Atividade[]
+            checklistsFerramentas: AtividadeFerramenta[]
+            ferramentasCatalogo: FerramentaCatalogo[]
+            ocorrencias: Atividade[]
+          }
           atualizarAtividadesNaTela({
-            ...dados,
-            checklists: dados.checklists.map(c => ({ ...c, fotoCarregada: temFotoCarregada(c.itens) })),
-          }, avisar)
+              ...dados,
+              checklists: dados.checklists.map(c => ({ ...c, fotoCarregada: temFotoCarregada(c.itens) })),
+            }, avisar)
+        }
       }
     } catch { setAtividades({ checklists: [], checklistsFerramentas: [], ferramentasCatalogo: [], ocorrencias: [] }) }
   }, [dataSelecionada, atualizarAtividadesNaTela])
@@ -541,20 +544,24 @@ export default function RadarDC() {
         registroTipo: tipo,
         agentesEnvolvidos: novo.agentesEnvolvidos,
       })
-      fetch('/api/push/radar', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          agentes: novo.agentesEnvolvidos,
-          texto: novo.texto,
-          data: novo.data,
-          hora: novo.hora,
-          prioridade: novo.prioridade,
-          remetente: agente,
-          notificacaoId: novo.id,
-          registroTipo: tipo,
-        }),
-      }).catch(() => {})
+      // No Netlify o bilhete já é sincronizado pelo Supabase Realtime.
+      // O envio de push de Radar continua sendo responsabilidade do backend Express.
+      if (!supabaseDisponivel) {
+        fetch('/api/push/radar', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            agentes: novo.agentesEnvolvidos,
+            texto: novo.texto,
+            data: novo.data,
+            hora: novo.hora,
+            prioridade: novo.prioridade,
+            remetente: agente,
+            notificacaoId: novo.id,
+            registroTipo: tipo,
+          }),
+        }).catch(() => {})
+      }
     } catch (error) {
       pendentesRef.current.delete(novo.id)
       setErroSalvamento(error instanceof Error ? error.message : 'Não foi possível salvar o registro.')

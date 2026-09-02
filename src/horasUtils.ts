@@ -153,6 +153,20 @@ export async function carregarFeriadosCustom(): Promise<string[]> {
     }
   } catch { /* ignora */ }
 
+  if (supabaseDisponivel) {
+    try {
+      const { data, error } = await supabase
+        .from('escala_estado')
+        .select('data')
+        .eq('id', 1)
+        .single()
+      if (!error && Array.isArray((data?.data as { feriadosCustom?: unknown } | null)?.feriadosCustom)) {
+        return (data.data as { feriadosCustom: string[] }).feriadosCustom
+      }
+    } catch { /* ignora */ }
+    return []
+  }
+
   // 2. Servidor — fonte de verdade (Moisés pode ter adicionado de outro dispositivo)
   try {
     const res = await fetch('/api/escala')

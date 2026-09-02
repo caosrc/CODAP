@@ -380,9 +380,14 @@ async function carregarDadosRemoto(): Promise<{ dados: EscalaData; updatedAt: st
           updatedAt: (data.updated_at as string) ?? '',
         }
       }
-      // Supabase sem dados — cai para Express
-    } catch { /* cai para Express */ }
+      // Supabase sem dados: não consulte o Express, pois ele não existe no Netlify.
+      return null
+    } catch {
+      return null
+    }
   }
+
+  if (supabaseDisponivel) return null
 
   // Express API (Replit PostgreSQL)
   try {

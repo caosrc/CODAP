@@ -194,6 +194,15 @@ export const matApi = {
   },
 
   async listarChecklistsFerramenta(ferramentaId: string): Promise<MatChecklistFerramenta[]> {
+    if (supabaseDisponivel) {
+      const { data, error } = await supabase
+        .from('checklists_ferramental')
+        .select('id,ferramenta_id,quantidade_cadastrada,quantidade_conferida,condicao,item_faltante,justificativa,realizado_por,data_checklist,created_at')
+        .eq('ferramenta_id', ferramentaId)
+        .order('data_checklist', { ascending: false })
+      if (error) sbErr(error, 'listarChecklistsFerramenta')
+      return (data ?? []) as MatChecklistFerramenta[]
+    }
     return apiFetch<MatChecklistFerramenta[]>(
       `/api/ferramentas/${encodeURIComponent(ferramentaId)}/checklists`,
     )
@@ -210,6 +219,15 @@ export const matApi = {
     realizado_por?: string | null
     data_checklist?: string
   }): Promise<MatChecklistFerramenta> {
+    if (supabaseDisponivel) {
+      const { data, error } = await supabase
+        .from('checklists_ferramental')
+        .insert(checklist)
+        .select()
+        .single()
+      if (error) sbErr(error, 'criarChecklistFerramenta')
+      return data as MatChecklistFerramenta
+    }
     return apiFetch<MatChecklistFerramenta>('/api/ferramentas/checklists', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

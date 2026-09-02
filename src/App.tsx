@@ -7,6 +7,7 @@ import { NATUREZA_ICONE } from './types'
 import { listarOcorrencias, criarOcorrencia, atualizarOcorrencia, enviarOcorrenciaServidor, listarRegistrosCurral, criarRegistroCurral, atualizarRegistroCurral, listarRelatoriosProcon, criarRelatorioProcon, enviarRelatorioProcon, ApiError } from './api'
 import { wsOn, wsAnunciarOnline } from './wsClient'
 import { supabase, supabaseDisponivel } from './supabaseClient'
+import { matApi } from './matApi'
 import { EVT_ROTA_RESGATE } from './sos'
 import { registrarPushSeNecessario, pedirPermissaoEInscrever, getStatusNotificacoes } from './pushNotifications'
 import AgentesOnline from './components/AgentesOnline'
@@ -458,13 +459,17 @@ export default function App() {
     async function carregarCampo() {
       if (supabaseDisponivel) {
         try {
-          const { data } = await supabase
+          const { data, error } = await supabase
             .from('equipamentos_campo')
             .select('id, material_nome, latitude, longitude, rua, bairro, observacao, status')
             .eq('status', 'ativo')
+          if (error) throw new Error(error.message)
           setEquipamentosCampoMapa((data ?? []) as EquipamentoCampoMapa[])
           return
-        } catch { /* cai para Express */ }
+        } catch {
+          setEquipamentosCampoMapa([])
+          return
+        }
       }
       try {
         const res = await fetch('/api/equipamentos-campo')
@@ -517,12 +522,21 @@ export default function App() {
       try {
         const hoje = new Date().toISOString().slice(0, 10)
 
-        const [empRes, campoRes] = await Promise.all([
-          fetch('/api/emprestimos'),
-          fetch('/api/equipamentos-campo'),
-        ])
-        const empData = empRes.ok ? await empRes.json() : []
-        const campoData = campoRes.ok ? await campoRes.json() : []
+        let empData: unknown[]
+        let campoData: unknown[]
+        if (supabaseDisponivel) {
+          ;[empData, campoData] = await Promise.all([
+            matApi.listarEmprestimos(),
+            matApi.listarCampo(),
+          ])
+        } else {
+          const [empRes, campoRes] = await Promise.all([
+            fetch('/api/emprestimos'),
+            fetch('/api/equipamentos-campo'),
+          ])
+          empData = empRes.ok ? await empRes.json() : []
+          campoData = campoRes.ok ? await campoRes.json() : []
+        }
 
         const empVencidos = (Array.isArray(empData) ? empData : []).filter(
           (e: { devolvido_em?: string | null; data_devolucao_prevista?: string | null }) =>

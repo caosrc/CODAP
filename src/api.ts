@@ -363,6 +363,24 @@ export async function buscarFotosOcorrencias(
   const lotes: number[][] = []
   for (let i = 0; i < ids.length; i += 50) lotes.push(ids.slice(i, i + 50))
 
+  if (supabaseDisponivel) {
+    const result: Record<number, { fotos: string[]; vistorias: unknown[] }> = {}
+    for (const lote of lotes) {
+      const { data, error } = await supabase
+        .from('ocorrencias')
+        .select('id,fotos,vistorias')
+        .in('id', lote)
+      if (error) throw new ApiError(503, `Falha ao buscar fotos: ${error.message}`)
+      for (const row of data ?? []) {
+        result[Number(row.id)] = {
+          fotos: Array.isArray(row.fotos) ? row.fotos : [],
+          vistorias: Array.isArray(row.vistorias) ? row.vistorias : [],
+        }
+      }
+    }
+    return result
+  }
+
   // Endpoint servidor do PostgreSQL local.
   try {
     const result: Record<number, { fotos: string[]; vistorias: unknown[] }> = {}
@@ -388,6 +406,25 @@ export async function buscarFotosChecklists(
   ids: number[]
 ): Promise<Record<number, { foto_frontal: string | null; foto_traseira: string | null; foto_direita: string | null; foto_esquerda: string | null; fotos_avarias: string[] }>> {
   if (ids.length === 0) return {}
+
+  if (supabaseDisponivel) {
+    const { data, error } = await supabase
+      .from('checklists_viatura')
+      .select('id,foto_frontal,foto_traseira,foto_direita,foto_esquerda,fotos_avarias')
+      .in('id', ids)
+    if (error) throw new ApiError(503, `Falha ao buscar fotos: ${error.message}`)
+    const result: Record<number, { foto_frontal: string | null; foto_traseira: string | null; foto_direita: string | null; foto_esquerda: string | null; fotos_avarias: string[] }> = {}
+    for (const row of data ?? []) {
+      result[Number(row.id)] = {
+        foto_frontal: row.foto_frontal ?? null,
+        foto_traseira: row.foto_traseira ?? null,
+        foto_direita: row.foto_direita ?? null,
+        foto_esquerda: row.foto_esquerda ?? null,
+        fotos_avarias: Array.isArray(row.fotos_avarias) ? row.fotos_avarias : [],
+      }
+    }
+    return result
+  }
 
   // Express (Replit)
   try {
@@ -457,6 +494,16 @@ function mapearRegistroCurral(registro: Record<string, unknown>): CurralRegistro
 }
 
 export async function listarRegistrosCurral(): Promise<CurralRegistro[]> {
+  if (supabaseDisponivel) {
+    const { data, error } = await supabase
+      .from('curral_registros')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(500)
+    if (error) throw new Error(error.message)
+    return (data ?? []).map((row) => mapearRegistroCurral(row as Record<string, unknown>))
+  }
+
   const res = await fetch('/api/curral')
   if (!res.ok) {
     const erro = await res.json().catch(() => ({ error: res.statusText }))
@@ -467,6 +514,30 @@ export async function listarRegistrosCurral(): Promise<CurralRegistro[]> {
 }
 
 export async function criarRegistroCurral(dados: CurralDados, agente: string | null): Promise<CurralRegistro> {
+  if (supabaseDisponivel) {
+    const { data, error } = await supabase
+      .from('curral_registros')
+      .insert({
+        especie: dados.especie,
+        porte: dados.porte,
+        sexo: dados.sexo || null,
+        identificacao: dados.identificacao || null,
+        local_descricao: dados.localDescricao,
+        observacoes: dados.observacoes || null,
+        latitude: dados.latitude,
+        longitude: dados.longitude,
+        precisao_gps: dados.precisaoGps,
+        capturado_em: dados.capturadoEm,
+        fotos: dados.fotos,
+        status: dados.status,
+        criado_por: agente,
+      })
+      .select()
+      .single()
+    if (error) throw new Error(error.message)
+    return mapearRegistroCurral(data as Record<string, unknown>)
+  }
+
   const res = await fetch('/api/curral', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -494,6 +565,30 @@ export async function criarRegistroCurral(dados: CurralDados, agente: string | n
 }
 
 export async function atualizarRegistroCurral(id: string | number, dados: CurralDados): Promise<CurralRegistro> {
+  if (supabaseDisponivel) {
+    const { data, error } = await supabase
+      .from('curral_registros')
+      .update({
+        especie: dados.especie,
+        porte: dados.porte,
+        sexo: dados.sexo || null,
+        identificacao: dados.identificacao || null,
+        local_descricao: dados.localDescricao,
+        observacoes: dados.observacoes || null,
+        latitude: dados.latitude,
+        longitude: dados.longitude,
+        precisao_gps: dados.precisaoGps,
+        capturado_em: dados.capturadoEm,
+        fotos: dados.fotos,
+        status: dados.status,
+      })
+      .eq('id', id)
+      .select()
+      .single()
+    if (error) throw new Error(error.message)
+    return mapearRegistroCurral(data as Record<string, unknown>)
+  }
+
   const res = await fetch(`/api/curral/${encodeURIComponent(String(id))}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
@@ -531,6 +626,16 @@ function mapearRelatorioProcon(registro: Record<string, unknown>): ProconRegistr
 }
 
 export async function listarRelatoriosProcon(): Promise<ProconRegistro[]> {
+  if (supabaseDisponivel) {
+    const { data, error } = await supabase
+      .from('procon_relatorios')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(500)
+    if (error) throw new Error(error.message)
+    return (data ?? []).map((row) => mapearRelatorioProcon(row as Record<string, unknown>))
+  }
+
   const res = await fetch('/api/procon')
   if (!res.ok) {
     const erro = await res.json().catch(() => ({ error: res.statusText }))
@@ -541,6 +646,21 @@ export async function listarRelatoriosProcon(): Promise<ProconRegistro[]> {
 }
 
 export async function criarRelatorioProcon(registro: ProconRegistro): Promise<ProconRegistro> {
+  if (supabaseDisponivel) {
+    const { data, error } = await supabase
+      .from('procon_relatorios')
+      .upsert({
+        id: String(registro.id),
+        status: registro.status || 'pendente',
+        criado_por: registro.identificacao.agente,
+        dados: registro,
+      }, { onConflict: 'id' })
+      .select()
+      .single()
+    if (error) throw new Error(error.message)
+    return mapearRelatorioProcon(data as Record<string, unknown>)
+  }
+
   const res = await fetch('/api/procon', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -559,6 +679,17 @@ export async function criarRelatorioProcon(registro: ProconRegistro): Promise<Pr
 }
 
 export async function enviarRelatorioProcon(id: string | number): Promise<ProconRegistro> {
+  if (supabaseDisponivel) {
+    const { data, error } = await supabase
+      .from('procon_relatorios')
+      .update({ status: 'enviado', atualizado_em: new Date().toISOString() })
+      .eq('id', String(id))
+      .select()
+      .single()
+    if (error) throw new Error(error.message)
+    return mapearRelatorioProcon(data as Record<string, unknown>)
+  }
+
   const res = await fetch(`/api/procon/${encodeURIComponent(String(id))}/enviar`, { method: 'PUT' })
   if (!res.ok) {
     const erro = await res.json().catch(() => ({ error: res.statusText }))

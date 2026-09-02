@@ -1,7 +1,8 @@
 -- ════════════════════════════════════════════════════════════════════════════
--- Defesa Civil Ouro Branco — Schema completo do Supabase
--- Execute este SQL UMA VEZ no SQL Editor do seu projeto Supabase.
--- Projeto: sjdpsplbcrlkekdfnnlj
+-- CODAP — schema base legado do Supabase.
+-- Para instalar todas as tabelas atuais de Defesa Civil, Curral e Procon,
+-- execute o arquivo supabase/supabase-completo.sql no SQL Editor.
+-- Projeto atual: lhmjpioaoqwkchtomnla
 -- ════════════════════════════════════════════════════════════════════════════
 
 -- ── Ocorrências ──────────────────────────────────────────────────────────────

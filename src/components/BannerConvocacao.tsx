@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { getNomeAgenteGlobal } from '../gpsService'
 import { wsOn } from '../wsClient'
+import { supabase, supabaseDisponivel } from '../supabaseClient'
 
 interface ConfirmacaoAgente {
   agente: string
@@ -40,11 +41,22 @@ function nomeCorresponde(agLista: string, agLogado: string): boolean {
 
 async function buscarPlanosComPendencia(agente: string): Promise<PlanoResumido[]> {
   try {
-    const res = await fetch('/api/planejamentos')
-    if (!res.ok) return []
-    const ct = res.headers.get('content-type') || ''
-    if (ct.includes('text/html')) return []
-    const rows: Record<string, unknown>[] = await res.json()
+    let rows: Record<string, unknown>[]
+    if (supabaseDisponivel) {
+      const { data, error } = await supabase
+        .from('planejamentos')
+        .select('*')
+        .order('criado_em', { ascending: false })
+        .limit(200)
+      if (error) return []
+      rows = (data ?? []) as Record<string, unknown>[]
+    } else {
+      const res = await fetch('/api/planejamentos')
+      if (!res.ok) return []
+      const ct = res.headers.get('content-type') || ''
+      if (ct.includes('text/html')) return []
+      rows = await res.json()
+    }
     if (!Array.isArray(rows)) return []
 
     const pendentes: PlanoResumido[] = []
@@ -139,15 +151,34 @@ export default function BannerConvocacao({ onPendentesChange, forceOpen }: Banne
     if (!plano) return
     setSalvando(true)
     try {
-      await fetch(`/api/planejamentos/${plano.id}/confirmar`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          agente,
-          confirmado,
-          criador: plano.criadoPor,
-        }),
-      })
+      if (supabaseDisponivel) {
+        const { data, error } = await supabase
+          .from('planejamentos')
+          .select('confirmacoes_agentes')
+          .eq('id', plano.id)
+          .single()
+        if (error) throw new Error(error.message)
+        const confirmacoes = Array.isArray(data?.confirmacoes_agentes)
+          ? data.confirmacoes_agentes as ConfirmacaoAgente[]
+          : []
+        const restantes = confirmacoes.filter(c => !nomeCorresponde(c.agente, agente))
+        restantes.push({ agente, confirmado, confirmedAt: new Date().toISOString() })
+        const { error: updateError } = await supabase
+          .from('planejamentos')
+          .update({ confirmacoes_agentes: restantes })
+          .eq('id', plano.id)
+        if (updateError) throw new Error(updateError.message)
+      } else {
+        await fetch(`/api/planejamentos/${plano.id}/confirmar`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            agente,
+            confirmado,
+            criador: plano.criadoPor,
+          }),
+        })
+      }
       const novosRespondidos = new Set(respondidos).add(plano.id)
       setRespondidos(novosRespondidos)
       const restantes = planos.filter(p => !novosRespondidos.has(p.id))

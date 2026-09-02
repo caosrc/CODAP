@@ -2730,16 +2730,34 @@ function DetalheP({
     if (!meuNomeAgente) return
     setSalvandoConf(true)
     try {
-      const res = await fetch(`/api/planejamentos/${planoLocal.id}/confirmar`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ agente: meuNomeAgente, confirmado: novoStatus, criador: planoLocal.criadoPor }),
-      })
-      if (res.ok) {
-        const data = await res.json()
-        const atualizado = { ...planoLocal, confirmacoes: data.confirmacoes }
+      if (supabaseDisponivel) {
+        const confirmacoes = (planoLocal.confirmacoes ?? [])
+          .filter(c => c.agente !== meuNomeAgente)
+        confirmacoes.push({
+          agente: meuNomeAgente,
+          confirmado: novoStatus,
+          confirmedAt: new Date().toISOString(),
+        })
+        const { error } = await supabase
+          .from('planejamentos')
+          .update({ confirmacoes_agentes: confirmacoes })
+          .eq('id', planoLocal.id)
+        if (error) throw new Error(error.message)
+        const atualizado = { ...planoLocal, confirmacoes }
         setPlanoLocal(atualizado)
         onAtualizar(atualizado)
+      } else {
+        const res = await fetch(`/api/planejamentos/${planoLocal.id}/confirmar`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ agente: meuNomeAgente, confirmado: novoStatus, criador: planoLocal.criadoPor }),
+        })
+        if (res.ok) {
+          const data = await res.json()
+          const atualizado = { ...planoLocal, confirmacoes: data.confirmacoes }
+          setPlanoLocal(atualizado)
+          onAtualizar(atualizado)
+        }
       }
     } finally {
       setSalvandoConf(false)
@@ -3068,15 +3086,24 @@ function DetalheP({
     setPlanoLocal(atualizado)
     onAtualizar(atualizado)
     try {
-      const res = await fetch(`/api/planejamentos/${planoLocal.id}/status`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status, conclusao: atualizado.conclusao ?? null }),
-      })
-      if (!res.ok) {
-        // Reverte estado local se o servidor recusar (ex: 409 já concluído)
-        setPlanoLocal(anterior)
-        onAtualizar(anterior)
+      if (supabaseDisponivel) {
+        const { error } = await supabase
+          .from('planejamentos')
+          .update({ status, conclusao: atualizado.conclusao ?? null })
+          .eq('id', planoLocal.id)
+        if (error) throw new Error(error.message)
+        wsSend({ tipo: 'planejamentos_atualizados' })
+      } else {
+        const res = await fetch(`/api/planejamentos/${planoLocal.id}/status`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status, conclusao: atualizado.conclusao ?? null }),
+        })
+        if (!res.ok) {
+          // Reverte estado local se o servidor recusar (ex: 409 já concluído)
+          setPlanoLocal(anterior)
+          onAtualizar(anterior)
+        }
       }
     } catch {
       // Falha de rede — reverte para o estado anterior
@@ -4346,7 +4373,7 @@ export default function Planejamento() {
           className={`plan-subtab radar-subtab ${subAba === 'radar' ? 'ativo' : ''}`}
           onClick={() => setSubAba('radar')}
         >
-          <img className="radar-tab-icon" src="/api/radar-icon" alt="" />
+          <img className="radar-tab-icon" src="/codap-icon.svg" alt="" />
           Radar DC
         </button>
         {(['evento', 'operacao', 'simulado', 'emergencia'] as TipoPlano[]).map(t => {

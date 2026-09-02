@@ -170,10 +170,17 @@ function GraficoNivel({ pontos }: { pontos: PontoNivel[] }) {
           return <line key={proporcao} x1={margem.esquerda} x2={largura - margem.direita} y1={y} y2={y} className="cnl-grafico-grade" />
         })}
         <polyline points={pontosSvg} className="cnl-grafico-linha cnl-grafico-linha-nivel" />
+        <polyline points={pontosSvg} className="cnl-grafico-linha-nivel-pulso" aria-hidden="true" />
         {pontos.map((ponto, indice) => {
           const x = margem.esquerda + (pontos.length <= 1 ? areaLargura / 2 : indice * areaLargura / (pontos.length - 1))
           const y = margem.topo + areaAltura - (ponto.valor / maior) * areaAltura
-          return <circle key={`${ponto.dataHora}-${indice}`} cx={x} cy={y} r="3.5" className="cnl-grafico-ponto cnl-grafico-ponto-nivel" />
+          const atual = indice === pontos.length - 1
+          return (
+            <g key={`${ponto.dataHora}-${indice}`}>
+              {atual && <circle cx={x} cy={y} r="8" className="cnl-grafico-ponto-atual" aria-hidden="true" />}
+              <circle cx={x} cy={y} r={atual ? '4.5' : '3.5'} className="cnl-grafico-ponto cnl-grafico-ponto-nivel" />
+            </g>
+          )
         })}
         <text x={margem.esquerda - 8} y={margem.topo + 4} textAnchor="end" className="cnl-grafico-label">{maior.toLocaleString('pt-BR', { maximumFractionDigits: 2 })} m</text>
         <text x={margem.esquerda - 8} y={margem.topo + areaAltura + 4} textAnchor="end" className="cnl-grafico-label">0 m</text>
@@ -336,7 +343,7 @@ export default function MonitoramentoCNL({ onAbrirMapa }: Props) {
       <section className="cnl-bloco">
         <div className="cnl-bloco-cabecalho">
           <div><span className="cnl-eyebrow">Cota instantânea</span><h2>Nível do Rio Bananeiras</h2></div>
-          <span className="cnl-badge-fonte">metros · GMT</span>
+          <span className="cnl-badge-fonte cnl-badge-ao-vivo"><span className="cnl-badge-ponto" /> ao vivo · 5 min</span>
         </div>
         <GraficoNivel pontos={dados.serieNivel} />
       </section>

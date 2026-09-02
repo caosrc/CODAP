@@ -3046,6 +3046,21 @@ function montarSerieNivelCnl(medidas) {
     .map((medida) => ({ dataHora: medida.dataHora, valor: medida.valor }))
 }
 
+function anexarNivelAtualNaSerie(serie, nivelAtual) {
+  const historico = Array.isArray(serie) ? [...serie] : []
+  if (!nivelAtual || nivelAtual.valor == null) return historico
+
+  const ultimo = historico.at(-1)
+  const atualMs = dataCemadenParaMs(nivelAtual.dataHora)
+  const ultimoMs = dataCemadenParaMs(ultimo?.dataHora)
+  if (!ultimo || (Number.isFinite(atualMs) && (!Number.isFinite(ultimoMs) || atualMs > ultimoMs))) {
+    historico.push({ dataHora: nivelAtual.dataHora, valor: nivelAtual.valor })
+  } else if (Number.isFinite(atualMs) && Number.isFinite(ultimoMs) && atualMs === ultimoMs) {
+    historico[historico.length - 1] = { dataHora: nivelAtual.dataHora, valor: nivelAtual.valor }
+  }
+  return historico.slice(-24)
+}
+
 app.get('/api/monitoramento-cnl', async (_req, res) => {
   const agora = Date.now()
   if (monitoramentoCnlCache && agora - monitoramentoCnlCacheTs < MONITORAMENTO_CNL_TTL_MS) {
@@ -3119,13 +3134,14 @@ app.get('/api/monitoramento-cnl', async (_req, res) => {
       },
     }
 
+    const serieNivel = anexarNivelAtualNaSerie(montarSerieNivelCnl(medidasNivel), nivelAtual)
     monitoramentoCnlCache = {
       sucesso: true,
       estacao,
       estacoes,
       serie: montarSerieHorariaCnl(horario),
       nivelAtual,
-      serieNivel: montarSerieNivelCnl(medidasNivel),
+      serieNivel,
       atualizadoEm: new Date().toISOString(),
       fonte: CNL_FONTE_URL,
       aviso: 'Nível calculado pelo recurso oficial MedidaResource do CEMADEN: offset - valor.',

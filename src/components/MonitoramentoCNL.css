@@ -58,6 +58,8 @@
 .cnl-btn-atualizar:disabled { opacity: 0.6; cursor: wait; }
 
 .cnl-aviso-atualizacao { margin: 0.65rem 0 0; padding: 0.55rem 0.7rem; color: #854d0e; background: #fef3c7; border: 1px solid #fcd34d; border-radius: 9px; font-size: 0.76rem; }
+.cnl-btn-editar { flex-shrink: 0; border: 1px solid #b9dfe0; border-radius: 8px; padding: 0.45rem 0.6rem; color: #14737b; background: #effafa; font: inherit; font-size: 0.68rem; font-weight: 800; cursor: pointer; }
+.cnl-btn-editar:hover, .cnl-btn-cancelar:hover { background: #e0f5f3; }
 
 .cnl-hero {
   margin-top: 0.8rem;
@@ -164,9 +166,24 @@
 .cnl-cota span:not(.cnl-cota-linha) { color: #5f737c; font-size: 0.67rem; font-weight: 800; }
 .cnl-cota strong { margin-top: 0.25rem; color: #163e50; font-size: 1rem; }
 .cnl-cota small { margin-top: 0.15rem; color: #7b8d94; font-size: 0.6rem; line-height: 1.2; }
+.cnl-cota input { display: block; width: 100%; box-sizing: border-box; margin-top: 0.3rem; border: 1px solid #cbdde0; border-radius: 6px; padding: 0.35rem 0.4rem; color: #163e50; background: #fff; font: inherit; font-size: 0.9rem; font-weight: 800; }
+.cnl-cota input:focus { outline: 2px solid #65c9c0; outline-offset: 1px; border-color: #1b9a96; }
 .cnl-cota-atencao .cnl-cota-linha { background: #eab308; }
 .cnl-cota-alerta .cnl-cota-linha { background: #f97316; }
 .cnl-cota-transbordamento .cnl-cota-linha { background: #dc2626; }
+.cnl-cotas-editor > p { margin: 0.65rem 0 0; color: #6f858d; font-size: 0.68rem; line-height: 1.4; }
+.cnl-cotas-editor .cnl-cotas { margin-top: 0.55rem; }
+.cnl-cotas-erro { margin-top: 0.55rem; padding: 0.5rem 0.6rem; border-radius: 7px; color: #9f3131; background: #fff0f0; font-size: 0.68rem; }
+.cnl-cotas-acoes { display: flex; justify-content: flex-end; gap: 0.45rem; margin-top: 0.65rem; }
+.cnl-btn-cancelar { border: 1px solid #cbdde0; border-radius: 8px; padding: 0.55rem 0.7rem; color: #52717c; background: #fff; font: inherit; font-size: 0.7rem; font-weight: 750; cursor: pointer; }
+.cnl-btn-salvar { margin-top: 0; padding: 0.55rem 0.75rem; font-size: 0.7rem; }
+.cnl-btn-cancelar:disabled, .cnl-btn-salvar:disabled { opacity: 0.6; cursor: wait; }
+.cnl-cotas-rodape { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-top: 0.55rem; color: #84949b; font-size: 0.62rem; }
+.cnl-cotas-rodape strong { color: #168b80; font-weight: 750; }
+.cnl-alerta-alerta { color: #8b3f18; border-color: #f4b18c; background: #fff4eb; }
+.cnl-alerta-alerta .cnl-alerta-icone { background: #e26625; }
+.cnl-alerta-transbordamento { color: #8d2630; border-color: #f39a9a; background: #fff0f0; }
+.cnl-alerta-transbordamento .cnl-alerta-icone { background: #d73545; }
 
 .cnl-tabela-chuva-wrap { margin-top: 0.7rem; overflow-x: auto; border: 1px solid #e4edef; border-radius: 10px; }
 .cnl-tabela-chuva { min-width: 30rem; }
@@ -214,4 +231,6 @@
   .cnl-estacao { grid-template-columns: minmax(0, 1fr) auto; }
   .cnl-estacao-codigo { display: none; }
   .cnl-estacao-status { text-align: right; }
+  .cnl-cotas { grid-template-columns: 1fr; }
+  .cnl-bloco-cabecalho { align-items: center; }
 }

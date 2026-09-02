@@ -1197,6 +1197,7 @@ export default function App() {
       <div className="conteudo">
         {(aba === 'curral' || aba === 'procon') && (
           <ExportacaoFiscalizacao
+            modulo={aba}
             registrosCurral={registrosCurral}
             relatoriosProcon={relatoriosProcon}
           />

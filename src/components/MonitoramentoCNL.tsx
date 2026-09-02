@@ -33,11 +33,13 @@ type LeituraCNL = EstacaoCNL & {
   longitude: number | null
   tipo: string
   status: string
-  cotas: {
-    atencao: number | null
-    alerta: number | null
-    transbordamento: number | null
-  }
+  cotas: CotasCNL
+}
+
+type CotasCNL = {
+  atencao: number | null
+  alerta: number | null
+  transbordamento: number | null
 }
 
 type PontoSerie = {
@@ -62,6 +64,7 @@ type DadosCNL = {
   serie: PontoSerie[]
   nivelAtual: NivelAtual | null
   serieNivel: PontoNivel[]
+  cotasConfiguradas?: boolean
   atualizadoEm: string
   fonte: string
   aviso?: string
@@ -233,6 +236,11 @@ export default function MonitoramentoCNL({ onAbrirMapa }: Props) {
   const [carregando, setCarregando] = useState(true)
   const [atualizando, setAtualizando] = useState(false)
   const [erro, setErro] = useState('')
+  const [editandoCotas, setEditandoCotas] = useState(false)
+  const [salvandoCotas, setSalvandoCotas] = useState(false)
+  const [erroCotas, setErroCotas] = useState('')
+  const [cotasSalvas, setCotasSalvas] = useState('')
+  const [cotasForm, setCotasForm] = useState({ atencao: '', alerta: '', transbordamento: '' })
 
   const carregar = useCallback(async () => {
     setAtualizando(true)
@@ -255,6 +263,91 @@ export default function MonitoramentoCNL({ onAbrirMapa }: Props) {
     const timer = window.setInterval(carregar, INTERVALO_ATUALIZACAO)
     return () => window.clearInterval(timer)
   }, [carregar])
+
+  useEffect(() => {
+    if (!dados || editandoCotas) return
+    setCotasForm({
+      atencao: dados.estacao.cotas.atencao?.toString() || '',
+      alerta: dados.estacao.cotas.alerta?.toString() || '',
+      transbordamento: dados.estacao.cotas.transbordamento?.toString() || '',
+    })
+  }, [dados, editandoCotas])
+
+  const iniciarEdicaoCotas = () => {
+    if (!dados) return
+    setCotasForm({
+      atencao: dados.estacao.cotas.atencao?.toString() || '',
+      alerta: dados.estacao.cotas.alerta?.toString() || '',
+      transbordamento: dados.estacao.cotas.transbordamento?.toString() || '',
+    })
+    setErroCotas('')
+    setCotasSalvas('')
+    setEditandoCotas(true)
+  }
+
+  const salvarCotas = async () => {
+    const valores = {
+      atencao: Number(cotasForm.atencao.replace(',', '.')),
+      alerta: Number(cotasForm.alerta.replace(',', '.')),
+      transbordamento: Number(cotasForm.transbordamento.replace(',', '.')),
+    }
+    if (!Object.values(valores).every((valor) => Number.isFinite(valor) && valor >= 0 && valor <= 100)) {
+      setErroCotas('Informe valores entre 0 e 100 metros.')
+      return
+    }
+    if (!(valores.atencao < valores.alerta && valores.alerta < valores.transbordamento)) {
+      setErroCotas('A ordem precisa ser: Atenção < Alerta < Transbordamento.')
+      return
+    }
+
+    setSalvandoCotas(true)
+    setErroCotas('')
+    try {
+      const resposta = await fetch('/api/monitoramento-cnl/cotas', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(valores),
+      })
+      const corpo = await resposta.json() as { sucesso?: boolean; cotas?: CotasCNL; erro?: string }
+      if (!resposta.ok || !corpo.sucesso || !corpo.cotas) throw new Error(corpo.erro || 'Não foi possível salvar as cotas.')
+      setDados((anterior) => anterior ? {
+        ...anterior,
+        cotasConfiguradas: true,
+        estacao: { ...anterior.estacao, cotas: corpo.cotas! },
+      } : anterior)
+      setEditandoCotas(false)
+      setCotasSalvas('Cotas salvas para todos os agentes do monitoramento.')
+    } catch (falha) {
+      setErroCotas(falha instanceof Error ? falha.message : 'Não foi possível salvar as cotas.')
+    } finally {
+      setSalvandoCotas(false)
+    }
+  }
+
+  const estadoNivelAtual = dados ? estadoNivel(dados.nivelAtual?.valor, dados.estacao.cotas) : 'sem-dados'
+
+  useEffect(() => {
+    const leitura = dados?.nivelAtual
+    const cotas = dados?.estacao.cotas
+    if (!leitura || leitura.valor == null || estadoNivelAtual === 'normal' || estadoNivelAtual === 'sem-dados') return
+    const cotaAtingida = cotas?.[estadoNivelAtual]
+    if (cotaAtingida == null) return
+
+    const chave = `cnl-notificacao-nivel:${estadoNivelAtual}:${leitura.dataHora}:${cotaAtingida}`
+    try {
+      if (localStorage.getItem('cnl-ultima-notificacao-nivel') === chave) return
+      localStorage.setItem('cnl-ultima-notificacao-nivel', chave)
+    } catch {
+      // O alerta visível na página continua funcionando mesmo sem localStorage.
+    }
+
+    if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+      new Notification(`Rio Bananeiras · ${rotuloNivel(estadoNivelAtual)}`, {
+        body: `Nível atual: ${formatarCota(leitura.valor)}. Cota de referência: ${formatarCota(cotaAtingida)}.`,
+        tag: `cnl-nivel-${estadoNivelAtual}`,
+      })
+    }
+  }, [dados, estadoNivelAtual])
 
   const acumulado24h = useMemo(() => {
     if (!dados) return null
@@ -287,8 +380,6 @@ export default function MonitoramentoCNL({ onAbrirMapa }: Props) {
 
   const { estacao } = dados
   const estadoPrincipal = estadoEstacao(estacao.dataHora)
-  const estadoNivelAtual = estadoNivel(dados.nivelAtual?.valor, estacao.cotas)
-
   return (
     <div className="cnl-pagina">
       <section className="cnl-cabecalho">
@@ -372,6 +463,16 @@ export default function MonitoramentoCNL({ onAbrirMapa }: Props) {
         <p>Fonte oficial CEMADEN. Atualização automática a cada 5 minutos.</p>
       </section>
 
+      {estadoNivelAtual !== 'normal' && estadoNivelAtual !== 'sem-dados' && dados.nivelAtual && (
+        <section className={`cnl-alerta cnl-alerta-${estadoNivelAtual}`} role="alert">
+          <div className="cnl-alerta-icone">!</div>
+          <div>
+            <strong>Notificação de {rotuloNivel(estadoNivelAtual).toLowerCase()}</strong>
+            <p>O nível do Rio Bananeiras está em {formatarCota(dados.nivelAtual.valor)}, atingindo a cota de {formatarCota(estacao.cotas[estadoNivelAtual])}. Acompanhe a evolução e prepare a resposta.</p>
+          </div>
+        </section>
+      )}
+
       <section className="cnl-bloco">
         <div className="cnl-bloco-cabecalho">
           <div><span className="cnl-eyebrow">Chuva acumulada</span><h2>Últimas 24 horas</h2></div>
@@ -391,13 +492,49 @@ export default function MonitoramentoCNL({ onAbrirMapa }: Props) {
       <section className="cnl-bloco">
         <div className="cnl-bloco-cabecalho">
           <div><span className="cnl-eyebrow">Referência hidrológica</span><h2>Cotas de acompanhamento</h2></div>
-          <span className="cnl-badge-fonte">metros</span>
+          {!editandoCotas && <button className="cnl-btn-editar" onClick={iniciarEdicaoCotas}>✎ Editar cotas</button>}
         </div>
-        <div className="cnl-cotas">
-          <div className="cnl-cota cnl-cota-atencao"><span className="cnl-cota-linha" /><span>Atenção</span><strong>{formatarCota(estacao.cotas.atencao)}</strong><small>começar a observar</small></div>
-          <div className="cnl-cota cnl-cota-alerta"><span className="cnl-cota-linha" /><span>Alerta</span><strong>{formatarCota(estacao.cotas.alerta)}</strong><small>preparar resposta</small></div>
-          <div className="cnl-cota cnl-cota-transbordamento"><span className="cnl-cota-linha" /><span>Transbordamento</span><strong>{formatarCota(estacao.cotas.transbordamento)}</strong><small>risco de cheia</small></div>
-        </div>
+        {editandoCotas ? (
+          <div className="cnl-cotas-editor">
+            <p>Os valores atuais vieram do CEMADEN. Ajuste as referências usadas pelos alertas do aplicativo.</p>
+            <div className="cnl-cotas">
+              {([
+                ['atencao', 'Atenção', 'começar a observar'],
+                ['alerta', 'Alerta', 'preparar resposta'],
+                ['transbordamento', 'Transbordamento', 'risco de cheia'],
+              ] as const).map(([chave, rotulo, descricao]) => (
+                <label key={chave} className={`cnl-cota cnl-cota-${chave}`}>
+                  <span className="cnl-cota-linha" />
+                  <span>{rotulo}</span>
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="0.01"
+                    value={cotasForm[chave]}
+                    onChange={(evento) => setCotasForm((anterior) => ({ ...anterior, [chave]: evento.target.value }))}
+                    aria-label={`Cota de ${rotulo}`}
+                  />
+                  <small>{descricao} · metros</small>
+                </label>
+              ))}
+            </div>
+            {erroCotas && <div className="cnl-cotas-erro" role="alert">{erroCotas}</div>}
+            <div className="cnl-cotas-acoes">
+              <button className="cnl-btn-cancelar" onClick={() => { setEditandoCotas(false); setErroCotas('') }} disabled={salvandoCotas}>Cancelar</button>
+              <button className="cnl-btn-principal cnl-btn-salvar" onClick={salvarCotas} disabled={salvandoCotas}>{salvandoCotas ? 'Salvando…' : 'Salvar cotas'}</button>
+            </div>
+          </div>
+        ) : (
+          <>
+            <div className="cnl-cotas">
+              <div className="cnl-cota cnl-cota-atencao"><span className="cnl-cota-linha" /><span>Atenção</span><strong>{formatarCota(estacao.cotas.atencao)}</strong><small>começar a observar</small></div>
+              <div className="cnl-cota cnl-cota-alerta"><span className="cnl-cota-linha" /><span>Alerta</span><strong>{formatarCota(estacao.cotas.alerta)}</strong><small>preparar resposta</small></div>
+              <div className="cnl-cota cnl-cota-transbordamento"><span className="cnl-cota-linha" /><span>Transbordamento</span><strong>{formatarCota(estacao.cotas.transbordamento)}</strong><small>risco de cheia</small></div>
+            </div>
+            <div className="cnl-cotas-rodape">{dados.cotasConfiguradas ? 'Referências personalizadas para os alertas do aplicativo.' : 'Referências oficiais atuais do CEMADEN.'}{cotasSalvas && <strong>{cotasSalvas}</strong>}</div>
+          </>
+        )}
       </section>
 
       <section className="cnl-bloco">

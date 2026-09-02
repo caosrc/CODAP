@@ -868,6 +868,16 @@ async function initDb() {
   `)
 
   await query(`
+    CREATE TABLE IF NOT EXISTS monitoramento_cnl_cotas (
+      id INTEGER PRIMARY KEY,
+      atencao DOUBLE PRECISION NOT NULL,
+      alerta DOUBLE PRECISION NOT NULL,
+      transbordamento DOUBLE PRECISION NOT NULL,
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `)
+
+  await query(`
     CREATE TABLE IF NOT EXISTS equipamentos_campo (
       id BIGSERIAL PRIMARY KEY,
       material_id TEXT REFERENCES materiais(id) ON DELETE SET NULL,
@@ -3176,6 +3186,7 @@ const CNL_RECURSOS_URL = 'https://mapservices.cemaden.gov.br/MapaInterativoWS/re
 const CNL_NIVEL_URL = 'https://resources.cemaden.gov.br/graficos/cemaden/hidro/resources/json/MedidaResource.php?est=6622&sen=20&pag=24'
 const CNL_FONTE_URL = `https://resources.cemaden.gov.br/graficos/interativo/grafico_CEMADEN.php?idpcd=${CNL_ESTACAO_ID}&uf=MG`
 const CNL_FUSO_HORARIO = 'America/Sao_Paulo'
+const CNL_COTAS_CHAVE = 1
 let monitoramentoCnlCache = null
 let monitoramentoCnlCacheTs = 0
 const MONITORAMENTO_CNL_TTL_MS = 2 * 60 * 1000
@@ -3362,6 +3373,64 @@ function anexarNivelAtualNaSerie(serie, nivelAtual) {
   return historico.slice(-24)
 }
 
+function cotasCnlValidas(cotas) {
+  const valores = [cotas?.atencao, cotas?.alerta, cotas?.transbordamento]
+  return valores.every((valor) => Number.isFinite(valor) && valor >= 0 && valor <= 100)
+    && cotas.atencao < cotas.alerta
+    && cotas.alerta < cotas.transbordamento
+}
+
+function cotasCnlNumericas(cotas) {
+  return {
+    atencao: Number(cotas.atencao),
+    alerta: Number(cotas.alerta),
+    transbordamento: Number(cotas.transbordamento),
+  }
+}
+
+async function buscarCotasCnlConfiguradas() {
+  const resultado = await query(`
+    SELECT atencao, alerta, transbordamento
+    FROM monitoramento_cnl_cotas
+    WHERE id = $1
+  `, [CNL_COTAS_CHAVE])
+  const registro = resultado.rows[0]
+  return registro ? cotasCnlNumericas(registro) : null
+}
+
+app.put('/api/monitoramento-cnl/cotas', async (req, res) => {
+  const cotas = cotasCnlNumericas(req.body || {})
+  if (!cotasCnlValidas(cotas)) {
+    return res.status(400).json({
+      sucesso: false,
+      erro: 'Informe cotas numéricas entre 0 e 100, em ordem crescente: Atenção < Alerta < Transbordamento.',
+    })
+  }
+
+  try {
+    const resultado = await query(`
+      INSERT INTO monitoramento_cnl_cotas (id, atencao, alerta, transbordamento, updated_at)
+      VALUES ($1, $2, $3, $4, NOW())
+      ON CONFLICT (id) DO UPDATE SET
+        atencao = EXCLUDED.atencao,
+        alerta = EXCLUDED.alerta,
+        transbordamento = EXCLUDED.transbordamento,
+        updated_at = NOW()
+      RETURNING atencao, alerta, transbordamento, updated_at
+    `, [CNL_COTAS_CHAVE, cotas.atencao, cotas.alerta, cotas.transbordamento])
+    monitoramentoCnlCache = null
+    monitoramentoCnlCacheTs = 0
+    return res.json({
+      sucesso: true,
+      cotas: cotasCnlNumericas(resultado.rows[0]),
+      atualizadoEm: resultado.rows[0].updated_at,
+    })
+  } catch (erro) {
+    console.error('[CNL] Falha ao salvar cotas:', erro?.message || erro)
+    return res.status(500).json({ sucesso: false, erro: 'Não foi possível salvar as cotas de acompanhamento.' })
+  }
+})
+
 app.get('/api/monitoramento-cnl', async (_req, res) => {
   const agora = Date.now()
   if (monitoramentoCnlCache && agora - monitoramentoCnlCacheTs < MONITORAMENTO_CNL_TTL_MS) {
@@ -3440,6 +3509,14 @@ app.get('/api/monitoramento-cnl', async (_req, res) => {
         }
       : ultimaMedidaNivel
 
+    const cotasOficiais = {
+      atencao: numeroCemaden(estacaoHorario.cotaAtencao),
+      alerta: numeroCemaden(estacaoHorario.cotaAlerta),
+      transbordamento: numeroCemaden(estacaoHorario.cotaTransbordamento),
+    }
+    const cotasConfiguradas = await buscarCotasCnlConfiguradas()
+    const cotas = cotasConfiguradas || cotasOficiais
+
     const dadosChuvaPorEstacao = new Map(
       [...chuvaPayloads.entries()].map(([id, payload]) => {
         const pontos = extrairPontosChuvaCnl(payload)
@@ -3478,11 +3555,7 @@ app.get('/api/monitoramento-cnl', async (_req, res) => {
       longitude: numeroCemaden(estacaoHorario.longitude),
       tipo: String(estacaoHorario.idTipoestacao?.descricao || 'Hidrológica'),
       status: String(estacaoHorario.status || 'UNKNOWN'),
-      cotas: {
-        atencao: numeroCemaden(estacaoHorario.cotaAtencao),
-        alerta: numeroCemaden(estacaoHorario.cotaAlerta),
-        transbordamento: numeroCemaden(estacaoHorario.cotaTransbordamento),
-      },
+      cotas,
     }
 
     const serieNivel = anexarNivelAtualNaSerie(montarSerieNivelCnl(medidasNivel), nivelAtual)
@@ -3494,6 +3567,7 @@ app.get('/api/monitoramento-cnl', async (_req, res) => {
       serie: serieChuva,
       nivelAtual,
       serieNivel,
+      cotasConfiguradas: Boolean(cotasConfiguradas),
       atualizadoEm: new Date().toISOString(),
       fonte: CNL_FONTE_URL,
       aviso: [

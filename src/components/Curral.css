@@ -131,7 +131,7 @@
 .curral-gms-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
 .curral-gms-heading strong { color: var(--curral-ink); font-size: 12px; }
 .curral-gms-heading span { color: var(--curral-muted); font: 10px 'DM Mono', monospace; }
-.curral-gms-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 11px; }
+.curral-gms-grid { display: grid; grid-template-columns: 1fr; gap: 11px; }
 .curral-gms-field { min-width: 0; }
 .curral-gms-field > span { display: block; margin-bottom: 6px; color: #526560; font-size: 10px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
 .curral-gms-inputs { display: flex; align-items: center; gap: 4px; }

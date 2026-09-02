@@ -95,7 +95,7 @@ const MESES = [
 ]
 
 function dataExtenso(d: Date): string {
-  return `Ouro Branco, ${d.getDate()} de ${MESES[d.getMonth()]} de ${d.getFullYear()}`
+  return `Conselheiro Lafaiete, ${d.getDate()} de ${MESES[d.getMonth()]} de ${d.getFullYear()}`
 }
 
 function formatarDataBr(iso: string | null): string {
@@ -262,14 +262,14 @@ export default function MateriaisEmprestimos({ onIrParaMapa, abrirCampoId, onAbr
 
     function disparar() {
       empVencidos.forEach(e => {
-        mostrarNotificacao('📦 Prazo de devolução — Defesa Civil', {
+        mostrarNotificacao('📦 Prazo de devolução — CODAP', {
           body: `${e.material_nome} emprestado a ${e.responsavel} está no prazo de devolução.`,
           tag: `emp-prazo-${e.id}`,
           icon: '/icons/icon-192.png',
         })
       })
       campoVencidos.forEach(c => {
-        mostrarNotificacao('🚧 Prazo de recolha — Defesa Civil', {
+        mostrarNotificacao('🚧 Prazo de recolha — CODAP', {
           body: `${c.material_nome ?? 'Equipamento'} em campo atingiu o prazo de recolha.`,
           tag: `campo-prazo-${c.id}`,
           icon: '/icons/icon-192.png',
@@ -1968,7 +1968,7 @@ function FormDevolucao({
 async function exportarMateriaisExcel(materiais: Material[], emprestimos: Emprestimo[]) {
   const { default: ExcelJS } = await import('exceljs')
   const wb = new ExcelJS.Workbook()
-  wb.creator = 'Defesa Civil Ouro Branco'
+  wb.creator = 'CODAP - Conselheiro Lafaiete'
   wb.created = new Date()
 
   // ── Busca fotos em lote ──────────────────────────────────────────────────
@@ -2158,10 +2158,10 @@ function gerarTermoEmprestimoPdf(e: Emprestimo, tipoOperacao: 'emprestimo' | 'ma
 </head><body>
   <button onclick="window.print()">🖨️ Salvar em PDF</button>
   <div class="cabecalho">
-    <img src="/logo-dc.jpg" alt="Defesa Civil" onerror="this.style.display='none'"/>
+    <span style="font-size:22px;font-weight:900;color:#1a4b8c">C</span>
     <div class="cabecalho-textos">
-      <strong>DEFESA CIVIL DE OURO BRANCO — MG</strong>
-      <span>Coordenadoria Municipal de Proteção e Defesa Civil</span>
+      <strong>CODAP — CONSELHEIRO LAFAIETE — MG</strong>
+      <span>Sistema operacional de campo</span>
     </div>
   </div>
 
@@ -2199,7 +2199,7 @@ function gerarTermoEmprestimoPdf(e: Emprestimo, tipoOperacao: 'emprestimo' | 'ma
 
   ${e.observacoes ? `<div class="condicao-box" style="margin-top:30px"><strong>Observações:</strong><p>${htmlEscape(e.observacoes)}</p></div>` : ''}
 
-  <div class="rodape">Termo gerado pelo aplicativo da Defesa Civil de Ouro Branco — registro nº ${e.id}.</div>
+  <div class="rodape">Termo gerado pelo aplicativo CODAP — registro nº ${e.id}.</div>
 </body></html>`
   win.document.write(html)
   win.document.close()

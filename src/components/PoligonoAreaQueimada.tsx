@@ -13,7 +13,7 @@ import 'leaflet/dist/leaflet.css'
   })
 })()
 
-const OURO_BRANCO_CENTER: [number, number] = [-20.5264, -43.6947]
+const CONSELHEIRO_LAFAIETE_CENTER: [number, number] = [-20.6604, -43.7863]
 
 export type PontoPoligono = { lat: number; lng: number }
 
@@ -106,8 +106,8 @@ export default function PoligonoAreaQueimada({ pontos, onChange, focoLat, focoLn
     setEditando(null)
   }
 
-  const centerLat = focoLat ?? pontos[0]?.lat ?? OURO_BRANCO_CENTER[0]
-  const centerLng = focoLng ?? pontos[0]?.lng ?? OURO_BRANCO_CENTER[1]
+  const centerLat = focoLat ?? pontos[0]?.lat ?? CONSELHEIRO_LAFAIETE_CENTER[0]
+  const centerLng = focoLng ?? pontos[0]?.lng ?? CONSELHEIRO_LAFAIETE_CENTER[1]
 
   return (
     <div className="poligono-area-section">

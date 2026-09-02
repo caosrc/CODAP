@@ -1,4 +1,4 @@
-/* Defesa Civil Ouro Branco — Service Worker
+/* CODAP — Service Worker
  * PWA + Offline First + Web Push
  *
  * Estratégias:
@@ -13,12 +13,12 @@
  *
  * Mensagens suportadas (vindas do app, ver src/offline.ts):
  *  - SKIP_WAITING                    → ativa SW novo imediatamente
- *  - CACHEAR_MAPA_OURO_BRANCO        → pré-baixa tiles da área urbana
+ *  - CACHEAR_MAPA_CONSELHEIRO_LAFAIETE → pré-baixa tiles da área municipal
  *  - INFO_CACHE_MAPA                 → devolve quantidade de tiles em cache
  *  - LIMPAR_CACHE_MAPA               → apaga todos os tiles cacheados
  */
 
-const VERSION = 'v13-2026-09-login-logo'
+const VERSION = 'v14-2026-09-codap-lafaiete'
 const APP_CACHE = `defesacivil-app-${VERSION}`
 const TILES_CACHE = 'defesacivil-tiles-osm'
 const ASSETS_CACHE = `defesacivil-assets-${VERSION}`
@@ -29,15 +29,7 @@ const APP_SHELL = [
   '/',
   '/index.html',
   '/manifest.json',
-  '/icon-192.png',
-  '/icon-192-maskable.png',
-  '/icon-512.png',
-  '/icon-512-maskable.png',
-  '/apple-touch-icon.png',
-  '/favicon.svg',
-  '/cod-logo.png',
-  '/logo-dc.jpg',
-  '/logo-dc.png',
+  '/codap-icon.svg',
   '/icons.svg',
 ]
 
@@ -210,7 +202,7 @@ self.addEventListener('push', (event) => {
   } catch {
     try { data = { body: event.data?.text() || '' } } catch { /* ignore */ }
   }
-  const titulo = data.title || '🆘 SOS — Defesa Civil'
+  const titulo = data.title || '🆘 SOS — CODAP'
   const corpo = data.body || 'Um agente acionou o SOS. Abra o app imediatamente.'
   const tag = data.tag || 'sos'
   const url = data.url || '/'
@@ -234,8 +226,8 @@ self.addEventListener('push', (event) => {
 
       await self.registration.showNotification(titulo, {
         body: corpo,
-        icon: '/icon-192.png',
-        badge: '/icon-192.png',
+        icon: '/codap-icon.svg',
+        badge: '/codap-icon.svg',
         tag,
         renotify: true,
         requireInteraction: ehSos || tipo === 'escala' || ehRadar,
@@ -302,12 +294,12 @@ self.addEventListener('message', (event) => {
     return
   }
 
-  if (msg.tipo === 'CACHEAR_MAPA_OURO_BRANCO') {
+  if (msg.tipo === 'CACHEAR_MAPA_CONSELHEIRO_LAFAIETE') {
     const zooms = Array.isArray(msg.zooms) && msg.zooms.length > 0
       ? msg.zooms
       : [11, 12, 13, 14, 15, 16]
     const raioKm = Number(msg.raioKm) > 0 ? Number(msg.raioKm) : 10
-    event.waitUntil(cachearMapaOuroBranco(zooms, raioKm, event.source))
+    event.waitUntil(cachearMapaConselheiroLafaiete(zooms, raioKm, event.source))
     return
   }
 
@@ -374,7 +366,7 @@ self.addEventListener('message', (event) => {
   }
 })
 
-// ── Pré-cache de tiles (Ouro Branco) ──────────────────────────────
+// ── Pré-cache de tiles (Conselheiro Lafaiete) ────────────────────
 function lon2tile(lon, zoom) {
   return Math.floor(((lon + 180) / 360) * Math.pow(2, zoom))
 }
@@ -386,10 +378,10 @@ function lat2tile(lat, zoom) {
   )
 }
 
-async function cachearMapaOuroBranco(zooms, raioKm, source) {
-  // Bounding box ao redor de Ouro Branco — MG (centro: -20.5195, -43.6983)
-  const lat = -20.5195
-  const lng = -43.6983
+async function cachearMapaConselheiroLafaiete(zooms, raioKm, source) {
+  // Bounding box ao redor de Conselheiro Lafaiete — MG.
+  const lat = -20.6604
+  const lng = -43.7863
   // 1 grau de latitude ≈ 111 km. Longitude ajusta pela cossecante da latitude.
   const margemLat = raioKm / 111
   const margemLng = raioKm / (111 * Math.cos((lat * Math.PI) / 180))

@@ -47,6 +47,20 @@ input, select, textarea { font-family: inherit; }
   border-radius: 8px;
   flex-shrink: 0;
 }
+.pwa-banner-icone-texto {
+  width: 38px;
+  height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border: 2px solid rgba(255,255,255,0.9);
+  border-radius: 9px;
+  color: white;
+  font-size: 1.35rem;
+  font-weight: 900;
+  letter-spacing: -0.08em;
+}
 .pwa-banner-texto {
   flex: 1;
   display: flex;
@@ -544,6 +558,21 @@ input, select, textarea { font-family: inherit; }
 }
 
 .header-logo { display: flex; align-items: center; gap: 0.6rem; }
+
+.header-logo-texto {
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border: 3px solid currentColor;
+  border-radius: 50%;
+  color: white;
+  font-size: 1.45rem;
+  font-weight: 900;
+  line-height: 1;
+}
 
 .header-textos { display: flex; flex-direction: column; }
 
@@ -2549,6 +2578,21 @@ input, select, textarea { font-family: inherit; }
   justify-content: center;
 }
 
+.header-logo-mini-texto {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border: 2px solid currentColor;
+  border-radius: 50%;
+  color: #1a4b8c;
+  font-size: 1.05rem;
+  font-weight: 900;
+  line-height: 1;
+}
+
 .header-titulo-texto {
   font-size: 1.05rem;
   font-weight: 700;
@@ -4236,6 +4280,13 @@ input, select, textarea { font-family: inherit; }
   background: #ffffff;
   box-shadow: 0 4px 18px rgba(15,23,42,0.12);
   border: 3px solid #e8edf5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #1a4b8c;
+  font-size: 2.35rem;
+  font-weight: 900;
+  letter-spacing: -0.08em;
 }
 
 .login-logo {

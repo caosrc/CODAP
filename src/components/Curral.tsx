@@ -256,7 +256,7 @@ export default function Curral({
           <span className="curral-mark" aria-hidden="true">C</span>
         </div>
         <div className="curral-header-copy">
-          <span className="curral-kicker">Defesa Civil · Campo</span>
+          <span className="curral-kicker">CODAP · Campo</span>
           <h1>Curral</h1>
           <p>Registro de animal encontrado</p>
         </div>

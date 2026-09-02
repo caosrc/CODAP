@@ -96,7 +96,7 @@ function formatarAreaExcel(m2: number): string {
 function extrairBairroExcel(endereco: string | null): string {
   if (!endereco) return 'Não informado'
   let s = endereco.trim()
-  s = s.replace(/,?\s*Ouro Branco.*$/i, '')
+  s = s.replace(/,?\s*Conselheiro Lafaiete.*$/i, '')
   s = s.replace(/\s*-\s*MG.*$/i, '')
   s = s.replace(/\s*\d{5}-?\d{3}.*$/, '')
   if (s.includes(' - ')) {
@@ -116,7 +116,7 @@ function extrairBairroExcel(endereco: string | null): string {
 
 function extrairRuaExcel(endereco: string | null): string {
   if (!endereco) return 'Não informada'
-  const limpo = endereco.trim().replace(/,?\s*Ouro Branco.*$/i, '').replace(/\s*-\s*MG.*$/i, '')
+  const limpo = endereco.trim().replace(/,?\s*Conselheiro Lafaiete.*$/i, '').replace(/\s*-\s*MG.*$/i, '')
   const primeiraParte = limpo.split(',')[0]?.trim() || limpo.split(' - ')[0]?.trim() || limpo
   return primeiraParte.replace(/\s+\d{1,5}\s*$/, '').trim() || 'Não informada'
 }
@@ -195,7 +195,7 @@ function adicionarAbaDetalhamento(wb: ExcelWorkbook, ocorrencias: Ocorrencia[]):
 export async function exportarOcorrenciaExcel(o: Ocorrencia): Promise<void> {
   const { default: ExcelJS } = await import('exceljs')
   const wb = new ExcelJS.Workbook()
-  wb.creator = 'Defesa Civil Ouro Branco'
+  wb.creator = 'CODAP - Conselheiro Lafaiete'
   wb.created = new Date()
 
   const ws = wb.addWorksheet('Ocorrência', {
@@ -212,7 +212,7 @@ export async function exportarOcorrenciaExcel(o: Ocorrencia): Promise<void> {
 
   ws.mergeCells('A1:E1')
   const titleCell = ws.getCell('A1')
-  titleCell.value = 'DEFESA CIVIL OURO BRANCO — RELATÓRIO DE OCORRÊNCIA'
+  titleCell.value = 'CODAP — CONSELHEIRO LAFAIETE — RELATÓRIO DE OCORRÊNCIA'
   titleCell.font = { bold: true, size: 14, color: { argb: BRANCO } }
   titleCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: AZUL } }
   titleCell.alignment = { horizontal: 'center', vertical: 'middle' }
@@ -749,7 +749,7 @@ async function exportarOcorrenciasSemFotos(
 ): Promise<void> {
   const { default: ExcelJS } = await import('exceljs')
   const wb = new ExcelJS.Workbook()
-  wb.creator = 'Defesa Civil Ouro Branco'
+  wb.creator = 'CODAP - Conselheiro Lafaiete'
   wb.created = new Date()
 
   const ws = wb.addWorksheet('Ocorrências')
@@ -764,7 +764,7 @@ async function exportarOcorrenciasSemFotos(
 
   const titulo = ws.getCell('A1')
   ws.mergeCells(1, 1, 1, cabecalhos.length)
-  titulo.value = `DEFESA CIVIL OURO BRANCO — OCORRÊNCIAS — Gerado em ${new Date().toLocaleString('pt-BR')}`
+  titulo.value = `CODAP — CONSELHEIRO LAFAIETE — OCORRÊNCIAS — Gerado em ${new Date().toLocaleString('pt-BR')}`
   titulo.font = { bold: true, size: 12, color: { argb: BRANCO } }
   titulo.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: LARANJA } }
   titulo.alignment = { horizontal: 'center', vertical: 'middle' }
@@ -950,7 +950,7 @@ async function exportarOcorrenciasSemFotos(
   const url = URL.createObjectURL(blob)
   const link = document.createElement('a')
   link.href = url
-  link.download = `defesacivil_ourobranco_${new Date().toLocaleDateString('pt-BR').replace(/\//g, '-')}.xlsx`
+  link.download = `codap_conselheiro_lafaiete_${new Date().toLocaleDateString('pt-BR').replace(/\//g, '-')}.xlsx`
   link.style.display = 'none'
   document.body.appendChild(link)
   link.click()
@@ -967,7 +967,7 @@ export async function exportarTodasExcel(
   /* Implementação analítica anterior mantida temporariamente para referência. */
   const { default: ExcelJS } = await import('exceljs')
   const wb = new ExcelJS.Workbook()
-  wb.creator = 'Defesa Civil Ouro Branco'
+  wb.creator = 'CODAP - Conselheiro Lafaiete'
   wb.created = new Date()
   wb.calcProperties = { calcMode: 'auto', fullCalcOnLoad: true, forceFullCalc: true }
 
@@ -983,7 +983,7 @@ export async function exportarTodasExcel(
   // ── Linha 1: título ───────────────────────────────────────────────────────
   ws.mergeCells(1, 1, 1, totalCols)
   const titulo = ws.getCell('A1')
-  titulo.value = `DEFESA CIVIL OURO BRANCO — TODAS AS OCORRÊNCIAS — Gerado em ${new Date().toLocaleString('pt-BR')}`
+  titulo.value = `CODAP — CONSELHEIRO LAFAIETE — TODAS AS OCORRÊNCIAS — Gerado em ${new Date().toLocaleString('pt-BR')}`
   titulo.font = { bold: true, size: 12, color: { argb: BRANCO } }
   titulo.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: LARANJA } }
   titulo.alignment = { horizontal: 'center', vertical: 'middle' }
@@ -1121,7 +1121,7 @@ export async function exportarTodasExcel(
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
-  a.download = `defesacivil_ourobranco_${new Date().toLocaleDateString('pt-BR').replace(/\//g, '-')}.xlsx`
+  a.download = `codap_conselheiro_lafaiete_${new Date().toLocaleDateString('pt-BR').replace(/\//g, '-')}.xlsx`
   a.style.display = 'none'
   document.body.appendChild(a)
   a.click()
@@ -1135,7 +1135,7 @@ export async function exportarTodasExcel(
 export async function exportarChecklistExcel(checklists: ChecklistExportData[], nomeArquivo?: string): Promise<void> {
   const { default: ExcelJS } = await import('exceljs')
   const wb = new ExcelJS.Workbook()
-  wb.creator = 'Defesa Civil Ouro Branco'
+  wb.creator = 'CODAP - Conselheiro Lafaiete'
   wb.created = new Date()
 
   const ws = wb.addWorksheet('Checklists', {
@@ -1203,7 +1203,7 @@ export async function exportarChecklistExcel(checklists: ChecklistExportData[], 
 
   ws.mergeCells(1, 1, 1, totalCols)
   const titulo = ws.getCell('A1')
-  titulo.value = `DEFESA CIVIL OURO BRANCO — CHECKLISTS DA VIATURA — Gerado em ${new Date().toLocaleString('pt-BR')}`
+  titulo.value = `CODAP — CONSELHEIRO LAFAIETE — CHECKLISTS DA VIATURA — Gerado em ${new Date().toLocaleString('pt-BR')}`
   titulo.font = { bold: true, size: 12, color: { argb: BRANCO } }
   titulo.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: AZUL } }
   titulo.alignment = { horizontal: 'center', vertical: 'middle' }

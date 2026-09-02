@@ -140,7 +140,7 @@ const RECURSOS_PADRAO: Recurso[] = [
 ]
 
 const EQUIPES_PADRAO: Equipe[] = [
-  { id: 'eq1', nome: 'Defesa Civil', orgao: 'Prefeitura Municipal', emoji: '🛡️', responsavel: 'Coord. DC', telefone: '(31) 0000-0000', missao: 'Coordenação geral e avaliação de risco', membros: [], setor: 'Coordenação' },
+  { id: 'eq1', nome: 'CODAP', orgao: 'Prefeitura Municipal', emoji: '🛡️', responsavel: 'Coordenação CODAP', telefone: '(31) 0000-0000', missao: 'Coordenação geral e avaliação de risco', membros: [], setor: 'Coordenação' },
   { id: 'eq2', nome: 'Corpo de Bombeiros', orgao: 'CBMMG', emoji: '🚒', responsavel: 'Cap. Bombeiros', telefone: '193', missao: 'Busca, resgate e combate a incêndio', membros: [], setor: 'Resgate' },
   { id: 'eq3', nome: 'SAMU', orgao: 'Saúde Municipal', emoji: '🚑', responsavel: 'Coord. SAMU', telefone: '192', missao: 'Atendimento pré-hospitalar', membros: [], setor: 'Saúde' },
   { id: 'eq4', nome: 'Polícia Militar', orgao: 'PM-MG', emoji: '🚓', responsavel: 'Sgt. PM', telefone: '190', missao: 'Segurança e isolamento de área', membros: [], setor: 'Segurança' },
@@ -247,8 +247,8 @@ export default function PlanoEmergencia() {
   const [itemMapaSelecionado, setItemMapaSelecionado] = useState<string | null>(null)
   const [labelNovoItem, setLabelNovoItem] = useState('')
 
-  // ── Centro do mapa (Ouro Branco MG) ──────────────────────────────────
-  const CENTER: [number, number] = [-20.5238, -43.6984]
+  // ── Centro do mapa (Conselheiro Lafaiete MG) ─────────────────────────
+  const CENTER: [number, number] = [-20.6604, -43.7863]
 
   // ── Persistência ─────────────────────────────────────────────────────
   useEffect(() => {
@@ -795,7 +795,7 @@ export default function PlanoEmergencia() {
                   </div>
                 )}
               </div>
-              <div className="pe-section-title" style={{ marginTop: 10 }}>Agentes da Defesa Civil</div>
+              <div className="pe-section-title" style={{ marginTop: 10 }}>Agentes do CODAP</div>
               <div className="pe-lista-inline">
                 {AGENTES.map(ag => (
                   <button key={ag}
@@ -981,7 +981,7 @@ export default function PlanoEmergencia() {
 
           <div className="pe-form-group">
             <label>Nome do Plano *</label>
-            <input placeholder="Ex: Deslizamento Serra Ouro Branco"
+            <input placeholder="Ex: Deslizamento zona rural de Conselheiro Lafaiete"
               value={formPlano.nome ?? ''}
               onChange={e => setFormPlano(f => ({ ...f, nome: e.target.value }))} />
           </div>

@@ -170,7 +170,7 @@ function BannerInstalar() {
   return (
     <div className="pwa-banner">
       <div className="pwa-banner-icone">
-        <img src="/logo-dc.jpg" alt="" />
+        <span className="pwa-banner-icone-texto">C</span>
       </div>
       <div className="pwa-banner-texto">
         <strong>Instale o app</strong>
@@ -409,14 +409,14 @@ export default function App() {
 
         async function disparar() {
           for (const e of empVencidos) {
-            await dispararNotif('📦 Prazo vencido — Defesa Civil', {
+            await dispararNotif('📦 Prazo vencido — CODAP', {
               body: `${e.material_nome} emprestado a ${e.responsavel} está com prazo vencido.`,
               tag: `app-emp-prazo-${e.id}`,
               icon: '/icons/icon-192.png',
             })
           }
           for (const c of campoVencidos) {
-            await dispararNotif('🚧 Recolha pendente — Defesa Civil', {
+            await dispararNotif('🚧 Recolha pendente — CODAP', {
               body: `${c.material_nome ?? 'Equipamento'} em campo atingiu o prazo de recolha.`,
               tag: `app-campo-prazo-${c.id}`,
               icon: '/icons/icon-192.png',
@@ -771,7 +771,7 @@ export default function App() {
     const kml = `<?xml version="1.0" encoding="UTF-8"?>
 <kml xmlns="http://www.opengis.net/kml/2.2">
   <Document>
-    <name>Defesa Civil Ouro Branco — Todas as Ocorrências</name>
+    <name>CODAP — Conselheiro Lafaiete — Todas as Ocorrências</name>
     <Style id="areaQueimada">
       <LineStyle>
         <color>ff0000ff</color>
@@ -797,7 +797,7 @@ export default function App() {
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `defesacivil_ourobranco_${Date.now()}.kmz`
+    a.download = `codap_conselheiro_lafaiete_${Date.now()}.kmz`
     a.click()
     URL.revokeObjectURL(url)
   }
@@ -935,10 +935,10 @@ export default function App() {
 
       <header className="header">
         <div className="header-logo">
-          <img src="/logo-dc.jpg" alt="Defesa Civil" className="logo-img" />
+          <div className="header-logo-texto" aria-label="CODAP">C</div>
           <div className="header-textos">
-            <span className="header-nome">Defesa Civil</span>
-            <span className="header-cidade">Ouro Branco — MG</span>
+            <span className="header-nome">CODAP</span>
+            <span className="header-cidade">Conselheiro Lafaiete — MG</span>
           </div>
         </div>
         <div className="header-direita">

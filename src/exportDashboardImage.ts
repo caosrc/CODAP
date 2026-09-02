@@ -9,7 +9,7 @@ import { NATUREZA_COR, NATUREZA_ICONE } from './types'
 function extrairBairro(endereco: string | null | undefined): string {
   if (!endereco) return 'Não informado'
   let s = endereco.trim()
-  s = s.replace(/,?\s*Ouro Branco.*$/i, '')
+  s = s.replace(/,?\s*Conselheiro Lafaiete.*$/i, '')
   s = s.replace(/\s*-\s*MG.*$/i, '')
   s = s.replace(/\s*\d{5}-?\d{3}.*$/, '')
   if (s.includes(' - ')) {
@@ -295,7 +295,7 @@ function montarSvg(stats: DashStats): { svg: string; w: number; h: number } {
     <text x="40" y="48" font-size="26" fill="white" font-weight="800"
       font-family="Segoe UI, Arial, sans-serif">📊 Painel de Ocorrências</text>
     <text x="40" y="78" font-size="14" fill="#bfdbfe" font-weight="500"
-      font-family="Segoe UI, Arial, sans-serif">Defesa Civil de Ouro Branco — MG  ·  ${stats.total} ocorrências analisadas</text>
+      font-family="Segoe UI, Arial, sans-serif">CODAP — Conselheiro Lafaiete, MG  ·  ${stats.total} ocorrências analisadas</text>
     <text x="${W - 40}" y="48" text-anchor="end" font-size="13" fill="#dbeafe" font-weight="600"
       font-family="Segoe UI, Arial, sans-serif">Gerado em ${dataGer}</text>
     <text x="${W - 40}" y="78" text-anchor="end" font-size="12" fill="#93c5fd"
@@ -397,7 +397,7 @@ function montarSvg(stats: DashStats): { svg: string; w: number; h: number } {
   // Rodapé
   const footer = `
     <text x="${W / 2}" y="${H - 18}" text-anchor="middle" font-size="11" fill="#94a3b8"
-      font-family="Segoe UI, Arial, sans-serif">🛡️ Defesa Civil de Ouro Branco — MG  ·  Relatório automático gerado em ${dataGer}</text>
+      font-family="Segoe UI, Arial, sans-serif">CODAP — Conselheiro Lafaiete, MG  ·  Relatório automático gerado em ${dataGer}</text>
   `
 
   const svg = `<?xml version="1.0" encoding="UTF-8"?>

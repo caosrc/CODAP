@@ -2991,7 +2991,7 @@ function ModalAgenteCalendario({
 async function exportarEscalaMensalExcel(dados: EscalaData, ano: number, mes: number, ocorrencias: Ocorrencia[] = []) {
   const { default: ExcelJS } = await import('exceljs')
   const wb = new ExcelJS.Workbook()
-  wb.creator = 'Defesa Civil de Ouro Branco'
+  wb.creator = 'CODAP - Conselheiro Lafaiete'
   wb.created = new Date()
 
   const nomeMes = MESES[mes]
@@ -3011,7 +3011,7 @@ async function exportarEscalaMensalExcel(dados: EscalaData, ano: number, mes: nu
 
   wsCal.mergeCells('A1:E1')
   const tit = wsCal.getCell('A1')
-  tit.value = `Escala — ${nomeMes} de ${ano} — Defesa Civil de Ouro Branco`
+  tit.value = `Escala — ${nomeMes} de ${ano} — CODAP — Conselheiro Lafaiete`
   tit.font = { bold: true, size: 14, color: { argb: 'FFFFFFFF' } }
   tit.alignment = { vertical: 'middle', horizontal: 'center' }
   tit.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0F4C81' } }
@@ -3068,7 +3068,7 @@ async function exportarEscalaMensalExcel(dados: EscalaData, ano: number, mes: nu
   // Título da aba
   wsBH.mergeCells('A1:G1')
   const tbh = wsBH.getCell('A1')
-  tbh.value = `Banco de Horas — ${nomeMes} de ${ano} — Defesa Civil de Ouro Branco`
+  tbh.value = `Banco de Horas — ${nomeMes} de ${ano} — CODAP — Conselheiro Lafaiete`
   tbh.font = { bold: true, size: 13, color: { argb: 'FFFFFFFF' } }
   tbh.alignment = { vertical: 'middle', horizontal: 'center' }
   tbh.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0F4C81' } }
@@ -3269,7 +3269,7 @@ async function exportarEscalaMensalExcel(dados: EscalaData, ano: number, mes: nu
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
-  a.download = `escala_${String(mes + 1).padStart(2, '0')}-${ano}_defesacivil_ourobranco.xlsx`
+  a.download = `escala_${String(mes + 1).padStart(2, '0')}-${ano}_codap_conselheiro_lafaiete.xlsx`
   document.body.appendChild(a)
   a.click()
   document.body.removeChild(a)

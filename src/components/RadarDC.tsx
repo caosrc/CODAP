@@ -37,7 +37,7 @@ type DiaPrevisao = { data: string; codigo: number; temperaturaMax: number; tempe
 type HoraPrevisao = { time: string; codigo: number; temperatura: number; probabilidade: number; precipitacao: number; vento: number }
 type TempoDC = { atual: { codigo: number; temperatura: number; chuva: number; vento: number; rajada: number; umidade: number }; horas: HoraPrevisao[]; dias: DiaPrevisao[] }
 
-const OURO_BRANCO = { latitude: -20.5236, longitude: -43.6949 }
+const CONSELHEIRO_LAFAIETE = { latitude: -20.6604, longitude: -43.7863 }
 const nomesTempo: Record<number, string> = { 0: 'Céu limpo', 1: 'Predominantemente limpo', 2: 'Parcialmente nublado', 3: 'Nublado', 45: 'Neblina', 48: 'Neblina com gelo', 51: 'Garoa leve', 53: 'Garoa moderada', 55: 'Garoa intensa', 61: 'Chuva leve', 63: 'Chuva moderada', 65: 'Chuva forte', 71: 'Neve leve', 73: 'Neve moderada', 75: 'Neve forte', 80: 'Pancadas leves', 81: 'Pancadas moderadas', 82: 'Pancadas fortes', 95: 'Trovoada', 96: 'Trovoada com granizo', 99: 'Trovoada forte' }
 function horarioNoturno(time?: string) {
   const hora = Number(time?.slice(11, 13))
@@ -392,7 +392,7 @@ export default function RadarDC() {
     let ativo = true
     const carregarTempo = async () => {
       try {
-        const params = new URLSearchParams({ latitude: String(OURO_BRANCO.latitude), longitude: String(OURO_BRANCO.longitude), current: 'temperature_2m,weather_code,precipitation,relative_humidity_2m,wind_speed_10m,wind_gusts_10m', hourly: 'temperature_2m,weather_code,precipitation_probability,precipitation,wind_speed_10m', daily: 'weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max,relative_humidity_2m_min,wind_speed_10m_max,wind_gusts_10m_max', timezone: 'America/Sao_Paulo', forecast_days: '7', wind_speed_unit: 'kmh', precipitation_unit: 'mm' })
+        const params = new URLSearchParams({ latitude: String(CONSELHEIRO_LAFAIETE.latitude), longitude: String(CONSELHEIRO_LAFAIETE.longitude), current: 'temperature_2m,weather_code,precipitation,relative_humidity_2m,wind_speed_10m,wind_gusts_10m', hourly: 'temperature_2m,weather_code,precipitation_probability,precipitation,wind_speed_10m', daily: 'weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max,relative_humidity_2m_min,wind_speed_10m_max,wind_gusts_10m_max', timezone: 'America/Sao_Paulo', forecast_days: '7', wind_speed_unit: 'kmh', precipitation_unit: 'mm' })
          const res = await fetch('https://api.open-meteo.com/v1/forecast?' + params, { cache: 'no-store' })
         if (!res.ok) throw new Error('Serviço meteorológico indisponível.')
         const json = await res.json() as { current: Record<string, number>; hourly: Record<string, Array<string | number>>; daily: Record<string, Array<string | number>> }
@@ -627,7 +627,7 @@ export default function RadarDC() {
     <section className={`radar-page ${tv ? 'radar-tv' : ''}`}>
        <section className="radar-weather radar-weather-compact" aria-labelledby="radar-weather-title">
          <div className="radar-weather-bar">
-           <strong className="radar-weather-place" id="radar-weather-title">Ouro Branco – MG</strong>
+           <strong className="radar-weather-place" id="radar-weather-title">Conselheiro Lafaiete – MG</strong>
            {erroTempo && <span className="radar-weather-error">{erroTempo}</span>}
            {!tempo && !erroTempo && <span className="radar-weather-loading">Carregando previsão...</span>}
            {tempo && <div className="radar-weather-condition"><span>{iconeTempo(tempo.atual.codigo)}</span><div><strong>{Math.round(tempo.atual.temperatura)}°C</strong><b>{nomesTempo[tempo.atual.codigo] || 'Condição variável'}</b></div></div>}

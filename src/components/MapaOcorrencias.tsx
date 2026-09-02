@@ -225,8 +225,8 @@ function coordsSemGps(id: number): [number, number] {
   const angle = (seed * 137.508) * (Math.PI / 180)
   const r = 0.0012 + (seed % 20) * 0.00015
   return [
-    OURO_BRANCO[0] + r * Math.cos(angle),
-    OURO_BRANCO[1] + r * Math.sin(angle),
+    CONSELHEIRO_LAFAIETE[0] + r * Math.cos(angle),
+    CONSELHEIRO_LAFAIETE[1] + r * Math.sin(angle),
   ]
 }
 
@@ -460,7 +460,8 @@ function nomeDiaSemana(dateStr: string): string {
   return dias[d.getDay()]
 }
 
-const OURO_BRANCO: [number, number] = [-20.5195, -43.6983]
+// Centro de Conselheiro Lafaiete; o zoom inicial cobre o território municipal.
+const CONSELHEIRO_LAFAIETE: [number, number] = [-20.6604, -43.7863]
 const RAIO_RADAR_CHUVA_METROS = 10_000
 
 const MAX_TRILHA = 300
@@ -1003,7 +1004,7 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
     setStatusOffline('baixando')
     setProgressoMapa(null)
     try {
-      // Tiles num raio de 10 km do centro de Ouro Branco, zooms 11..17
+      // Tiles num raio de 10 km do centro de Conselheiro Lafaiete.
       await baixarMapaOffline((p) => {
         setProgressoMapa(p)
         if (p.status === 'concluido') setStatusOffline('concluido')
@@ -1042,7 +1043,7 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
   // Estratégia:
   //   1. Busca local na malha viária baixada (instantâneo, offline)
   //   2. Em paralelo, se online, consulta o Nominatim direto (sem proxy)
-  //      restringindo o viewbox a ~12 km ao redor de Ouro Branco
+  //      restringindo o viewbox ao território de Conselheiro Lafaiete
   //   3. Mescla resultados (locais primeiro, sem duplicatas)
   const buscaTokenRef = useRef(0)
   const buscarEndereco = useCallback(async (texto: string) => {
@@ -1067,10 +1068,10 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
     // 2. Nominatim direto (chama de fora porque em produção não há proxy)
     if (navigator.onLine) {
       try {
-        // Viewbox: ~12 km ao redor de Ouro Branco (-20.5195, -43.6983)
+        // Viewbox abrangendo Conselheiro Lafaiete e o território municipal.
         // Formato Nominatim: lonMin,latMax,lonMax,latMin (canto NW e SE)
-        const viewbox = '-43.81,-20.41,-43.58,-20.63'
-        const queryFinal = /ouro branco|mg|minas/i.test(q) ? q : `${q}, Ouro Branco, MG, Brasil`
+        const viewbox = '-43.90,-20.57,-43.67,-20.75'
+        const queryFinal = /conselheiro lafaiete|mg|minas/i.test(q) ? q : `${q}, Conselheiro Lafaiete, MG, Brasil`
         // Detecta se a query parece "rua + número" (ex.: "Rua das Flores, 123" ou "Av X 45")
         // Se sim, pede `addressdetails=1` para o Nominatim devolver o número do imóvel
         const temNumero = /\b\d{1,5}\b/.test(q)
@@ -1126,7 +1127,7 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
     return () => clearTimeout(t)
   }, [enderecoBusca, buscarEndereco])
 
-  // Calcula rota do ponto atual (GPS ou centro de Ouro Branco) até o destino.
+  // Calcula rota do ponto atual (GPS ou centro de Conselheiro Lafaiete) até o destino.
   // Estratégia: tenta roteamento local (Dijkstra na malha baixada) primeiro
   // — funciona offline e é instantâneo. Se não houver malha, cai para
   // OSRM público; se também falhar, desenha linha reta como último recurso.
@@ -1187,7 +1188,7 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
     buscaTokenRef.current++
     ignorarBuscaRef.current = true
     setEnderecoBusca(r.display.split(',')[0])
-    const origem: [number, number] = posicaoAtual ?? OURO_BRANCO
+    const origem: [number, number] = posicaoAtual ?? CONSELHEIRO_LAFAIETE
     calcularRota(origem, dest)
   }
 
@@ -1215,7 +1216,7 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
 
   // Quando o pai envia um destino externo (botão "Traçar rota de resgate" do SOS),
   // posiciona o pino, traça a rota a partir da posição GPS atual (ou do centro de
-  // Ouro Branco como fallback) e avisa o pai que já consumiu o destino.
+  // Conselheiro Lafaiete como fallback) e avisa o pai que já consumiu o destino.
   // Quando soMostrar=true (botão "Ver no Mapa" de equipamento em campo), apenas
   // centraliza no ponto sem calcular rota.
   useEffect(() => {
@@ -1234,7 +1235,7 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
       setRota([])
       setRotaInfo(null)
     } else {
-      const origem: [number, number] = posicaoAtual ?? OURO_BRANCO
+      const origem: [number, number] = posicaoAtual ?? CONSELHEIRO_LAFAIETE
       calcularRota(origem, dest)
     }
     onDestinoExternoConsumido?.()
@@ -1296,8 +1297,8 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
   return (
     <div className="mapa-wrapper">
       <MapContainer
-        center={OURO_BRANCO}
-        zoom={13}
+        center={CONSELHEIRO_LAFAIETE}
+        zoom={11}
         minZoom={11}
         // O mapa pode ser arrastado livremente para consultar outras regiões.
         dragging={true}
@@ -1367,7 +1368,7 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
         )}
         {mostrarChuva && (
           <Circle
-            center={OURO_BRANCO}
+            center={CONSELHEIRO_LAFAIETE}
             radius={RAIO_RADAR_CHUVA_METROS}
             pathOptions={{
               color: '#1d4ed8',
@@ -1381,13 +1382,13 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
             <Popup>
               <strong>Área de observação da chuva</strong>
               <br />
-              Raio de 10 km a partir do centro de Ouro Branco
+              Raio de 10 km a partir do centro de Conselheiro Lafaiete
             </Popup>
           </Circle>
         )}
         {mostrarChuva && (
           <CircleMarker
-            center={OURO_BRANCO}
+            center={CONSELHEIRO_LAFAIETE}
             radius={5}
             pathOptions={{
               color: '#0f172a',
@@ -1397,7 +1398,7 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
             }}
           >
             <Popup>
-              <strong>Centro de Ouro Branco</strong>
+              <strong>Centro de Conselheiro Lafaiete</strong>
               <br />
               Ponto usado para consultar a precipitação local.
             </Popup>
@@ -1624,7 +1625,7 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
           <span className="mapa-fogo-alerta-icone">🔥</span>
           <div className="mapa-fogo-alerta-texto">
             <strong>{focosIncendio.length} foco{focosIncendio.length > 1 ? 's' : ''} de incêndio</strong>
-            <span>detectado{focosIncendio.length > 1 ? 's' : ''} em Ouro Branco</span>
+            <span>detectado{focosIncendio.length > 1 ? 's' : ''} em Conselheiro Lafaiete</span>
           </div>
           <button
             className="mapa-fogo-alerta-ver"
@@ -1685,7 +1686,7 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
               if (!proximoEstado) setMostrarRRQPE(false)
             }}
             aria-pressed={mostrarChuva}
-            title="Mostrar radar de chuva ao vivo em Ouro Branco"
+            title="Mostrar radar de chuva ao vivo em Conselheiro Lafaiete"
           >
             🌧️ Chuva
           </button>
@@ -1694,7 +1695,7 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
               <div className="mapa-chuva-painel-header">
                 <div>
                   <strong>🌧️ Chuva ao vivo</strong>
-                  <span>Ouro Branco, MG · área tracejada = raio de observação de 10 km</span>
+                  <span>Conselheiro Lafaiete, MG · área tracejada = raio de observação de 10 km</span>
                 </div>
                 <button
                   onClick={() => setPainelChuvaAberto(false)}
@@ -1723,7 +1724,7 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
                 <>
                   <div className="mapa-chuva-resumo">
                     <div>
-                        <span className="mapa-chuva-resumo-label">Ponto central · Ouro Branco</span>
+                        <span className="mapa-chuva-resumo-label">Ponto central · Conselheiro Lafaiete</span>
                       <strong className={chuvaNoPonto?.precipitacao && chuvaNoPonto.precipitacao > 0 ? 'chovendo' : ''}>
                         {chuvaNoPonto?.precipitacao != null
                           ? chuvaNoPonto.precipitacao > 0
@@ -1871,7 +1872,7 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
                 ? 'Configure FIRMS_MAP_KEY ou autentique o Google Earth Engine para ativar'
                 : focosIncendio.length > 0
                   ? `${focosIncendio.length} foco(s) — ${focosFontes.join(' + ')} — ${focosAtualizadoEm ? new Date(focosAtualizadoEm).toLocaleTimeString('pt-BR') : ''}`
-                  : `Monitoramento via ${focosFontes.length > 0 ? focosFontes.join(' + ') : 'NASA FIRMS + Earth Engine'} — área oficial de Ouro Branco`
+                  : `Monitoramento via ${focosFontes.length > 0 ? focosFontes.join(' + ') : 'NASA FIRMS + Earth Engine'} — área oficial de Conselheiro Lafaiete`
             }
           >
             🔥 Incêndios{focosIncendio.length > 0 ? ` (${focosIncendio.length})` : ''}{focosConfigurado === false && !focosMonitoramento?.earthEngine?.configurado ? ' ⚠️' : ''}
@@ -1885,7 +1886,7 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
             <div>
               <strong>🛰️ Detecção de incêndio por satélite</strong>
               <span>
-  NASA FIRMS · Ouro Branco/MG
+  NASA FIRMS · Conselheiro Lafaiete/MG
   {focosAtualizadoEm
     ? ` · atualizado às ${new Date(focosAtualizadoEm).toLocaleTimeString('pt-BR')}`
     : ''}
@@ -2107,7 +2108,7 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
                   {rotaInfo.km.toFixed(1)} km · {rotaInfo.min} min
                 </span>
                 <span className="mapa-rota-info-origem">
-                  {posicaoAtual ? 'Saindo da sua posição GPS' : 'Saindo do centro de Ouro Branco — ative o GPS para rota real'}
+                  {posicaoAtual ? 'Saindo da sua posição GPS' : 'Saindo do centro de Conselheiro Lafaiete — ative o GPS para rota real'}
                 </span>
               </>
             )}
@@ -2210,7 +2211,7 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
       {painelOfflineAberto && (
         <div className="mapa-offline-painel">
           <div className="mapa-offline-painel-header">
-            <span>📥 Mapa Offline — Ouro Branco</span>
+            <span>📥 Mapa Offline — Conselheiro Lafaiete</span>
             <button onClick={() => setPainelOfflineAberto(false)}>✕</button>
           </div>
           <div className="mapa-offline-painel-corpo">
@@ -2245,7 +2246,7 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
                 disabled={!navigator.onLine}
               >
                 {navigator.onLine
-                  ? tilesCacheados > 0 ? '🔄 Atualizar mapa offline' : '📥 Salvar mapa de Ouro Branco'
+                  ? tilesCacheados > 0 ? '🔄 Atualizar mapa offline' : '📥 Salvar mapa de Conselheiro Lafaiete'
                   : '📵 Sem conexão para baixar'}
               </button>
             )}
@@ -2255,7 +2256,7 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
               </button>
             )}
             <div className="mapa-offline-aviso">
-              Cobre raio de 10 km ao redor do centro de Ouro Branco — MG (cidade + entorno imediato). O GPS funciona offline pelo hardware do aparelho.
+              Cobre raio de 10 km ao redor do centro de Conselheiro Lafaiete — MG (cidade + entorno imediato). O GPS funciona offline pelo hardware do aparelho.
             </div>
 
             {/* ── Malha viária offline (ruas + roteamento) ── */}

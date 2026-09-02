@@ -110,7 +110,7 @@ export async function adicionarMarcaDagua(
         if (useLat != null && useLng != null) {
           linhas.push(`${gmsCompacto(useLat, 'N', 'S')} ${gmsCompacto(useLng, 'L', 'O')}`)
         }
-        linhas.push('DEFESA CIVIL - OURO BRANCO')
+        linhas.push('CODAP - CONSELHEIRO LAFAIETE')
 
         const fontSize = Math.max(14, Math.round(drawW * 0.022))
         const lineHeight = fontSize * 1.45

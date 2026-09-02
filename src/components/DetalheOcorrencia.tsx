@@ -381,7 +381,7 @@ export default function DetalheOcorrencia({ ocorrencia: oc, onFechar, onDeletado
     const kml = `<?xml version="1.0" encoding="UTF-8"?>
 <kml xmlns="http://www.opengis.net/kml/2.2">
   <Document>
-    <name>Defesa Civil Ouro Branco — Ocorrência #${o.id}</name>
+    <name>CODAP — Conselheiro Lafaiete — Ocorrência #${o.id}</name>
     <Style id="areaQueimada">
       <LineStyle>
         <color>ff0000ff</color>

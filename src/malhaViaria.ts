@@ -1,5 +1,5 @@
 /**
- * Malha viária local (offline) — Defesa Civil de Ouro Branco
+ * Malha viária local (offline) — CODAP de Conselheiro Lafaiete
  *
  * Carrega o JSON da Overpass que o Service Worker pré-baixou
  * (`/__malha-viaria__`), constrói um grafo de nós e arestas das ruas e
@@ -207,7 +207,7 @@ export async function buscarRuas(query: string, limite = 8): Promise<ResultadoRu
     if (!pos) continue
     resultados.push({
       nome: nomeOriginal,
-      display: `${nomeOriginal.replace(/\b\w/g, (c) => c.toUpperCase())} — Ouro Branco, MG`,
+      display: `${nomeOriginal.replace(/\b\w/g, (c) => c.toUpperCase())} — Conselheiro Lafaiete, MG`,
       lat: pos.lat,
       lng: pos.lng,
       score,

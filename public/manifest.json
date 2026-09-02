@@ -1,7 +1,7 @@
 {
-  "name": "Defesa Civil Ouro Branco - MG",
-  "short_name": "Defesa Civil OB-MG",
-  "description": "Sistema de Vistorias da Defesa Civil de Ouro Branco - MG",
+  "name": "CODAP - Conselheiro Lafaiete - MG",
+  "short_name": "CODAP",
+  "description": "Sistema operacional de campo do CODAP em Conselheiro Lafaiete - MG",
   "id": "/",
   "start_url": "/",
   "scope": "/",
@@ -13,27 +13,27 @@
   "lang": "pt-BR",
   "icons": [
     {
-      "src": "/icon-192.png",
-      "sizes": "192x192",
-      "type": "image/png",
+      "src": "/codap-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
       "purpose": "any"
     },
     {
-      "src": "/icon-192-maskable.png",
-      "sizes": "192x192",
-      "type": "image/png",
+      "src": "/codap-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
       "purpose": "maskable"
     },
     {
-      "src": "/icon-512.png",
-      "sizes": "512x512",
-      "type": "image/png",
+      "src": "/codap-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
       "purpose": "any"
     },
     {
-      "src": "/icon-512-maskable.png",
-      "sizes": "512x512",
-      "type": "image/png",
+      "src": "/codap-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
       "purpose": "maskable"
     }
   ],

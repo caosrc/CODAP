@@ -220,31 +220,29 @@ export function clearFotosCampoPendentesPlano(planoId: string): Promise<void> {
 // Geocodificação via Nominatim (online) ou fallback offline
 // ------------------------------------------------------------------
 
-// Bairros / pontos de referência de Ouro Branco para geocodificação offline
-const REFERENCIAS_OURO_BRANCO: Record<string, { lat: number; lng: number }> = {
-  'centro':         { lat: -20.5195, lng: -43.6983 },
-  'bairro novo':    { lat: -20.5150, lng: -43.6950 },
-  'progresso':      { lat: -20.5220, lng: -43.7020 },
-  'são francisco':  { lat: -20.5180, lng: -43.6960 },
-  'ipanema':        { lat: -20.5230, lng: -43.7010 },
-  'santa rita':     { lat: -20.5160, lng: -43.7040 },
-  'prefeito':       { lat: -20.5195, lng: -43.6983 },
-  'praça':          { lat: -20.5195, lng: -43.6983 },
-  'cemitério':      { lat: -20.5250, lng: -43.6970 },
-  'usp':            { lat: -20.5120, lng: -43.6900 },
-  'usina':          { lat: -20.5050, lng: -43.6870 },
-  'belgo':          { lat: -20.5050, lng: -43.6870 },
-  'arcelor':        { lat: -20.5050, lng: -43.6870 },
-  'escola':         { lat: -20.5200, lng: -43.6990 },
-  'hospital':       { lat: -20.5210, lng: -43.7000 },
-  'prefeitura':     { lat: -20.5195, lng: -43.6983 },
-  'câmara':         { lat: -20.5195, lng: -43.6983 },
+// Bairros / pontos de referência de Conselheiro Lafaiete para geocodificação offline
+const REFERENCIAS_CONSELHEIRO_LAFAIETE: Record<string, { lat: number; lng: number }> = {
+  'centro':         { lat: -20.6604, lng: -43.7863 },
+  'são sebastião':  { lat: -20.6530, lng: -43.7800 },
+  'santa matilde':  { lat: -20.6680, lng: -43.7750 },
+  'queluz':         { lat: -20.6560, lng: -43.7960 },
+  'chapada':        { lat: -20.6490, lng: -43.8020 },
+  'progresso':      { lat: -20.6700, lng: -43.7900 },
+  'carijós':        { lat: -20.6620, lng: -43.7710 },
+  'siderúrgico':    { lat: -20.6740, lng: -43.8090 },
+  'prefeito':       { lat: -20.6604, lng: -43.7863 },
+  'praça':          { lat: -20.6604, lng: -43.7863 },
+  'cemitério':      { lat: -20.6650, lng: -43.7820 },
+  'escola':         { lat: -20.6600, lng: -43.7870 },
+  'hospital':       { lat: -20.6610, lng: -43.7840 },
+  'prefeitura':     { lat: -20.6604, lng: -43.7863 },
+  'câmara':         { lat: -20.6604, lng: -43.7863 },
 }
 
 // Retorna coordenadas por referência offline ou null
 function geocodificarOffline(endereco: string): { lat: number; lng: number } | null {
   const lower = endereco.toLowerCase()
-  for (const [chave, coords] of Object.entries(REFERENCIAS_OURO_BRANCO)) {
+  for (const [chave, coords] of Object.entries(REFERENCIAS_CONSELHEIRO_LAFAIETE)) {
     if (lower.includes(chave)) return coords
   }
   return null
@@ -253,11 +251,11 @@ function geocodificarOffline(endereco: string): { lat: number; lng: number } | n
 export async function geocodificarEndereco(endereco: string): Promise<{ lat: number; lng: number } | null> {
   // Tenta online via Nominatim
   if (navigator.onLine) {
-    const query = encodeURIComponent(`${endereco}, Ouro Branco, MG, Brasil`)
+    const query = encodeURIComponent(`${endereco}, Conselheiro Lafaiete, MG, Brasil`)
     try {
       const res = await fetch(
         `https://nominatim.openstreetmap.org/search?q=${query}&format=json&limit=1&countrycodes=br`,
-        { headers: { 'User-Agent': 'DefesaCivilOuroBranco/1.0 (defesacivil@ourobranco.mg.gov.br)' } }
+        { headers: { 'User-Agent': 'CODAP/1.0 (Conselheiro Lafaiete, MG)' } }
       )
       const data = await res.json()
       if (data.length > 0) {
@@ -283,7 +281,7 @@ export type ProgressoMapa = {
   status: 'iniciando' | 'andamento' | 'concluido' | 'erro'
 }
 
-// Envia mensagem ao SW para pré-cachear tiles de Ouro Branco
+// Envia mensagem ao SW para pré-cachear tiles de Conselheiro Lafaiete
 // Chama onProgresso com atualizações até status === 'concluido'.
 // Por padrão cobre raio de 10 km e zooms 11..17 (cidade + entorno imediato).
 export function baixarMapaOffline(
@@ -315,7 +313,7 @@ export function baixarMapaOffline(
 
     navigator.serviceWorker.addEventListener('message', handler)
     navigator.serviceWorker.controller.postMessage({
-      tipo: 'CACHEAR_MAPA_OURO_BRANCO',
+      tipo: 'CACHEAR_MAPA_CONSELHEIRO_LAFAIETE',
       zooms,
       raioKm,
     })

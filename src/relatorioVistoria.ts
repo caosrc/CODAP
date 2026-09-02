@@ -164,7 +164,7 @@ export async function gerarRelatorioVistoria(ocorrencia: Ocorrencia): Promise<Bl
     documentXml = documentXml
       .split('Talita Oliveira de Ara\u00FAjo').join('Cristiane Caroline Campos Lopes')
       .split('Talita Oliveira de Araújo').join('Cristiane Caroline Campos Lopes')
-      .split('Analista Ambiental').join('Engenheira Civil - Coordenadoria Municipal de Prote\u00E7\u00E3o e Defesa Civil')
+      .split('Analista Ambiental').join('Engenheira Civil - CODAP')
   }
 
   documentXml = documentXml

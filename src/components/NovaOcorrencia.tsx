@@ -21,7 +21,7 @@ import PoligonoAreaQueimada, { type PontoPoligono } from './PoligonoAreaQueimada
   })
 })()
 
-const OURO_BRANCO_CENTER: [number, number] = [-20.5264, -43.6947]
+const CONSELHEIRO_LAFAIETE_CENTER: [number, number] = [-20.6604, -43.7863]
 const RASCUNHO_KEY = 'dc_rascunho_nova_oc'
 
 function MapPickerClick({ onPick }: { onPick: (lat: number, lng: number) => void }) {
@@ -403,7 +403,7 @@ export default function NovaOcorrencia({ onSalvo, onVoltar, isOnline }: Props) {
       <header className="header">
         <button className="btn-voltar" onClick={onVoltar}>‹</button>
         <div className="header-logo-mini">
-          <img src="/logo-dc.jpg" alt="Defesa Civil" className="logo-img-mini" />
+          <span className="header-logo-mini-texto" aria-label="CODAP">C</span>
           <span className="header-titulo-texto">Nova Ocorrência</span>
         </div>
         <div style={{ width: 36 }}>
@@ -902,7 +902,7 @@ export default function NovaOcorrencia({ onSalvo, onVoltar, isOnline }: Props) {
 
           <div style={{ flex: 1, position: 'relative' }}>
             <MapContainer
-              center={latPicker && lngPicker ? [latPicker, lngPicker] : OURO_BRANCO_CENTER}
+              center={latPicker && lngPicker ? [latPicker, lngPicker] : CONSELHEIRO_LAFAIETE_CENTER}
               zoom={latPicker ? 16 : 14}
               style={{ height: '100%', width: '100%' }}
               zoomControl={true}

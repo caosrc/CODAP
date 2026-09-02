@@ -27,7 +27,7 @@ const ORGAOS_EMPENHO: { categoria: string; emoji: string; orgaos: { emoji: strin
     { emoji: '🚒', nome: 'Corpo de Bombeiros' },
     { emoji: '🚑', nome: 'SAMU' },
     { emoji: '🧯', nome: 'Brigada de Incêndio' },
-    { emoji: '⛑️', nome: 'Defesa Civil' },
+    { emoji: '⛑️', nome: 'CODAP' },
     { emoji: '🏥', nome: 'Equipe Médica' },
     { emoji: '🩺', nome: 'Vigilância Sanitária' },
     { emoji: '🛟', nome: 'Resgate Aquático' },
@@ -442,7 +442,7 @@ const PRE_LISTAS: { nome: string; emoji: string; itens: { emoji: string; label: 
   ]},
 ]
 
-const OURO_BRANCO_CENTER: [number, number] = [-20.5195, -43.6983]
+const CONSELHEIRO_LAFAIETE_CENTER: [number, number] = [-20.6604, -43.7863]
 // Coordenada padrão para fotos sem GPS: 20° 30' 54,72" S  43° 41' 27,64" W
 const LAT_FOTO_PADRAO = -(20 + 30 / 60 + 54.72 / 3600)  // -20.51520
 const LNG_FOTO_PADRAO = -(43 + 41 / 60 + 27.64 / 3600)  // -43.69101
@@ -773,7 +773,7 @@ function MapaPickerModal({
   )
   const centro: [number, number] = marcado
     ? [marcado.lat, marcado.lng]
-    : lat && lng ? [lat, lng] : OURO_BRANCO_CENTER
+    : lat && lng ? [lat, lng] : CONSELHEIRO_LAFAIETE_CENTER
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 2500, display: 'flex', flexDirection: 'column', background: '#1a4b8c' }}>
@@ -821,8 +821,8 @@ function MapaPickerModal({
             </Marker>
           )}
           {!marcado && (
-            <Marker position={OURO_BRANCO_CENTER} icon={criarIconeCentro()}>
-              <Popup>🏙️ Centro de Ouro Branco</Popup>
+            <Marker position={CONSELHEIRO_LAFAIETE_CENTER} icon={criarIconeCentro()}>
+              <Popup>🏙️ Centro de Conselheiro Lafaiete</Popup>
             </Marker>
           )}
         </MapContainer>
@@ -877,7 +877,7 @@ function MapaDetalhe({
   const [posGpsLocal, setPosGpsLocal] = useState<{ lat: number; lng: number; precisao: number } | null>(null)
   const [gpsFlyKey, setGpsFlyKey] = useState(0)
   const watchIdLocalRef = useRef<number | null>(null)
-  const centro: [number, number] = plano.lat && plano.lng ? [plano.lat, plano.lng] : OURO_BRANCO_CENTER
+  const centro: [number, number] = plano.lat && plano.lng ? [plano.lat, plano.lng] : CONSELHEIRO_LAFAIETE_CENTER
 
   useEffect(() => {
     return () => {
@@ -1081,7 +1081,7 @@ function MapaDetalhe({
                       const ativo = itemSelecionado === key
                       return (
                         <button key={orgao} onClick={() => setItemSelecionado(ativo ? null : key)} style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', background: ativo ? '#1e40af' : '#dbeafe', color: ativo ? 'white' : '#1e3a8a', border: ativo ? '1.5px solid #1e40af' : '1.5px solid #bfdbfe', borderRadius: 20, padding: '0.22rem 0.6rem', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer', boxShadow: ativo ? '0 0 0 2px #93c5fd' : 'none' }}>
-                          {orgaoInfo?.nome === 'Defesa Civil' ? <img src="/logo-dc.png" style={{ width: 14, height: 14, objectFit: 'contain' }} alt="" /> : <span style={{ fontSize: '0.88rem' }}>{emoji}</span>}
+                          {orgaoInfo?.nome === 'CODAP' ? <span style={{ fontSize: '0.78rem', fontWeight: 900 }}>C</span> : <span style={{ fontSize: '0.88rem' }}>{emoji}</span>}
                           {orgaoInfo?.nome ?? orgao}{ativo && <span style={{ fontSize: '0.6rem' }}>📍</span>}
                         </button>
                       )
@@ -1092,14 +1092,14 @@ function MapaDetalhe({
           )}
         </div>
 
-        {/* ── Seção: Agentes da Defesa Civil (recolhível) ── */}
+        {/* ── Seção: Agentes do CODAP (recolhível) ── */}
         <div style={{ borderBottom: '1px solid #e5e7eb' }}>
           <button
             onClick={() => setSecaoAberta(secaoAberta === 'agentes' ? null : 'agentes')}
             style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.4rem 0.75rem', background: secaoAberta === 'agentes' ? 'linear-gradient(90deg,#065f46,#059669)' : '#f0fdf4', border: 'none', cursor: 'pointer', textAlign: 'left' }}
           >
             <span style={{ fontSize: '0.88rem' }}>🧑‍🚒</span>
-            <span style={{ fontSize: '0.72rem', fontWeight: 800, color: secaoAberta === 'agentes' ? 'white' : '#166534', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Agentes da Defesa Civil</span>
+            <span style={{ fontSize: '0.72rem', fontWeight: 800, color: secaoAberta === 'agentes' ? 'white' : '#166534', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Agentes do CODAP</span>
             <span style={{ marginLeft: 'auto', background: secaoAberta === 'agentes' ? 'rgba(255,255,255,0.22)' : '#bbf7d0', color: secaoAberta === 'agentes' ? 'white' : '#166534', borderRadius: 10, fontSize: '0.62rem', fontWeight: 700, padding: '0.05rem 0.4rem' }}>
               {(plano.agentesDefesaCivil ?? []).length}
             </span>
@@ -1627,8 +1627,8 @@ function OrgaosPanel({ selecionados, onChange }: { selecionados: string[]; onCha
                       onClick={() => toggle(k)}
                       style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', background: sel ? '#1e40af' : '#f1f5ff', color: sel ? 'white' : '#1e3a8a', border: sel ? '1.5px solid #1e40af' : '1.5px solid #dbeafe', borderRadius: 7, padding: '0.3rem 0.45rem', fontSize: '0.73rem', fontWeight: 600, cursor: 'pointer', textAlign: 'left' }}
                     >
-                      {o.nome === 'Defesa Civil' ? (
-                        <img src="/logo-dc.png" style={{ width: 18, height: 18, objectFit: 'contain', flexShrink: 0, borderRadius: 3 }} />
+                      {o.nome === 'CODAP' ? (
+                        <span style={{ fontSize: '0.78rem', fontWeight: 900, flexShrink: 0 }}>C</span>
                       ) : (
                         <span style={{ fontSize: '0.9rem', lineHeight: 1, flexShrink: 0 }}>{o.emoji}</span>
                       )}
@@ -1750,7 +1750,7 @@ function exportarPDF(plano: Plano, mapCenter?: [number, number], mapZoom?: numbe
           <div style="border-bottom:3px solid #1a4b8c;padding-bottom:10px;margin-bottom:18px;display:flex;align-items:center;justify-content:space-between">
             <div>
               <div style="font-size:16px;font-weight:800;color:#1a4b8c">📸 ${LABEL_FOTOS_TIPO[plano.tipo]} — Página ${numPag}</div>
-              <div style="font-size:11px;color:#6b7280">${plano.nome} — Defesa Civil Ouro Branco</div>
+              <div style="font-size:11px;color:#6b7280">${plano.nome} — CODAP — Conselheiro Lafaiete</div>
             </div>
             <div style="font-size:10px;color:#9ca3af">Fotos ${i + 1}–${Math.min(i + 4, todasFotos.length)} de ${todasFotos.length}</div>
           </div>
@@ -1775,7 +1775,7 @@ function exportarPDF(plano: Plano, mapCenter?: [number, number], mapZoom?: numbe
 
   const html = `<!DOCTYPE html>
 <html lang="pt-BR"><head><meta charset="UTF-8">
-<title>${plano.nome} — Defesa Civil Ouro Branco</title>
+<title>${plano.nome} — CODAP — Conselheiro Lafaiete</title>
 <script>window.addEventListener('afterprint', function(){ setTimeout(function(){ window.close(); }, 300); });<\/script>
 <style>
   *{box-sizing:border-box;margin:0;padding:0}
@@ -1808,7 +1808,7 @@ function exportarPDF(plano: Plano, mapCenter?: [number, number], mapZoom?: numbe
 <div class="header">
   <div>
     <h1>${cfg.emoji} ${plano.nome}</h1>
-    <div class="sub">Defesa Civil Ouro Branco — ${cfg.label} | Emitido em ${dataEmissao}</div>
+    <div class="sub">CODAP — Conselheiro Lafaiete — ${cfg.label} | Emitido em ${dataEmissao}</div>
   </div>
   <div class="logo">🛡️</div>
 </div>
@@ -1861,7 +1861,7 @@ ${plano.conclusao ? `<div class="section" style="border-left:4px solid #059669;b
 </div>` : ''}
 
 <div class="footer">
-  <span>Defesa Civil Ouro Branco — Sistema de Gerenciamento de Ocorrências</span>
+  <span>CODAP — Conselheiro Lafaiete — Sistema de Gerenciamento de Ocorrências</span>
   <span>Emitido em ${dataEmissao}</span>
 </div>
 
@@ -1874,7 +1874,7 @@ ${(plano.lat && plano.lng) || plano.itensMapa.length > 0 || (plano.pontosExtras 
   <div style="border-bottom:3px solid #1a4b8c;padding-bottom:10px;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between">
     <div>
       <div style="font-size:16px;font-weight:800;color:#1a4b8c">🗺️ Mapa de Planejamento Operacional</div>
-      <div style="font-size:11px;color:#6b7280">${plano.nome} — Defesa Civil Ouro Branco</div>
+      <div style="font-size:11px;color:#6b7280">${plano.nome} — CODAP — Conselheiro Lafaiete</div>
     </div>
     <div style="font-size:10px;color:#9ca3af">Emitido em ${dataEmissao}</div>
   </div>
@@ -2246,7 +2246,7 @@ function FormularioPlano({
           <div className="plan-form-secao">🏛️ Órgãos Empenhados</div>
           <OrgaosPanel selecionados={equipe} onChange={setEquipe} />
 
-          <div className="plan-form-secao">🧑‍🚒 Agentes da Defesa Civil</div>
+          <div className="plan-form-secao">🧑‍🚒 Agentes do CODAP</div>
           <div style={{ background: '#f0fdf4', border: '1.5px solid #bbf7d0', borderRadius: 10, padding: '0.6rem 0.7rem', marginBottom: '0.3rem' }}>
             <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#166534', marginBottom: '0.45rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
               Selecione os agentes escalados para este planejamento
@@ -2499,7 +2499,7 @@ function PrevisaoTempoCompleta({ lat, lng, data, horario }: { lat: number; lng: 
 async function exportarEventoExcel(plano: Plano) {
   const ExcelJS = (await import('exceljs')).default
   const wb = new ExcelJS.Workbook()
-  wb.creator = 'Defesa Civil Ouro Branco'
+  wb.creator = 'CODAP - Conselheiro Lafaiete'
   const ws = wb.addWorksheet('Evento', { pageSetup: { paperSize: 9, orientation: 'portrait' } })
 
   ws.columns = [
@@ -2511,7 +2511,7 @@ async function exportarEventoExcel(plano: Plano) {
   const estiloSecao = { font: { bold: true, size: 10, color: { argb: 'FFFFFFFF' } }, fill: { type: 'pattern' as const, pattern: 'solid' as const, fgColor: { argb: 'FF059669' } } }
   const estiloLabel = { font: { bold: true, size: 9, color: { argb: 'FF374151' } }, fill: { type: 'pattern' as const, pattern: 'solid' as const, fgColor: { argb: 'FFF1F5F9' } } }
 
-  const r1 = ws.addRow(['Defesa Civil Ouro Branco — ' + plano.nome, ''])
+  const r1 = ws.addRow(['CODAP — Conselheiro Lafaiete — ' + plano.nome, ''])
   ws.mergeCells(`A${r1.number}:B${r1.number}`)
   Object.assign(r1.getCell(1), estiloTitulo)
   r1.height = 22
@@ -2873,8 +2873,8 @@ function DetalheP({
         )
         lat = pos.coords.latitude
         lng = pos.coords.longitude
-      } catch { /* GPS indisponível — usa coordenada padrão de Ouro Branco */ }
-      // Se não obteve GPS, posiciona no centro de Ouro Branco para poder editar depois
+      } catch { /* GPS indisponível — usa coordenada padrão de Conselheiro Lafaiete */ }
+      // Se não obteve GPS, posiciona no centro de Conselheiro Lafaiete para poder editar depois
       if (lat === null || lng === null) {
         lat = LAT_FOTO_PADRAO
         lng = LNG_FOTO_PADRAO
@@ -3273,8 +3273,8 @@ function DetalheP({
         {planoLocal.dataInicio && (
           <div style={{ position: 'relative', zIndex: 1000 }}>
             <PrevisaoTempoCompleta
-              lat={planoLocal.lat ?? OURO_BRANCO_CENTER[0]}
-              lng={planoLocal.lng ?? OURO_BRANCO_CENTER[1]}
+              lat={planoLocal.lat ?? CONSELHEIRO_LAFAIETE_CENTER[0]}
+              lng={planoLocal.lng ?? CONSELHEIRO_LAFAIETE_CENTER[1]}
               data={planoLocal.dataInicio}
               horario={planoLocal.horario}
             />
@@ -3841,7 +3841,7 @@ function MapaSecaoPlanos({
   const planoCentral = planosDoTipo.find(p => p.lat && p.lng)
   const centro: [number, number] = planoCentral?.lat && planoCentral?.lng
     ? [planoCentral.lat, planoCentral.lng]
-    : OURO_BRANCO_CENTER
+    : CONSELHEIRO_LAFAIETE_CENTER
 
   const todosOrgaos = [...new Set(planosDoTipo.flatMap(p => p.equipe))]
   const todosMateriais = planosDoTipo.flatMap(p => p.materiais)

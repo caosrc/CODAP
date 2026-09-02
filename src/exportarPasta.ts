@@ -99,7 +99,7 @@ function gerarDocxXml(o: Ocorrencia): string {
 
   const paragrafos = [
     par('Relatorio Simplificado de Ocorrencia', true),
-    par('Defesa Civil — Ouro Branco, MG', true),
+    par('CODAP — Conselheiro Lafaiete, MG', true),
     parVazio(),
     o.data_ocorrencia
       ? bloco('📅', 'Data da Ocorrencia', dataExtenso(o.data_ocorrencia))

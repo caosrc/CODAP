@@ -135,7 +135,7 @@ async function enviarPushSosServidor(msg) {
       ? `📍 ${Number(msg.lat).toFixed(4)}, ${Number(msg.lng).toFixed(4)}`
       : 'Localização em apuração'
     const payload = JSON.stringify({
-      title: '🆘 SOS — Defesa Civil Ouro Branco',
+      title: '🆘 SOS — CODAP',
       body: `${msg.agente} acionou o SOS! ${localPart}`,
       tag: `sos-${msg.id}`,
       sosId: msg.id,
@@ -216,7 +216,7 @@ async function notificarEventosDoDia() {
       if (!agentes.length) continue
       const payload = JSON.stringify({
         title: `📸 Evento hoje: ${p.nome}`,
-        body: 'Registre fotos do evento no aplicativo da Defesa Civil!',
+        body: 'Registre fotos do evento no aplicativo CODAP!',
         tag: `evento-dia-${p.id}-${hoje}`,
         tipo: 'evento_dia',
         url: '/',
@@ -666,7 +666,7 @@ async function gerarRelatorioVistoria(ocorrencia) {
     documentXml = documentXml
       .split('Talita Oliveira de Ara\u00FAjo').join('Cristiane Caroline Campos Lopes')
       .split('Talita Oliveira de Araújo').join('Cristiane Caroline Campos Lopes')
-      .split('Analista Ambiental').join('Engenheira Civil - Coordenadoria Municipal de Prote\u00E7\u00E3o e Defesa Civil')
+      .split('Analista Ambiental').join('Engenheira Civil - CODAP')
   }
 
   documentXml = documentXml
@@ -1585,7 +1585,7 @@ app.post('/api/push/escala', async (req, res) => {
     const remetenteInfo = remetente ? `${remetente} convocou você` : 'Você foi escalado'
     const notifBody = `${remetenteInfo} para o ${tipoLabel}: ${planoNome}${dataInfo}${horarioInfo}. Confirme sua presença no app.`
     const payload = JSON.stringify({
-      title: '🗓️ Convocação — Defesa Civil',
+      title: '🗓️ Convocação — CODAP',
       body: notifBody,
       tag: `escala-${planoId}`,
       tipo: 'escala',
@@ -1686,42 +1686,56 @@ const FONTES_FOGO_CATALOGO = [
   },
 ]
 
-// Polígono oficial do município de Ouro Branco - MG (IBGE 3145901)
-// Fonte: servicodados.ibge.gov.br — resolução 5 (29 vértices)
-const OURO_BRANCO_POLIGONO = [
-  [-20.58410, -43.60130],
-  [-20.59710, -43.62220],
-  [-20.58790, -43.63630],
-  [-20.59360, -43.65400],
-  [-20.62150, -43.67870],
-  [-20.59990, -43.68800],
-  [-20.58820, -43.72000],
-  [-20.60100, -43.74160],
-  [-20.56720, -43.76480],
-  [-20.56960, -43.77440],
-  [-20.53800, -43.79980],
-  [-20.53410, -43.79190],
-  [-20.54800, -43.75790],
-  [-20.56440, -43.73460],
-  [-20.55200, -43.70290],
-  [-20.53830, -43.71100],
-  [-20.52150, -43.74400],
-  [-20.51240, -43.73640],
-  [-20.49950, -43.76630],
-  [-20.46020, -43.74780],
-  [-20.46140, -43.71210],
-  [-20.43150, -43.68740],
-  [-20.43330, -43.66160],
-  [-20.47150, -43.62430],
-  [-20.48700, -43.58930],
-  [-20.50870, -43.58010],
-  [-20.54090, -43.59760],
-  [-20.56200, -43.60060],
-  [-20.57520, -43.59010],
+// Polígono oficial simplificado do município de Conselheiro Lafaiete - MG
+// (IBGE 3118304; redução preservando a forma do limite municipal).
+const CONSELHEIRO_LAFAIETE_POLIGONO = [
+  [-20.65880, -43.92390], [-20.65840, -43.91770], [-20.66480, -43.91540],
+  [-20.66000, -43.90870], [-20.66650, -43.90290], [-20.66530, -43.89400],
+  [-20.67210, -43.88520], [-20.67170, -43.88030], [-20.67660, -43.87510],
+  [-20.68940, -43.87180], [-20.69090, -43.86950], [-20.68940, -43.86370],
+  [-20.69910, -43.85290], [-20.70150, -43.85260], [-20.70490, -43.85660],
+  [-20.70840, -43.85560], [-20.71070, -43.85010], [-20.71340, -43.84950],
+  [-20.70930, -43.84740], [-20.70990, -43.84570], [-20.72000, -43.83920],
+  [-20.72250, -43.83200], [-20.72630, -43.83240], [-20.73310, -43.82660],
+  [-20.73710, -43.80610], [-20.74160, -43.80280], [-20.74660, -43.80260],
+  [-20.75190, -43.80770], [-20.75620, -43.82030], [-20.77250, -43.81940],
+  [-20.78360, -43.80440], [-20.78440, -43.79690], [-20.79050, -43.79290],
+  [-20.79560, -43.79290], [-20.80100, -43.77280], [-20.79580, -43.76840],
+  [-20.78960, -43.76850], [-20.78380, -43.75980], [-20.77890, -43.75800],
+  [-20.77390, -43.75690], [-20.76710, -43.76120], [-20.76330, -43.75820],
+  [-20.75490, -43.76070], [-20.75830, -43.75520], [-20.75580, -43.74170],
+  [-20.74750, -43.72980], [-20.74410, -43.71910], [-20.73870, -43.71730],
+  [-20.73030, -43.70910], [-20.72880, -43.70060], [-20.72290, -43.69490],
+  [-20.72350, -43.69210], [-20.71320, -43.69190], [-20.70970, -43.69720],
+  [-20.70390, -43.69920], [-20.69720, -43.69780], [-20.69480, -43.69410],
+  [-20.68310, -43.69450], [-20.67120, -43.68820], [-20.66290, -43.68800],
+  [-20.64710, -43.70170], [-20.64360, -43.70230], [-20.63930, -43.71050],
+  [-20.63600, -43.70900], [-20.63700, -43.70600], [-20.63390, -43.69720],
+  [-20.62580, -43.69020], [-20.63090, -43.68090], [-20.62150, -43.67880],
+  [-20.61470, -43.68010], [-20.60790, -43.68750], [-20.59780, -43.68990],
+  [-20.59610, -43.70170], [-20.58810, -43.71430], [-20.58820, -43.72000],
+  [-20.59270, -43.72780], [-20.59180, -43.73260], [-20.60050, -43.74300],
+  [-20.59880, -43.74570], [-20.58680, -43.75600], [-20.57970, -43.75880],
+  [-20.57620, -43.75710], [-20.57590, -43.75930], [-20.56880, -43.76180],
+  [-20.56720, -43.76770], [-20.57010, -43.77350], [-20.56390, -43.77420],
+  [-20.56130, -43.78110], [-20.55280, -43.78320], [-20.55340, -43.78670],
+  [-20.53800, -43.79980], [-20.54560, -43.80950], [-20.54760, -43.80860],
+  [-20.55010, -43.81290], [-20.55580, -43.81330], [-20.57080, -43.80940],
+  [-20.57360, -43.81150], [-20.57770, -43.80450], [-20.58630, -43.80570],
+  [-20.59220, -43.79890], [-20.59290, -43.80960], [-20.59810, -43.81170],
+  [-20.59240, -43.82250], [-20.60360, -43.83050], [-20.60480, -43.83490],
+  [-20.60180, -43.83680], [-20.60130, -43.84510], [-20.60380, -43.85080],
+  [-20.61290, -43.85480], [-20.61850, -43.87270], [-20.61080, -43.88340],
+  [-20.59830, -43.88880], [-20.60010, -43.89330], [-20.59550, -43.89670],
+  [-20.59350, -43.90360], [-20.59800, -43.90380], [-20.60360, -43.90950],
+  [-20.60490, -43.90640], [-20.61260, -43.90830], [-20.61730, -43.91380],
+  [-20.62460, -43.91660], [-20.62980, -43.92600], [-20.63620, -43.92890],
+  [-20.63760, -43.92760], [-20.64200, -43.92990], [-20.64420, -43.92360],
+  [-20.64990, -43.92590], [-20.65480, -43.92240],
 ]
 
 function pontoNoCidade(lat, lng) {
-  const poly = OURO_BRANCO_POLIGONO
+  const poly = CONSELHEIRO_LAFAIETE_POLIGONO
   let inside = false
   for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
     const [yi, xi] = poly[i]
@@ -2010,7 +2024,7 @@ app.get('/api/focos-incendio', async (_req, res) => {
     }
 
     // bbox: oeste,sul,leste,norte — IBGE 3145901 com margem ~5 km
-    const bbox = '-43.85,-20.67,-43.53,-20.38'
+    const bbox = '-43.95,-20.83,-43.66,-20.51'
     const base = `https://firms.modaps.eosdis.nasa.gov/api/area/csv/${firmsKey}`
     const SIG = 8000 // timeout por satélite (ms)
 
@@ -2064,7 +2078,7 @@ app.get('/api/focos-incendio', async (_req, res) => {
     const atualizadoEm = new Date().toISOString()
 
     console.log(
-      `[focos-incendio] SNPP:${brutos['VIIRS-SNPP']??'-'} N20:${brutos['VIIRS-N20']??'-'} N21:${brutos['VIIRS-N21']??'-'} MODIS:${brutos['MODIS']??'-'} → Ouro Branco: ${focos.length}`
+      `[focos-incendio] SNPP:${brutos['VIIRS-SNPP']??'-'} N20:${brutos['VIIRS-N20']??'-'} N21:${brutos['VIIRS-N21']??'-'} MODIS:${brutos['MODIS']??'-'} → Conselheiro Lafaiete: ${focos.length}`
     )
     res.json({
       focos,
@@ -2695,7 +2709,7 @@ app.post('/api/send-sos-push', async (req, res) => {
     ? `📍 ${Number(body.lat).toFixed(5)}, ${Number(body.lng).toFixed(5)}`
     : 'Localização indisponível'
   const payload = JSON.stringify({
-    title: '🆘 SOS — Defesa Civil',
+    title: '🆘 SOS — CODAP',
     body: `${body.agente} acionou o SOS. ${localPart}`,
     tag: `sos-${body.id}`,
     sosId: body.id,
@@ -2747,7 +2761,7 @@ app.get('/api/tiles/:z/:x/:y', async (req, res) => {
   try {
     const response = await fetch(tileUrl, {
       headers: {
-        'User-Agent': 'DefesaCivilOuroBranco/1.0 (defesacivil@ourobranco.mg.gov.br)',
+        'User-Agent': 'CODAP/1.0 (Conselheiro Lafaiete, MG)',
         'Accept': 'image/png,image/*,*/*;q=0.8',
       },
       signal: AbortSignal.timeout(10000),
@@ -2774,10 +2788,10 @@ app.get('/api/geocode', async (req, res) => {
   const cached = geocodeCache.get(chave)
   if (cached && (agora - cached.ts) < GEOCODE_TTL_MS) return res.json(cached.data)
   try {
-    const queryFinal = /ouro branco|mg|minas/i.test(q) ? q : `${q}, Ouro Branco, MG, Brasil`
+    const queryFinal = /conselheiro lafaiete|mg|minas/i.test(q) ? q : `${q}, Conselheiro Lafaiete, MG, Brasil`
     const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(queryFinal)}&format=json&limit=6&addressdetails=0&countrycodes=br&accept-language=pt-BR`
     const resp = await fetch(url, {
-      headers: { 'User-Agent': 'DefesaCivilOuroBranco/1.0', 'Accept-Language': 'pt-BR' },
+      headers: { 'User-Agent': 'CODAP/1.0 (Conselheiro Lafaiete, MG)', 'Accept-Language': 'pt-BR' },
     })
     if (!resp.ok) return res.status(502).json({ erro: 'Nominatim retornou ' + resp.status })
     const data = await resp.json()
@@ -2804,7 +2818,7 @@ app.get('/api/rota', async (req, res) => {
   }
   try {
     const url = `https://router.project-osrm.org/route/v1/driving/${from[1]},${from[0]};${to[1]},${to[0]}?overview=full&geometries=geojson`
-    const resp = await fetch(url, { headers: { 'User-Agent': 'DefesaCivilOuroBranco/1.0' } })
+    const resp = await fetch(url, { headers: { 'User-Agent': 'CODAP/1.0 (Conselheiro Lafaiete, MG)' } })
     if (!resp.ok) return res.status(502).json({ erro: 'OSRM retornou ' + resp.status })
     const json = await resp.json()
     const r = json?.routes?.[0]
@@ -2818,8 +2832,8 @@ app.get('/api/rota', async (req, res) => {
 })
 
 // ── Weather / Previsão horária ────────────────────────────────────────────────
-const OURO_BRANCO_LAT = -20.5195
-const OURO_BRANCO_LON = -43.6983
+const CONSELHEIRO_LAFAIETE_LAT = -20.6604
+const CONSELHEIRO_LAFAIETE_LON = -43.7863
 const INMET_ESTACAO_OB = 'A513'
 
 let climaCache = null
@@ -2828,8 +2842,8 @@ const CLIMA_TTL_MS = 10 * 60 * 1000
 
 async function buscarPrevisaoOpenMeteo() {
   const params = new URLSearchParams({
-    latitude: String(OURO_BRANCO_LAT),
-    longitude: String(OURO_BRANCO_LON),
+    latitude: String(CONSELHEIRO_LAFAIETE_LAT),
+    longitude: String(CONSELHEIRO_LAFAIETE_LON),
 
     timezone: 'America/Sao_Paulo',
     forecast_days: '7',
@@ -2950,9 +2964,9 @@ async function buscarPrevisaoOpenMeteo() {
     .sort((a, b) => b.probabilidadeChuva - a.probabilidadeChuva)[0] ?? null
 
   return {
-    local: 'Ouro Branco - MG',
-    latitude: OURO_BRANCO_LAT,
-    longitude: OURO_BRANCO_LON,
+    local: 'Conselheiro Lafaiete - MG',
+    latitude: CONSELHEIRO_LAFAIETE_LAT,
+    longitude: CONSELHEIRO_LAFAIETE_LON,
 
     timezone: json.timezone,
 
@@ -3234,15 +3248,15 @@ app.get('/api/monitoramento-cnl', async (_req, res) => {
     const [catalogoResposta, horarioResposta, nivelResposta] = await Promise.all([
       fetch(CNL_CATALOGO_URL, {
         signal: controlador.signal,
-        headers: { 'User-Agent': 'DefesaCivilOuroBranco/1.0' },
+        headers: { 'User-Agent': 'CODAP/1.0 (Conselheiro Lafaiete, MG)' },
       }),
       fetch(`${CNL_RECURSOS_URL}/horario/${CNL_ESTACAO_ID}/23`, {
         signal: controlador.signal,
-        headers: { 'User-Agent': 'DefesaCivilOuroBranco/1.0' },
+        headers: { 'User-Agent': 'CODAP/1.0 (Conselheiro Lafaiete, MG)' },
       }),
       fetch(CNL_NIVEL_URL, {
         signal: controlador.signal,
-        headers: { 'User-Agent': 'DefesaCivilOuroBranco/1.0' },
+        headers: { 'User-Agent': 'CODAP/1.0 (Conselheiro Lafaiete, MG)' },
       }),
     ])
     if (!catalogoResposta.ok || !horarioResposta.ok || !nivelResposta.ok) {
@@ -3270,7 +3284,7 @@ app.get('/api/monitoramento-cnl', async (_req, res) => {
         .map(async (id) => {
           const resposta = await fetch(`${CNL_RECURSOS_URL}/horario/${id}/47`, {
             signal: controlador.signal,
-            headers: { 'User-Agent': 'DefesaCivilOuroBranco/1.0' },
+            headers: { 'User-Agent': 'CODAP/1.0 (Conselheiro Lafaiete, MG)' },
           })
           if (!resposta.ok) throw new Error(`estação ${id} respondeu ${resposta.status}`)
           return { id, payload: await resposta.json() }
@@ -3464,17 +3478,17 @@ app.get('/api/rrqpe', (_req, res) => {
   })
 })
 
-// Limite oficial do município, usado para destacar a área de Ouro Branco sobre
+// Limite oficial do município, usado para destacar a área de Conselheiro Lafaiete sobre
 // o radar. Mantemos cache longo para não sobrecarregar o Nominatim.
-let limiteOuroBrancoCache = null
-let limiteOuroBrancoCacheTs = 0
-const LIMITE_OURO_BRANCO_TTL_MS = 24 * 60 * 60 * 1000
+let limiteConselheiroLafaieteCache = null
+let limiteConselheiroLafaieteCacheTs = 0
+const LIMITE_CONSELHEIRO_LAFAIETE_TTL_MS = 24 * 60 * 60 * 1000
 
-app.get('/api/limite-ouro-branco', async (_req, res) => {
+app.get('/api/limite-conselheiro-lafaiete', async (_req, res) => {
   try {
     const agora = Date.now()
-    if (limiteOuroBrancoCache && (agora - limiteOuroBrancoCacheTs) < LIMITE_OURO_BRANCO_TTL_MS) {
-      return res.json(limiteOuroBrancoCache)
+    if (limiteConselheiroLafaieteCache && (agora - limiteConselheiroLafaieteCacheTs) < LIMITE_CONSELHEIRO_LAFAIETE_TTL_MS) {
+      return res.json(limiteConselheiroLafaieteCache)
     }
 
     const params = new URLSearchParams({
@@ -3483,11 +3497,11 @@ app.get('/api/limite-ouro-branco', async (_req, res) => {
       limit: '1',
       country: 'Brazil',
       state: 'Minas Gerais',
-      city: 'Ouro Branco',
+      city: 'Conselheiro Lafaiete',
     })
     const resposta = await fetch(`https://nominatim.openstreetmap.org/search?${params}`, {
       headers: {
-        'User-Agent': 'DefesaCivilOuroBranco/1.0',
+        'User-Agent': 'CODAP/1.0 (Conselheiro Lafaiete, MG)',
         'Accept-Language': 'pt-BR',
         Accept: 'application/json',
       },
@@ -3501,12 +3515,12 @@ app.get('/api/limite-ouro-branco', async (_req, res) => {
       throw new Error('Limite municipal não encontrado')
     }
 
-    limiteOuroBrancoCache = geojson
-    limiteOuroBrancoCacheTs = agora
+    limiteConselheiroLafaieteCache = geojson
+    limiteConselheiroLafaieteCacheTs = agora
     return res.json(geojson)
   } catch (err) {
-    console.error('Erro no limite de Ouro Branco:', err?.message || err)
-    if (limiteOuroBrancoCache) return res.json(limiteOuroBrancoCache)
+    console.error('Erro no limite de Conselheiro Lafaiete:', err?.message || err)
+    if (limiteConselheiroLafaieteCache) return res.json(limiteConselheiroLafaieteCache)
     return res.status(503).json({ erro: 'Limite municipal indisponível' })
   }
 })
@@ -3533,7 +3547,7 @@ const PORT = parseInt(process.env.PORT || '5000', 10)
 try {
   await initDb()
   httpServer.listen(PORT, '0.0.0.0', () => {
-    console.log(`API Defesa Civil rodando na porta ${PORT}`)
+    console.log(`API CODAP rodando na porta ${PORT}`)
     console.log(`WebSocket de rastreamento ativo em ws://0.0.0.0:${PORT}/ws`)
   })
   httpServer.on('error', (err) => {

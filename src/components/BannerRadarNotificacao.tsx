@@ -95,7 +95,7 @@ export default function BannerRadarNotificacao() {
             data: String(row.data || ''),
             hora: String(row.hora || ''),
             prioridade: String(row.prioridade || 'normal'),
-            criadoPor: String(row.criado_por || row.criadoPor || 'Equipe Defesa Civil'),
+            criadoPor: String(row.criado_por || row.criadoPor || 'Equipe CODAP'),
             confirmacoesAgentes,
           }
 
@@ -147,7 +147,7 @@ export default function BannerRadarNotificacao() {
         data: String(mensagem.data || ''),
         hora: String(mensagem.hora || ''),
         prioridade: String(mensagem.prioridade || 'normal'),
-        criadoPor: String(mensagem.criadoPor || 'Equipe Defesa Civil'),
+        criadoPor: String(mensagem.criadoPor || 'Equipe CODAP'),
         tipo: 'confirmacao',
         confirmacoesAgentes: [],
       }

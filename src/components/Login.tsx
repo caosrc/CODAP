@@ -125,11 +125,9 @@ export default function Login({ onLogin, apenasAgente = false }: Props) {
     return (
       <div className="login-tela">
         <div className="login-box">
-          <div className="login-logo-wrap">
-            <img src="/cod-logo.png" alt="Símbolo do aplicativo" className="login-logo" />
-          </div>
-          <div className="login-titulo">Defesa Civil</div>
-          <div className="login-subtitulo">Defesa Civil somos todos nós</div>
+          <div className="login-logo-wrap" aria-label="CODAP">CODAP</div>
+          <div className="login-titulo">CODAP</div>
+          <div className="login-subtitulo">Sistema operacional de campo</div>
 
           <div style={{ textAlign: 'center', marginBottom: '1rem' }}>
             <span style={{ fontSize: '2rem' }}>🔒</span>
@@ -203,11 +201,9 @@ export default function Login({ onLogin, apenasAgente = false }: Props) {
     return (
       <div className="login-tela">
         <div className="login-box login-box--agente">
-          <div className="login-logo-wrap">
-            <img src="/cod-logo.png" alt="Símbolo do aplicativo" className="login-logo" />
-          </div>
-          <div className="login-titulo">Defesa Civil</div>
-          <div className="login-subtitulo">Defesa Civil somos todos nós</div>
+          <div className="login-logo-wrap" aria-label="CODAP">CODAP</div>
+          <div className="login-titulo">CODAP</div>
+          <div className="login-subtitulo">Sistema operacional de campo</div>
 
           <div className="login-agente-titulo">Quem está acessando?</div>
           <div className="login-agente-grid">
@@ -233,11 +229,9 @@ export default function Login({ onLogin, apenasAgente = false }: Props) {
   return (
     <div className="login-tela">
       <div className="login-box">
-        <div className="login-logo-wrap">
-            <img src="/cod-logo.png" alt="Símbolo do aplicativo" className="login-logo" />
-        </div>
-        <div className="login-titulo">Defesa Civil</div>
-        <div className="login-subtitulo">Defesa Civil somos todos nós</div>
+        <div className="login-logo-wrap" aria-label="CODAP">CODAP</div>
+        <div className="login-titulo">CODAP</div>
+        <div className="login-subtitulo">Sistema operacional de campo</div>
 
         <form className="login-form" onSubmit={entrar} autoComplete="off">
           <div className="login-campo">

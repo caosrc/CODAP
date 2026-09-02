@@ -9,7 +9,7 @@ interface Props {
 function extrairBairro(endereco: string | null): string {
   if (!endereco) return 'Não informado'
   let s = endereco.trim()
-  s = s.replace(/,?\s*Ouro Branco.*$/i, '')
+  s = s.replace(/,?\s*Conselheiro Lafaiete.*$/i, '')
   s = s.replace(/\s*-\s*MG.*$/i, '')
   s = s.replace(/\s*\d{5}-?\d{3}.*$/, '')
   if (s.includes(' - ')) {

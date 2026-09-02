@@ -248,12 +248,9 @@ export default function Curral({
           <button className="curral-back" type="button" onClick={onVoltar} data-testid="button-curral-voltar" aria-label="Voltar">
             ←
           </button>
-          <span className="curral-brand" aria-label="CODAP">CODAP</span>
         </div>
         <div className="curral-header-copy">
-          <span className="curral-kicker">Registro de campo</span>
-          <h1>Curral</h1>
-          <p>Registro de animal encontrado</p>
+          <h1>Curral - Registro de apreensão de animal</h1>
         </div>
       </header>
 

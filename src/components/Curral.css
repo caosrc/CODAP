@@ -25,19 +25,19 @@
 .curral-shell button:disabled { cursor: not-allowed; opacity: .62; }
 
 .curral-header {
-  min-height: 146px;
-  padding: max(18px, env(safe-area-inset-top)) clamp(18px, 5vw, 34px) 22px;
+  min-height: 78px;
+  padding: max(12px, env(safe-area-inset-top)) clamp(18px, 5vw, 34px) 12px;
   display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 15px;
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
   color: #f8f4ea;
   background:
     linear-gradient(120deg, rgba(50, 117, 109, .12), transparent 54%),
     var(--curral-deep);
   position: relative;
 }
-.curral-header-top { display: flex; align-items: center; justify-content: space-between; position: relative; z-index: 1; }
+.curral-header-top { display: flex; align-items: center; position: relative; z-index: 1; }
 .curral-back {
   width: 38px;
   height: 38px;
@@ -54,8 +54,7 @@
 }
 .curral-back:hover { background: rgba(255, 255, 255, .1); transform: translateX(-2px); }
 .curral-header-copy { position: relative; z-index: 1; min-width: 0; padding-left: 2px; }
-.curral-header h1 { margin: 6px 0 0; font-size: clamp(32px, 8vw, 42px); line-height: .95; letter-spacing: -.07em; }
-.curral-header p { margin-top: 7px; color: #bed0c8; font-size: 12px; font-weight: 600; letter-spacing: .01em; }
+.curral-header h1 { margin: 0; font-size: clamp(18px, 3.2vw, 25px); line-height: 1.1; letter-spacing: -.045em; }
 .curral-kicker {
   display: block;
   color: #e4b078;
@@ -227,8 +226,8 @@
   .curral-header { padding-left: max(28px, calc((100vw - 760px) / 2)); padding-right: max(28px, calc((100vw - 760px) / 2)); }
 }
 @media (max-width: 480px) {
-  .curral-header { min-height: 143px; gap: 14px; padding-bottom: 20px; }
-  .curral-header h1 { font-size: 34px; }
+  .curral-header { min-height: 70px; gap: 10px; padding-bottom: 10px; }
+  .curral-header h1 { font-size: 17px; }
   .curral-content { padding-top: 19px; }
   .curral-intro { align-items: flex-start; flex-direction: column; gap: 13px; }
   .curral-progress { align-self: flex-end; }

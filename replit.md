@@ -40,12 +40,12 @@ Required env vars (all set in Replit shared env / secrets):
 - `public/sw.js` — Service Worker (PWA, map tile cache)
 - `attached_assets/` — report template (.docx)
 
-## Architecture on Replit
-- **Replit PostgreSQL** is the only data store for this copy of the app
-- The Supabase project belongs exclusively to the original `dc-2026.netlify.app` app and is not read or written here
-- DB tables auto-created on server startup — no separate migration step needed
-- In production, Express serves the built `/dist` frontend directly on port 5000
-- Vite dev server (port 5000) proxies `/api` and `/ws` to Express (port 3001) in dev mode only
+## Architecture on Replit and Netlify
+- **Netlify + Supabase** is the production path: the Vite frontend reads and writes the Supabase project configured by `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`
+- Netlify Functions provide the server-only proxy for CEMADEN, weather/radar and protected external APIs
+- The Express server and Replit PostgreSQL remain a local development fallback; they are not the production data store
+- Before the first Netlify deploy, execute `supabase/supabase-completo.sql` in the configured Supabase project's SQL Editor. For an existing database, at minimum execute all files in `supabase/migrations/`
+- The production build is `npm run build`, with `dist` published and Functions loaded from `netlify/functions`
 
 ## Product
 - Register and manage civil defense incidents with photos and GPS
@@ -63,13 +63,18 @@ Required env vars (all set in Replit shared env / secrets):
 - Portuguese (pt-BR) UI
 
 ## Gotchas
-- Do not add Supabase credentials to this project; its database is isolated in Replit PostgreSQL
-- DB tables auto-created on server startup — no separate migration step needed on Replit
-- Production: `npm run build && node server/index.js` — Express serves built `/dist`
+- `VITE_USE_SUPABASE=true` is required for Netlify. The Supabase URL and anon key are public frontend configuration; never put a service-role key in the browser
+- Supabase tables and RLS policies must exist before the Netlify app can save data. The anon key cannot create tables, so run the SQL files in `supabase/` once in the Supabase SQL Editor
+- Production on Netlify: `npm run build`, publish `dist`, and load Functions from `netlify/functions`
 - Push notifications require `VAPID_PRIVATE_KEY` secret to be set in Replit secrets
 - Earth Engine requires the service account to have Earth Engine access and the `Service Usage Consumer` role on the Google Cloud project
 - O botão **Chuva** mostra precipitação observada pelo radar RainViewer, atualizada automaticamente a cada 5 minutos, com legenda e limite municipal tracejado. A leitura em mm do centro é um resumo do Open-Meteo e não substitui pluviômetro local.
 - O monitoramento do Earth Engine usa `FireMask >= 7` para MODIS/VIIRS e `Area > 0` para GOES-19 FDCF (cadência de 10 minutos); não interpreta chuva, radar, vegetação ou cicatriz de queimada como incêndio ativo
+
+## Netlify setup
+- Configure the Netlify site base directory as the repository root, build command as `npm run build`, publish directory as `dist`, and Functions directory as `netlify/functions`
+- Keep `VITE_USE_SUPABASE=true`, `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` in the Netlify environment for both build and Functions
+- The route redirects for every Function are duplicated in `netlify.toml` and `public/_redirects`; keep both in sync so the SPA fallback does not return `index.html` for an API request
 
 ## Pointers
 - DB schema: `server/index.js` → `initDb()` function

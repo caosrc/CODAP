@@ -141,6 +141,7 @@
 .curral-gms-inputs input:nth-of-type(3) { flex: 1.3; }
 .curral-gms-inputs input:focus, .curral-gms-inputs select:focus { border-color: var(--curral-teal); outline: none; box-shadow: 0 0 0 2px rgba(50,117,109,.12); }
 .curral-gms-inputs b { color: var(--curral-muted); font-size: 12px; font-weight: 600; }
+.curral-gms-inputs .curral-gms-fixed-hemisphere { min-width: 20px; color: var(--curral-teal); font-weight: 800; text-align: center; }
 .curral-gms-inputs select { width: 46px; padding: 8px 3px; color: var(--curral-ink); border: 1px solid #cbd7cc; border-radius: 6px; background: #fffef9; font-size: 11px; font-weight: 800; }
 .curral-gms-editor > p { margin-top: 9px; color: var(--curral-muted); font: 10px 'DM Mono', monospace; }
 .curral-gps-note { margin: 8px 2px 0; color: #7b8881; font-size: 10px; line-height: 1.45; }

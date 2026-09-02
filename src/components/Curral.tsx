@@ -36,21 +36,21 @@ export interface CurralProps {
 }
 
 type GpsStatus = 'inativo' | 'aguardando' | 'ativo' | 'indisponivel' | 'negado' | 'erro'
-type GmsHemisphere = 'N' | 'S' | 'E' | 'W'
+type GmsHemisphere = 'S' | 'W'
 type GmsPart = { graus: string; minutos: string; segundos: string; hemisferio: GmsHemisphere }
 
-const GMS_VAZIO: GmsPart = { graus: '', minutos: '', segundos: '', hemisferio: 'N' }
+const GMS_VAZIO: GmsPart = { graus: '', minutos: '', segundos: '', hemisferio: 'S' }
 
 function decimalParaGms(valor: number | null, latitude: boolean): GmsPart {
   if (typeof valor !== 'number' || !Number.isFinite(valor)) {
-    return { ...GMS_VAZIO, hemisferio: latitude ? 'N' : 'E' }
+    return { ...GMS_VAZIO, hemisferio: latitude ? 'S' : 'W' }
   }
   const absoluto = Math.abs(valor)
   const graus = Math.floor(absoluto)
   const minutosDecimais = (absoluto - graus) * 60
   const minutos = Math.floor(minutosDecimais)
   const segundos = (minutosDecimais - minutos) * 60
-  const hemisferio = valor < 0 ? (latitude ? 'S' : 'W') : (latitude ? 'N' : 'E')
+  const hemisferio = latitude ? 'S' : 'W'
   return { graus: String(graus), minutos: String(minutos), segundos: segundos.toFixed(2), hemisferio }
 }
 
@@ -64,7 +64,7 @@ function gmsParaDecimal(parte: GmsPart, latitude: boolean): number | null {
     || graus < 0 || graus > limiteGraus || minutos < 0 || minutos >= 60 || segundos < 0 || segundos >= 60
     || graus === limiteGraus && (minutos > 0 || segundos > 0)) return null
   const absoluto = graus + minutos / 60 + segundos / 3600
-  return parte.hemisferio === (latitude ? 'S' : 'W') ? -absoluto : absoluto
+  return -absoluto
 }
 
 function comprimirFoto(dataUrl: string): Promise<string> {
@@ -153,8 +153,8 @@ export default function Curral({
   const [registroEditandoId, setRegistroEditandoId] = useState<string | number | null>(null)
   const [foiEdicao, setFoiEdicao] = useState(false)
   const [coordenadasGms, setCoordenadasGms] = useState<{ latitude: GmsPart; longitude: GmsPart }>({
-    latitude: { ...GMS_VAZIO, hemisferio: 'N' },
-    longitude: { ...GMS_VAZIO, hemisferio: 'E' },
+    latitude: { ...GMS_VAZIO, hemisferio: 'S' },
+    longitude: { ...GMS_VAZIO, hemisferio: 'W' },
   })
   const fotoInputRef = useRef<HTMLInputElement>(null)
   const ocorrenciaCapturaIdRef = useRef<number | null>(null)
@@ -312,8 +312,8 @@ export default function Curral({
     setRegistroEditandoId(null)
     setFoiEdicao(false)
     setCoordenadasGms({
-      latitude: { ...GMS_VAZIO, hemisferio: 'N' },
-      longitude: { ...GMS_VAZIO, hemisferio: 'E' },
+      latitude: { ...GMS_VAZIO, hemisferio: 'S' },
+      longitude: { ...GMS_VAZIO, hemisferio: 'W' },
     })
     ocorrenciaCapturaIdRef.current = null
     criandoOcorrenciaRef.current = false
@@ -450,10 +450,7 @@ export default function Curral({
                           <b>'</b>
                           <input inputMode="decimal" value={coordenadasGms.latitude.segundos} onChange={(e) => atualizarCoordenadaGms('latitude', 'segundos', e.target.value)} placeholder="0,00" aria-label="Segundos da latitude" data-testid="input-curral-latitude-segundos" />
                           <b>"</b>
-                          <select value={coordenadasGms.latitude.hemisferio} onChange={(e) => atualizarCoordenadaGms('latitude', 'hemisferio', e.target.value)} aria-label="Hemisfério da latitude" data-testid="select-curral-latitude-hemisferio">
-                            <option value="N">N</option>
-                            <option value="S">S</option>
-                          </select>
+                          <b className="curral-gms-fixed-hemisphere">S</b>
                         </div>
                       </div>
                       <div className="curral-gms-field">
@@ -465,10 +462,7 @@ export default function Curral({
                           <b>'</b>
                           <input inputMode="decimal" value={coordenadasGms.longitude.segundos} onChange={(e) => atualizarCoordenadaGms('longitude', 'segundos', e.target.value)} placeholder="0,00" aria-label="Segundos da longitude" data-testid="input-curral-longitude-segundos" />
                           <b>"</b>
-                          <select value={coordenadasGms.longitude.hemisferio} onChange={(e) => atualizarCoordenadaGms('longitude', 'hemisferio', e.target.value)} aria-label="Hemisfério da longitude" data-testid="select-curral-longitude-hemisferio">
-                            <option value="E">E</option>
-                            <option value="W">W</option>
-                          </select>
+                          <b className="curral-gms-fixed-hemisphere">W</b>
                         </div>
                       </div>
                     </div>

@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, lazy, Suspense, useRef, Component } from 'react'
 import type { ErrorInfo, ReactNode } from 'react'
 import './App.css'
-import Login, { estaLogado, agenteEscolhido, getAgenteLogado } from './components/Login'
+import Login, { estaLogado, agenteEscolhido, orgaoEscolhido, getAgenteLogado, getOrgaoSelecionado } from './components/Login'
 import type { Ocorrencia, NivelRisco } from './types'
 import { NATUREZA_ICONE } from './types'
 import { listarOcorrencias, criarOcorrencia, atualizarOcorrencia, enviarOcorrenciaServidor, listarRegistrosCurral, criarRegistroCurral, atualizarRegistroCurral, listarRelatoriosProcon, criarRelatorioProcon, enviarRelatorioProcon, ApiError } from './api'
@@ -47,6 +47,11 @@ const Procon = lazy(() => import('./components/Procon'))
 type Aba = 'lista' | 'mapa' | 'nova' | 'viatura' | 'escala' | 'materiais' | 'planejamento' | 'monitoramento' | 'curral' | 'procon'
 
 const PROCON_LOCAL_KEY = 'procon-relatorios-v1'
+const NOMES_ORGAOS = {
+  'defesa-civil': 'Defesa Civil',
+  curral: 'Curral',
+  procon: 'Procon',
+} as const
 
 function chaveLocalizacaoData(lat: number | null, lng: number | null, data: string | null | undefined): string | null {
   if (typeof lat !== 'number' || !Number.isFinite(lat) || typeof lng !== 'number' || !Number.isFinite(lng)) return null
@@ -259,7 +264,8 @@ function BannerInstalar() {
 }
 
 export default function App() {
-  const [logado, setLogado] = useState(estaLogado() && agenteEscolhido())
+  const [logado, setLogado] = useState(estaLogado() && agenteEscolhido() && orgaoEscolhido())
+  const [orgao, setOrgao] = useState(getOrgaoSelecionado)
   const [aba, setAba] = useState<Aba>('lista')
   const [ocorrencias, setOcorrencias] = useState<Ocorrencia[]>([])
   const [carregando, setCarregando] = useState(true)
@@ -1033,8 +1039,19 @@ export default function App() {
     ativos: ocorrencias.filter((o) => o.status_oc === 'ativo').length,
   }), [ocorrencias])
 
+  const orgaoAtual = orgao ?? 'defesa-civil'
+  const nomeOrgaoAtual = NOMES_ORGAOS[orgaoAtual]
+
   if (!logado) {
-    return <Login onLogin={() => setLogado(true)} apenasAgente={estaLogado() && !agenteEscolhido()} />
+    return (
+      <Login
+        onLogin={() => {
+          setOrgao(getOrgaoSelecionado())
+          setLogado(true)
+        }}
+        apenasAgente={estaLogado() && (!agenteEscolhido() || !orgaoEscolhido())}
+      />
+    )
   }
 
   if (aba === 'nova') {
@@ -1099,7 +1116,7 @@ export default function App() {
           <div className="header-logo-texto" aria-label="CODAP">C</div>
           <div className="header-textos">
             <span className="header-nome">CODAP</span>
-            <span className="header-cidade">Conselheiro Lafaiete — MG</span>
+            <span className="header-cidade">Conselheiro Lafaiete — MG · {nomeOrgaoAtual}</span>
           </div>
         </div>
         <div className="header-direita">
@@ -1427,10 +1444,12 @@ export default function App() {
           <span className="nav-emoji">📐</span>
           <span>Planejamento</span>
         </button>
-        <button className={`nav-btn nav-monitoramento ${aba === 'monitoramento' ? 'ativo' : ''}`} onClick={() => setAba('monitoramento')}>
-          <span className="nav-emoji">🌊</span>
-          <span>Monitoramento</span>
-        </button>
+        {orgaoAtual === 'defesa-civil' && (
+          <button className={`nav-btn nav-monitoramento ${aba === 'monitoramento' ? 'ativo' : ''}`} onClick={() => setAba('monitoramento')}>
+            <span className="nav-emoji">🌊</span>
+            <span>Monitoramento</span>
+          </button>
+        )}
         <button className={`nav-btn ${aba === 'lista' ? 'ativo' : ''}`} onClick={() => setAba('lista')}>
           <span className="nav-emoji">📋</span>
           <span>Ocorrências</span>
@@ -1446,17 +1465,21 @@ export default function App() {
           <span className="nav-emoji">🚗</span>
           <span>Viatura</span>
         </button>
+        {orgaoAtual === 'curral' && (
+          <button className={`nav-btn nav-curral ${aba === 'curral' ? 'ativo' : ''}`} onClick={() => setAba('curral')}>
+            <span className="nav-emoji">🐎</span>
+            <span>Curral</span>
+          </button>
+        )}
+        {orgaoAtual === 'procon' && (
+          <button className={`nav-btn nav-procon ${aba === 'procon' ? 'ativo' : ''}`} onClick={() => setAba('procon')}>
+            <span className="nav-emoji">P</span>
+            <span>Procon</span>
+          </button>
+        )}
         <button className={`nav-btn ${aba === 'materiais' ? 'ativo' : ''}`} onClick={() => setAba('materiais')}>
           <span className="nav-emoji">📦</span>
           <span>Patrimônio</span>
-        </button>
-        <button className={`nav-btn nav-curral ${aba === 'curral' ? 'ativo' : ''}`} onClick={() => setAba('curral')}>
-          <span className="nav-emoji">🐎</span>
-          <span>Curral</span>
-        </button>
-        <button className={`nav-btn nav-procon ${aba === 'procon' ? 'ativo' : ''}`} onClick={() => setAba('procon')}>
-          <span className="nav-emoji">P</span>
-          <span>Procon</span>
         </button>
       </nav>
 

@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { AGENTES, getSenhaAgente } from '../types'
+import SelecaoOrgao from './SelecaoOrgao'
 
 function useGeolocalizacao() {
   const [pos, setPos] = useState<{ lat: number; lng: number } | null>(null)
@@ -23,8 +24,11 @@ function useGeolocalizacao() {
 const LOGIN_KEY = 'defesacivil-logado'
 const AGENTE_SESSION_KEY = 'defesacivil-agente-sessao'
 const AGENTE_NOME_KEY = 'defesacivil-device-nome'
+const ORGAO_SESSION_KEY = 'defesacivil-orgao-sessao'
 const USUARIO_CORRETO = 'defesacivilob@gmail.com'
 const SENHA_CORRETA = 'dc-2026'
+
+export type Orgao = 'defesa-civil' | 'curral' | 'procon'
 
 export function estaLogado(): boolean {
   return localStorage.getItem(LOGIN_KEY) === '1'
@@ -34,9 +38,23 @@ export function agenteEscolhido(): boolean {
   return !!sessionStorage.getItem(AGENTE_SESSION_KEY)
 }
 
+export function orgaoEscolhido(): boolean {
+  return !!sessionStorage.getItem(ORGAO_SESSION_KEY)
+}
+
+export function getOrgaoSelecionado(): Orgao | null {
+  const orgao = sessionStorage.getItem(ORGAO_SESSION_KEY)
+  return orgao === 'defesa-civil' || orgao === 'curral' || orgao === 'procon' ? orgao : null
+}
+
+export function selecionarOrgao(orgao: Orgao) {
+  sessionStorage.setItem(ORGAO_SESSION_KEY, orgao)
+}
+
 export function fazerLogout() {
   localStorage.removeItem(LOGIN_KEY)
   sessionStorage.removeItem(AGENTE_SESSION_KEY)
+  sessionStorage.removeItem(ORGAO_SESSION_KEY)
 }
 
 export function getAgenteLogado(): string {
@@ -48,10 +66,12 @@ interface Props {
   apenasAgente?: boolean
 }
 
-type Etapa = 'credenciais' | 'agente' | 'senha'
+type Etapa = 'credenciais' | 'orgao' | 'agente' | 'senha'
 
 export default function Login({ onLogin, apenasAgente = false }: Props) {
-  const [etapa, setEtapa] = useState<Etapa>(apenasAgente ? 'agente' : 'credenciais')
+  const [etapa, setEtapa] = useState<Etapa>(
+    apenasAgente ? (orgaoEscolhido() ? 'agente' : 'orgao') : 'credenciais'
+  )
   const [usuario, setUsuario] = useState('')
   const [senha, setSenha] = useState('')
   const [erro, setErro] = useState('')
@@ -85,7 +105,9 @@ export default function Login({ onLogin, apenasAgente = false }: Props) {
         senha === SENHA_CORRETA
       ) {
         localStorage.setItem(LOGIN_KEY, '1')
-        setEtapa('agente')
+        sessionStorage.removeItem(AGENTE_SESSION_KEY)
+        sessionStorage.removeItem(ORGAO_SESSION_KEY)
+        setEtapa('orgao')
         setCarregando(false)
       } else {
         setErro('Usuário ou senha incorretos.')
@@ -223,6 +245,12 @@ export default function Login({ onLogin, apenasAgente = false }: Props) {
 
         </div>
       </div>
+    )
+  }
+
+  if (etapa === 'orgao') {
+    return (
+      <SelecaoOrgao onSelecionar={() => setEtapa('agente')} />
     )
   }
 

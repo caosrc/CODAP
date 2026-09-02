@@ -4421,6 +4421,110 @@ input, select, textarea { font-family: inherit; }
   transform: scale(0.97);
 }
 
+/* ── Seleção de órgão ─────────────────────────────────────────── */
+.selecao-orgao-tela {
+  background:
+    radial-gradient(circle at 15% 10%, rgba(26, 75, 140, 0.08), transparent 32%),
+    #f7f9fc;
+}
+
+.selecao-orgao-box {
+  max-width: 430px;
+}
+
+.selecao-orgao-lista {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+
+.selecao-orgao-card {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 3rem 1fr auto;
+  align-items: center;
+  gap: 0.75rem;
+  text-align: left;
+  padding: 0.9rem 0.85rem;
+  border: 2px solid #dbe4f2;
+  border-radius: 14px;
+  background: #fff;
+  color: #173f76;
+  cursor: pointer;
+  transition: transform 0.15s, border-color 0.15s, box-shadow 0.15s, background 0.15s;
+}
+
+.selecao-orgao-card:hover {
+  transform: translateY(-2px);
+  border-color: #1a4b8c;
+  box-shadow: 0 7px 18px rgba(26, 75, 140, 0.14);
+}
+
+.selecao-orgao-card:focus-visible {
+  outline: 3px solid rgba(37, 99, 235, 0.35);
+  outline-offset: 2px;
+}
+
+.selecao-orgao-icone {
+  width: 3rem;
+  height: 3rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  background: #edf4ff;
+  font-size: 1.55rem;
+}
+
+.selecao-orgao-card--curral .selecao-orgao-icone {
+  background: #fff2e9;
+}
+
+.selecao-orgao-card--procon .selecao-orgao-icone {
+  background: #f1edff;
+  color: #5b3ca5;
+  font-size: 1.3rem;
+  font-weight: 900;
+}
+
+.selecao-orgao-texto {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.selecao-orgao-texto strong {
+  font-size: 1rem;
+}
+
+.selecao-orgao-texto small {
+  color: #64748b;
+  font-size: 0.75rem;
+  line-height: 1.3;
+}
+
+.selecao-orgao-texto em {
+  color: #1a4b8c;
+  font-size: 0.68rem;
+  font-style: normal;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.selecao-orgao-seta {
+  color: #94a3b8;
+  font-size: 1.45rem;
+  transition: transform 0.15s, color 0.15s;
+}
+
+.selecao-orgao-card:hover .selecao-orgao-seta {
+  color: #1a4b8c;
+  transform: translateX(3px);
+}
+
 /* ═══════════════════════════════════════════════
    MODAL DE SENHA
 ═══════════════════════════════════════════════ */

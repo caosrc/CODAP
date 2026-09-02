@@ -1,4 +1,5 @@
 import type { Ocorrencia } from './types'
+import type { CurralDados, CurralRegistro } from './components/Curral'
 import { savePending, getCachedOcorrencias } from './offline'
 import { supabase, supabaseDisponivel } from './supabaseClient'
 import { wsSend } from './wsClient'
@@ -432,4 +433,60 @@ export async function deletarOcorrencia(id: number): Promise<void> {
   }
 
   throw new Error('Servidor indisponível')
+}
+
+function mapearRegistroCurral(registro: Record<string, unknown>): CurralRegistro {
+  return {
+    id: registro.id as string | number,
+    especie: String(registro.especie ?? ''),
+    porte: String(registro.porte ?? ''),
+    sexo: String(registro.sexo ?? ''),
+    identificacao: String(registro.identificacao ?? ''),
+    localDescricao: String(registro.local_descricao ?? ''),
+    observacoes: String(registro.observacoes ?? ''),
+    latitude: registro.latitude == null ? null : Number(registro.latitude),
+    longitude: registro.longitude == null ? null : Number(registro.longitude),
+    precisaoGps: registro.precisao_gps == null ? null : Number(registro.precisao_gps),
+    capturadoEm: String(registro.capturado_em ?? registro.created_at ?? ''),
+    fotos: Array.isArray(registro.fotos) ? registro.fotos as string[] : [],
+    fotosCount: registro.fotos_count == null ? undefined : Number(registro.fotos_count),
+    status: (registro.status as CurralRegistro['status']) ?? 'encontrado',
+  }
+}
+
+export async function listarRegistrosCurral(): Promise<CurralRegistro[]> {
+  const res = await fetch('/api/curral')
+  if (!res.ok) {
+    const erro = await res.json().catch(() => ({ error: res.statusText }))
+    throw new Error(erro.error || res.statusText)
+  }
+  const dados = await res.json()
+  return Array.isArray(dados) ? dados.map(mapearRegistroCurral) : []
+}
+
+export async function criarRegistroCurral(dados: CurralDados, agente: string | null): Promise<CurralRegistro> {
+  const res = await fetch('/api/curral', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      especie: dados.especie,
+      porte: dados.porte,
+      sexo: dados.sexo || null,
+      identificacao: dados.identificacao || null,
+      local_descricao: dados.localDescricao,
+      observacoes: dados.observacoes || null,
+      latitude: dados.latitude,
+      longitude: dados.longitude,
+      precisao_gps: dados.precisaoGps,
+      capturado_em: dados.capturadoEm,
+      fotos: dados.fotos,
+      status: dados.status,
+      criado_por: agente,
+    }),
+  })
+  if (!res.ok) {
+    const erro = await res.json().catch(() => ({ error: res.statusText }))
+    throw new Error(erro.error || res.statusText)
+  }
+  return mapearRegistroCurral(await res.json())
 }

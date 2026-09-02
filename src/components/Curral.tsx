@@ -1,4 +1,5 @@
-import { ChangeEvent, FormEvent, useMemo, useRef, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
+import type { ChangeEvent, FormEvent } from 'react'
 import './Curral.css'
 
 export type CurralStatus = 'encontrado' | 'a_caminho' | 'no_curral' | 'encerrado'
@@ -20,6 +21,7 @@ export interface CurralDados {
 
 export interface CurralRegistro extends CurralDados {
   id: string | number
+  fotosCount?: number
 }
 
 export interface CurralProps {
@@ -32,6 +34,29 @@ export interface CurralProps {
 }
 
 type GpsStatus = 'inativo' | 'aguardando' | 'ativo' | 'indisponivel' | 'negado' | 'erro'
+
+function comprimirFoto(dataUrl: string): Promise<string> {
+  if (!dataUrl.startsWith('data:image/')) return Promise.resolve(dataUrl)
+  return new Promise((resolve) => {
+    const imagem = new Image()
+    imagem.onload = () => {
+      const maxLargura = 1280
+      const escala = Math.min(1, maxLargura / imagem.width)
+      const canvas = document.createElement('canvas')
+      canvas.width = Math.max(1, Math.round(imagem.width * escala))
+      canvas.height = Math.max(1, Math.round(imagem.height * escala))
+      const contexto = canvas.getContext('2d')
+      if (!contexto) {
+        resolve(dataUrl)
+        return
+      }
+      contexto.drawImage(imagem, 0, 0, canvas.width, canvas.height)
+      resolve(canvas.toDataURL('image/jpeg', 0.72))
+    }
+    imagem.onerror = () => resolve(dataUrl)
+    imagem.src = dataUrl
+  })
+}
 
 const novoRegistro = (): CurralDados => ({
   especie: '',
@@ -67,6 +92,10 @@ function rotuloStatus(status: CurralStatus) {
     encerrado: 'Encerrado',
   }
   return labels[status]
+}
+
+function quantidadeFotos(registro: CurralRegistro) {
+  return registro.fotosCount ?? registro.fotos.length
 }
 
 export default function Curral({
@@ -144,7 +173,7 @@ export default function Curral({
     Promise.all(
       arquivos.map((arquivo) => new Promise<string>((resolve, reject) => {
         const leitor = new FileReader()
-        leitor.onload = () => resolve(String(leitor.result))
+        leitor.onload = async () => resolve(await comprimirFoto(String(leitor.result)))
         leitor.onerror = () => reject(new Error('Não foi possível ler a imagem.'))
         leitor.readAsDataURL(arquivo)
       })),
@@ -432,7 +461,7 @@ export default function Curral({
                           <span className={`curral-status status-${registro.status}`}>{rotuloStatus(registro.status)}</span>
                         </div>
                         <span className="curral-record-place">{registro.localDescricao || 'Local não informado'}</span>
-                        <span className="curral-record-meta">{formatarData(registro.capturadoEm)} · {registro.fotos.length} {registro.fotos.length === 1 ? 'foto' : 'fotos'}</span>
+                        <span className="curral-record-meta">{formatarData(registro.capturadoEm)} · {quantidadeFotos(registro)} {quantidadeFotos(registro) === 1 ? 'foto' : 'fotos'}</span>
                       </div>
                     </article>
                   ))}

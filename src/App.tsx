@@ -4,7 +4,7 @@ import './App.css'
 import Login, { estaLogado, agenteEscolhido, getAgenteLogado } from './components/Login'
 import type { Ocorrencia, NivelRisco } from './types'
 import { NATUREZA_ICONE } from './types'
-import { listarOcorrencias, criarOcorrencia, enviarOcorrenciaServidor, ApiError } from './api'
+import { listarOcorrencias, enviarOcorrenciaServidor, listarRegistrosCurral, criarRegistroCurral, ApiError } from './api'
 import { wsOn, wsAnunciarOnline } from './wsClient'
 import { supabase, supabaseDisponivel } from './supabaseClient'
 import { EVT_ROTA_RESGATE } from './sos'
@@ -16,6 +16,7 @@ import BannerConvocacao from './components/BannerConvocacao'
 import BannerRadarNotificacao from './components/BannerRadarNotificacao'
 import { cacheOcorrencias, getCachedOcorrencias, getPending, removePending, countPending, clearAllPending } from './offline'
 import { calcularAreaM2, formatarArea } from './components/PoligonoAreaQueimada'
+import type { CurralDados, CurralRegistro } from './components/Curral'
 
 interface EquipamentoCampoMapa {
   id: number
@@ -38,8 +39,9 @@ const SosOverlay = lazy(() => import('./components/SosOverlay'))
 const MateriaisEmprestimos = lazy(() => import('./components/MateriaisEmprestimos'))
 const Planejamento = lazy(() => import('./components/Planejamento'))
 const MonitoramentoCNL = lazy(() => import('./components/MonitoramentoCNL'))
+const Curral = lazy(() => import('./components/Curral'))
 
-type Aba = 'lista' | 'mapa' | 'nova' | 'viatura' | 'escala' | 'materiais' | 'planejamento' | 'monitoramento'
+type Aba = 'lista' | 'mapa' | 'nova' | 'viatura' | 'escala' | 'materiais' | 'planejamento' | 'monitoramento' | 'curral'
 
 function dataLocal(iso: string): string {
   const d = new Date(iso)
@@ -207,6 +209,9 @@ export default function App() {
   const [equipamentosCampoMapa, setEquipamentosCampoMapa] = useState<EquipamentoCampoMapa[]>([])
   const [abrirCampoId, setAbrirCampoId] = useState<number | null>(null)
   const [abrirChecklistId, setAbrirChecklistId] = useState<number | null>(null)
+  const [registrosCurral, setRegistrosCurral] = useState<CurralRegistro[]>([])
+  const [carregandoCurral, setCarregandoCurral] = useState(false)
+  const [erroCurral, setErroCurral] = useState<string | null>(null)
 
   useEffect(() => {
     function abrirChecklist(e: Event) {
@@ -244,6 +249,33 @@ export default function App() {
     window.addEventListener(EVT_ROTA_RESGATE, aoSolicitarRota)
     return () => window.removeEventListener(EVT_ROTA_RESGATE, aoSolicitarRota)
   }, [])
+
+  const carregarCurral = useCallback(async () => {
+    setCarregandoCurral(true)
+    setErroCurral(null)
+    try {
+      setRegistrosCurral(await listarRegistrosCurral())
+    } catch (erro) {
+      setErroCurral(erro instanceof Error ? erro.message : 'Não foi possível carregar os registros.')
+    } finally {
+      setCarregandoCurral(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (aba === 'curral') carregarCurral()
+  }, [aba, carregarCurral])
+
+  useEffect(() => {
+    return wsOn('curral_atualizado', () => {
+      if (aba === 'curral') carregarCurral()
+    })
+  }, [aba, carregarCurral])
+
+  const salvarCurral = useCallback(async (dados: CurralDados) => {
+    await criarRegistroCurral(dados, getAgenteLogado())
+    await carregarCurral()
+  }, [carregarCurral])
 
   // Carrega equipamentos em campo para o mapa
   useEffect(() => {
@@ -572,6 +604,7 @@ export default function App() {
         import('./components/MateriaisEmprestimos'),
         import('./components/Planejamento'),
         import('./components/MonitoramentoCNL'),
+        import('./components/Curral'),
       ]).catch(() => { /* sem internet ou bloqueado, ignora */ })
     }, 1500)
     return () => window.clearTimeout(id)
@@ -1095,6 +1128,21 @@ export default function App() {
           </ErrorBoundary>
         )}
 
+        {aba === 'curral' && (
+          <ErrorBoundary>
+            <Suspense fallback={<LazyFallback />}>
+              <Curral
+                registros={registrosCurral}
+                carregandoLista={carregandoCurral}
+                erroLista={erroCurral}
+                onSalvar={salvarCurral}
+                onAtualizarLista={carregarCurral}
+                onVoltar={() => setAba('lista')}
+              />
+            </Suspense>
+          </ErrorBoundary>
+        )}
+
         {aba === 'monitoramento' && (
           <ErrorBoundary>
             <Suspense fallback={<LazyFallback />}>
@@ -1141,6 +1189,10 @@ export default function App() {
         <button className={`nav-btn ${aba === 'materiais' ? 'ativo' : ''}`} onClick={() => setAba('materiais')}>
           <span className="nav-emoji">📦</span>
           <span>Patrimônio</span>
+        </button>
+        <button className={`nav-btn nav-curral ${aba === 'curral' ? 'ativo' : ''}`} onClick={() => setAba('curral')}>
+          <span className="nav-emoji">🐎</span>
+          <span>Curral</span>
         </button>
       </nav>
 

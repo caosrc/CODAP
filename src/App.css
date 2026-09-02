@@ -2509,6 +2509,7 @@ input, select, textarea { font-family: inherit; }
 }
 .nav-btn.ativo .nav-emoji { transform: scale(1.12); }
 .nav-emoji { font-size: 1.35rem; }
+.nav-curral.ativo { color: #9a4d2f; border-top-color: #9a4d2f; }
 
 .nav-nova {
   flex: none;

@@ -937,6 +937,25 @@ async function initDb() {
   await query(`ALTER TABLE planejamentos ADD COLUMN IF NOT EXISTS conclusao TEXT`)
   await query(`ALTER TABLE ocorrencias ADD COLUMN IF NOT EXISTS descricoes_fotos JSONB DEFAULT '[]'`)
   await query(`
+    CREATE TABLE IF NOT EXISTS curral_registros (
+      id BIGSERIAL PRIMARY KEY,
+      especie TEXT NOT NULL,
+      porte TEXT NOT NULL,
+      sexo TEXT,
+      identificacao TEXT,
+      local_descricao TEXT NOT NULL,
+      observacoes TEXT,
+      latitude DOUBLE PRECISION NOT NULL,
+      longitude DOUBLE PRECISION NOT NULL,
+      precisao_gps DOUBLE PRECISION,
+      capturado_em TEXT NOT NULL,
+      fotos JSONB NOT NULL DEFAULT '[]',
+      status TEXT NOT NULL DEFAULT 'encontrado',
+      criado_por TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `)
+  await query(`
     CREATE TABLE IF NOT EXISTS radar_bilhetes (
       id TEXT PRIMARY KEY,
       texto TEXT NOT NULL,
@@ -1117,6 +1136,66 @@ app.delete('/api/ocorrencias/:id', async (req, res) => {
     broadcastOcorrenciasAtualizadas()
     res.json({ success: true })
   } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// ── Curral Regional ──────────────────────────────────────────────────────────
+app.get('/api/curral', async (_req, res) => {
+  try {
+    const result = await query(
+      `SELECT id, especie, porte, sexo, identificacao, local_descricao,
+              observacoes, latitude, longitude, precisao_gps, capturado_em,
+              jsonb_array_length(COALESCE(fotos, '[]'::jsonb)) AS fotos_count,
+              status, criado_por, created_at
+       FROM curral_registros
+       ORDER BY created_at DESC
+       LIMIT 100`
+    )
+    res.json(result.rows)
+  } catch (err) {
+    console.error('GET /api/curral error:', err)
+    res.status(500).json({ error: err.message })
+  }
+})
+
+app.post('/api/curral', async (req, res) => {
+  const {
+    especie, porte, sexo, identificacao, local_descricao, observacoes,
+    latitude, longitude, precisao_gps, capturado_em, fotos, status, criado_por,
+  } = req.body || {}
+  const lat = Number(latitude)
+  const lng = Number(longitude)
+  if (!String(especie || '').trim() || !String(porte || '').trim() || !String(local_descricao || '').trim()) {
+    return res.status(400).json({ error: 'Espécie, porte e descrição do local são obrigatórios.' })
+  }
+  if (!Number.isFinite(lat) || !Number.isFinite(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+    return res.status(400).json({ error: 'A localização GPS do animal é obrigatória e inválida.' })
+  }
+  const fotosSeguras = Array.isArray(fotos)
+    ? fotos.filter((foto) => typeof foto === 'string' && foto.startsWith('data:image/')).slice(0, 6)
+    : []
+  const statusPermitidos = new Set(['encontrado', 'a_caminho', 'no_curral', 'encerrado'])
+  const statusSeguro = statusPermitidos.has(status) ? status : 'encontrado'
+  try {
+    const result = await query(
+      `INSERT INTO curral_registros
+        (especie, porte, sexo, identificacao, local_descricao, observacoes,
+         latitude, longitude, precisao_gps, capturado_em, fotos, status, criado_por)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+       RETURNING *`,
+      [
+        String(especie).trim(), String(porte).trim(), sexo || null, identificacao || null,
+        String(local_descricao).trim(), observacoes || null, lat, lng,
+        Number.isFinite(Number(precisao_gps)) ? Number(precisao_gps) : null,
+        String(capturado_em || new Date().toISOString()), JSON.stringify(fotosSeguras),
+        statusSeguro, criado_por || null,
+      ]
+    )
+    broadcastParaTodos({ tipo: 'curral_atualizado' })
+    res.status(201).json(result.rows[0])
+  } catch (err) {
+    console.error('POST /api/curral error:', err)
     res.status(500).json({ error: err.message })
   }
 })

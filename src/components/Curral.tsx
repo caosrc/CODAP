@@ -28,7 +28,8 @@ export interface CurralProps {
   registros?: CurralRegistro[]
   carregandoLista?: boolean
   erroLista?: string | null
-  onSalvar: (dados: CurralDados) => void | Promise<void>
+  onSalvar: (dados: CurralDados, ocorrenciaId?: number | null) => void | Promise<void>
+  onCapturarGps?: (dados: CurralDados) => void | Promise<number | null>
   onAtualizarLista: () => void | Promise<void>
   onVoltar: () => void
 }
@@ -103,6 +104,7 @@ export default function Curral({
   carregandoLista = false,
   erroLista = null,
   onSalvar,
+  onCapturarGps,
   onAtualizarLista,
   onVoltar,
 }: CurralProps) {
@@ -113,18 +115,22 @@ export default function Curral({
   const [salvando, setSalvando] = useState(false)
   const [erroSalvar, setErroSalvar] = useState('')
   const [fotoEmFoco, setFotoEmFoco] = useState<string | null>(null)
+  const [ocorrenciaSalva, setOcorrenciaSalva] = useState(false)
   const fotoInputRef = useRef<HTMLInputElement>(null)
+  const ocorrenciaCapturaIdRef = useRef<number | null>(null)
+  const criandoOcorrenciaRef = useRef(false)
 
   const formularioValido = Boolean(dados.especie && dados.porte && dados.localDescricao && dados.latitude !== null)
   const gpsCapturado = dados.latitude !== null && dados.longitude !== null
   const textoGps = useMemo(() => {
     if (gpsStatus === 'aguardando') return 'Buscando posição do aparelho...'
+    if (gpsStatus === 'ativo' && ocorrenciaSalva) return 'GPS registrado e ocorrência salva em Ocorrências'
     if (gpsStatus === 'ativo' && dados.precisaoGps) return `Posição registrada com precisão de ${Math.round(dados.precisaoGps)} m`
     if (gpsStatus === 'negado') return 'Permissão de localização negada'
     if (gpsStatus === 'indisponivel') return 'GPS indisponível neste dispositivo'
     if (gpsStatus === 'erro') return gpsMensagem || 'Não foi possível capturar o GPS'
     return gpsCapturado ? 'Local georreferenciado neste registro' : 'Local ainda não georreferenciado'
-  }, [dados.precisaoGps, gpsCapturado, gpsMensagem, gpsStatus])
+  }, [dados.precisaoGps, gpsCapturado, gpsMensagem, gpsStatus, ocorrenciaSalva])
 
   function atualizarCampo(campo: keyof CurralDados, valor: string) {
     setDados((anterior) => ({ ...anterior, [campo]: valor }))
@@ -142,6 +148,12 @@ export default function Curral({
     setGpsMensagem('')
     navigator.geolocation.getCurrentPosition(
       (posicao) => {
+        const dadosComGps = {
+          ...dados,
+          latitude: posicao.coords.latitude,
+          longitude: posicao.coords.longitude,
+          precisaoGps: posicao.coords.accuracy,
+        }
         setDados((anterior) => ({
           ...anterior,
           latitude: posicao.coords.latitude,
@@ -149,6 +161,19 @@ export default function Curral({
           precisaoGps: posicao.coords.accuracy,
         }))
         setGpsStatus('ativo')
+        if (onCapturarGps && ocorrenciaCapturaIdRef.current === null && !criandoOcorrenciaRef.current) {
+          criandoOcorrenciaRef.current = true
+          void Promise.resolve(onCapturarGps(dadosComGps))
+            .then((id) => {
+              ocorrenciaCapturaIdRef.current = typeof id === 'number' ? id : null
+              setOcorrenciaSalva(typeof id === 'number')
+            })
+            .catch(() => {
+              setOcorrenciaSalva(false)
+              setGpsMensagem('GPS capturado, mas não foi possível salvar a ocorrência. Tente enviar novamente.')
+            })
+            .finally(() => { criandoOcorrenciaRef.current = false })
+        }
       },
       (erro) => {
         if (erro.code === erro.PERMISSION_DENIED) {
@@ -201,7 +226,7 @@ export default function Curral({
     setSalvando(true)
     setErroSalvar('')
     try {
-      await onSalvar(dados)
+      await onSalvar(dados, ocorrenciaCapturaIdRef.current)
       setEtapa('sucesso')
     } catch {
       setErroSalvar('Não foi possível enviar o registro. Confira a conexão e tente novamente.')
@@ -212,6 +237,9 @@ export default function Curral({
 
   function iniciarOutro() {
     setDados(novoRegistro())
+    ocorrenciaCapturaIdRef.current = null
+    criandoOcorrenciaRef.current = false
+    setOcorrenciaSalva(false)
     setGpsStatus('inativo')
     setGpsMensagem('')
     setErroSalvar('')

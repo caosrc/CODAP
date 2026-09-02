@@ -4,7 +4,7 @@ import './App.css'
 import Login, { estaLogado, agenteEscolhido, getAgenteLogado } from './components/Login'
 import type { Ocorrencia, NivelRisco } from './types'
 import { NATUREZA_ICONE } from './types'
-import { listarOcorrencias, enviarOcorrenciaServidor, listarRegistrosCurral, criarRegistroCurral, ApiError } from './api'
+import { listarOcorrencias, criarOcorrencia, atualizarOcorrencia, enviarOcorrenciaServidor, listarRegistrosCurral, criarRegistroCurral, ApiError } from './api'
 import { wsOn, wsAnunciarOnline } from './wsClient'
 import { supabase, supabaseDisponivel } from './supabaseClient'
 import { EVT_ROTA_RESGATE } from './sos'
@@ -272,8 +272,45 @@ export default function App() {
     })
   }, [aba, carregarCurral])
 
-  const salvarCurral = useCallback(async (dados: CurralDados) => {
-    await criarRegistroCurral(dados, getAgenteLogado())
+  const salvarCurral = useCallback(async (dados: CurralDados, ocorrenciaId?: number | null) => {
+    const agente = getAgenteLogado()
+    const capturadoEm = dados.capturadoEm || new Date().toISOString()
+    await criarRegistroCurral(dados, agente)
+    if (ocorrenciaId && ocorrenciaId > 0) {
+      try {
+        await atualizarOcorrencia(ocorrenciaId, {
+          tipo: 'Diligência',
+          natureza: 'Captura de animal',
+          subnatureza: dados.porte ? `Porte: ${dados.porte}` : null,
+          nivel_risco: 'baixo',
+          status_oc: 'ativo',
+          fotos: dados.fotos,
+          descricoes_fotos: [],
+          lat: dados.latitude,
+          lng: dados.longitude,
+          endereco: dados.localDescricao || 'Localização da captura do animal',
+          proprietario: dados.identificacao || null,
+          situacao: [
+            dados.especie || 'Animal não identificado',
+            dados.sexo ? `Sexo: ${dados.sexo}` : '',
+            dados.observacoes || '',
+          ].filter(Boolean).join(' · '),
+          recomendacao: 'Encaminhar ao Curral para acompanhamento.',
+          conclusao: null,
+          data_ocorrencia: capturadoEm.slice(0, 10),
+          hora_inicio: capturadoEm.slice(11, 16) || null,
+          hora_fim: null,
+          horas_total: null,
+          horas_sobreaviso: null,
+          agentes: agente ? [agente] : [],
+          vistorias: [],
+          focos_incendio: null,
+          poligono_area_queimada: null,
+        })
+      } catch (erro) {
+        console.warn('[Curral] ocorrência criada, mas não foi possível atualizar seus detalhes:', erro)
+      }
+    }
     await carregarCurral()
   }, [carregarCurral])
 
@@ -482,6 +519,43 @@ export default function App() {
     setCarregando(false)
     await atualizarPendingCount()
   }, [atualizarPendingCount])
+
+  const criarOcorrenciaCapturaAnimal = useCallback(async (dados: CurralDados) => {
+    const agente = getAgenteLogado()
+    const capturadoEm = dados.capturadoEm || new Date().toISOString()
+    const ocorrencia = await criarOcorrencia({
+      tipo: 'Diligência',
+      natureza: 'Captura de animal',
+      subnatureza: dados.porte ? `Porte: ${dados.porte}` : null,
+      nivel_risco: 'baixo',
+      status_oc: 'ativo',
+      fotos: dados.fotos,
+      descricoes_fotos: [],
+      lat: dados.latitude,
+      lng: dados.longitude,
+      endereco: dados.localDescricao || 'Localização da captura do animal',
+      proprietario: dados.identificacao || null,
+      situacao: [
+        dados.especie || 'Animal não identificado',
+        dados.sexo ? `Sexo: ${dados.sexo}` : '',
+        dados.observacoes || '',
+      ].filter(Boolean).join(' · '),
+      recomendacao: 'Encaminhar ao Curral para acompanhamento.',
+      conclusao: null,
+      data_ocorrencia: capturadoEm.slice(0, 10),
+      hora_inicio: capturadoEm.slice(11, 16) || null,
+      hora_fim: null,
+      horas_total: null,
+      horas_sobreaviso: null,
+      agentes: agente ? [agente] : [],
+      responsavel_registro: agente || null,
+      vistorias: [],
+      focos_incendio: null,
+      poligono_area_queimada: null,
+    })
+    await carregar()
+    return Number(ocorrencia.id)
+  }, [carregar])
 
   const sincronizar = useCallback(async (silencioso = false) => {
     if (sincronizando) return
@@ -1136,6 +1210,7 @@ export default function App() {
                 carregandoLista={carregandoCurral}
                 erroLista={erroCurral}
                 onSalvar={salvarCurral}
+                onCapturarGps={criarOcorrenciaCapturaAnimal}
                 onAtualizarLista={carregarCurral}
                 onVoltar={() => setAba('lista')}
               />

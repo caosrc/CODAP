@@ -25,11 +25,12 @@
 .curral-shell button:disabled { cursor: not-allowed; opacity: .62; }
 
 .curral-header {
-  min-height: 118px;
-  padding: max(22px, env(safe-area-inset-top)) clamp(18px, 5vw, 34px) 22px;
+  min-height: 166px;
+  padding: max(18px, env(safe-area-inset-top)) clamp(18px, 5vw, 34px) 25px;
   display: flex;
-  align-items: center;
-  gap: 16px;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 17px;
   color: #f8f4ea;
   background:
     radial-gradient(circle at 82% 20%, rgba(119, 171, 151, .18), transparent 34%),
@@ -47,6 +48,7 @@
   border: 1px solid rgba(227, 184, 127, .32);
   border-radius: 50%;
 }
+.curral-header-top { display: flex; align-items: center; justify-content: space-between; position: relative; z-index: 1; }
 .curral-back {
   width: 42px;
   height: 42px;
@@ -62,9 +64,9 @@
   z-index: 1;
 }
 .curral-back:hover { background: rgba(255, 255, 255, .13); transform: translateX(-2px); }
-.curral-header-copy { position: relative; z-index: 1; min-width: 0; }
-.curral-header h1 { margin: 2px 0 1px; font-size: clamp(25px, 7vw, 34px); line-height: 1; letter-spacing: -.06em; }
-.curral-header p { color: #bed0c8; font-size: 12px; font-weight: 600; }
+.curral-header-copy { position: relative; z-index: 1; min-width: 0; padding-left: 2px; }
+.curral-header h1 { margin: 7px 0 0; font-size: clamp(32px, 8vw, 42px); line-height: .95; letter-spacing: -.07em; }
+.curral-header p { margin-top: 9px; color: #bed0c8; font-size: 12px; font-weight: 600; letter-spacing: .01em; }
 .curral-kicker {
   display: block;
   color: var(--curral-orange);
@@ -75,7 +77,7 @@
   line-height: 1.2;
   text-transform: uppercase;
 }
-.curral-header .curral-kicker { color: #e4b078; }
+.curral-header .curral-kicker { color: #e4b078; font-size: 10px; letter-spacing: .14em; }
 .curral-mark {
   width: 42px;
   height: 42px;
@@ -91,6 +93,7 @@
   position: relative;
   z-index: 1;
 }
+.curral-header-rule { width: 46px; height: 3px; display: block; position: relative; z-index: 1; border-radius: 99px; background: var(--curral-orange); }
 
 .curral-content { width: min(100%, 760px); margin: 0 auto; padding: 24px clamp(16px, 4vw, 32px) 48px; }
 .curral-intro { display: flex; justify-content: space-between; align-items: flex-end; gap: 18px; margin-bottom: 21px; }
@@ -244,6 +247,8 @@
   .curral-header { padding-left: max(28px, calc((100vw - 760px) / 2)); padding-right: max(28px, calc((100vw - 760px) / 2)); }
 }
 @media (max-width: 480px) {
+  .curral-header { min-height: 158px; gap: 15px; padding-bottom: 22px; }
+  .curral-header h1 { font-size: 34px; }
   .curral-content { padding-top: 19px; }
   .curral-intro { align-items: flex-start; flex-direction: column; gap: 13px; }
   .curral-progress { align-self: flex-end; }

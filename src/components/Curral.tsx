@@ -249,15 +249,18 @@ export default function Curral({
   return (
     <main className="curral-shell" data-testid="page-curral">
       <header className="curral-header">
-        <button className="curral-back" type="button" onClick={onVoltar} data-testid="button-curral-voltar" aria-label="Voltar">
-          ←
-        </button>
+        <div className="curral-header-top">
+          <button className="curral-back" type="button" onClick={onVoltar} data-testid="button-curral-voltar" aria-label="Voltar">
+            ←
+          </button>
+          <span className="curral-mark" aria-hidden="true">C</span>
+        </div>
         <div className="curral-header-copy">
           <span className="curral-kicker">Defesa Civil · Campo</span>
           <h1>Curral</h1>
           <p>Registro de animal encontrado</p>
         </div>
-        <span className="curral-mark" aria-hidden="true">C</span>
+        <span className="curral-header-rule" aria-hidden="true" />
       </header>
 
       <div className="curral-content">

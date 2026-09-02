@@ -36,6 +36,7 @@ export interface Ocorrencia {
   vistorias: VistoriaAdicional[] | null
   focos_incendio?: { lat: number; lng: number }[] | null
   poligono_area_queimada?: { lat: number; lng: number }[] | null
+  origem?: 'curral'
   _offline?: boolean
   _localId?: number
 }

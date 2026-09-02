@@ -2407,10 +2407,17 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
             </div>
             {selecionada.endereco && <div className="mapa-painel-end">📍 {selecionada.endereco}</div>}
             {selecionada.proprietario && <div className="mapa-painel-end">👤 {selecionada.proprietario}</div>}
+            {selecionada.situacao && <div className="mapa-painel-end">📝 {selecionada.situacao}</div>}
             <div className="mapa-painel-data">🕐 {new Date(selecionada.created_at).toLocaleString('pt-BR')}</div>
-            <button className="mapa-painel-btn" onClick={() => { onSelecionar(selecionada); setSelecionada(null) }}>
-              Ver detalhes completos →
-            </button>
+            {selecionada.origem === 'curral' ? (
+              <div className="mapa-painel-end" style={{ marginTop: 8, color: '#7c3aed', fontWeight: 700 }}>
+                🐾 Registro completo disponível na aba Curral.
+              </div>
+            ) : (
+              <button className="mapa-painel-btn" onClick={() => { onSelecionar(selecionada); setSelecionada(null) }}>
+                Ver detalhes completos →
+              </button>
+            )}
           </div>
         </div>
       )}

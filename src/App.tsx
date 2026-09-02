@@ -48,6 +48,59 @@ type Aba = 'lista' | 'mapa' | 'nova' | 'viatura' | 'escala' | 'materiais' | 'pla
 
 const PROCON_LOCAL_KEY = 'procon-relatorios-v1'
 
+function chaveLocalizacaoData(lat: number | null, lng: number | null, data: string | null | undefined): string | null {
+  if (typeof lat !== 'number' || !Number.isFinite(lat) || typeof lng !== 'number' || !Number.isFinite(lng)) return null
+  return `${lat.toFixed(5)}|${lng.toFixed(5)}|${String(data ?? '').slice(0, 10)}`
+}
+
+function idCurralNoMapa(id: string | number): number {
+  const numero = Number(id)
+  if (Number.isFinite(numero)) return -1_000_000_000 - Math.abs(Math.trunc(numero))
+  const texto = String(id)
+  let hash = 0
+  for (let i = 0; i < texto.length; i++) hash = ((hash << 5) - hash + texto.charCodeAt(i)) | 0
+  return -1_500_000_000 - Math.abs(hash)
+}
+
+function curralParaOcorrenciaMapa(registro: CurralRegistro): Ocorrencia {
+  const capturadoEm = registro.capturadoEm || new Date().toISOString()
+  const detalhes = [
+    registro.especie ? `Espécie: ${registro.especie}` : '',
+    registro.porte ? `Porte: ${registro.porte}` : '',
+    registro.sexo ? `Sexo: ${registro.sexo}` : '',
+    registro.observacoes || '',
+  ].filter(Boolean).join(' · ')
+
+  return {
+    id: idCurralNoMapa(registro.id),
+    tipo: 'Diligência · Curral',
+    natureza: 'Captura de animal',
+    subnatureza: registro.porte ? `Porte: ${registro.porte}` : null,
+    nivel_risco: 'baixo',
+    status_oc: registro.status === 'encerrado' ? 'resolvido' : 'ativo',
+    fotos: [],
+    lat: registro.latitude,
+    lng: registro.longitude,
+    endereco: registro.localDescricao || null,
+    proprietario: registro.identificacao || null,
+    situacao: detalhes || null,
+    recomendacao: 'Registro de apreensão de animal realizado pelo Curral.',
+    conclusao: registro.status === 'encerrado' ? 'Atendimento encerrado.' : null,
+    data_ocorrencia: capturadoEm.slice(0, 10) || null,
+    hora_inicio: capturadoEm.slice(11, 16) || null,
+    hora_fim: null,
+    horas_total: null,
+    horas_sobreaviso: null,
+    created_at: capturadoEm,
+    agentes: registro.criadoPor ? [registro.criadoPor] : [],
+    responsavel_registro: registro.criadoPor ?? null,
+    vistorias: [],
+    focos_incendio: null,
+    poligono_area_queimada: null,
+    origem: 'curral',
+  }
+}
+
 function carregarRelatoriosProconLocais(): ProconRegistro[] {
   try {
     const salvo = localStorage.getItem(PROCON_LOCAL_KEY)
@@ -328,12 +381,16 @@ export default function App() {
   }, [aba, carregarCurral])
 
   useEffect(() => {
+    if (aba === 'mapa') carregarCurral()
+  }, [aba, carregarCurral])
+
+  useEffect(() => {
     if (aba === 'procon') carregarProcon()
   }, [aba, carregarProcon])
 
   useEffect(() => {
     return wsOn('curral_atualizado', () => {
-      if (aba === 'curral') carregarCurral()
+      if (aba === 'curral' || aba === 'mapa') carregarCurral()
     })
   }, [aba, carregarCurral])
 
@@ -922,6 +979,34 @@ export default function App() {
     return resultado
   }, [ocorrencias])
 
+  const ocorrenciasMapa = useMemo(() => {
+    const registrosComGps = registrosCurral.filter((registro) =>
+      typeof registro.latitude === 'number' && Number.isFinite(registro.latitude) &&
+      typeof registro.longitude === 'number' && Number.isFinite(registro.longitude)
+    )
+
+    const curralMapa = registrosComGps
+      .map(curralParaOcorrenciaMapa)
+      .filter((registroCurral) => {
+        const chaveCurral = chaveLocalizacaoData(
+          registroCurral.lat,
+          registroCurral.lng,
+          registroCurral.data_ocorrencia,
+        )
+        if (!chaveCurral) return false
+
+        // O fluxo de captura por GPS já cria uma ocorrência geral. Nesse
+        // caso, mantém apenas o registro geral para não desenhar dois pinos.
+        return !ocorrencias.some((ocorrencia) =>
+          ocorrencia.natureza === 'Captura de animal' &&
+          chaveLocalizacaoData(ocorrencia.lat, ocorrencia.lng, ocorrencia.data_ocorrencia) === chaveCurral &&
+          (!registroCurral.proprietario || !ocorrencia.proprietario || registroCurral.proprietario === ocorrencia.proprietario)
+        )
+      })
+
+    return [...ocorrencias, ...curralMapa]
+  }, [ocorrencias, registrosCurral])
+
   const ocorrenciasFiltradas = useMemo(() => ocorrencias.filter((o) => {
     if (filtroData !== 'todas') {
       const dOc = dataLocal(o.created_at)
@@ -1234,7 +1319,7 @@ export default function App() {
           <ErrorBoundary>
             <Suspense fallback={<LazyFallback />}>
               <MapaOcorrencias
-                ocorrencias={ocorrencias}
+                ocorrencias={ocorrenciasMapa}
                 onSelecionar={(o) => setSelecionada(o)}
                 destinoExterno={destinoSos ?? destinoCampo}
                 onDestinoExternoConsumido={() => { setDestinoSos(null); setDestinoCampo(null) }}

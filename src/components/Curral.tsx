@@ -22,6 +22,7 @@ export interface CurralDados {
 export interface CurralRegistro extends CurralDados {
   id: string | number
   fotosCount?: number
+  criadoPor?: string | null
 }
 
 export interface CurralProps {

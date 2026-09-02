@@ -1162,7 +1162,7 @@ app.get('/api/curral', async (_req, res) => {
               status, criado_por, created_at
        FROM curral_registros
        ORDER BY created_at DESC
-       LIMIT 100`
+       LIMIT 500`
     )
     res.json(result.rows)
   } catch (err) {

@@ -451,6 +451,7 @@ function mapearRegistroCurral(registro: Record<string, unknown>): CurralRegistro
     capturadoEm: String(registro.capturado_em ?? registro.created_at ?? ''),
     fotos: Array.isArray(registro.fotos) ? registro.fotos as string[] : [],
     fotosCount: registro.fotos_count == null ? undefined : Number(registro.fotos_count),
+    criadoPor: registro.criado_por == null ? null : String(registro.criado_por),
     status: (registro.status as CurralRegistro['status']) ?? 'encontrado',
   }
 }

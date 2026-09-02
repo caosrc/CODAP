@@ -120,7 +120,6 @@ export default function Curral({
   const ocorrenciaCapturaIdRef = useRef<number | null>(null)
   const criandoOcorrenciaRef = useRef(false)
 
-  const formularioValido = Boolean(dados.especie && dados.porte && dados.localDescricao && dados.latitude !== null)
   const gpsCapturado = dados.latitude !== null && dados.longitude !== null
   const textoGps = useMemo(() => {
     if (gpsStatus === 'aguardando') return 'Buscando posição do aparelho...'
@@ -214,10 +213,6 @@ export default function Curral({
 
   function revisar(evento: FormEvent) {
     evento.preventDefault()
-    if (!formularioValido) {
-      setErroSalvar('Preencha espécie, porte, local e capture o GPS antes de revisar.')
-      return
-    }
     setErroSalvar('')
     setEtapa('revisao')
   }
@@ -253,14 +248,13 @@ export default function Curral({
           <button className="curral-back" type="button" onClick={onVoltar} data-testid="button-curral-voltar" aria-label="Voltar">
             ←
           </button>
-          <span className="curral-mark" aria-hidden="true">C</span>
+          <span className="curral-brand" aria-label="CODAP">CODAP</span>
         </div>
         <div className="curral-header-copy">
-          <span className="curral-kicker">CODAP · Campo</span>
+          <span className="curral-kicker">Registro de campo</span>
           <h1>Curral</h1>
           <p>Registro de animal encontrado</p>
         </div>
-        <span className="curral-header-rule" aria-hidden="true" />
       </header>
 
       <div className="curral-content">
@@ -289,7 +283,7 @@ export default function Curral({
               <div>
                 <span className="curral-kicker">Atendimento rápido</span>
                 <h2>Primeiro, cuide do registro.</h2>
-                <p>Identifique o animal, marque o ponto da captura e envie para a equipe.</p>
+                <p>Preencha o que puder, marque o ponto se disponível e envie para a equipe.</p>
               </div>
               <div className="curral-progress" aria-label={`Etapa ${etapa === 'formulario' ? '1' : '2'} de 2`}>
                 <span className={etapa === 'formulario' ? 'active' : 'done'}>01</span>
@@ -310,11 +304,11 @@ export default function Curral({
                   </div>
                   <div className="curral-field-grid">
                     <label className="curral-field curral-field-wide">
-                      <span>Espécie <b>*</b></span>
+                      <span>Espécie</span>
                       <input value={dados.especie} onChange={(e) => atualizarCampo('especie', e.target.value)} placeholder="Ex.: bovino, equino, cão" data-testid="input-curral-especie" />
                     </label>
                     <label className="curral-field">
-                      <span>Porte <b>*</b></span>
+                      <span>Porte</span>
                       <select value={dados.porte} onChange={(e) => atualizarCampo('porte', e.target.value)} data-testid="select-curral-porte">
                         <option value="">Selecionar</option>
                         <option value="pequeno">Pequeno</option>
@@ -347,7 +341,7 @@ export default function Curral({
                     <span className="curral-location-pin" aria-hidden="true">⌖</span>
                   </div>
                   <label className="curral-field">
-                    <span>Descrição do local <b>*</b></span>
+                    <span>Descrição do local</span>
                     <input value={dados.localDescricao} onChange={(e) => atualizarCampo('localDescricao', e.target.value)} placeholder="Rua, ponto de referência ou propriedade" data-testid="input-curral-local" />
                   </label>
                   <div className={`curral-gps-box ${gpsCapturado ? 'captured' : ''} ${gpsStatus === 'negado' || gpsStatus === 'erro' || gpsStatus === 'indisponivel' ? 'warning' : ''}`} data-testid="status-curral-gps">
@@ -429,14 +423,14 @@ export default function Curral({
                 </div>
                 <div className="curral-review-card">
                   <div className="curral-review-title"><span>Animal</span><button type="button" onClick={() => setEtapa('formulario')} data-testid="button-curral-editar">Editar</button></div>
-                  <h2>{dados.especie}</h2>
+                   <h2>{dados.especie || 'Animal não identificado'}</h2>
                   <div className="curral-review-chips">
-                    <span>{dados.porte}</span>
+                     {dados.porte && <span>{dados.porte}</span>}
                     {dados.sexo && <span>{dados.sexo}</span>}
                     {dados.identificacao && <span>{dados.identificacao}</span>}
                   </div>
                   <dl className="curral-review-details">
-                    <div><dt>Local</dt><dd>{dados.localDescricao}</dd></div>
+                     <div><dt>Local</dt><dd>{dados.localDescricao || 'Não informado'}</dd></div>
                     <div><dt>GPS</dt><dd>{formatarCoordenada(dados.latitude)}, {formatarCoordenada(dados.longitude)}{dados.precisaoGps ? ` · ±${Math.round(dados.precisaoGps)} m` : ''}</dd></div>
                     <div><dt>Capturado em</dt><dd>{formatarData(dados.capturadoEm)}</dd></div>
                     {dados.observacoes && <div><dt>Observações</dt><dd>{dados.observacoes}</dd></div>}

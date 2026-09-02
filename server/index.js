@@ -2954,6 +2954,7 @@ app.get('/api/tempo', async (_req, res) => {
 const CNL_ESTACAO_ID = 6622
 const CNL_CATALOGO_URL = 'https://resources.cemaden.gov.br/graficos/interativo/getJson2.php?uf=MG'
 const CNL_RECURSOS_URL = 'https://mapservices.cemaden.gov.br/MapaInterativoWS/resources'
+const CNL_NIVEL_URL = 'https://resources.cemaden.gov.br/graficos/cemaden/hidro/resources/json/MedidaResource.php?est=6622&sen=20&pag=24'
 const CNL_FONTE_URL = `https://resources.cemaden.gov.br/graficos/interativo/grafico_CEMADEN.php?idpcd=${CNL_ESTACAO_ID}&uf=MG`
 let monitoramentoCnlCache = null
 let monitoramentoCnlCacheTs = 0
@@ -3005,6 +3006,46 @@ function montarSerieHorariaCnl(payload) {
   return serie.slice(-24)
 }
 
+function dataCemadenParaMs(valor) {
+  const texto = String(valor || '').trim()
+  const brasileiro = texto.match(/^(\d{2})\/(\d{2})\/(\d{2,4})\s+(\d{2}):(\d{2})/)
+  if (brasileiro) {
+    const ano = Number(brasileiro[3].length === 2 ? `20${brasileiro[3]}` : brasileiro[3])
+    return Date.UTC(ano, Number(brasileiro[2]) - 1, Number(brasileiro[1]), Number(brasileiro[4]), Number(brasileiro[5]))
+  }
+  const isoSemFuso = texto.match(/^(\d{4}-\d{2}-\d{2})\s+(\d{2}:\d{2}(?::\d{2})?)/)
+  if (isoSemFuso) return Date.parse(`${isoSemFuso[1]}T${isoSemFuso[2]}Z`)
+  return Date.parse(texto)
+}
+
+function normalizarMedidaNivelCnl(medida) {
+  const valorBruto = numeroCemaden(medida?.valor)
+  const offset = numeroCemaden(medida?.offset)
+  const nivel = valorBruto != null && offset != null
+    ? Number((offset - valorBruto).toFixed(2))
+    : null
+  return {
+    dataHora: String(medida?.datahora || ''),
+    valor: nivel,
+    valorBruto,
+    offset,
+    qualificacao: String(medida?.qualificacao || ''),
+    cotas: {
+      atencao: numeroCemaden(medida?.cota_atencao),
+      alerta: numeroCemaden(medida?.cota_alerta),
+      transbordamento: numeroCemaden(medida?.cota_transbordamento),
+    },
+  }
+}
+
+function montarSerieNivelCnl(medidas) {
+  return (Array.isArray(medidas) ? medidas : [])
+    .map(normalizarMedidaNivelCnl)
+    .filter((medida) => medida.valor != null)
+    .slice(-24)
+    .map((medida) => ({ dataHora: medida.dataHora, valor: medida.valor }))
+}
+
 app.get('/api/monitoramento-cnl', async (_req, res) => {
   const agora = Date.now()
   if (monitoramentoCnlCache && agora - monitoramentoCnlCacheTs < MONITORAMENTO_CNL_TTL_MS) {
@@ -3014,7 +3055,7 @@ app.get('/api/monitoramento-cnl', async (_req, res) => {
   const controlador = new AbortController()
   const timeout = setTimeout(() => controlador.abort(), 15000)
   try {
-    const [catalogoResposta, horarioResposta] = await Promise.all([
+    const [catalogoResposta, horarioResposta, nivelResposta] = await Promise.all([
       fetch(CNL_CATALOGO_URL, {
         signal: controlador.signal,
         headers: { 'User-Agent': 'DefesaCivilOuroBranco/1.0' },
@@ -3023,17 +3064,41 @@ app.get('/api/monitoramento-cnl', async (_req, res) => {
         signal: controlador.signal,
         headers: { 'User-Agent': 'DefesaCivilOuroBranco/1.0' },
       }),
+      fetch(CNL_NIVEL_URL, {
+        signal: controlador.signal,
+        headers: { 'User-Agent': 'DefesaCivilOuroBranco/1.0' },
+      }),
     ])
-    if (!catalogoResposta.ok || !horarioResposta.ok) {
-      throw new Error(`CEMADEN respondeu catálogo ${catalogoResposta.status} e série ${horarioResposta.status}`)
+    if (!catalogoResposta.ok || !horarioResposta.ok || !nivelResposta.ok) {
+      throw new Error(`CEMADEN respondeu catálogo ${catalogoResposta.status}, série ${horarioResposta.status} e nível ${nivelResposta.status}`)
     }
 
-    const [catalogo, horario] = await Promise.all([catalogoResposta.json(), horarioResposta.json()])
+    const [catalogo, horario, medidasNivel] = await Promise.all([
+      catalogoResposta.json(),
+      horarioResposta.json(),
+      nivelResposta.json(),
+    ])
     const estacaoCatalogo = Array.isArray(catalogo)
       ? catalogo.find((item) => Number(item?.idestacao) === CNL_ESTACAO_ID)
       : null
     const estacaoHorario = horario?.estacao || {}
     if (!estacaoCatalogo || !estacaoHorario) throw new Error('Estação Rio Bananeiras não encontrada no CEMADEN')
+    const nivelMedidas = (Array.isArray(medidasNivel) ? medidasNivel : [])
+      .map(normalizarMedidaNivelCnl)
+      .filter((medida) => medida.valor != null)
+    const ultimaMedidaNivel = nivelMedidas.at(-1) || null
+    const nivelCatalogo = numeroCemaden(estacaoCatalogo.ultimovalor)
+    const dataNivelCatalogo = dataCemadenParaMs(estacaoCatalogo.datahoraUltimovalor)
+    const dataUltimaMedidaNivel = dataCemadenParaMs(ultimaMedidaNivel?.dataHora)
+    const nivelAtual = nivelCatalogo != null &&
+      Number.isFinite(dataNivelCatalogo) &&
+      (!Number.isFinite(dataUltimaMedidaNivel) || dataNivelCatalogo >= dataUltimaMedidaNivel)
+      ? {
+          dataHora: String(estacaoCatalogo.datahoraUltimovalor || ''),
+          valor: nivelCatalogo,
+          qualificacao: 'catálogo CEMADEN',
+        }
+      : ultimaMedidaNivel
 
     const estacoes = (Array.isArray(catalogo) ? catalogo : [])
       .filter((item) => Number(item?.codibge) === Number(estacaoCatalogo.codibge))
@@ -3059,9 +3124,11 @@ app.get('/api/monitoramento-cnl', async (_req, res) => {
       estacao,
       estacoes,
       serie: montarSerieHorariaCnl(horario),
+      nivelAtual,
+      serieNivel: montarSerieNivelCnl(medidasNivel),
       atualizadoEm: new Date().toISOString(),
       fonte: CNL_FONTE_URL,
-      aviso: 'A cota instantânea do rio não é retornada pelo endpoint público consultado.',
+      aviso: 'Nível calculado pelo recurso oficial MedidaResource do CEMADEN: offset - valor.',
     }
     monitoramentoCnlCacheTs = agora
     res.set('Cache-Control', 'no-store')

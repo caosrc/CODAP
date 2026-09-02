@@ -36,11 +36,22 @@ type PontoSerie = {
   valor: number
 }
 
+type PontoNivel = {
+  dataHora: string
+  valor: number
+}
+
+type NivelAtual = PontoNivel & {
+  qualificacao?: string
+}
+
 type DadosCNL = {
   sucesso: boolean
   estacao: LeituraCNL
   estacoes: EstacaoCNL[]
   serie: PontoSerie[]
+  nivelAtual: NivelAtual | null
+  serieNivel: PontoNivel[]
   atualizadoEm: string
   fonte: string
   aviso?: string
@@ -62,7 +73,8 @@ function formatarCota(valor: number | null | undefined): string {
 
 function formatarDataHora(iso?: string): string {
   if (!iso) return '—'
-  const data = new Date(iso)
+  const cemaden = iso.match(/^(\d{4}-\d{2}-\d{2})\s+(\d{2}:\d{2}(?::\d{2})?)/)
+  const data = new Date(cemaden ? `${cemaden[1]}T${cemaden[2]}Z` : iso)
   return Number.isNaN(data.getTime())
     ? iso
     : data.toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })
@@ -132,6 +144,47 @@ function ChartaChuva({ pontos }: { pontos: PontoSerie[] }) {
   )
 }
 
+function GraficoNivel({ pontos }: { pontos: PontoNivel[] }) {
+  const largura = 620
+  const altura = 190
+  const margem = { topo: 18, direita: 18, baixo: 34, esquerda: 42 }
+  const valores = pontos.map((ponto) => ponto.valor)
+  const maior = Math.max(...valores, 0.5)
+  const areaLargura = largura - margem.esquerda - margem.direita
+  const areaAltura = altura - margem.topo - margem.baixo
+  const pontosSvg = pontos.map((ponto, indice) => {
+    const x = margem.esquerda + (pontos.length <= 1 ? areaLargura / 2 : indice * areaLargura / (pontos.length - 1))
+    const y = margem.topo + areaAltura - (ponto.valor / maior) * areaAltura
+    return `${x.toFixed(1)},${y.toFixed(1)}`
+  }).join(' ')
+
+  if (pontos.length === 0) {
+    return <div className="cnl-grafico-vazio">A estação ainda não retornou pontos de nível para o período.</div>
+  }
+
+  return (
+    <div className="cnl-grafico-wrap">
+      <svg className="cnl-grafico" viewBox={`0 0 ${largura} ${altura}`} role="img" aria-label="Nível do Rio Bananeiras nas últimas 24 horas">
+        {[0, 0.5, 1].map((proporcao) => {
+          const y = margem.topo + areaAltura - proporcao * areaAltura
+          return <line key={proporcao} x1={margem.esquerda} x2={largura - margem.direita} y1={y} y2={y} className="cnl-grafico-grade" />
+        })}
+        <polyline points={pontosSvg} className="cnl-grafico-linha cnl-grafico-linha-nivel" />
+        {pontos.map((ponto, indice) => {
+          const x = margem.esquerda + (pontos.length <= 1 ? areaLargura / 2 : indice * areaLargura / (pontos.length - 1))
+          const y = margem.topo + areaAltura - (ponto.valor / maior) * areaAltura
+          return <circle key={`${ponto.dataHora}-${indice}`} cx={x} cy={y} r="3.5" className="cnl-grafico-ponto cnl-grafico-ponto-nivel" />
+        })}
+        <text x={margem.esquerda - 8} y={margem.topo + 4} textAnchor="end" className="cnl-grafico-label">{maior.toLocaleString('pt-BR', { maximumFractionDigits: 2 })} m</text>
+        <text x={margem.esquerda - 8} y={margem.topo + areaAltura + 4} textAnchor="end" className="cnl-grafico-label">0 m</text>
+        <text x={margem.esquerda} y={altura - 8} className="cnl-grafico-label">{formatarDataHora(pontos[0]?.dataHora)}</text>
+        <text x={largura - margem.direita} y={altura - 8} textAnchor="end" className="cnl-grafico-label">{formatarDataHora(pontos.at(-1)?.dataHora)}</text>
+      </svg>
+      <div className="cnl-grafico-legenda">Cota instantânea em metros · cálculo oficial do CEMADEN</div>
+    </div>
+  )
+}
+
 function CartaoMetrica({ rotulo, valor, detalhe, classe = '' }: { rotulo: string; valor: string; detalhe: string; classe?: string }) {
   return (
     <div className={`cnl-metrica ${classe}`}>
@@ -170,9 +223,9 @@ export default function MonitoramentoCNL({ onAbrirMapa }: Props) {
     return () => window.clearInterval(timer)
   }, [carregar])
 
-  const maiorAcumulado = useMemo(() => {
+  const acumulado24h = useMemo(() => {
     if (!dados) return null
-    return dados.estacao.acumulados.vinteQuatroHoras ?? dados.estacao.acumulados.setentaEDuasHoras
+    return dados.estacao.acumulados.vinteQuatroHoras
   }, [dados])
 
   if (carregando && !dados) {
@@ -193,6 +246,7 @@ export default function MonitoramentoCNL({ onAbrirMapa }: Props) {
 
   const { estacao } = dados
   const estadoPrincipal = estadoEstacao(estacao.dataHora)
+  const estadoNivelAtual = estadoNivel(dados.nivelAtual?.valor, estacao.cotas)
 
   return (
     <div className="cnl-pagina">
@@ -242,31 +296,33 @@ export default function MonitoramentoCNL({ onAbrirMapa }: Props) {
 
       <section className="cnl-metricas">
         <CartaoMetrica
-          rotulo="Último registro"
-          valor={formatarMm(estacao.ultimoValor)}
-          detalhe={`Leitura em ${estacao.dataHora || 'horário não informado'}`}
+          rotulo="Nível atual do rio"
+          valor={formatarCota(dados.nivelAtual?.valor)}
+          detalhe={`Leitura em ${formatarDataHora(dados.nivelAtual?.dataHora)}`}
           classe="cnl-metrica-azul"
         />
         <CartaoMetrica
           rotulo="Acumulado em 24h"
-          valor={formatarMm(maiorAcumulado)}
+          valor={formatarMm(acumulado24h)}
           detalhe="Indicador de atenção para chuva"
-          classe={maiorAcumulado != null && maiorAcumulado >= 30 ? 'cnl-metrica-laranja' : 'cnl-metrica-verde'}
+          classe={acumulado24h != null && acumulado24h >= 30 ? 'cnl-metrica-laranja' : 'cnl-metrica-verde'}
         />
         <CartaoMetrica
-          rotulo="Tipo da estação"
-          valor="Hidrológica"
-          detalhe={`${estacoesAtivas(dados.estacoes)} estações com leitura recente`}
+          rotulo="Status do nível"
+          valor={rotuloNivel(estadoNivelAtual)}
+          detalhe={`Alerta a partir de ${formatarCota(estacao.cotas.alerta)}`}
           classe="cnl-metrica-roxa"
         />
       </section>
 
-      <section className="cnl-alerta">
-        <div className="cnl-alerta-icone">!</div>
-        <div>
-          <strong>Nível do rio: dado não disponível nesta consulta</strong>
-          <p>O CEMADEN retorna a chuva e as cotas de referência da estação, mas não envia uma cota instantânea do Rio Bananeiras por este endpoint. Os valores abaixo são os limites oficiais para acompanhamento.</p>
+      <section className={`cnl-nivel-destaque cnl-nivel-${estadoNivelAtual}`}>
+        <div className="cnl-nivel-icone">≋</div>
+        <div className="cnl-nivel-conteudo">
+          <span className="cnl-eyebrow">Leitura hidrológica em tempo real</span>
+          <strong>{formatarCota(dados.nivelAtual?.valor)}</strong>
+          <span>{rotuloNivel(estadoNivelAtual)} · última leitura {formatarDataHora(dados.nivelAtual?.dataHora)}</span>
         </div>
+        <p>Fonte oficial CEMADEN. Atualização automática a cada 5 minutos.</p>
       </section>
 
       <section className="cnl-bloco">
@@ -275,6 +331,14 @@ export default function MonitoramentoCNL({ onAbrirMapa }: Props) {
           <span className="cnl-badge-fonte">Atualização automática · 5 min</span>
         </div>
         <ChartaChuva pontos={dados.serie} />
+      </section>
+
+      <section className="cnl-bloco">
+        <div className="cnl-bloco-cabecalho">
+          <div><span className="cnl-eyebrow">Cota instantânea</span><h2>Nível do Rio Bananeiras</h2></div>
+          <span className="cnl-badge-fonte">metros · GMT</span>
+        </div>
+        <GraficoNivel pontos={dados.serieNivel} />
       </section>
 
       <section className="cnl-bloco">
@@ -325,4 +389,22 @@ export default function MonitoramentoCNL({ onAbrirMapa }: Props) {
 
 function estacoesAtivas(estacoes: EstacaoCNL[]): number {
   return estacoes.filter((estacao) => estadoEstacao(estacao.dataHora) !== 'sem-dados').length
+}
+
+type EstadoNivel = 'normal' | 'atencao' | 'alerta' | 'transbordamento' | 'sem-dados'
+
+function estadoNivel(valor: number | null | undefined, cotas: LeituraCNL['cotas']): EstadoNivel {
+  if (valor == null || !Number.isFinite(valor)) return 'sem-dados'
+  if (cotas.transbordamento != null && valor >= cotas.transbordamento) return 'transbordamento'
+  if (cotas.alerta != null && valor >= cotas.alerta) return 'alerta'
+  if (cotas.atencao != null && valor >= cotas.atencao) return 'atencao'
+  return 'normal'
+}
+
+function rotuloNivel(estado: EstadoNivel): string {
+  if (estado === 'transbordamento') return 'Transbordamento'
+  if (estado === 'alerta') return 'Alerta'
+  if (estado === 'atencao') return 'Atenção'
+  if (estado === 'normal') return 'Normal'
+  return 'Sem dados'
 }

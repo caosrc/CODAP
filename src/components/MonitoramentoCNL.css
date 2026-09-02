@@ -93,6 +93,32 @@
 .cnl-metrica-laranja { border-top: 3px solid #f59e0b; }
 .cnl-metrica-roxa { border-top: 3px solid #8b7ddd; }
 
+.cnl-nivel-destaque {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 0.7rem;
+  padding: 0.85rem 0.9rem;
+  border: 1px solid #b9e6ec;
+  border-radius: 14px;
+  color: #0f5268;
+  background: linear-gradient(115deg, #e9fbfc, #f8ffff);
+}
+.cnl-nivel-icone { display: grid; place-items: center; width: 2.35rem; height: 2.35rem; border-radius: 11px; color: #fff; background: #1596ad; font-size: 1.75rem; line-height: 0.65; }
+.cnl-nivel-conteudo .cnl-eyebrow { display: block; color: #168b8c; }
+.cnl-nivel-conteudo strong { display: block; margin-top: 0.12rem; color: #075985; font-size: 1.65rem; line-height: 1; }
+.cnl-nivel-conteudo > span:last-child { display: block; margin-top: 0.2rem; color: #5c7b87; font-size: 0.67rem; }
+.cnl-nivel-destaque > p { max-width: 14rem; margin: 0; color: #5c7b87; font-size: 0.68rem; line-height: 1.35; text-align: right; }
+.cnl-nivel-atencao { border-color: #f0d38b; background: #fff9e8; }
+.cnl-nivel-atencao .cnl-nivel-icone { background: #d79a16; }
+.cnl-nivel-alerta { border-color: #f4b18c; background: #fff4eb; }
+.cnl-nivel-alerta .cnl-nivel-icone { background: #e26625; }
+.cnl-nivel-transbordamento { border-color: #f39a9a; background: #fff0f0; }
+.cnl-nivel-transbordamento .cnl-nivel-icone { background: #d73545; }
+.cnl-nivel-sem-dados { border-color: #d8e2e5; background: #f6f8f9; }
+.cnl-nivel-sem-dados .cnl-nivel-icone { background: #8b9ba0; }
+
 .cnl-alerta { display: flex; gap: 0.7rem; margin-top: 0.7rem; padding: 0.8rem; color: #745114; border: 1px solid #f4d58b; border-radius: 12px; background: #fff9e8; }
 .cnl-alerta-icone { flex: 0 0 1.55rem; height: 1.55rem; display: grid; place-items: center; border-radius: 50%; color: white; background: #e4a51b; font-weight: 900; }
 .cnl-alerta strong { display: block; font-size: 0.8rem; }
@@ -107,6 +133,8 @@
 .cnl-grafico-grade { stroke: #e1edef; stroke-dasharray: 3 4; }
 .cnl-grafico-linha { fill: none; stroke: #129d9b; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
 .cnl-grafico-ponto { fill: #fff; stroke: #129d9b; stroke-width: 2; }
+.cnl-grafico-linha-nivel { stroke: #1687b2; }
+.cnl-grafico-ponto-nivel { stroke: #1687b2; }
 .cnl-grafico-label { fill: #78909b; font-size: 10px; }
 .cnl-grafico-legenda { color: #8799a2; text-align: center; font-size: 0.65rem; }
 .cnl-grafico-vazio, .cnl-carregando { padding: 2rem 0.8rem; color: #71858e; text-align: center; font-size: 0.8rem; }
@@ -149,6 +177,8 @@
 @media (max-width: 390px) {
   .cnl-metricas { grid-template-columns: 1fr; }
   .cnl-metrica-rotulo { min-height: auto; }
+  .cnl-nivel-destaque { grid-template-columns: auto minmax(0, 1fr); }
+  .cnl-nivel-destaque > p { grid-column: 1 / -1; max-width: none; text-align: left; }
   .cnl-estacao { grid-template-columns: minmax(0, 1fr) auto; }
   .cnl-estacao-codigo { display: none; }
   .cnl-estacao-status { text-align: right; }

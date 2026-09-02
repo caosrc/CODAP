@@ -29,12 +29,43 @@ export interface CurralProps {
   carregandoLista?: boolean
   erroLista?: string | null
   onSalvar: (dados: CurralDados, ocorrenciaId?: number | null) => void | Promise<void>
+  onAtualizarRegistro?: (id: string | number, dados: CurralDados) => void | Promise<void>
   onCapturarGps?: (dados: CurralDados) => void | Promise<number | null>
   onAtualizarLista: () => void | Promise<void>
   onVoltar: () => void
 }
 
 type GpsStatus = 'inativo' | 'aguardando' | 'ativo' | 'indisponivel' | 'negado' | 'erro'
+type GmsHemisphere = 'N' | 'S' | 'E' | 'W'
+type GmsPart = { graus: string; minutos: string; segundos: string; hemisferio: GmsHemisphere }
+
+const GMS_VAZIO: GmsPart = { graus: '', minutos: '', segundos: '', hemisferio: 'N' }
+
+function decimalParaGms(valor: number | null, latitude: boolean): GmsPart {
+  if (typeof valor !== 'number' || !Number.isFinite(valor)) {
+    return { ...GMS_VAZIO, hemisferio: latitude ? 'N' : 'E' }
+  }
+  const absoluto = Math.abs(valor)
+  const graus = Math.floor(absoluto)
+  const minutosDecimais = (absoluto - graus) * 60
+  const minutos = Math.floor(minutosDecimais)
+  const segundos = (minutosDecimais - minutos) * 60
+  const hemisferio = valor < 0 ? (latitude ? 'S' : 'W') : (latitude ? 'N' : 'E')
+  return { graus: String(graus), minutos: String(minutos), segundos: segundos.toFixed(2), hemisferio }
+}
+
+function gmsParaDecimal(parte: GmsPart, latitude: boolean): number | null {
+  if (!parte.graus.trim() && !parte.minutos.trim() && !parte.segundos.trim()) return null
+  const graus = Number(parte.graus.replace(',', '.'))
+  const minutos = Number(parte.minutos.replace(',', '.'))
+  const segundos = Number(parte.segundos.replace(',', '.'))
+  const limiteGraus = latitude ? 90 : 180
+  if (!Number.isFinite(graus) || !Number.isFinite(minutos) || !Number.isFinite(segundos)
+    || graus < 0 || graus > limiteGraus || minutos < 0 || minutos >= 60 || segundos < 0 || segundos >= 60
+    || graus === limiteGraus && (minutos > 0 || segundos > 0)) return null
+  const absoluto = graus + minutos / 60 + segundos / 3600
+  return parte.hemisferio === (latitude ? 'S' : 'W') ? -absoluto : absoluto
+}
 
 function comprimirFoto(dataUrl: string): Promise<string> {
   if (!dataUrl.startsWith('data:image/')) return Promise.resolve(dataUrl)
@@ -81,8 +112,10 @@ function formatarData(data: string) {
   return valor.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
 }
 
-function formatarCoordenada(valor: number | null) {
-  return typeof valor === 'number' ? valor.toFixed(6) : 'não capturada'
+function formatarCoordenada(valor: number | null, latitude: boolean) {
+  if (typeof valor !== 'number' || !Number.isFinite(valor)) return 'não capturada'
+  const parte = decimalParaGms(valor, latitude)
+  return `${parte.graus}° ${parte.minutos}' ${parte.segundos.replace('.', ',')}" ${parte.hemisferio}`
 }
 
 function rotuloStatus(status: CurralStatus) {
@@ -104,6 +137,7 @@ export default function Curral({
   carregandoLista = false,
   erroLista = null,
   onSalvar,
+  onAtualizarRegistro,
   onCapturarGps,
   onAtualizarLista,
   onVoltar,
@@ -116,6 +150,12 @@ export default function Curral({
   const [erroSalvar, setErroSalvar] = useState('')
   const [fotoEmFoco, setFotoEmFoco] = useState<string | null>(null)
   const [ocorrenciaSalva, setOcorrenciaSalva] = useState(false)
+  const [registroEditandoId, setRegistroEditandoId] = useState<string | number | null>(null)
+  const [foiEdicao, setFoiEdicao] = useState(false)
+  const [coordenadasGms, setCoordenadasGms] = useState<{ latitude: GmsPart; longitude: GmsPart }>({
+    latitude: { ...GMS_VAZIO, hemisferio: 'N' },
+    longitude: { ...GMS_VAZIO, hemisferio: 'E' },
+  })
   const fotoInputRef = useRef<HTMLInputElement>(null)
   const ocorrenciaCapturaIdRef = useRef<number | null>(null)
   const criandoOcorrenciaRef = useRef(false)
@@ -159,6 +199,10 @@ export default function Curral({
           longitude: posicao.coords.longitude,
           precisaoGps: posicao.coords.accuracy,
         }))
+        setCoordenadasGms({
+          latitude: decimalParaGms(posicao.coords.latitude, true),
+          longitude: decimalParaGms(posicao.coords.longitude, false),
+        })
         setGpsStatus('ativo')
         if (onCapturarGps && ocorrenciaCapturaIdRef.current === null && !criandoOcorrenciaRef.current) {
           criandoOcorrenciaRef.current = true
@@ -211,8 +255,36 @@ export default function Curral({
     setDados((anterior) => ({ ...anterior, fotos: anterior.fotos.filter((_, posicao) => posicao !== indice) }))
   }
 
+  function atualizarCoordenadaGms(eixo: 'latitude' | 'longitude', campo: keyof GmsPart, valor: string) {
+    const parteAtualizada = { ...coordenadasGms[eixo], [campo]: valor } as GmsPart
+    setCoordenadasGms((anterior) => ({ ...anterior, [eixo]: parteAtualizada }))
+    const decimal = gmsParaDecimal(parteAtualizada, eixo === 'latitude')
+    setDados((anterior) => ({ ...anterior, [eixo]: decimal }))
+    setGpsStatus(decimal === null ? 'inativo' : 'ativo')
+    setErroSalvar('')
+  }
+
+  function editarRegistro(registro: CurralRegistro) {
+    setDados({ ...registro, fotos: registro.fotos ?? [] })
+    setRegistroEditandoId(registro.id)
+    setFoiEdicao(true)
+    setCoordenadasGms({
+      latitude: decimalParaGms(registro.latitude, true),
+      longitude: decimalParaGms(registro.longitude, false),
+    })
+    setGpsStatus(registro.latitude !== null && registro.longitude !== null ? 'ativo' : 'inativo')
+    setGpsMensagem('')
+    setErroSalvar('')
+    setEtapa('formulario')
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
   function revisar(evento: FormEvent) {
     evento.preventDefault()
+    if (dados.latitude === null || dados.longitude === null) {
+      setErroSalvar('Informe latitude e longitude válidas em GMS antes de continuar.')
+      return
+    }
     setErroSalvar('')
     setEtapa('revisao')
   }
@@ -221,7 +293,12 @@ export default function Curral({
     setSalvando(true)
     setErroSalvar('')
     try {
-      await onSalvar(dados, ocorrenciaCapturaIdRef.current)
+      if (registroEditandoId !== null) {
+        if (!onAtualizarRegistro) throw new Error('Edição não disponível')
+        await onAtualizarRegistro(registroEditandoId, dados)
+      } else {
+        await onSalvar(dados, ocorrenciaCapturaIdRef.current)
+      }
       setEtapa('sucesso')
     } catch {
       setErroSalvar('Não foi possível enviar o registro. Confira a conexão e tente novamente.')
@@ -232,6 +309,12 @@ export default function Curral({
 
   function iniciarOutro() {
     setDados(novoRegistro())
+    setRegistroEditandoId(null)
+    setFoiEdicao(false)
+    setCoordenadasGms({
+      latitude: { ...GMS_VAZIO, hemisferio: 'N' },
+      longitude: { ...GMS_VAZIO, hemisferio: 'E' },
+    })
     ocorrenciaCapturaIdRef.current = null
     criandoOcorrenciaRef.current = false
     setOcorrenciaSalva(false)
@@ -258,9 +341,9 @@ export default function Curral({
         {etapa === 'sucesso' ? (
           <section className="curral-success" data-testid="status-curral-sucesso">
             <div className="curral-success-mark" aria-hidden="true">✓</div>
-            <span className="curral-kicker">Registro enviado</span>
-            <h2>Atendimento salvo no curral</h2>
-            <p>Os dados e as fotos foram entregues para a fila de acompanhamento. A coordenada ficou vinculada a este registro.</p>
+            <span className="curral-kicker">{foiEdicao ? 'Registro atualizado' : 'Registro enviado'}</span>
+            <h2>{foiEdicao ? 'Registro atualizado no curral' : 'Atendimento salvo no curral'}</h2>
+            <p>{foiEdicao ? 'As informações do registro e a coordenada em GMS foram atualizadas.' : 'Os dados e as fotos foram entregues para a fila de acompanhamento. A coordenada ficou vinculada a este registro.'}</p>
             <div className="curral-success-meta">
               <span>{dados.especie || 'Animal'}</span>
               <strong>{dados.fotos.length} {dados.fotos.length === 1 ? 'foto' : 'fotos'}</strong>
@@ -346,11 +429,50 @@ export default function Curral({
                     <div className="curral-gps-copy">
                       <strong>{gpsCapturado ? 'Local marcado no mapa' : 'Marque o ponto exato'}</strong>
                       <span>{textoGps}</span>
-                      {gpsCapturado && <small>{formatarCoordenada(dados.latitude)} · {formatarCoordenada(dados.longitude)}</small>}
+                      {gpsCapturado && <small>{formatarCoordenada(dados.latitude, true)} · {formatarCoordenada(dados.longitude, false)}</small>}
                     </div>
                     <button className="curral-gps-button" type="button" onClick={capturarGps} disabled={gpsStatus === 'aguardando'} data-testid="button-curral-gps">
                       {gpsStatus === 'aguardando' ? 'Buscando' : gpsCapturado ? 'Atualizar' : 'Capturar GPS'}
                     </button>
+                  </div>
+                  <div className="curral-gms-editor" data-testid="section-curral-coordenadas-gms">
+                    <div className="curral-gms-heading">
+                      <strong>Coordenadas em GMS</strong>
+                      <span>Graus · minutos · segundos</span>
+                    </div>
+                    <div className="curral-gms-grid">
+                      <div className="curral-gms-field">
+                        <span>Latitude</span>
+                        <div className="curral-gms-inputs">
+                          <input inputMode="numeric" value={coordenadasGms.latitude.graus} onChange={(e) => atualizarCoordenadaGms('latitude', 'graus', e.target.value)} placeholder="0" aria-label="Graus da latitude" data-testid="input-curral-latitude-graus" />
+                          <b>°</b>
+                          <input inputMode="numeric" value={coordenadasGms.latitude.minutos} onChange={(e) => atualizarCoordenadaGms('latitude', 'minutos', e.target.value)} placeholder="0" aria-label="Minutos da latitude" data-testid="input-curral-latitude-minutos" />
+                          <b>'</b>
+                          <input inputMode="decimal" value={coordenadasGms.latitude.segundos} onChange={(e) => atualizarCoordenadaGms('latitude', 'segundos', e.target.value)} placeholder="0,00" aria-label="Segundos da latitude" data-testid="input-curral-latitude-segundos" />
+                          <b>"</b>
+                          <select value={coordenadasGms.latitude.hemisferio} onChange={(e) => atualizarCoordenadaGms('latitude', 'hemisferio', e.target.value)} aria-label="Hemisfério da latitude" data-testid="select-curral-latitude-hemisferio">
+                            <option value="N">N</option>
+                            <option value="S">S</option>
+                          </select>
+                        </div>
+                      </div>
+                      <div className="curral-gms-field">
+                        <span>Longitude</span>
+                        <div className="curral-gms-inputs">
+                          <input inputMode="numeric" value={coordenadasGms.longitude.graus} onChange={(e) => atualizarCoordenadaGms('longitude', 'graus', e.target.value)} placeholder="0" aria-label="Graus da longitude" data-testid="input-curral-longitude-graus" />
+                          <b>°</b>
+                          <input inputMode="numeric" value={coordenadasGms.longitude.minutos} onChange={(e) => atualizarCoordenadaGms('longitude', 'minutos', e.target.value)} placeholder="0" aria-label="Minutos da longitude" data-testid="input-curral-longitude-minutos" />
+                          <b>'</b>
+                          <input inputMode="decimal" value={coordenadasGms.longitude.segundos} onChange={(e) => atualizarCoordenadaGms('longitude', 'segundos', e.target.value)} placeholder="0,00" aria-label="Segundos da longitude" data-testid="input-curral-longitude-segundos" />
+                          <b>"</b>
+                          <select value={coordenadasGms.longitude.hemisferio} onChange={(e) => atualizarCoordenadaGms('longitude', 'hemisferio', e.target.value)} aria-label="Hemisfério da longitude" data-testid="select-curral-longitude-hemisferio">
+                            <option value="E">E</option>
+                            <option value="W">W</option>
+                          </select>
+                        </div>
+                      </div>
+                    </div>
+                    <p>Exemplo: 20° 39' 36,44&quot; S · 43° 47' 11,24&quot; W</p>
                   </div>
                   <p className="curral-gps-note">A coordenada será registrada junto deste atendimento. O navegador não insere GPS dentro da foto.</p>
                 </section>
@@ -419,7 +541,7 @@ export default function Curral({
                   </div>
                 </div>
                 <div className="curral-review-card">
-                  <div className="curral-review-title"><span>Animal</span><button type="button" onClick={() => setEtapa('formulario')} data-testid="button-curral-editar">Editar</button></div>
+                  <div className="curral-review-title"><span>{foiEdicao ? 'Edição do registro' : 'Animal'}</span><button type="button" onClick={() => setEtapa('formulario')} data-testid="button-curral-editar">Editar</button></div>
                    <h2>{dados.especie || 'Animal não identificado'}</h2>
                   <div className="curral-review-chips">
                      {dados.porte && <span>{dados.porte}</span>}
@@ -428,7 +550,7 @@ export default function Curral({
                   </div>
                   <dl className="curral-review-details">
                      <div><dt>Local</dt><dd>{dados.localDescricao || 'Não informado'}</dd></div>
-                    <div><dt>GPS</dt><dd>{formatarCoordenada(dados.latitude)}, {formatarCoordenada(dados.longitude)}{dados.precisaoGps ? ` · ±${Math.round(dados.precisaoGps)} m` : ''}</dd></div>
+                    <div><dt>GPS · GMS</dt><dd>{formatarCoordenada(dados.latitude, true)}, {formatarCoordenada(dados.longitude, false)}{dados.precisaoGps ? ` · ±${Math.round(dados.precisaoGps)} m` : ''}</dd></div>
                     <div><dt>Capturado em</dt><dd>{formatarData(dados.capturadoEm)}</dd></div>
                     {dados.observacoes && <div><dt>Observações</dt><dd>{dados.observacoes}</dd></div>}
                   </dl>
@@ -485,6 +607,9 @@ export default function Curral({
                         <span className="curral-record-place">{registro.localDescricao || 'Local não informado'}</span>
                         <span className="curral-record-meta">{formatarData(registro.capturadoEm)} · {quantidadeFotos(registro)} {quantidadeFotos(registro) === 1 ? 'foto' : 'fotos'}</span>
                       </div>
+                      <button className="curral-record-edit" type="button" onClick={() => editarRegistro(registro)} data-testid={`button-curral-editar-registro-${registro.id}`}>
+                        Editar
+                      </button>
                     </article>
                   ))}
                 </div>

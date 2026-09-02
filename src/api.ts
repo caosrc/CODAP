@@ -1,5 +1,6 @@
 import type { Ocorrencia } from './types'
 import type { CurralDados, CurralRegistro } from './components/Curral'
+import type { ProconRegistro } from './components/Procon'
 import { savePending, getCachedOcorrencias } from './offline'
 import { supabase, supabaseDisponivel } from './supabaseClient'
 import { wsSend } from './wsClient'
@@ -489,4 +490,78 @@ export async function criarRegistroCurral(dados: CurralDados, agente: string | n
     throw new Error(erro.error || res.statusText)
   }
   return mapearRegistroCurral(await res.json())
+}
+
+export async function atualizarRegistroCurral(id: string | number, dados: CurralDados): Promise<CurralRegistro> {
+  const res = await fetch(`/api/curral/${encodeURIComponent(String(id))}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      especie: dados.especie,
+      porte: dados.porte,
+      sexo: dados.sexo || null,
+      identificacao: dados.identificacao || null,
+      local_descricao: dados.localDescricao,
+      observacoes: dados.observacoes || null,
+      latitude: dados.latitude,
+      longitude: dados.longitude,
+      precisao_gps: dados.precisaoGps,
+      capturado_em: dados.capturadoEm,
+      fotos: dados.fotos,
+      status: dados.status,
+    }),
+  })
+  if (!res.ok) {
+    const erro = await res.json().catch(() => ({ error: res.statusText }))
+    throw new Error(erro.error || res.statusText)
+  }
+  return mapearRegistroCurral(await res.json())
+}
+
+function mapearRelatorioProcon(registro: Record<string, unknown>): ProconRegistro {
+  const dados = registro.dados && typeof registro.dados === 'object'
+    ? registro.dados as Record<string, unknown>
+    : registro
+  return {
+    ...dados,
+    id: registro.id ?? dados.id ?? `procon-${Date.now()}`,
+    status: registro.status as ProconRegistro['status'] ?? 'pendente',
+  } as ProconRegistro
+}
+
+export async function listarRelatoriosProcon(): Promise<ProconRegistro[]> {
+  const res = await fetch('/api/procon')
+  if (!res.ok) {
+    const erro = await res.json().catch(() => ({ error: res.statusText }))
+    throw new Error(erro.error || res.statusText)
+  }
+  const dados = await res.json()
+  return Array.isArray(dados) ? dados.map(mapearRelatorioProcon) : []
+}
+
+export async function criarRelatorioProcon(registro: ProconRegistro): Promise<ProconRegistro> {
+  const res = await fetch('/api/procon', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      id: String(registro.id),
+      status: registro.status || 'pendente',
+      criado_por: registro.identificacao.agente,
+      dados: registro,
+    }),
+  })
+  if (!res.ok) {
+    const erro = await res.json().catch(() => ({ error: res.statusText }))
+    throw new Error(erro.error || res.statusText)
+  }
+  return mapearRelatorioProcon(await res.json())
+}
+
+export async function enviarRelatorioProcon(id: string | number): Promise<ProconRegistro> {
+  const res = await fetch(`/api/procon/${encodeURIComponent(String(id))}/enviar`, { method: 'PUT' })
+  if (!res.ok) {
+    const erro = await res.json().catch(() => ({ error: res.statusText }))
+    throw new Error(erro.error || res.statusText)
+  }
+  return mapearRelatorioProcon(await res.json())
 }

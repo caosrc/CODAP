@@ -956,6 +956,18 @@ async function initDb() {
     )
   `)
   await query(`
+    CREATE TABLE IF NOT EXISTS procon_relatorios (
+      id TEXT PRIMARY KEY,
+      tipo_documento TEXT NOT NULL DEFAULT 'termo_constatacao',
+      numero_processo TEXT,
+      status TEXT NOT NULL DEFAULT 'pendente',
+      dados JSONB NOT NULL,
+      criado_por TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      atualizado_em TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `)
+  await query(`
     CREATE TABLE IF NOT EXISTS radar_bilhetes (
       id TEXT PRIMARY KEY,
       texto TEXT NOT NULL,
@@ -1196,6 +1208,120 @@ app.post('/api/curral', async (req, res) => {
     res.status(201).json(result.rows[0])
   } catch (err) {
     console.error('POST /api/curral error:', err)
+    res.status(500).json({ error: err.message })
+  }
+})
+
+app.put('/api/curral/:id', async (req, res) => {
+  const {
+    especie, porte, sexo, identificacao, local_descricao, observacoes,
+    latitude, longitude, precisao_gps, capturado_em, fotos, status,
+  } = req.body || {}
+  const lat = Number(latitude)
+  const lng = Number(longitude)
+  if (!String(especie || '').trim() || !String(porte || '').trim() || !String(local_descricao || '').trim()) {
+    return res.status(400).json({ error: 'Espécie, porte e descrição do local são obrigatórios.' })
+  }
+  if (!Number.isFinite(lat) || !Number.isFinite(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+    return res.status(400).json({ error: 'A localização GPS do animal é obrigatória e inválida.' })
+  }
+  const fotosSeguras = Array.isArray(fotos)
+    ? fotos.filter((foto) => typeof foto === 'string' && foto.startsWith('data:image/')).slice(0, 6)
+    : []
+  const statusPermitidos = new Set(['encontrado', 'a_caminho', 'no_curral', 'encerrado'])
+  const statusSeguro = statusPermitidos.has(status) ? status : 'encontrado'
+  try {
+    const result = await query(
+      `UPDATE curral_registros
+       SET especie = $1, porte = $2, sexo = $3, identificacao = $4,
+           local_descricao = $5, observacoes = $6, latitude = $7, longitude = $8,
+           precisao_gps = $9, capturado_em = $10, fotos = $11, status = $12
+       WHERE id = $13
+       RETURNING *`,
+      [
+        String(especie).trim(), String(porte).trim(), sexo || null, identificacao || null,
+        String(local_descricao).trim(), observacoes || null, lat, lng,
+        Number.isFinite(Number(precisao_gps)) ? Number(precisao_gps) : null,
+        String(capturado_em || new Date().toISOString()), JSON.stringify(fotosSeguras),
+        statusSeguro, req.params.id,
+      ]
+    )
+    if (!result.rows[0]) return res.status(404).json({ error: 'Registro do Curral não encontrado.' })
+    broadcastParaTodos({ tipo: 'curral_atualizado' })
+    res.json(result.rows[0])
+  } catch (err) {
+    console.error('PUT /api/curral/:id error:', err)
+    res.status(500).json({ error: err.message })
+  }
+})
+
+app.get('/api/procon', async (_req, res) => {
+  try {
+    const result = await query(
+      `SELECT id, status, dados, created_at, atualizado_em
+       FROM procon_relatorios
+       ORDER BY created_at DESC
+       LIMIT 100`
+    )
+    res.json(result.rows)
+  } catch (err) {
+    console.error('GET /api/procon error:', err)
+    res.status(500).json({ error: err.message })
+  }
+})
+
+app.post('/api/procon', async (req, res) => {
+  const { id, status, criado_por, dados } = req.body || {}
+  if (!id || !dados || typeof dados !== 'object') {
+    return res.status(400).json({ error: 'Documento Procon inválido.' })
+  }
+  const statusSeguro = new Set(['rascunho', 'pendente', 'finalizado', 'enviado']).has(status) ? status : 'pendente'
+  const identificacao = dados.identificacao || {}
+  try {
+    const result = await query(
+      `INSERT INTO procon_relatorios
+        (id, tipo_documento, numero_processo, status, dados, criado_por, atualizado_em)
+       VALUES ($1, $2, $3, $4, $5, $6, NOW())
+       ON CONFLICT (id) DO UPDATE SET
+         tipo_documento = EXCLUDED.tipo_documento,
+         numero_processo = EXCLUDED.numero_processo,
+         status = EXCLUDED.status,
+         dados = EXCLUDED.dados,
+         atualizado_em = NOW()
+       RETURNING id, status, dados, created_at, atualizado_em`,
+      [
+        String(id),
+        identificacao.tipoDocumento || 'termo_constatacao',
+        identificacao.numeroProcesso || null,
+        statusSeguro,
+        JSON.stringify({ ...dados, id: String(id), status: statusSeguro }),
+        criado_por || identificacao.agente || null,
+      ]
+    )
+    broadcastParaTodos({ tipo: 'procon_atualizado' })
+    res.status(201).json(result.rows[0])
+  } catch (err) {
+    console.error('POST /api/procon error:', err)
+    res.status(500).json({ error: err.message })
+  }
+})
+
+app.put('/api/procon/:id/enviar', async (req, res) => {
+  try {
+    const result = await query(
+      `UPDATE procon_relatorios
+       SET status = 'enviado',
+           dados = jsonb_set(COALESCE(dados, '{}'::jsonb), '{status}', '"enviado"'::jsonb),
+           atualizado_em = NOW()
+       WHERE id = $1
+       RETURNING id, status, dados, created_at, atualizado_em`,
+      [req.params.id]
+    )
+    if (!result.rows[0]) return res.status(404).json({ error: 'Documento Procon não encontrado.' })
+    broadcastParaTodos({ tipo: 'procon_atualizado' })
+    res.json(result.rows[0])
+  } catch (err) {
+    console.error('PUT /api/procon/:id/enviar error:', err)
     res.status(500).json({ error: err.message })
   }
 })

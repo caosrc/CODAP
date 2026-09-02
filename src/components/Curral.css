@@ -127,6 +127,22 @@
 .curral-gps-copy small { color: var(--curral-teal); font-family: 'DM Mono', monospace; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .curral-gps-button { flex: 0 0 auto; padding: 9px 10px; color: #fffdf8; border: 0; border-radius: 8px; background: var(--curral-teal); font-size: 10px; font-weight: 800; transition: background .16s, transform .16s; }
 .curral-gps-button:hover:not(:disabled) { background: #255e58; transform: translateY(-1px); }
+.curral-gms-editor { margin-top: 13px; padding: 13px; border: 1px solid #d4dfd4; border-radius: 11px; background: #f7faf5; }
+.curral-gms-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+.curral-gms-heading strong { color: var(--curral-ink); font-size: 12px; }
+.curral-gms-heading span { color: var(--curral-muted); font: 10px 'DM Mono', monospace; }
+.curral-gms-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 11px; }
+.curral-gms-field { min-width: 0; }
+.curral-gms-field > span { display: block; margin-bottom: 6px; color: #526560; font-size: 10px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
+.curral-gms-inputs { display: flex; align-items: center; gap: 4px; }
+.curral-gms-inputs input { min-width: 0; width: 100%; padding: 8px 5px; color: var(--curral-ink); border: 1px solid #cbd7cc; border-radius: 6px; background: #fffef9; font-size: 12px; text-align: center; }
+.curral-gms-inputs input:nth-of-type(1) { flex: .8; }
+.curral-gms-inputs input:nth-of-type(2) { flex: .8; }
+.curral-gms-inputs input:nth-of-type(3) { flex: 1.3; }
+.curral-gms-inputs input:focus, .curral-gms-inputs select:focus { border-color: var(--curral-teal); outline: none; box-shadow: 0 0 0 2px rgba(50,117,109,.12); }
+.curral-gms-inputs b { color: var(--curral-muted); font-size: 12px; font-weight: 600; }
+.curral-gms-inputs select { width: 46px; padding: 8px 3px; color: var(--curral-ink); border: 1px solid #cbd7cc; border-radius: 6px; background: #fffef9; font-size: 11px; font-weight: 800; }
+.curral-gms-editor > p { margin-top: 9px; color: var(--curral-muted); font: 10px 'DM Mono', monospace; }
 .curral-gps-note { margin: 8px 2px 0; color: #7b8881; font-size: 10px; line-height: 1.45; }
 
 .curral-file-input { display: none; }
@@ -169,6 +185,8 @@
 .status-encerrado { color: #65716e; background: #e3e7e2; }
 .curral-record-place { display: block; overflow: hidden; margin-top: 4px; color: #526560; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
 .curral-record-meta { display: block; margin-top: 5px; color: #8a9890; font: 10px 'DM Mono', monospace; }
+.curral-record-edit { flex: 0 0 auto; padding: 8px 10px; color: var(--curral-teal); border: 1px solid #a9c0b2; border-radius: 7px; background: transparent; font-size: 10px; font-weight: 800; }
+.curral-record-edit:hover { background: #e7eee8; }
 .curral-list-state { padding: 28px 18px; border: 1px dashed #c8d0c6; border-radius: 13px; color: var(--curral-muted); background: rgba(255,253,248,.45); text-align: center; }
 .curral-empty-mark { display: block; margin-bottom: 6px; color: #c38662; font: 24px 'DM Mono', monospace; }
 .curral-list-state strong { display: block; color: var(--curral-ink); font-size: 12px; }
@@ -232,6 +250,10 @@
   .curral-intro { align-items: flex-start; flex-direction: column; gap: 13px; }
   .curral-progress { align-self: flex-end; }
   .curral-card { padding: 16px; }
+  .curral-gms-grid { grid-template-columns: 1fr; gap: 10px; }
+  .curral-gms-heading { align-items: flex-start; flex-direction: column; gap: 3px; }
+  .curral-record { align-items: flex-start; }
+  .curral-record-edit { margin-top: 1px; }
   .curral-review-actions { align-items: stretch; flex-direction: column-reverse; }
   .curral-review-actions .curral-submit { flex: none; }
 }

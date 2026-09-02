@@ -9,6 +9,9 @@ type EstacaoCNL = {
   codigo: string
   ultimoValor: number | null
   dataHora: string
+  precipitacaoAtual: number | null
+  precipitacaoDataHora: string
+  precipitacaoDiaria: PrecipitacaoDia[]
   acumulados: {
     umaHora: number | null
     seisHoras: number | null
@@ -16,6 +19,13 @@ type EstacaoCNL = {
     vinteQuatroHoras: number | null
     setentaEDuasHoras: number | null
   }
+}
+
+type PrecipitacaoDia = {
+  data: string
+  total: number
+  pontos: number
+  ultimaDataHora: string
 }
 
 type LeituraCNL = EstacaoCNL & {
@@ -62,6 +72,7 @@ type Props = {
 }
 
 const INTERVALO_ATUALIZACAO = 5 * 60 * 1000
+const FUSO_HORARIO = 'America/Sao_Paulo'
 
 function formatarMm(valor: number | null | undefined): string {
   return valor == null || !Number.isFinite(valor) ? '—' : `${valor.toLocaleString('pt-BR', { maximumFractionDigits: 2 })} mm`
@@ -71,20 +82,29 @@ function formatarCota(valor: number | null | undefined): string {
   return valor == null || !Number.isFinite(valor) ? '—' : `${valor.toLocaleString('pt-BR', { maximumFractionDigits: 2 })} m`
 }
 
+function formatarDiaPrecipitacao(data: string): string {
+  const partes = data.split('-')
+  return partes.length === 3 ? `${partes[2]}/${partes[1]}` : data
+}
+
 function formatarDataHora(iso?: string): string {
   if (!iso) return '—'
-  const cemaden = iso.match(/^(\d{4}-\d{2}-\d{2})\s+(\d{2}:\d{2}(?::\d{2})?)/)
-  const data = new Date(cemaden ? `${cemaden[1]}T${cemaden[2]}Z` : iso)
-  return Number.isNaN(data.getTime())
-    ? iso
-    : data.toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })
+  const data = parseDataCemaden(iso)
+  return data
+    ? data.toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short', timeZone: FUSO_HORARIO })
+    : iso
 }
 
 function parseDataCemaden(valor: string): Date | null {
-  const match = valor?.match(/^(\d{2})\/(\d{2})\/(\d{2,4})\s+(\d{2}):(\d{2})$/)
-  if (!match) return null
-  const ano = Number(match[3].length === 2 ? `20${match[3]}` : match[3])
-  const data = new Date(Date.UTC(ano, Number(match[2]) - 1, Number(match[1]), Number(match[4]), Number(match[5])))
+  const texto = String(valor || '').trim()
+  const brasileiro = texto.match(/^(\d{2})\/(\d{2})\/(\d{2,4})\s+(\d{2}):(\d{2})(?::(\d{2}))?$/)
+  if (brasileiro) {
+    const ano = Number(brasileiro[3].length === 2 ? `20${brasileiro[3]}` : brasileiro[3])
+    const data = new Date(Date.UTC(ano, Number(brasileiro[2]) - 1, Number(brasileiro[1]), Number(brasileiro[4]), Number(brasileiro[5]), Number(brasileiro[6] || 0)))
+    return Number.isNaN(data.getTime()) ? null : data
+  }
+  const isoSemFuso = texto.match(/^(\d{4}-\d{2}-\d{2})\s+(\d{2}:\d{2}(?::\d{2})?)/)
+  const data = new Date(isoSemFuso ? `${isoSemFuso[1]}T${isoSemFuso[2]}Z` : texto)
   return Number.isNaN(data.getTime()) ? null : data
 }
 
@@ -136,12 +156,18 @@ function ChartaChuva({ pontos }: { pontos: PontoSerie[] }) {
         })}
         <text x={margem.esquerda - 8} y={margem.topo + 4} textAnchor="end" className="cnl-grafico-label">{maior.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}</text>
         <text x={margem.esquerda - 8} y={margem.topo + areaAltura + 4} textAnchor="end" className="cnl-grafico-label">0</text>
-        <text x={margem.esquerda} y={altura - 8} className="cnl-grafico-label">{pontos[0]?.hora}</text>
-        <text x={largura - margem.direita} y={altura - 8} textAnchor="end" className="cnl-grafico-label">{pontos.at(-1)?.hora}</text>
+        <text x={margem.esquerda} y={altura - 8} className="cnl-grafico-label">{formatarPontoChuva(pontos[0])}</text>
+        <text x={largura - margem.direita} y={altura - 8} textAnchor="end" className="cnl-grafico-label">{formatarPontoChuva(pontos.at(-1))}</text>
       </svg>
       <div className="cnl-grafico-legenda">Acumulado horário em milímetros · horário informado pelo CEMADEN</div>
     </div>
   )
+}
+
+function formatarPontoChuva(ponto?: PontoSerie): string {
+  if (!ponto) return '—'
+  const hora = ponto.hora.match(/\d{1,2}/)?.[0]
+  return hora ? formatarDataHora(`${ponto.data} ${hora.padStart(2, '0')}:00`) : ponto.hora
 }
 
 function GraficoNivel({ pontos }: { pontos: PontoNivel[] }) {
@@ -235,6 +261,14 @@ export default function MonitoramentoCNL({ onAbrirMapa }: Props) {
     return dados.estacao.acumulados.vinteQuatroHoras
   }, [dados])
 
+  const diasPrecipitacao = useMemo(() => {
+    if (!dados) return []
+    return [...new Set(dados.estacoes.flatMap((estacao) => estacao.precipitacaoDiaria.map((dia) => dia.data)))]
+      .sort()
+      .reverse()
+      .slice(0, 2)
+  }, [dados])
+
   if (carregando && !dados) {
     return <div className="cnl-pagina"><div className="cnl-carregando">Consultando estações do CEMADEN…</div></div>
   }
@@ -287,7 +321,7 @@ export default function MonitoramentoCNL({ onAbrirMapa }: Props) {
         </div>
         <div className={`cnl-status-principal cnl-status-${estadoPrincipal}`}>
           <span className="cnl-status-ponto" />
-          <div><strong>{rotuloEstado(estadoPrincipal)}</strong><small>{estacao.dataHora || 'Sem horário'}</small></div>
+          <div><strong>{rotuloEstado(estadoPrincipal)}</strong><small>{formatarDataHora(estacao.dataHora) || 'Sem horário'} · Brasília</small></div>
         </div>
         <div className="cnl-hero-acoes">
           {onAbrirMapa && estacao.latitude != null && estacao.longitude != null && (
@@ -309,9 +343,15 @@ export default function MonitoramentoCNL({ onAbrirMapa }: Props) {
           classe="cnl-metrica-azul"
         />
         <CartaoMetrica
-          rotulo="Acumulado em 24h"
+          rotulo="Chuva na última hora"
+          valor={formatarMm(estacao.precipitacaoAtual)}
+          detalhe={`Leitura em ${formatarDataHora(estacao.precipitacaoDataHora)}`}
+          classe="cnl-metrica-verde"
+        />
+        <CartaoMetrica
+          rotulo="Acumulado móvel em 24h"
           valor={formatarMm(acumulado24h)}
-          detalhe="Indicador de atenção para chuva"
+          detalhe="Janela móvel informada pelo CEMADEN"
           classe={acumulado24h != null && acumulado24h >= 30 ? 'cnl-metrica-laranja' : 'cnl-metrica-verde'}
         />
         <CartaoMetrica
@@ -343,7 +383,7 @@ export default function MonitoramentoCNL({ onAbrirMapa }: Props) {
       <section className="cnl-bloco">
         <div className="cnl-bloco-cabecalho">
           <div><span className="cnl-eyebrow">Cota instantânea</span><h2>Nível do Rio Bananeiras</h2></div>
-          <span className="cnl-badge-fonte cnl-badge-ao-vivo"><span className="cnl-badge-ponto" /> ao vivo · 5 min</span>
+          <span className="cnl-badge-fonte cnl-badge-ao-vivo"><span className="cnl-badge-ponto" /> ao vivo · 5 min · Brasília</span>
         </div>
         <GraficoNivel pontos={dados.serieNivel} />
       </section>
@@ -358,6 +398,40 @@ export default function MonitoramentoCNL({ onAbrirMapa }: Props) {
           <div className="cnl-cota cnl-cota-alerta"><span className="cnl-cota-linha" /><span>Alerta</span><strong>{formatarCota(estacao.cotas.alerta)}</strong><small>preparar resposta</small></div>
           <div className="cnl-cota cnl-cota-transbordamento"><span className="cnl-cota-linha" /><span>Transbordamento</span><strong>{formatarCota(estacao.cotas.transbordamento)}</strong><small>risco de cheia</small></div>
         </div>
+      </section>
+
+      <section className="cnl-bloco">
+        <div className="cnl-bloco-cabecalho">
+          <div><span className="cnl-eyebrow">Precipitação diária</span><h2>Acumulado por estação</h2></div>
+          <span className="cnl-badge-fonte cnl-badge-ao-vivo"><span className="cnl-badge-ponto" /> atualiza · 5 min</span>
+        </div>
+        {diasPrecipitacao.length === 0 ? (
+          <div className="cnl-grafico-vazio">Ainda não há leituras diárias disponíveis.</div>
+        ) : (
+          <div className="cnl-tabela-chuva-wrap">
+            <div className="cnl-tabela-chuva" role="table" aria-label="Acumulado diário de precipitação por estação">
+              <div className="cnl-tabela-chuva-linha cnl-tabela-chuva-cabecalho" role="row" style={{ gridTemplateColumns: `minmax(9rem, 1.6fr) minmax(5.5rem, 0.8fr) repeat(${diasPrecipitacao.length}, minmax(5rem, 1fr))` }}>
+                <strong role="columnheader">Estação</strong>
+                <strong role="columnheader">Agora</strong>
+                {diasPrecipitacao.map((dia) => <strong key={dia} role="columnheader">{formatarDiaPrecipitacao(dia)}</strong>)}
+              </div>
+              {dados.estacoes.map((item) => (
+                <div key={item.id} className="cnl-tabela-chuva-linha" role="row" style={{ gridTemplateColumns: `minmax(9rem, 1.6fr) minmax(5.5rem, 0.8fr) repeat(${diasPrecipitacao.length}, minmax(5rem, 1fr))` }}>
+                  <span className="cnl-tabela-chuva-estacao" role="cell">
+                    <strong>{item.nome}</strong>
+                    <small>{item.codigo || `CEMADEN ${item.id}`}</small>
+                  </span>
+                  <span role="cell" className="cnl-tabela-chuva-agora">{formatarMm(item.precipitacaoAtual)}<small>{formatarDataHora(item.precipitacaoDataHora)}</small></span>
+                  {diasPrecipitacao.map((dia) => {
+                    const leitura = item.precipitacaoDiaria.find((itemDia) => itemDia.data === dia)
+                    return <span key={dia} role="cell" className="cnl-tabela-chuva-total">{formatarMm(leitura?.total)}</span>
+                  })}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+        <p className="cnl-tabela-chuva-nota">“Agora” é o acumulado da última hora. Os totais diários são a soma das leituras horárias do CEMADEN no horário de Brasília.</p>
       </section>
 
       <section className="cnl-bloco">
@@ -377,7 +451,7 @@ export default function MonitoramentoCNL({ onAbrirMapa }: Props) {
                   {selecionada && <span className="cnl-tag-rio">RIO</span>}
                 </div>
                 <span className="cnl-estacao-codigo">{item.codigo || `CEMADEN ${item.id}`}</span>
-                <span className="cnl-estacao-leitura">{formatarMm(item.acumulados.vinteQuatroHoras)} <small>em 24h</small></span>
+                <span className="cnl-estacao-leitura">{formatarMm(item.precipitacaoDiaria.at(-1)?.total)} <small>no dia</small></span>
                 <span className={`cnl-estacao-status cnl-estacao-status-${estado}`}>{rotuloEstado(estado)}</span>
               </div>
             )

@@ -2956,6 +2956,7 @@ const CNL_CATALOGO_URL = 'https://resources.cemaden.gov.br/graficos/interativo/g
 const CNL_RECURSOS_URL = 'https://mapservices.cemaden.gov.br/MapaInterativoWS/resources'
 const CNL_NIVEL_URL = 'https://resources.cemaden.gov.br/graficos/cemaden/hidro/resources/json/MedidaResource.php?est=6622&sen=20&pag=24'
 const CNL_FONTE_URL = `https://resources.cemaden.gov.br/graficos/interativo/grafico_CEMADEN.php?idpcd=${CNL_ESTACAO_ID}&uf=MG`
+const CNL_FUSO_HORARIO = 'America/Sao_Paulo'
 let monitoramentoCnlCache = null
 let monitoramentoCnlCacheTs = 0
 const MONITORAMENTO_CNL_TTL_MS = 2 * 60 * 1000
@@ -2975,6 +2976,9 @@ function normalizarEstacaoCnl(estacao) {
     codigo: String(estacao.codEstacao || ''),
     ultimoValor: numeroCemaden(estacao.ultimovalor),
     dataHora: String(estacao.datahoraUltimovalor || ''),
+    precipitacaoAtual: numeroCemaden(estacao.acc1hr),
+    precipitacaoDataHora: String(estacao.datahoraUltimovalor || ''),
+    precipitacaoDiaria: [],
     acumulados: {
       umaHora: numeroCemaden(estacao.acc1hr),
       seisHoras: numeroCemaden(estacao.acc6hr),
@@ -2985,25 +2989,41 @@ function normalizarEstacaoCnl(estacao) {
   }
 }
 
-function montarSerieHorariaCnl(payload) {
+function horaCemadenParaNumero(valor) {
+  const match = String(valor || '').match(/^(\d{1,2})h$/)
+  return match ? Number(match[1]) : null
+}
+
+function extrairPontosChuvaCnl(payload) {
   const horarios = Array.isArray(payload?.horarios) ? payload.horarios : []
   const datas = Array.isArray(payload?.datas) ? payload.datas : []
   const acumulados = Array.isArray(payload?.acumulados) ? payload.acumulados : []
-  const serie = []
+  const pontos = []
 
   acumulados.forEach((linha, indiceData) => {
     if (!Array.isArray(linha)) return
     linha.forEach((valor, indiceHora) => {
       const numero = numeroCemaden(valor)
-      if (numero == null) return
-      serie.push({
-        data: String(datas[indiceData] || ''),
-        hora: String(horarios[indiceHora] || ''),
+      const data = String(datas[indiceData] || '')
+      const hora = String(horarios[indiceHora] || '')
+      const horaNumero = horaCemadenParaNumero(hora)
+      if (numero == null || !data || horaNumero == null) return
+      pontos.push({
+        data,
+        hora,
         valor: numero,
+        dataHora: `${data} ${hora}`,
+        dataHoraMs: dataCemadenParaMs(`${data} ${String(horaNumero).padStart(2, '0')}:00`),
       })
     })
   })
-  return serie.slice(-24)
+  return pontos.sort((a, b) => a.dataHoraMs - b.dataHoraMs)
+}
+
+function montarSerieHorariaCnl(payload) {
+  return extrairPontosChuvaCnl(payload)
+    .slice(-24)
+    .map(({ data, hora, valor }) => ({ data, hora, valor }))
 }
 
 function dataCemadenParaMs(valor) {
@@ -3016,6 +3036,68 @@ function dataCemadenParaMs(valor) {
   const isoSemFuso = texto.match(/^(\d{4}-\d{2}-\d{2})\s+(\d{2}:\d{2}(?::\d{2})?)/)
   if (isoSemFuso) return Date.parse(`${isoSemFuso[1]}T${isoSemFuso[2]}Z`)
   return Date.parse(texto)
+}
+
+function chaveDiaBrasilia(dataHoraMs) {
+  if (!Number.isFinite(dataHoraMs)) return ''
+  const partes = new Intl.DateTimeFormat('en-US', {
+    timeZone: CNL_FUSO_HORARIO,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(new Date(dataHoraMs))
+  const valores = Object.fromEntries(partes.map((parte) => [parte.type, parte.value]))
+  return `${valores.year}-${valores.month}-${valores.day}`
+}
+
+function montarPrecipitacaoDiariaCnl(payload) {
+  const dias = new Map()
+  extrairPontosChuvaCnl(payload).forEach((ponto) => {
+    const data = chaveDiaBrasilia(ponto.dataHoraMs)
+    if (!data) return
+    const dia = dias.get(data) || {
+      data,
+      total: 0,
+      pontos: 0,
+      ultimaDataHora: '',
+      ultimaDataHoraMs: -Infinity,
+    }
+    dia.total += ponto.valor
+    dia.pontos += 1
+    if (ponto.dataHoraMs >= dia.ultimaDataHoraMs) {
+      dia.ultimaDataHora = `${ponto.data} ${ponto.hora}`
+      dia.ultimaDataHoraMs = ponto.dataHoraMs
+    }
+    dias.set(data, dia)
+  })
+  return [...dias.values()]
+    .sort((a, b) => a.data.localeCompare(b.data))
+    .map(({ ultimaDataHoraMs, ...dia }) => ({
+      ...dia,
+      total: Number(dia.total.toFixed(2)),
+    }))
+}
+
+function anexarChuvaAtualNaSerie(serie, estacao, dataHoraFallback = '') {
+  const valor = numeroCemaden(estacao?.acc1hr)
+  const dataHora = String(estacao?.datahoraUltimovalor || dataHoraFallback || '')
+  if (valor == null || !dataHora) return serie
+  const brasileiro = dataHora.match(/^(\d{2})\/(\d{2})\/(\d{2,4})\s+(\d{2}):(\d{2})/)
+  if (!brasileiro) return serie
+  const ano = brasileiro[3].length === 2 ? `20${brasileiro[3]}` : brasileiro[3]
+  const pontoAtual = {
+    data: `${brasileiro[1]}/${brasileiro[2]}/${ano}`,
+    hora: `${Number(brasileiro[4])}h`,
+    valor,
+  }
+  const atualizado = Array.isArray(serie) ? [...serie] : []
+  const ultimo = atualizado.at(-1)
+  if (ultimo?.data === pontoAtual.data && ultimo?.hora === pontoAtual.hora) {
+    atualizado[atualizado.length - 1] = pontoAtual
+  } else {
+    atualizado.push(pontoAtual)
+  }
+  return atualizado.slice(-24)
 }
 
 function normalizarMedidaNivelCnl(medida) {
@@ -3098,6 +3180,30 @@ app.get('/api/monitoramento-cnl', async (_req, res) => {
       : null
     const estacaoHorario = horario?.estacao || {}
     if (!estacaoCatalogo || !estacaoHorario) throw new Error('Estação Rio Bananeiras não encontrada no CEMADEN')
+    const estacoesCatalogo = (Array.isArray(catalogo) ? catalogo : [])
+      .filter((item) => Number(item?.codibge) === Number(estacaoCatalogo.codibge))
+    const chuvaPayloads = new Map([[CNL_ESTACAO_ID, horario]])
+    const falhasChuva = []
+    const respostasChuva = await Promise.allSettled(
+      estacoesCatalogo
+        .map((item) => Number(item?.idestacao))
+        .filter((id) => Number.isFinite(id) && id !== CNL_ESTACAO_ID)
+        .map(async (id) => {
+          const resposta = await fetch(`${CNL_RECURSOS_URL}/horario/${id}/47`, {
+            signal: controlador.signal,
+            headers: { 'User-Agent': 'DefesaCivilOuroBranco/1.0' },
+          })
+          if (!resposta.ok) throw new Error(`estação ${id} respondeu ${resposta.status}`)
+          return { id, payload: await resposta.json() }
+        }),
+    )
+    respostasChuva.forEach((resultado) => {
+      if (resultado.status === 'fulfilled') {
+        chuvaPayloads.set(resultado.value.id, resultado.value.payload)
+      } else {
+        falhasChuva.push(resultado.reason?.message || 'estação sem resposta')
+      }
+    })
     const nivelMedidas = (Array.isArray(medidasNivel) ? medidasNivel : [])
       .map(normalizarMedidaNivelCnl)
       .filter((medida) => medida.valor != null)
@@ -3115,13 +3221,39 @@ app.get('/api/monitoramento-cnl', async (_req, res) => {
         }
       : ultimaMedidaNivel
 
-    const estacoes = (Array.isArray(catalogo) ? catalogo : [])
-      .filter((item) => Number(item?.codibge) === Number(estacaoCatalogo.codibge))
+    const dadosChuvaPorEstacao = new Map(
+      [...chuvaPayloads.entries()].map(([id, payload]) => {
+        const pontos = extrairPontosChuvaCnl(payload)
+        return [id, {
+          pontos,
+          diaria: montarPrecipitacaoDiariaCnl(payload),
+        }]
+      }),
+    )
+    const estacoes = estacoesCatalogo
       .map(normalizarEstacaoCnl)
+      .map((item) => {
+        const chuva = dadosChuvaPorEstacao.get(item.id)
+        const ultimaChuva = chuva?.pontos.at(-1)
+        return {
+          ...item,
+          dataHora: item.dataHora || item.precipitacaoDataHora,
+          precipitacaoAtual: item.precipitacaoAtual ?? ultimaChuva?.valor ?? null,
+          precipitacaoDataHora: item.precipitacaoDataHora || ultimaChuva?.dataHora || '',
+          precipitacaoDiaria: chuva?.diaria || [],
+        }
+      })
       .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
     const base = normalizarEstacaoCnl(estacaoCatalogo)
+    const chuvaPrincipal = dadosChuvaPorEstacao.get(CNL_ESTACAO_ID)
+    const dataHoraChuvaPrincipal = base.precipitacaoDataHora || nivelAtual?.dataHora || ''
     const estacao = {
       ...base,
+      ultimoValor: nivelAtual?.valor ?? base.ultimoValor,
+      dataHora: nivelAtual?.dataHora || base.dataHora,
+      precipitacaoAtual: base.precipitacaoAtual ?? chuvaPrincipal?.pontos.at(-1)?.valor ?? null,
+      precipitacaoDataHora: dataHoraChuvaPrincipal,
+      precipitacaoDiaria: chuvaPrincipal?.diaria || [],
       codigo: String(estacaoHorario.codEstacao || base.codigo || ''),
       latitude: numeroCemaden(estacaoHorario.latitude),
       longitude: numeroCemaden(estacaoHorario.longitude),
@@ -3135,16 +3267,20 @@ app.get('/api/monitoramento-cnl', async (_req, res) => {
     }
 
     const serieNivel = anexarNivelAtualNaSerie(montarSerieNivelCnl(medidasNivel), nivelAtual)
+    const serieChuva = anexarChuvaAtualNaSerie(montarSerieHorariaCnl(horario), estacaoCatalogo, nivelAtual?.dataHora)
     monitoramentoCnlCache = {
       sucesso: true,
       estacao,
       estacoes,
-      serie: montarSerieHorariaCnl(horario),
+      serie: serieChuva,
       nivelAtual,
       serieNivel,
       atualizadoEm: new Date().toISOString(),
       fonte: CNL_FONTE_URL,
-      aviso: 'Nível calculado pelo recurso oficial MedidaResource do CEMADEN: offset - valor.',
+      aviso: [
+        'Nível calculado pelo recurso oficial MedidaResource do CEMADEN: offset - valor.',
+        falhasChuva.length ? `Precipitação diária indisponível para ${falhasChuva.length} estação(ões) neste ciclo.` : '',
+      ].filter(Boolean).join(' '),
     }
     monitoramentoCnlCacheTs = agora
     res.set('Cache-Control', 'no-store')

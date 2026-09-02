@@ -82,7 +82,7 @@
 .cnl-hero-acoes { display: flex; flex-wrap: wrap; gap: 0.45rem; margin-top: 0.75rem; }
 .cnl-btn-secundario { display: inline-flex; align-items: center; justify-content: center; color: #e6fffb; background: rgba(255,255,255,0.13); padding: 0.55rem 0.7rem; font-size: 0.73rem; text-decoration: none; }
 
-.cnl-metricas { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem; margin-top: 0.7rem; }
+.cnl-metricas { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.5rem; margin-top: 0.7rem; }
 .cnl-metrica { min-width: 0; padding: 0.75rem 0.65rem; border: 1px solid #dbe8ea; border-radius: 12px; background: #fff; box-shadow: 0 2px 8px rgba(18,48,71,0.04); }
 .cnl-metrica-rotulo, .cnl-metrica-detalhe { display: block; }
 .cnl-metrica-rotulo { min-height: 1.55rem; color: #607887; text-transform: uppercase; letter-spacing: 0.04em; font-size: 0.6rem; font-weight: 800; }
@@ -167,6 +167,20 @@
 .cnl-cota-atencao .cnl-cota-linha { background: #eab308; }
 .cnl-cota-alerta .cnl-cota-linha { background: #f97316; }
 .cnl-cota-transbordamento .cnl-cota-linha { background: #dc2626; }
+
+.cnl-tabela-chuva-wrap { margin-top: 0.7rem; overflow-x: auto; border: 1px solid #e4edef; border-radius: 10px; }
+.cnl-tabela-chuva { min-width: 30rem; }
+.cnl-tabela-chuva-linha { display: grid; align-items: center; gap: 0.45rem; padding: 0.65rem 0.7rem; border-top: 1px solid #edf2f3; }
+.cnl-tabela-chuva-cabecalho { border-top: 0; color: #71858e; background: #f7fafb; text-transform: uppercase; letter-spacing: 0.04em; font-size: 0.58rem; }
+.cnl-tabela-chuva-cabecalho strong:not(:first-child) { text-align: right; }
+.cnl-tabela-chuva-estacao, .cnl-tabela-chuva-agora, .cnl-tabela-chuva-total { min-width: 0; }
+.cnl-tabela-chuva-estacao strong, .cnl-tabela-chuva-estacao small, .cnl-tabela-chuva-agora, .cnl-tabela-chuva-agora small { display: block; }
+.cnl-tabela-chuva-estacao strong { overflow: hidden; color: #1d4657; font-size: 0.75rem; text-overflow: ellipsis; white-space: nowrap; }
+.cnl-tabela-chuva-estacao small { margin-top: 0.14rem; color: #8a9ba1; font-size: 0.57rem; }
+.cnl-tabela-chuva-agora, .cnl-tabela-chuva-total { color: #17768a; font-size: 0.72rem; font-weight: 800; text-align: right; white-space: nowrap; }
+.cnl-tabela-chuva-agora small { margin-top: 0.14rem; color: #8a9ba1; font-size: 0.55rem; font-weight: 500; }
+.cnl-tabela-chuva-total { color: #176b62; }
+.cnl-tabela-chuva-nota { margin: 0.55rem 0 0; color: #84949b; font-size: 0.63rem; line-height: 1.35; }
 
 .cnl-estacoes { display: flex; flex-direction: column; gap: 0.45rem; margin-top: 0.7rem; }
 .cnl-estacao { display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(0, 0.9fr) auto auto; align-items: center; gap: 0.45rem; padding: 0.62rem 0.65rem; border: 1px solid #e4edef; border-radius: 10px; background: #fbfdfd; }

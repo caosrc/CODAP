@@ -460,7 +460,7 @@ function nomeDiaSemana(dateStr: string): string {
   return dias[d.getDay()]
 }
 
-// Centro de Conselheiro Lafaiete; o zoom inicial mantém o enquadramento regional.
+// Centro de Conselheiro Lafaiete; zoom 12 enquadra a cidade e suas ruas.
 const CONSELHEIRO_LAFAIETE: [number, number] = [-20.6604, -43.7863]
 const RAIO_RADAR_CHUVA_METROS = 10_000
 
@@ -1298,7 +1298,7 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
     <div className="mapa-wrapper">
       <MapContainer
         center={CONSELHEIRO_LAFAIETE}
-        zoom={11}
+        zoom={12}
         minZoom={8}
         // O mapa pode ser arrastado livremente para consultar outras regiões.
         dragging={true}

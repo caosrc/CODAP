@@ -4,7 +4,7 @@ import './App.css'
 import Login, { estaLogado, agenteEscolhido, orgaoEscolhido, getAgenteLogado, getOrgaoSelecionado } from './components/Login'
 import type { Ocorrencia, NivelRisco } from './types'
 import { NATUREZA_ICONE } from './types'
-import { listarOcorrencias, criarOcorrencia, atualizarOcorrencia, enviarOcorrenciaServidor, listarRegistrosCurral, criarRegistroCurral, atualizarRegistroCurral, listarRelatoriosProcon, criarRelatorioProcon, enviarRelatorioProcon, ApiError } from './api'
+import { listarOcorrencias, enviarOcorrenciaServidor, listarRegistrosCurral, ApiError } from './api'
 import { wsOn, wsAnunciarOnline } from './wsClient'
 import { supabase, supabaseDisponivel } from './supabaseClient'
 import { matApi } from './matApi'
@@ -17,9 +17,7 @@ import BannerConvocacao from './components/BannerConvocacao'
 import BannerRadarNotificacao from './components/BannerRadarNotificacao'
 import { cacheOcorrencias, getCachedOcorrencias, getPending, removePending, countPending, clearAllPending } from './offline'
 import { calcularAreaM2, formatarArea } from './components/PoligonoAreaQueimada'
-import type { CurralDados, CurralRegistro } from './components/Curral'
-import type { ProconDados, ProconRegistro } from './components/Procon'
-import ExportacaoFiscalizacao from './components/ExportacaoFiscalizacao'
+import type { CurralRegistro } from './components/Curral'
 
 interface EquipamentoCampoMapa {
   id: number
@@ -42,12 +40,8 @@ const SosOverlay = lazy(() => import('./components/SosOverlay'))
 const MateriaisEmprestimos = lazy(() => import('./components/MateriaisEmprestimos'))
 const Planejamento = lazy(() => import('./components/Planejamento'))
 const MonitoramentoCNL = lazy(() => import('./components/MonitoramentoCNL'))
-const Curral = lazy(() => import('./components/Curral'))
-const Procon = lazy(() => import('./components/Procon'))
 
-type Aba = 'lista' | 'mapa' | 'nova' | 'viatura' | 'escala' | 'materiais' | 'planejamento' | 'monitoramento' | 'curral' | 'procon'
-
-const PROCON_LOCAL_KEY = 'procon-relatorios-v1'
+type Aba = 'lista' | 'mapa' | 'nova' | 'viatura' | 'escala' | 'materiais' | 'planejamento' | 'monitoramento'
 const NOMES_ORGAOS = {
   'defesa-civil': 'Defesa Civil',
   curral: 'Curral',
@@ -104,17 +98,6 @@ function curralParaOcorrenciaMapa(registro: CurralRegistro): Ocorrencia {
     focos_incendio: null,
     poligono_area_queimada: null,
     origem: 'curral',
-  }
-}
-
-function carregarRelatoriosProconLocais(): ProconRegistro[] {
-  try {
-    const salvo = localStorage.getItem(PROCON_LOCAL_KEY)
-    if (!salvo) return []
-    const registros = JSON.parse(salvo) as ProconRegistro[]
-    return Array.isArray(registros) ? registros : []
-  } catch {
-    return []
   }
 }
 
@@ -286,11 +269,6 @@ export default function App() {
   const [abrirCampoId, setAbrirCampoId] = useState<number | null>(null)
   const [abrirChecklistId, setAbrirChecklistId] = useState<number | null>(null)
   const [registrosCurral, setRegistrosCurral] = useState<CurralRegistro[]>([])
-  const [carregandoCurral, setCarregandoCurral] = useState(false)
-  const [erroCurral, setErroCurral] = useState<string | null>(null)
-  const [relatoriosProcon, setRelatoriosProcon] = useState<ProconRegistro[]>(carregarRelatoriosProconLocais)
-  const [carregandoProcon, setCarregandoProcon] = useState(false)
-  const [erroProcon, setErroProcon] = useState<string | null>(null)
 
   useEffect(() => {
     function abrirChecklist(e: Event) {
@@ -330,129 +308,22 @@ export default function App() {
   }, [])
 
   const carregarCurral = useCallback(async () => {
-    setCarregandoCurral(true)
-    setErroCurral(null)
     try {
       setRegistrosCurral(await listarRegistrosCurral())
     } catch (erro) {
-      setErroCurral(erro instanceof Error ? erro.message : 'Não foi possível carregar os registros.')
-    } finally {
-      setCarregandoCurral(false)
+      console.warn('[Curral] Não foi possível carregar registros legados para o mapa:', erro)
     }
   }, [])
-
-  const carregarProcon = useCallback(async () => {
-    setCarregandoProcon(true)
-    setErroProcon(null)
-    try {
-      const locais = carregarRelatoriosProconLocais()
-      const remotos = await listarRelatoriosProcon()
-      const porId = new Map<string, ProconRegistro>()
-      locais.forEach((registro) => porId.set(String(registro.id), registro))
-      remotos.forEach((registro) => porId.set(String(registro.id), registro))
-      setRelatoriosProcon(Array.from(porId.values()).sort((a, b) => String(b.identificacao.horaInicio).localeCompare(String(a.identificacao.horaInicio))).slice(0, 50))
-    } catch (erro) {
-      setRelatoriosProcon(carregarRelatoriosProconLocais())
-      setErroProcon(erro instanceof Error ? erro.message : 'Não foi possível consultar o sistema do órgão.')
-    } finally {
-      setCarregandoProcon(false)
-    }
-  }, [])
-
-  const salvarProcon = useCallback(async (dados: ProconDados): Promise<ProconRegistro> => {
-    const registro: ProconRegistro = {
-      ...dados,
-      id: `procon-${Date.now()}`,
-      status: 'pendente',
-    }
-    const salvo = await criarRelatorioProcon(registro)
-    setRelatoriosProcon((anteriores) => {
-      const atualizados = [salvo, ...anteriores.filter((item) => String(item.id) !== String(salvo.id))].slice(0, 50)
-      localStorage.setItem(PROCON_LOCAL_KEY, JSON.stringify(atualizados))
-      return atualizados
-    })
-    return salvo
-  }, [])
-
-  const enviarProcon = useCallback(async (id: string | number) => {
-    const enviado = await enviarRelatorioProcon(id)
-    setRelatoriosProcon((anteriores) => {
-      const atualizados = anteriores.map((registro) => String(registro.id) === String(id) ? enviado : registro)
-      localStorage.setItem(PROCON_LOCAL_KEY, JSON.stringify(atualizados))
-      return atualizados
-    })
-  }, [])
-
-  useEffect(() => {
-    if (aba === 'curral') carregarCurral()
-  }, [aba, carregarCurral])
 
   useEffect(() => {
     if (aba === 'mapa') carregarCurral()
   }, [aba, carregarCurral])
 
   useEffect(() => {
-    if (aba === 'procon') carregarProcon()
-  }, [aba, carregarProcon])
-
-  useEffect(() => {
     return wsOn('curral_atualizado', () => {
-      if (aba === 'curral' || aba === 'mapa') carregarCurral()
+      if (aba === 'mapa') carregarCurral()
     })
   }, [aba, carregarCurral])
-
-  useEffect(() => {
-    return wsOn('procon_atualizado', () => {
-      if (aba === 'procon') carregarProcon()
-    })
-  }, [aba, carregarProcon])
-
-  const salvarCurral = useCallback(async (dados: CurralDados, ocorrenciaId?: number | null) => {
-    const agente = getAgenteLogado()
-    const capturadoEm = dados.capturadoEm || new Date().toISOString()
-    await criarRegistroCurral(dados, agente)
-    if (ocorrenciaId && ocorrenciaId > 0) {
-      try {
-        await atualizarOcorrencia(ocorrenciaId, {
-          tipo: 'Diligência',
-          natureza: 'Captura de animal',
-          subnatureza: dados.porte ? `Porte: ${dados.porte}` : null,
-          nivel_risco: 'baixo',
-          status_oc: 'ativo',
-          fotos: dados.fotos,
-          descricoes_fotos: [],
-          lat: dados.latitude,
-          lng: dados.longitude,
-          endereco: dados.localDescricao || 'Localização da captura do animal',
-          proprietario: dados.identificacao || null,
-          situacao: [
-            dados.especie || 'Animal não identificado',
-            dados.sexo ? `Sexo: ${dados.sexo}` : '',
-            dados.observacoes || '',
-          ].filter(Boolean).join(' · '),
-          recomendacao: 'Encaminhar ao Curral para acompanhamento.',
-          conclusao: null,
-          data_ocorrencia: capturadoEm.slice(0, 10),
-          hora_inicio: capturadoEm.slice(11, 16) || null,
-          hora_fim: null,
-          horas_total: null,
-          horas_sobreaviso: null,
-          agentes: agente ? [agente] : [],
-          vistorias: [],
-          focos_incendio: null,
-          poligono_area_queimada: null,
-        })
-      } catch (erro) {
-        console.warn('[Curral] ocorrência criada, mas não foi possível atualizar seus detalhes:', erro)
-      }
-    }
-    await carregarCurral()
-  }, [carregarCurral])
-
-  const editarCurral = useCallback(async (id: string | number, dados: CurralDados) => {
-    await atualizarRegistroCurral(id, dados)
-    await carregarCurral()
-  }, [carregarCurral])
 
   // Carrega equipamentos em campo para o mapa
   useEffect(() => {
@@ -672,43 +543,6 @@ export default function App() {
     setCarregando(false)
     await atualizarPendingCount()
   }, [atualizarPendingCount])
-
-  const criarOcorrenciaCapturaAnimal = useCallback(async (dados: CurralDados) => {
-    const agente = getAgenteLogado()
-    const capturadoEm = dados.capturadoEm || new Date().toISOString()
-    const ocorrencia = await criarOcorrencia({
-      tipo: 'Diligência',
-      natureza: 'Captura de animal',
-      subnatureza: dados.porte ? `Porte: ${dados.porte}` : null,
-      nivel_risco: 'baixo',
-      status_oc: 'ativo',
-      fotos: dados.fotos,
-      descricoes_fotos: [],
-      lat: dados.latitude,
-      lng: dados.longitude,
-      endereco: dados.localDescricao || 'Localização da captura do animal',
-      proprietario: dados.identificacao || null,
-      situacao: [
-        dados.especie || 'Animal não identificado',
-        dados.sexo ? `Sexo: ${dados.sexo}` : '',
-        dados.observacoes || '',
-      ].filter(Boolean).join(' · '),
-      recomendacao: 'Encaminhar ao Curral para acompanhamento.',
-      conclusao: null,
-      data_ocorrencia: capturadoEm.slice(0, 10),
-      hora_inicio: capturadoEm.slice(11, 16) || null,
-      hora_fim: null,
-      horas_total: null,
-      horas_sobreaviso: null,
-      agentes: agente ? [agente] : [],
-      responsavel_registro: agente || null,
-      vistorias: [],
-      focos_incendio: null,
-      poligono_area_queimada: null,
-    })
-    await carregar()
-    return Number(ocorrencia.id)
-  }, [carregar])
 
   const sincronizar = useCallback(async (silencioso = false) => {
     if (sincronizando) return
@@ -1080,6 +914,7 @@ export default function App() {
           }}
           onVoltar={() => setAba('lista')}
           isOnline={isOnline}
+          orgao={orgaoAtual}
         />
       </Suspense>
     )
@@ -1209,13 +1044,6 @@ export default function App() {
       )}
 
       <div className="conteudo">
-        {(aba === 'curral' || aba === 'procon') && (
-          <ExportacaoFiscalizacao
-            modulo={aba}
-            registrosCurral={registrosCurral}
-            relatoriosProcon={relatoriosProcon}
-          />
-        )}
         {aba === 'lista' && (
           <>
             <div className="filtros-box">
@@ -1401,40 +1229,6 @@ export default function App() {
           </ErrorBoundary>
         )}
 
-        {aba === 'curral' && (
-          <ErrorBoundary>
-            <Suspense fallback={<LazyFallback />}>
-              <Curral
-                registros={registrosCurral}
-                carregandoLista={carregandoCurral}
-                erroLista={erroCurral}
-                onSalvar={salvarCurral}
-                onAtualizarRegistro={editarCurral}
-                onCapturarGps={criarOcorrenciaCapturaAnimal}
-                onAtualizarLista={carregarCurral}
-                onVoltar={() => setAba('lista')}
-              />
-            </Suspense>
-          </ErrorBoundary>
-        )}
-
-        {aba === 'procon' && (
-          <ErrorBoundary>
-            <Suspense fallback={<LazyFallback />}>
-              <Procon
-                relatorios={relatoriosProcon}
-                carregandoLista={carregandoProcon}
-                erroLista={erroProcon}
-                agenteNome={getAgenteLogado()}
-                onSalvar={salvarProcon}
-                onEnviar={enviarProcon}
-                onAtualizarLista={carregarProcon}
-                onVoltar={() => setAba('lista')}
-              />
-            </Suspense>
-          </ErrorBoundary>
-        )}
-
         {aba === 'monitoramento' && (
           <ErrorBoundary>
             <Suspense fallback={<LazyFallback />}>
@@ -1480,18 +1274,6 @@ export default function App() {
           <span className="nav-emoji">🚗</span>
           <span>Viatura</span>
         </button>
-        {orgaoAtual === 'curral' && (
-          <button className={`nav-btn nav-curral ${aba === 'curral' ? 'ativo' : ''}`} onClick={() => setAba('curral')}>
-            <span className="nav-emoji">🐎</span>
-            <span>Curral</span>
-          </button>
-        )}
-        {orgaoAtual === 'procon' && (
-          <button className={`nav-btn nav-procon ${aba === 'procon' ? 'ativo' : ''}`} onClick={() => setAba('procon')}>
-            <span className="nav-emoji">P</span>
-            <span>Procon</span>
-          </button>
-        )}
         <button className={`nav-btn ${aba === 'materiais' ? 'ativo' : ''}`} onClick={() => setAba('materiais')}>
           <span className="nav-emoji">📦</span>
           <span>Patrimônio</span>

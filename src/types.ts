@@ -60,7 +60,7 @@ export function getSenhaAgente(nome: string): string | null {
   return AGENTE_SENHAS[nome] ?? null
 }
 
-export const TIPOS_OCORRENCIA = ['Diligência', 'Vistoria de Engenharia', 'Vistoria Ambiental', 'Apoio', 'Outro']
+export const TIPOS_OCORRENCIA = ['Diligência', 'Vistoria de Engenharia', 'Vistoria Ambiental', 'Apoio', 'Fiscalização', 'Outro']
 
 export const NATUREZAS = [
   'Árvore Gerando Risco (Caída ou Não)',
@@ -85,6 +85,7 @@ export const NATUREZAS = [
   'Acidente de Trânsito',
   'Sinalização de Segurança',
   'Eventos',
+  'Fiscalização Procon',
 ]
 
 export const NATUREZA_ICONE: Record<string, string> = {
@@ -110,6 +111,7 @@ export const NATUREZA_ICONE: Record<string, string> = {
   'Acidente de Trânsito': '🚗',
   'Sinalização de Segurança': '🚦',
   'Eventos': '🎪',
+  'Fiscalização Procon': '⚖️',
 }
 
 export const NATUREZA_COR: Record<string, string> = {
@@ -135,4 +137,5 @@ export const NATUREZA_COR: Record<string, string> = {
   'Acidente de Trânsito': '#ef4444',
   'Sinalização de Segurança': '#f59e0b',
   'Eventos': '#0891b2',
+  'Fiscalização Procon': '#0f766e',
 }

@@ -9,6 +9,16 @@ import { geocodificarEndereco } from '../offline'
 import { formatarCoordenadas, adicionarMarcaDagua, mensagemErroGps } from '../utils'
 import { calcularHorasTotal, calcularHorasOcorrenciaBanco, formatarHoras, carregarFeriadosCustom } from '../horasUtils'
 import PoligonoAreaQueimada, { type PontoPoligono } from './PoligonoAreaQueimada'
+import CamposOrgao, {
+  nomesCamposOrgao,
+  novaProconOcorrencia,
+  novoCurralOcorrencia,
+} from './CamposOrgao'
+import type {
+  CurralOcorrenciaCampos,
+  OrgaoOperacional,
+  ProconOcorrenciaCampos,
+} from './CamposOrgao'
 
 // Fix Leaflet default icon
 ;(function fixLeafletIcon() {
@@ -33,19 +43,22 @@ interface Props {
   onSalvo: (offline: boolean) => void
   onVoltar: () => void
   isOnline: boolean
+  orgao?: OrgaoOperacional
 }
 
 type FocoIncendio = { lat: number | null; lng: number | null; buscando: boolean }
 
-export default function NovaOcorrencia({ onSalvo, onVoltar, isOnline }: Props) {
+export default function NovaOcorrencia({ onSalvo, onVoltar, isOnline, orgao = 'defesa-civil' }: Props) {
   const hoje = new Date().toISOString().split('T')[0]
+  const ehCurral = orgao === 'curral'
+  const ehProcon = orgao === 'procon'
   const [feriadosCustom, setFeriadosCustom] = useState<string[]>([])
   useEffect(() => {
     carregarFeriadosCustom().then(setFeriadosCustom).catch(() => {})
   }, [])
-  const [tipo, setTipo] = useState('')
+  const [tipo, setTipo] = useState(ehCurral ? 'Diligência' : ehProcon ? 'Fiscalização' : '')
   const [tipoOutro, setTipoOutro] = useState('')
-  const [natureza, setNatureza] = useState('')
+  const [natureza, setNatureza] = useState(ehCurral ? 'Captura de animal' : ehProcon ? 'Fiscalização Procon' : '')
   const [subnatureza, setSubnatureza] = useState('')
   const [nivelRisco, setNivelRisco] = useState<NivelRisco>('baixo')
   const [statusOc, setStatusOc] = useState<StatusOc>('ativo')
@@ -88,6 +101,8 @@ export default function NovaOcorrencia({ onSalvo, onVoltar, isOnline }: Props) {
   const [focosIncendio, setFocosIncendio] = useState<FocoIncendio[]>([{ lat: null, lng: null, buscando: false }])
   // ── Polígono da área queimada ────────────────────────────────────────────────
   const [poligonoArea, setPoligonoArea] = useState<PontoPoligono[]>([])
+  const [curralCampos, setCurralCampos] = useState<CurralOcorrenciaCampos>(novoCurralOcorrencia)
+  const [proconCampos, setProconCampos] = useState<ProconOcorrenciaCampos>(novaProconOcorrencia)
 
   // ── Restaurar rascunho ao abrir o formulário ────────────────────────────────
   useEffect(() => {
@@ -95,6 +110,7 @@ export default function NovaOcorrencia({ onSalvo, onVoltar, isOnline }: Props) {
       const raw = localStorage.getItem(RASCUNHO_KEY)
       if (!raw) return
       const d = JSON.parse(raw)
+      if (d.orgao && d.orgao !== orgao) return
       if (d.tipo) setTipo(d.tipo)
       if (d.tipoOutro) setTipoOutro(d.tipoOutro)
       if (d.natureza) setNatureza(d.natureza)
@@ -117,6 +133,8 @@ export default function NovaOcorrencia({ onSalvo, onVoltar, isOnline }: Props) {
       if (Array.isArray(d.fotos) && d.fotos.length > 0) setFotos(d.fotos)
       if (Array.isArray(d.focosIncendio) && d.focosIncendio.length > 0) setFocosIncendio(d.focosIncendio)
       if (Array.isArray(d.poligonoArea) && d.poligonoArea.length > 0) setPoligonoArea(d.poligonoArea)
+      if (d.curralCampos && typeof d.curralCampos === 'object') setCurralCampos((anterior) => ({ ...anterior, ...d.curralCampos }))
+      if (d.proconCampos && typeof d.proconCampos === 'object') setProconCampos((anterior) => ({ ...anterior, ...d.proconCampos }))
       setRascunhoRestaurado(true)
     } catch {
       // rascunho corrompido — ignora
@@ -133,6 +151,7 @@ export default function NovaOcorrencia({ onSalvo, onVoltar, isOnline }: Props) {
         rua, numero, bairro, lat, lng,
         proprietario, situacao, recomendacao, conclusao,
         agentes, focosIncendio, fotos, poligonoArea,
+        curralCampos, proconCampos, orgao,
       }
       try {
         localStorage.setItem(RASCUNHO_KEY, JSON.stringify(draft))
@@ -148,11 +167,12 @@ export default function NovaOcorrencia({ onSalvo, onVoltar, isOnline }: Props) {
       dataOcorrencia, horaInicio, horaFim,
       rua, numero, bairro, lat, lng,
       proprietario, situacao, recomendacao, conclusao,
-      agentes, focosIncendio, fotos, poligonoArea])
+      agentes, focosIncendio, fotos, poligonoArea, curralCampos, proconCampos, orgao])
 
   const descartarRascunho = useCallback(() => {
     localStorage.removeItem(RASCUNHO_KEY)
-    setTipo(''); setTipoOutro(''); setNatureza(''); setSubnatureza('')
+    setTipo(ehCurral ? 'Diligência' : ehProcon ? 'Fiscalização' : '')
+    setTipoOutro(''); setNatureza(ehCurral ? 'Captura de animal' : ehProcon ? 'Fiscalização Procon' : ''); setSubnatureza('')
     setNivelRisco('baixo'); setStatusOc('ativo')
     setDataOcorrencia(hoje); setHoraInicio(''); setHoraFim('')
     setRua(''); setNumero(''); setBairro('')
@@ -163,6 +183,8 @@ export default function NovaOcorrencia({ onSalvo, onVoltar, isOnline }: Props) {
     setFotos([])
     setFocosIncendio([{ lat: null, lng: null, buscando: false }])
     setPoligonoArea([])
+    setCurralCampos(novoCurralOcorrencia())
+    setProconCampos(novaProconOcorrencia())
     setRascunhoRestaurado(false)
     setErro('')
   }, [hoje])
@@ -324,7 +346,12 @@ export default function NovaOcorrencia({ onSalvo, onVoltar, isOnline }: Props) {
       setErro(`Informe: ${labelSubnatureza}`)
       return
     }
-    if (!lat && !endereco.trim()) {
+    const enderecoEspecializado = ehProcon
+      ? [rua, numero, bairro, proconCampos.complemento, proconCampos.municipio, proconCampos.uf, proconCampos.cep].filter(Boolean).join(', ')
+      : ehCurral
+        ? [endereco, curralCampos.localDescricao].filter(Boolean).join(', ')
+        : endereco
+    if (!lat && !enderecoEspecializado.trim()) {
       setErro('Informe a localização (GPS ou endereço).')
       return
     }
@@ -334,8 +361,8 @@ export default function NovaOcorrencia({ onSalvo, onVoltar, isOnline }: Props) {
     // If address provided but no GPS yet, try to geocode now
     let finalLat = lat
     let finalLng = lng
-    if (!finalLat && endereco.trim() && navigator.onLine) {
-      const geo = await geocodificarEndereco(endereco)
+    if (!finalLat && enderecoEspecializado.trim() && navigator.onLine) {
+      const geo = await geocodificarEndereco(enderecoEspecializado)
       if (geo) { finalLat = geo.lat; finalLng = geo.lng }
     }
 
@@ -352,6 +379,18 @@ export default function NovaOcorrencia({ onSalvo, onVoltar, isOnline }: Props) {
     const horasBanco = (horaInicio && horaFim && dataOcorrencia)
       ? calcularHorasOcorrenciaBanco(dataOcorrencia, horaInicio, horaFim, feriadosCustom)
       : null
+    const detalhesOrgao = nomesCamposOrgao(orgao, curralCampos, proconCampos)
+    const situacaoFinal = [situacao.trim(), detalhesOrgao].filter(Boolean).join('\n\n')
+    const enderecoFinal = ehProcon
+      ? enderecoEspecializado || endereco
+      : ehCurral && !endereco.trim()
+        ? curralCampos.localDescricao
+        : endereco
+    const proprietarioFinal = ehCurral
+      ? curralCampos.identificacao || proprietario
+      : ehProcon
+        ? proconCampos.nomeFantasia || proconCampos.razaoSocial || proprietario
+        : proprietario
 
     const payload = {
       tipo: tipoFinal,
@@ -367,9 +406,9 @@ export default function NovaOcorrencia({ onSalvo, onVoltar, isOnline }: Props) {
       fotos,
       lat: finalLat,
       lng: finalLng,
-      endereco: endereco || null,
-      proprietario: proprietario || null,
-      situacao: situacao || null,
+      endereco: enderecoFinal || null,
+      proprietario: proprietarioFinal || null,
+      situacao: situacaoFinal || null,
       recomendacao: recomendacao || null,
       conclusao: conclusao || null,
       agentes,
@@ -513,6 +552,14 @@ export default function NovaOcorrencia({ onSalvo, onVoltar, isOnline }: Props) {
               />
             </div>
           )}
+
+          <CamposOrgao
+            orgao={orgao}
+            curral={curralCampos}
+            onCurralChange={setCurralCampos}
+            procon={proconCampos}
+            onProconChange={setProconCampos}
+          />
 
           {/* 3 - Nível de Risco */}
           <div className="campo">

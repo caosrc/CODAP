@@ -2,6 +2,8 @@ import { useState, useRef, useEffect } from 'react'
 import { AGENTES, getSenhaAgente, normalizarNomeAgente } from '../types'
 import SelecaoOrgao from './SelecaoOrgao'
 import codapBanner from '../../attached_assets/banner-codap-scaled_1788407707766.jpg'
+import defesaCivilLogo from '../../attached_assets/bandeira-logo_1788407973835.jpg'
+import proconLogo from '../../attached_assets/images_(18)_1788408031391.jpeg'
 
 function useGeolocalizacao() {
   const [pos, setPos] = useState<{ lat: number; lng: number } | null>(null)
@@ -85,6 +87,10 @@ export default function Login({ onLogin, apenasAgente = false }: Props) {
   const [erroSenhaAgente, setErroSenhaAgente] = useState(false)
   const [mostrarSenhaAgente, setMostrarSenhaAgente] = useState(false)
   const senhaAgenteRef = useRef<HTMLInputElement>(null)
+  const orgaoAcesso = getOrgaoSelecionado()
+  const logoAcessoAgente = orgaoAcesso === 'defesa-civil'
+    ? defesaCivilLogo
+    : orgaoAcesso === 'procon' ? proconLogo : codapBanner
 
   useEffect(() => {
     if (etapa === 'credenciais') {
@@ -150,7 +156,11 @@ export default function Login({ onLogin, apenasAgente = false }: Props) {
       <div className="login-tela">
         <div className="login-box">
           <div className="login-logo-wrap">
-            <img className="login-logo" src={codapBanner} alt="CODAP — Consórcio Público" />
+            <img
+              className="login-logo"
+              src={logoAcessoAgente}
+              alt={orgaoAcesso === 'defesa-civil' ? 'Defesa Civil' : orgaoAcesso === 'procon' ? 'Procon' : 'CODAP — Consórcio Público'}
+            />
           </div>
           <div className="login-titulo">CODAP</div>
           <div className="login-subtitulo">Sistema operacional de campo</div>

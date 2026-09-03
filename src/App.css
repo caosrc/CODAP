@@ -4596,6 +4596,11 @@ input, select, textarea { font-family: inherit; }
   font-size: 1.55rem;
 }
 
+.selecao-orgao-logo {
+  object-fit: cover;
+  border: 1px solid #dbe4f2;
+}
+
 .selecao-orgao-card--curral .selecao-orgao-icone {
   background: #fff2e9;
 }

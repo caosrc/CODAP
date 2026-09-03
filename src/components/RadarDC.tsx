@@ -286,7 +286,7 @@ export default function RadarDC() {
       ocorrenciasNotificadasRef.current.add(ocorrencia.id)
       if ('Notification' in window && Notification.permission === 'granted') {
         const detalhes = [ocorrencia.hora, ocorrencia.natureza || 'Ocorrência registrada', ocorrencia.endereco || 'Endereço não informado'].join(' · ')
-        new Notification('Nova ocorrência no Radar DC', { body: detalhes, tag: 'radar-ocorrencia-' + ocorrencia.id })
+        new Notification('Nova ocorrência no Radar Codap', { body: detalhes, tag: 'radar-ocorrencia-' + ocorrencia.id })
       }
     })
   }, [])
@@ -596,7 +596,7 @@ export default function RadarDC() {
     const envolvidos = Array.isArray(mensagem.agentesEnvolvidos) ? mensagem.agentesEnvolvidos.map(String) : []
     if (!envolvidos.includes(agente) || String(mensagem.criadoPor) === agente) return
     if ('Notification' in window && Notification.permission === 'granted') {
-      new Notification('Radar DC — você foi envolvido', {
+      new Notification('Radar Codap — você foi envolvido', {
         body: `${String(mensagem.data || '')} às ${String(mensagem.hora || '')} · ${String(mensagem.texto || '')}`,
         tag: `radar-envolvido-${String(mensagem.id)}`,
       })
@@ -606,8 +606,8 @@ export default function RadarDC() {
   useEffect(() => wsOn('radar_confirmacao', (mensagem) => {
     if (String(mensagem.criadoPor) !== agente || !('Notification' in window) || Notification.permission !== 'granted') return
     const nome = String(mensagem.agente || 'Agente')
-    const texto = String(mensagem.texto || 'notificação do Radar DC')
-    new Notification(mensagem.confirmado === true ? '✅ Radar DC — presença confirmada' : '❌ Radar DC — presença recusada', {
+      const texto = String(mensagem.texto || 'notificação do Radar Codap')
+      new Notification(mensagem.confirmado === true ? '✅ Radar Codap — presença confirmada' : '❌ Radar Codap — presença recusada', {
       body: mensagem.confirmado === true ? `${nome} confirmou presença: ${texto}` : `${nome} informou que não poderá ir: ${texto}`,
       tag: `radar-confirmacao-${String(mensagem.id)}-${nome}`,
     })
@@ -751,7 +751,7 @@ export default function RadarDC() {
                  ))}
                </div>
              </fieldset>
-             <button className="radar-add" type="submit" disabled={!textoNotificacao.trim() || salvando}>{salvando ? 'Salvando...' : '+ Colocar no Radar DC'}</button>
+             <button className="radar-add" type="submit" disabled={!textoNotificacao.trim() || salvando}>{salvando ? 'Salvando...' : '+ Colocar no Radar Codap'}</button>
             {erroSalvamento && <p className="radar-save-error" role="alert">{erroSalvamento}</p>}
           </form>}
         </div>
@@ -817,7 +817,7 @@ export default function RadarDC() {
         </div>
       </div>
       <div className="radar-ticker">
-        <span>RADAR DC</span>
+        <span>RADAR CODAP</span>
         <div className="radar-ticker-viewport">
           {(() => {
             const filaTicker = proximasNotificacoes.length ? proximasNotificacoes : notificacoes

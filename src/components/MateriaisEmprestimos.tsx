@@ -1508,13 +1508,13 @@ function ChecklistFerramenta({
 
         {ehEstoqueLiquido && quantidadeConferida < 10 && (
           <div className="mat-checklist-alerta" role="status">
-            ⚠️ Atenção: estoque baixo ({quantidadeConferida} {ehPorLitro ? `litro${quantidadeConferida === 1 ? '' : 's'}` : `item${quantidadeConferida === 1 ? '' : 'ns'}`}). O Radar DC mostrará uma notificação em “Checklists de ferramentas”.
+            ⚠️ Atenção: estoque baixo ({quantidadeConferida} {ehPorLitro ? `litro${quantidadeConferida === 1 ? '' : 's'}` : `item${quantidadeConferida === 1 ? '' : 'ns'}`}). O Radar Codap mostrará uma notificação em “Checklists de ferramentas”.
           </div>
         )}
 
         {ehSerragem && quantidadeConferida <= 2 && (
           <div className="mat-checklist-alerta" role="status">
-            ⚠️ Atenção: estoque baixo. O Radar DC mostrará a mensagem “Repor serragem”.
+            ⚠️ Atenção: estoque baixo. O Radar Codap mostrará a mensagem “Repor serragem”.
           </div>
         )}
 

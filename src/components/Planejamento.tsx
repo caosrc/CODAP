@@ -4374,7 +4374,7 @@ export default function Planejamento() {
           onClick={() => setSubAba('radar')}
         >
           <img className="radar-tab-icon" src="/codap-icon.svg" alt="" />
-          Radar DC
+          Radar Codap
         </button>
         {(['evento', 'operacao', 'simulado', 'emergencia'] as TipoPlano[]).map(t => {
           const c = TIPOS_CONFIG[t]

@@ -91,7 +91,7 @@ export default function BannerRadarNotificacao() {
           const minhaConfirmacao = confirmacoesAgentes.find(item => item.agente === agente)
           const base = {
             id: String(row.id),
-            texto: String(row.texto || 'Nova convocação no Radar DC'),
+             texto: String(row.texto || 'Nova convocação no Radar Codap'),
             data: String(row.data || ''),
             hora: String(row.hora || ''),
             prioridade: String(row.prioridade || 'normal'),
@@ -110,7 +110,7 @@ export default function BannerRadarNotificacao() {
             localStorage.setItem(chaveDoDia, '1')
             novas.push({ ...base, tipo: 'eventoHoje' })
             if ('Notification' in window && Notification.permission === 'granted') {
-              new Notification('📅 Radar DC — evento hoje', {
+              new Notification('📅 Radar Codap — evento hoje', {
                 body: `${base.hora || 'Horário não informado'} · ${base.texto}`,
                 tag: `radar-evento-dia-${base.id}-${hoje}`,
               })
@@ -143,7 +143,7 @@ export default function BannerRadarNotificacao() {
 
       const nova: NotificacaoRadar = {
         id: String(mensagem.id || `${mensagem.data}-${mensagem.hora}-${mensagem.texto}`),
-        texto: String(mensagem.texto || 'Nova convocação no Radar DC'),
+        texto: String(mensagem.texto || 'Nova convocação no Radar Codap'),
         data: String(mensagem.data || ''),
         hora: String(mensagem.hora || ''),
         prioridade: String(mensagem.prioridade || 'normal'),
@@ -218,12 +218,12 @@ export default function BannerRadarNotificacao() {
   if (!atual) return null
 
   return (
-    <div className="radar-convocacao-overlay" role="alertdialog" aria-label="Nova convocação do Radar DC">
+    <div className="radar-convocacao-overlay" role="alertdialog" aria-label="Nova convocação do Radar Codap">
       <div className="radar-convocacao-card">
         <div className="radar-convocacao-header">
           <span className="radar-convocacao-sino">{atual.tipo === 'eventoHoje' ? '📅' : '🔔'}</span>
           <div>
-            <strong>{atual.tipo === 'eventoHoje' ? 'Evento hoje no Radar DC' : 'Você foi marcado no Radar DC'}</strong>
+            <strong>{atual.tipo === 'eventoHoje' ? 'Evento hoje no Radar Codap' : 'Você foi marcado no Radar Codap'}</strong>
             <small>{atual.tipo === 'eventoHoje' ? 'Lembrete da presença confirmada' : 'Confirme se poderá comparecer'}</small>
           </div>
           {atual.tipo === 'eventoHoje' && <button type="button" className="radar-convocacao-fechar" onClick={fecharAtual} aria-label="Fechar lembrete">×</button>}
@@ -243,7 +243,7 @@ export default function BannerRadarNotificacao() {
           </div>
         ) : (
           <div className="radar-convocacao-actions">
-            <button type="button" className="radar-convocacao-abrir" onClick={abrirRadar}>Abrir Radar DC</button>
+            <button type="button" className="radar-convocacao-abrir" onClick={abrirRadar}>Abrir Radar Codap</button>
           </div>
         )}
         {fila.length > 1 && <div className="radar-convocacao-fila">+ {fila.length - 1} notificação(ões) aguardando</div>}

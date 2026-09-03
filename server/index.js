@@ -238,7 +238,7 @@ async function notificarEventosDoDia() {
       const chave = `${registro.id}-${hoje}`
       if (!agentes.length || radarEventosNotificados.has(chave)) continue
       const payload = JSON.stringify({
-        title: '📅 Radar DC — evento hoje',
+        title: '📅 Radar Codap — evento hoje',
         body: `${registro.hora || 'Horário não informado'} · ${registro.texto}`,
         tag: `radar-evento-dia-${chave}`,
         tipo: 'radar_evento_dia',
@@ -246,7 +246,7 @@ async function notificarEventosDoDia() {
       })
       const n = await enviarPushParaAgentes(agentes, payload)
       radarEventosNotificados.add(chave)
-      console.log(`[scheduler] Radar DC "${registro.texto}": ${n} notificação(ões) enviada(s)`)
+      console.log(`[scheduler] Radar Codap "${registro.texto}": ${n} notificação(ões) enviada(s)`)
     }
   } catch (e) {
     console.warn('[scheduler] notificarEventosDoDia:', e?.message)
@@ -1412,7 +1412,7 @@ app.delete('/api/planejamentos/:id', async (req, res) => {
   }
 })
 
-// ── Radar DC — lembretes e notificações compartilhados entre os agentes ────
+// ── Radar Codap — lembretes e notificações compartilhados entre os agentes ─
 app.get('/api/radar-bilhetes', async (_req, res) => {
   try {
     const result = await query('SELECT * FROM radar_bilhetes ORDER BY data ASC, hora ASC, criado_em ASC')
@@ -1495,7 +1495,7 @@ app.post('/api/radar-bilhetes/:id/confirmar', async (req, res) => {
 
     if (registro.criado_por && registro.criado_por !== agente) {
       const payload = {
-        title: confirmado ? '✅ Radar DC — presença confirmada' : '❌ Radar DC — presença recusada',
+        title: confirmado ? '✅ Radar Codap — presença confirmada' : '❌ Radar Codap — presença recusada',
         body: confirmado
           ? `${agente} confirmou presença: ${registro.texto}`
           : `${agente} informou que não poderá ir: ${registro.texto}`,
@@ -1517,7 +1517,7 @@ app.post('/api/push/radar', async (req, res) => {
     const { agentes, texto, data, hora, prioridade, remetente, notificacaoId } = req.body || {}
     if (!Array.isArray(agentes) || agentes.length === 0 || !texto) return res.json({ enviados: 0 })
     const payload = {
-      title: `🔔 Radar DC — novo ${req.body?.registroTipo === 'lembrete' ? 'lembrete' : 'aviso'}`,
+      title: `🔔 Radar Codap — novo ${req.body?.registroTipo === 'lembrete' ? 'lembrete' : 'aviso'}`,
       body: `${data || ''} às ${hora || ''} · ${texto}`,
       tag: `radar-${notificacaoId || Date.now()}`,
       tipo: 'radar_notificacao',

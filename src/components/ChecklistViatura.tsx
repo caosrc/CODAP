@@ -418,8 +418,8 @@ export default function ChecklistViatura({ abrirId }: { abrirId?: number | null 
   const mesAtual = hoje.substring(0, 7)
   const [data, setData] = useState(hoje)
   const [km, setKm] = useState('')
-  const [placa, setPlaca] = useState('QXW1E43')
-  const [editandoPlaca, setEditandoPlaca] = useState(false)
+  const [placa, setPlaca] = useState('')
+  const [editandoPlaca, setEditandoPlaca] = useState(true)
   const [motorista, setMotorista] = useState('')
   const [motoristaOutro, setMotoristaOutro] = useState(false)
   const [fotosAvarias, setFotosAvarias] = useState<string[]>([])
@@ -659,7 +659,7 @@ export default function ChecklistViatura({ abrirId }: { abrirId?: number | null 
   }, [modo])
 
   function resetForm() {
-    setData(hoje); setKm(''); setPlaca('QXW1E43'); setEditandoPlaca(false)
+    setData(hoje); setKm(''); setPlaca(''); setEditandoPlaca(true)
     setMotorista(''); setMotoristaOutro(false)
     setFotosAvarias([]); setFotoFrontal(null); setFotoTraseira(null)
     setFotoDireita(null); setFotoEsquerda(null)

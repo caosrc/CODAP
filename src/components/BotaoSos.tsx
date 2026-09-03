@@ -2,13 +2,15 @@ import { useEffect, useRef, useState } from 'react'
 import { dispararSos, type StatusSos, type DisparoEmCurso } from '../sos'
 import { wsSend, wsOn } from '../wsClient'
 import './BotaoSos.css'
+import { normalizarNomeAgente } from '../types'
 
 function getNomeAgente(): string {
-  return (
+  const nome = (
     sessionStorage.getItem('defesacivil-agente-sessao') ||
     localStorage.getItem('defesacivil-agente') ||
     'Agente'
   )
+  return normalizarNomeAgente(nome)
 }
 
 const SEGURAR_MS = 1500

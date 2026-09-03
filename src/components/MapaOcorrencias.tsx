@@ -3,7 +3,7 @@ import { MapContainer, TileLayer, Marker, Popup, useMapEvents, useMap, Circle, P
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import type { Ocorrencia } from '../types'
-import { NATUREZA_ICONE, NATUREZA_COR, NATUREZAS } from '../types'
+import { NATUREZA_ICONE, NATUREZA_COR, NATUREZAS, normalizarNomeAgente } from '../types'
 import {
   baixarMapaOffline,
   obterInfoCacheMapa,
@@ -179,11 +179,12 @@ function getDispositivoId(): string {
 
 // Nome do dispositivo = nome do agente logado na sessão
 function getNomeAgente(): string {
-  return (
+  const nome = (
     sessionStorage.getItem('defesacivil-agente-sessao') ||
     localStorage.getItem('defesacivil-device-nome') ||
     `Equipe ${getDispositivoId()}`
   )
+  return normalizarNomeAgente(nome)
 }
 
 // ── Ícones ──────────────────────────────────────────────────────

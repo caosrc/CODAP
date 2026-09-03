@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { AGENTES, getSenhaAgente } from '../types'
+import { AGENTES, getSenhaAgente, normalizarNomeAgente } from '../types'
 import SelecaoOrgao from './SelecaoOrgao'
 
 function useGeolocalizacao() {
@@ -58,7 +58,8 @@ export function fazerLogout() {
 }
 
 export function getAgenteLogado(): string {
-  return sessionStorage.getItem(AGENTE_SESSION_KEY) || localStorage.getItem(AGENTE_NOME_KEY) || ''
+  const nome = sessionStorage.getItem(AGENTE_SESSION_KEY) || localStorage.getItem(AGENTE_NOME_KEY) || ''
+  return normalizarNomeAgente(nome)
 }
 
 interface Props {

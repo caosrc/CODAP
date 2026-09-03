@@ -6,8 +6,9 @@ import ModalSenha from './ModalSenha'
 import { wsOn, wsSend } from '../wsClient'
 import { supabase, supabaseDisponivel } from '../supabaseClient'
 import { getSenhaAgente } from '../types'
+import { getAgenteLogado } from './Login'
 
-const MOTORISTAS = ['Moisés', 'Arthur', 'Gustavo', 'Valteir', 'Dyonathan']
+const MOTORISTAS = ['A', 'C', 'D', 'B', 'I']
 const CHECKLIST_LOCAL_KEY = 'checklists-pendentes-v1'
 
 function carregarChecklistsLocais(): ChecklistData[] {
@@ -432,7 +433,7 @@ export default function ChecklistViatura({ abrirId }: { abrirId?: number | null 
   const [salvando, setSalvando] = useState(false)
   const [erro, setErro] = useState('')
   const [pedindoSenhaDeletar, setPedindoSenhaDeletar] = useState<number | null>(null)
-  const agenteLogadoCk = (sessionStorage.getItem('defesacivil-agente-sessao') || '').trim()
+  const agenteLogadoCk = getAgenteLogado()
   const senhaAgenteCk = getSenhaAgente(agenteLogadoCk)
 
   function solicitarDeletar(id: number) {

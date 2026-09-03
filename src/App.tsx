@@ -3,7 +3,7 @@ import type { ErrorInfo, ReactNode } from 'react'
 import './App.css'
 import Login, { estaLogado, agenteEscolhido, orgaoEscolhido, getAgenteLogado, getOrgaoSelecionado } from './components/Login'
 import type { Ocorrencia, NivelRisco } from './types'
-import { NATUREZA_ICONE } from './types'
+import { NATUREZA_ICONE, normalizarNomeAgente } from './types'
 import { listarOcorrencias, enviarOcorrenciaServidor, listarRegistrosCurral, ApiError } from './api'
 import { wsOn, wsAnunciarOnline } from './wsClient'
 import { supabase, supabaseDisponivel } from './supabaseClient'
@@ -92,8 +92,8 @@ function curralParaOcorrenciaMapa(registro: CurralRegistro): Ocorrencia {
     horas_total: null,
     horas_sobreaviso: null,
     created_at: capturadoEm,
-    agentes: registro.criadoPor ? [registro.criadoPor] : [],
-    responsavel_registro: registro.criadoPor ?? null,
+    agentes: registro.criadoPor ? [normalizarNomeAgente(registro.criadoPor)] : [],
+    responsavel_registro: registro.criadoPor ? normalizarNomeAgente(registro.criadoPor) : null,
     vistorias: [],
     focos_incendio: null,
     poligono_area_queimada: null,
@@ -528,12 +528,12 @@ export default function App() {
       lng: p.lng ?? null,
       endereco: p.endereco ?? null,
       proprietario: p.proprietario ?? null,
-      responsavel_registro: p.responsavel_registro ?? null,
+      responsavel_registro: p.responsavel_registro ? normalizarNomeAgente(p.responsavel_registro) : null,
       situacao: p.situacao ?? null,
       recomendacao: p.recomendacao ?? null,
       conclusao: p.conclusao ?? null,
       data_ocorrencia: p.data_ocorrencia ?? null,
-      agentes: Array.isArray(p.agentes) ? p.agentes : [],
+      agentes: Array.isArray(p.agentes) ? p.agentes.map(normalizarNomeAgente) : [],
       vistorias: Array.isArray(p.vistorias) ? p.vistorias : [],
       created_at: p._savedAt ?? new Date().toISOString(),
       _offline: true,
@@ -1149,7 +1149,7 @@ export default function App() {
                           {o.endereco && <span>📍 {o.endereco}</span>}
                           <span>🕐 {new Date(o.created_at).toLocaleDateString('pt-BR')}</span>
                           {Array.isArray(o.agentes) && o.agentes.length > 0 && (
-                            <span>👤 {o.agentes.join(', ')}</span>
+                            <span>👤 {o.agentes.map(normalizarNomeAgente).join(', ')}</span>
                           )}
                         </div>
                       </div>

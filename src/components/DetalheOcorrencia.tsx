@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import JSZip from 'jszip'
 import type { Ocorrencia, NivelRisco, StatusOc, VistoriaAdicional } from '../types'
 import { exportarPastaOcorrencia, nomePastaOcorrencia } from '../exportarPasta'
-import { NATUREZA_ICONE, NATUREZA_COR, TIPOS_OCORRENCIA, NATUREZAS, AGENTES, getSenhaAgente } from '../types'
+import { NATUREZA_ICONE, NATUREZA_COR, TIPOS_OCORRENCIA, NATUREZAS, AGENTES, getSenhaAgente, normalizarNomeAgente } from '../types'
 import { deletarOcorrencia, atualizarOcorrencia, buscarOcorrenciaCompleta } from '../api'
 import { geocodificarEndereco, updatePending } from '../offline'
 import { exportarOcorrenciaExcel } from '../exportExcel'
@@ -10,6 +10,7 @@ import { formatarCoordenadas, parseDateLocal, mensagemErroGps, adicionarMarcaDag
 import ModalSenha from './ModalSenha'
 import PoligonoAreaQueimada, { calcularAreaM2, formatarArea, type PontoPoligono } from './PoligonoAreaQueimada'
 import { calcularHorasTotal, calcularHorasOcorrenciaBanco, formatarHoras, carregarFeriadosCustom } from '../horasUtils'
+import { getAgenteLogado } from './Login'
 
 interface Props {
   ocorrencia: Ocorrencia
@@ -120,8 +121,8 @@ export default function DetalheOcorrencia({ ocorrencia: oc, onFechar, onDeletado
   const galEditRef = useRef<HTMLInputElement>(null)
 
   // ── Permissão: somente quem registrou pode editar/excluir ──
-  const agenteLogado = (sessionStorage.getItem('defesacivil-agente-sessao') || '').trim()
-  const responsavel = (o.responsavel_registro || '').trim()
+  const agenteLogado = getAgenteLogado()
+  const responsavel = normalizarNomeAgente((o.responsavel_registro || '').trim())
   // Se a ocorrência não tem responsável registrado (legado), libera para todos.
   const podeEditar = !responsavel || agenteLogado === responsavel
   // Senha individual do agente logado (null = sem senha, acesso direto)
@@ -179,7 +180,7 @@ export default function DetalheOcorrencia({ ocorrencia: oc, onFechar, onDeletado
   const [eSituacao, setESituacao] = useState(o.situacao ?? '')
   const [eRecomendacao, setERecomendacao] = useState(o.recomendacao ?? '')
   const [eConclusao, setEConclusao] = useState(o.conclusao ?? '')
-  const [eAgentes, setEAgentes] = useState<string[]>(Array.isArray(o.agentes) ? o.agentes : [])
+  const [eAgentes, setEAgentes] = useState<string[]>(Array.isArray(o.agentes) ? o.agentes.map(normalizarNomeAgente) : [])
   const [eCreatedAt, setECreatedAt] = useState(() => isoParaDatetimeLocal(o.created_at))
 
   const precisaSubnatureza = eNatureza === 'Queda de Estrutura' || eNatureza === 'Apreensão e Captura de Animal'
@@ -210,7 +211,7 @@ export default function DetalheOcorrencia({ ocorrencia: oc, onFechar, onDeletado
     setESituacao(o.situacao ?? '')
     setERecomendacao(o.recomendacao ?? '')
     setEConclusao(o.conclusao ?? '')
-    setEAgentes(Array.isArray(o.agentes) ? o.agentes : [])
+    setEAgentes(Array.isArray(o.agentes) ? o.agentes.map(normalizarNomeAgente) : [])
     setECreatedAt(isoParaDatetimeLocal(o.created_at))
     setEFotos(Array.isArray(o.fotos) ? [...o.fotos] : [])
     setEDescricoesFotos(Array.isArray(o.descricoes_fotos) ? [...o.descricoes_fotos] : [])
@@ -455,7 +456,7 @@ export default function DetalheOcorrencia({ ocorrencia: oc, onFechar, onDeletado
         data: novaVistoriaData || new Date().toISOString(),
         observacao: novaVistoriaObs.trim(),
         fotos: novaVistoriaFotos,
-        agente: sessionStorage.getItem('defesacivil-agente-sessao') || null,
+        agente: getAgenteLogado() || null,
         status: novaVistoriaStatus,
       }
       const vistoriasAtualizadas = [...vistoriasSalvas, nova]
@@ -654,10 +655,10 @@ export default function DetalheOcorrencia({ ocorrencia: oc, onFechar, onDeletado
                 {o.recomendacao && <InfoRow icone="💡" label="Recomendação" valor={o.recomendacao} />}
                 {o.conclusao && <InfoRow icone="✅" label="Conclusão" valor={o.conclusao} />}
                 {o.responsavel_registro && (
-                  <InfoRow icone="🪪" label="Responsável pelo Registro" valor={o.responsavel_registro!} destaque />
+                  <InfoRow icone="🪪" label="Responsável pelo Registro" valor={normalizarNomeAgente(o.responsavel_registro!)} destaque />
                 )}
                 {Array.isArray(o.agentes) && o.agentes.length > 0 && (
-                  <InfoRow icone="👷" label="Agentes Empenhados" valor={o.agentes.join(', ')} />
+                  <InfoRow icone="👷" label="Agentes Empenhados" valor={o.agentes.map(normalizarNomeAgente).join(', ')} />
                 )}
                 <InfoRow icone="🕐" label="Registrado em" valor={dataFormatada} />
 
@@ -708,7 +709,7 @@ export default function DetalheOcorrencia({ ocorrencia: oc, onFechar, onDeletado
                           </div>
                         )}
                         {v.agente && (
-                          <div className="vistoria-agente">👤 {v.agente}</div>
+                          <div className="vistoria-agente">👤 {normalizarNomeAgente(v.agente)}</div>
                         )}
                         {v.observacao && (
                           <div className="vistoria-obs">{v.observacao}</div>

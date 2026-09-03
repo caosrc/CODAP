@@ -41,23 +41,41 @@ export interface Ocorrencia {
   _localId?: number
 }
 
-export const AGENTES = ['Moisés', 'Valteir', 'Arthur', 'Gustavo', 'Vânia', 'Graça', 'Talita', 'Cristiane', 'Dyonathan', 'Sócrates']
+export const AGENTES = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J']
+
+/** Compatibilidade para sessões e escalas criadas antes da anonimização dos nomes. */
+export const AGENTES_LEGADOS_PARA_NOVOS: Record<string, string> = {
+  'Moisés': 'A',
+  Valteir: 'B',
+  Arthur: 'C',
+  Gustavo: 'D',
+  'Vânia': 'E',
+  'Graça': 'F',
+  Talita: 'G',
+  Cristiane: 'H',
+  Dyonathan: 'I',
+  'Sócrates': 'J',
+}
+
+export function normalizarNomeAgente(nome: string): string {
+  return AGENTES_LEGADOS_PARA_NOVOS[nome] ?? nome
+}
 
 export const AGENTE_SENHAS: Record<string, string> = {
-  'Sócrates': '3004',
-  'Moisés': '301067',
-  'Arthur': '0620',
-  'Gustavo': '8228',
-  'Cristiane': '1950',
-  'Vânia': '1210',
-  'Valteir': '1234',
-  'Talita': '1234',
-  'Graça': '1122',
-  'Dyonathan': '2806',
+  A: '301067',
+  B: '1234',
+  C: '0620',
+  D: '8228',
+  E: '1210',
+  F: '1122',
+  G: '1234',
+  H: '1950',
+  I: '2806',
+  J: '3004',
 }
 
 export function getSenhaAgente(nome: string): string | null {
-  return AGENTE_SENHAS[nome] ?? null
+  return AGENTE_SENHAS[normalizarNomeAgente(nome)] ?? null
 }
 
 export const TIPOS_OCORRENCIA = ['Diligência', 'Vistoria de Engenharia', 'Vistoria Ambiental', 'Apoio', 'Fiscalização', 'Outro']

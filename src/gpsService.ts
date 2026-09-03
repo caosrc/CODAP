@@ -1,5 +1,6 @@
 import { wsSend } from './wsClient'
 import { mensagemErroGps } from './utils'
+import { normalizarNomeAgente } from './types'
 
 // ── Serviço de GPS GLOBAL (singleton) ────────────────────────────────────
 // Mantém o watchPosition ativo INDEPENDENTE de qual aba do app o usuário
@@ -57,11 +58,12 @@ function getDispositivoId(): string {
 }
 
 function getNomeAgente(): string {
-  return (
+  const nome = (
     sessionStorage.getItem('defesacivil-agente-sessao') ||
     localStorage.getItem('defesacivil-device-nome') ||
     `Equipe ${getDispositivoId()}`
   )
+  return normalizarNomeAgente(nome)
 }
 
 function notificar() {

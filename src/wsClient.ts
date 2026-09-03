@@ -1,5 +1,6 @@
 import { dispararPushSos } from './pushNotifications'
 import { supabase, supabaseDisponivel } from './supabaseClient'
+import { normalizarNomeAgente } from './types'
 
 type WsHandler = (msg: Record<string, unknown>) => void
 type OpenHandler = () => void
@@ -67,11 +68,12 @@ function getMeuId(): string {
 }
 
 function getMeuNome(): string {
-  return (
+  const nome = (
     sessionStorage.getItem('defesacivil-agente-sessao') ||
     localStorage.getItem('defesacivil-device-nome') ||
     `Equipe ${getMeuId()}`
   )
+  return normalizarNomeAgente(nome)
 }
 
 function dispatch(tipo: string, msg: Record<string, unknown>) {

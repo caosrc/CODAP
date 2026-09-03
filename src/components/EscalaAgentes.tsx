@@ -3,28 +3,28 @@ import { getAgenteLogado } from './Login'
 import ModalSenha from './ModalSenha'
 import { wsOn, wsSend } from '../wsClient'
 import { supabase, supabaseDisponivel } from '../supabaseClient'
-import { getSenhaAgente } from '../types'
+import { getSenhaAgente, normalizarNomeAgente } from '../types'
 import type { Ocorrencia } from '../types'
 import './EscalaAgentes.css'
 
 // ── Constantes ────────────────────────────────────────────────────
-// Todos os agentes — incluindo Moisés — participam da escala/banco de horas
+// Todos os agentes participam da escala/banco de horas.
 const AGENTES_ESCALA = [
-  { nome: 'Moisés',    cor: '#0f766e', iniciais: 'MO' },
-  { nome: 'Valteir',   cor: '#2563eb', iniciais: 'VA' },
-  { nome: 'Arthur',    cor: '#16a34a', iniciais: 'AR' },
-  { nome: 'Gustavo',   cor: '#dc2626', iniciais: 'GU' },
-  { nome: 'Vânia',     cor: '#9333ea', iniciais: 'VÂ' },
-  { nome: 'Graça',     cor: '#ea580c', iniciais: 'GR' },
-  { nome: 'Talita',    cor: '#0891b2', iniciais: 'TA' },
-  { nome: 'Cristiane', cor: '#db2777', iniciais: 'CR' },
-  { nome: 'Dyonathan', cor: '#b45309', iniciais: 'DY' },
-  { nome: 'Sócrates',  cor: '#475569', iniciais: 'SÓ' },
+  { nome: 'A', cor: '#0f766e', iniciais: 'A' },
+  { nome: 'B', cor: '#2563eb', iniciais: 'B' },
+  { nome: 'C', cor: '#16a34a', iniciais: 'C' },
+  { nome: 'D', cor: '#dc2626', iniciais: 'D' },
+  { nome: 'E', cor: '#9333ea', iniciais: 'E' },
+  { nome: 'F', cor: '#ea580c', iniciais: 'F' },
+  { nome: 'G', cor: '#0891b2', iniciais: 'G' },
+  { nome: 'H', cor: '#db2777', iniciais: 'H' },
+  { nome: 'I', cor: '#b45309', iniciais: 'I' },
+  { nome: 'J', cor: '#475569', iniciais: 'J' },
 ]
 
 // Quem NÃO faz sobreaviso (mas registra horas extras 1:1, sem multiplicador)
-// Sócrates permanece neste grupo; Talita e Cristiane fazem sobreaviso normalmente.
-const AGENTES_SEM_SOBREAVISO = new Set(['Sócrates'])
+// J mantém a regra que era usada pelo último agente da lista anterior.
+const AGENTES_SEM_SOBREAVISO = new Set(['J'])
 
 // Quem pode ser escalado para sobreaviso = agentes operacionais
 const AGENTES_SOBREAVISO = AGENTES_ESCALA.filter(ag => !AGENTES_SEM_SOBREAVISO.has(ag.nome))
@@ -43,13 +43,11 @@ const MESES = [
 
 const HORAS_POR_SEMANA_SOBREAVISO = 16
 const HORAS_POR_DIA_SOBREAVISO = 4.62
-// Quantas horas cada folga marcada desconta do banco — varia por agente
-// Talita e Cristiane → 4h por folga
-// Sócrates           → 6h por folga
-// Demais             → 8h por folga (jornada padrão)
+// Quantas horas cada folga marcada desconta do banco — varia por agente.
+// G e H mantêm a regra de 4h; J mantém a regra de 6h da configuração anterior.
 function horasPorFolga(agente: string): number {
-  if (agente === 'Talita' || agente === 'Cristiane') return 4
-  if (agente === 'Sócrates') return 6
+  if (agente === 'G' || agente === 'H') return 4
+  if (agente === 'J') return 6
   return 8
 }
 // Usado só em textos legados/genéricos quando não há agente em contexto
@@ -155,13 +153,55 @@ function normalizarSemanal(raw: Record<string, string | string[]>): Record<strin
   return out
 }
 
+function normalizarListaAgentes(agentes: string[]): string[] {
+  return Array.from(new Set(agentes.filter(Boolean).map(normalizarNomeAgente)))
+}
+
+function normalizarMapaPorData(raw: Record<string, string[]>): Record<string, string[]> {
+  const out: Record<string, string[]> = {}
+  for (const [data, agentes] of Object.entries(raw)) {
+    out[data] = normalizarListaAgentes([...(out[data] ?? []), ...(Array.isArray(agentes) ? agentes : [])])
+  }
+  return out
+}
+
+function normalizarMapaPorAgente<T>(raw: Record<string, T>): Record<string, T> {
+  const out: Record<string, T> = {}
+  for (const [agente, valor] of Object.entries(raw)) {
+    const nomeNovo = normalizarNomeAgente(agente)
+    // Se já existir uma chave nova, ela é a fonte mais recente/confiável.
+    if (!(nomeNovo in out) || agente === nomeNovo) out[nomeNovo] = valor
+  }
+  return out
+}
+
+function normalizarDadosAgentes(data: EscalaData): EscalaData {
+  return {
+    ...data,
+    adm: normalizarMapaPorData(data.adm),
+    sobreaviso: normalizarMapaPorData(data.sobreaviso),
+    sobreavisoSemanal: normalizarMapaPorData(data.sobreavisoSemanal),
+    folgas: normalizarMapaPorData(data.folgas),
+    ferias: data.ferias.map((item) => ({ ...item, agente: normalizarNomeAgente(item.agente) })),
+    afastamentos: data.afastamentos.map((item) => ({ ...item, agente: normalizarNomeAgente(item.agente) })),
+    horasSobreaviso: normalizarMapaPorAgente(data.horasSobreaviso),
+    horasTrabalhadasSobreaviso: normalizarMapaPorAgente(data.horasTrabalhadasSobreaviso),
+    justificativasSobreaviso: normalizarMapaPorAgente(data.justificativasSobreaviso),
+    descontosFolgaBanco: normalizarMapaPorAgente(data.descontosFolgaBanco),
+    horasExtrasSimples: normalizarMapaPorAgente(data.horasExtrasSimples),
+    justificativasExtrasSimples: normalizarMapaPorAgente(data.justificativasExtrasSimples),
+    ajustesBanco: normalizarMapaPorAgente(data.ajustesBanco),
+    ajustesBancoLogs: normalizarMapaPorAgente(data.ajustesBancoLogs ?? {}),
+  }
+}
+
 function carregarDados(): EscalaData {
   try {
     // Tenta v3 primeiro
     const rawV3 = localStorage.getItem(STORAGE_KEY)
     if (rawV3) {
       const p = JSON.parse(rawV3)
-      return {
+      return normalizarDadosAgentes({
         adm: p.adm ?? {},
         sobreaviso: p.sobreaviso ?? {},
         sobreavisoSemanal: normalizarSemanal(p.sobreavisoSemanal ?? {}),
@@ -180,13 +220,13 @@ function carregarDados(): EscalaData {
         justificativasExtrasSimples: p.justificativasExtrasSimples ?? {},
         ajustesBanco: p.ajustesBanco ?? {},
         ajustesBancoLogs: p.ajustesBancoLogs ?? {},
-      }
+      })
     }
     // Migra v2
     const rawV2 = localStorage.getItem('escala-data-v2')
     if (rawV2) {
       const p = JSON.parse(rawV2)
-      return {
+      return normalizarDadosAgentes({
         adm: p.adm ?? {},
         sobreaviso: p.sobreaviso ?? {},
         sobreavisoSemanal: normalizarSemanal(p.sobreavisoSemanal ?? {}),
@@ -204,10 +244,10 @@ function carregarDados(): EscalaData {
         horasExtrasSimples: {},
         justificativasExtrasSimples: {},
         ajustesBanco: {},
-      }
+      })
     }
   } catch { /* */ }
-  return { adm: {}, sobreaviso: {}, sobreavisoSemanal: {}, folgas: {}, ferias: [], afastamentos: [], horasSobreaviso: {}, horasTrabalhadasSobreaviso: {}, justificativasSobreaviso: {}, feriadosCustom: [], percDomingoFeriado: 100, percSobreaviso: 50, percSabado: 50, descontosFolgaBanco: {}, horasExtrasSimples: {}, justificativasExtrasSimples: {}, ajustesBanco: {}, ajustesBancoLogs: {} }
+  return normalizarDadosAgentes({ adm: {}, sobreaviso: {}, sobreavisoSemanal: {}, folgas: {}, ferias: [], afastamentos: [], horasSobreaviso: {}, horasTrabalhadasSobreaviso: {}, justificativasSobreaviso: {}, feriadosCustom: [], percDomingoFeriado: 100, percSobreaviso: 50, percSabado: 50, descontosFolgaBanco: {}, horasExtrasSimples: {}, justificativasExtrasSimples: {}, ajustesBanco: {}, ajustesBancoLogs: {} })
 }
 
 // Marca o instante da última edição local — usado para evitar que o snapshot remoto
@@ -294,8 +334,9 @@ function podarDadosAntigos(data: EscalaData, mesesRetencao = 13): EscalaData {
 function salvarDados(data: EscalaData) {
   marcarEdicaoLocal()
   const now = new Date().toISOString()
-  const dataPodada = podarDadosAntigos(data)
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
+  const dataNormalizada = normalizarDadosAgentes(data)
+  const dataPodada = podarDadosAntigos(dataNormalizada)
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(dataNormalizada))
   localStorage.setItem(LOCAL_TS_KEY, now)
 
   if (supabaseDisponivel) {
@@ -315,8 +356,9 @@ function salvarDados(data: EscalaData) {
 async function salvarDadosAsync(data: EscalaData): Promise<{ ok: boolean; mensagem?: string }> {
   marcarEdicaoLocal()
   const now = new Date().toISOString()
-  const dataPodada = podarDadosAntigos(data)
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
+  const dataNormalizada = normalizarDadosAgentes(data)
+  const dataPodada = podarDadosAntigos(dataNormalizada)
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(dataNormalizada))
   localStorage.setItem(LOCAL_TS_KEY, now)
 
   if (supabaseDisponivel) {
@@ -343,7 +385,7 @@ async function salvarDadosAsync(data: EscalaData): Promise<{ ok: boolean; mensag
 }
 
 function parseEscalaRow(p: Partial<EscalaData> & Record<string, unknown>): EscalaData {
-  return {
+  return normalizarDadosAgentes({
     adm: (p.adm as EscalaData['adm']) ?? {},
     sobreaviso: (p.sobreaviso as EscalaData['sobreaviso']) ?? {},
     sobreavisoSemanal: normalizarSemanal((p.sobreavisoSemanal as Record<string, string | string[]>) ?? {}),
@@ -362,7 +404,7 @@ function parseEscalaRow(p: Partial<EscalaData> & Record<string, unknown>): Escal
     justificativasExtrasSimples: (p.justificativasExtrasSimples as EscalaData['justificativasExtrasSimples']) ?? {},
     ajustesBanco: (p.ajustesBanco as EscalaData['ajustesBanco']) ?? {},
     ajustesBancoLogs: (p.ajustesBancoLogs as EscalaData['ajustesBancoLogs']) ?? {},
-  }
+  })
 }
 
 async function carregarDadosRemoto(): Promise<{ dados: EscalaData; updatedAt: string } | null> {
@@ -1895,7 +1937,7 @@ function ModalDetalhesBanco({
       {confirmandoRemocaoIdx !== null && (
         <ModalSenha
           titulo="Confirmar exclusão de ajuste"
-          senhaCorreta={getSenhaAgente('Moisés') ?? '301067'}
+          senhaCorreta={getSenhaAgente('A') ?? '301067'}
           onConfirmar={() => {
             onRemoverAjuste?.(confirmandoRemocaoIdx)
             setConfirmandoRemocaoIdx(null)
@@ -2045,7 +2087,7 @@ function BancoHorasMoises({ sobreavisoSemanal, horasTrabalhadasSobreaviso, justi
         ))}
       </div>
       <div className="bh-moises-rodape">
-        {HORAS_POR_DIA_SOBREAVISO}h por dia de sobreaviso · Dias úteis ×{(1 + percSobreaviso / 100).toFixed(1)} · Sábado ×{(1 + percSabado / 100).toFixed(1)} · Dom/Feriado ×{(1 + percDomingoFeriado / 100).toFixed(1)} · folga: -8h padrão · -4h Talita/Cristiane · -6h Sócrates
+        {HORAS_POR_DIA_SOBREAVISO}h por dia de sobreaviso · Dias úteis ×{(1 + percSobreaviso / 100).toFixed(1)} · Sábado ×{(1 + percSabado / 100).toFixed(1)} · Dom/Feriado ×{(1 + percDomingoFeriado / 100).toFixed(1)} · folga: -8h padrão · -4h G/H · -6h J
       </div>
 
       {editando && (() => {
@@ -2240,7 +2282,7 @@ function ModalDia({ data, selecionados, folgasSelecionadas, ferias, afastamentos
           })}
         </div>
 
-        <p className="escala-modal-sub" style={{ marginTop: 16 }}>🏠 Folga (desconta horas do banco ao passar do dia — varia por agente: 8h padrão, 4h Talita/Cristiane, 6h Sócrates):</p>
+        <p className="escala-modal-sub" style={{ marginTop: 16 }}>🏠 Folga (desconta horas do banco ao passar do dia — varia por agente: 8h padrão, 4h G/H, 6h J):</p>
         <div className="escala-modal-lista">
           {AGENTES_ESCALA.map(ag => {
             const emFerias = agenteEmFerias(ag.nome, data, ferias)
@@ -3302,9 +3344,8 @@ export default function EscalaAgentes({ ocorrencias = [] }: EscalaAgentesProps) 
 
   const hoje = hojeComOffset(offsetDias)
   const agenteLogado = getAgenteLogado()
-  const isMoises = agenteLogado === 'Moisés'
-  // Gestores: mesmo acesso que Moisés para editar/visualizar toda a escala
-  const isGestor = isMoises || agenteLogado === 'Talita' || agenteLogado === 'Cristiane'
+  // A concentra as funções de gestão que antes pertenciam a Moisés, Talita e Cristiane.
+  const isGestor = agenteLogado === 'A'
   const isSobreaviso = AGENTES_SOBREAVISO.some(a => a.nome === agenteLogado)
   const isHorasExtras = AGENTES_SEM_SOBREAVISO.has(agenteLogado)
 
@@ -3314,7 +3355,7 @@ export default function EscalaAgentes({ ocorrencias = [] }: EscalaAgentesProps) 
     if (old && !localStorage.getItem(STORAGE_KEY)) {
       try {
         const p = JSON.parse(old)
-        const migrado: EscalaData = {
+        const migrado: EscalaData = normalizarDadosAgentes({
           adm: p.adm ?? {},
           sobreaviso: p.sobreaviso ?? {},
           sobreavisoSemanal: {},
@@ -3331,7 +3372,7 @@ export default function EscalaAgentes({ ocorrencias = [] }: EscalaAgentesProps) 
           horasExtrasSimples: {},
           justificativasExtrasSimples: {},
           ajustesBanco: {},
-        }
+        })
         salvarDados(migrado)
         setDados(migrado)
       } catch { /* */ }
@@ -3376,20 +3417,20 @@ export default function EscalaAgentes({ ocorrencias = [] }: EscalaAgentesProps) 
     return off
   }, [])
 
-  // Reset único do banco do Valteir (pedido em abr/2026: zerar 4,5h)
+  // Reset único do banco do agente B (regra herdada do antigo Valteir).
   useEffect(() => {
     if (valteirZeradoRef.current) return
     const FLAG = 'banco-valteir-zerado-2026-04'
     if (localStorage.getItem(FLAG)) { valteirZeradoRef.current = true; return }
     const calc = calcularBancoHoras(
-      'Valteir', dados.sobreaviso, dados.horasTrabalhadasSobreaviso,
+      'B', dados.sobreaviso, dados.horasTrabalhadasSobreaviso,
       dados.percDomingoFeriado, dados.percSobreaviso, dados.percSabado,
       dados.feriadosCustom, dados.descontosFolgaBanco, dados.folgas, hojeStr(),
     )
-    const ajusteAtual = dados.ajustesBanco?.['Valteir'] ?? 0
+    const ajusteAtual = dados.ajustesBanco?.['B'] ?? 0
     const totalAtual = calc + ajusteAtual
     if (totalAtual !== 0) {
-      const novosAjustes = { ...(dados.ajustesBanco ?? {}), Valteir: -calc }
+      const novosAjustes = { ...(dados.ajustesBanco ?? {}), B: -calc }
       const novos = { ...dados, ajustesBanco: novosAjustes }
       setDados(novos)
       salvarDados(novos)

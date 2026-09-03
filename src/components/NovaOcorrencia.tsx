@@ -9,6 +9,7 @@ import { geocodificarEndereco } from '../offline'
 import { formatarCoordenadas, adicionarMarcaDagua, mensagemErroGps } from '../utils'
 import { calcularHorasTotal, calcularHorasOcorrenciaBanco, formatarHoras, carregarFeriadosCustom } from '../horasUtils'
 import PoligonoAreaQueimada, { type PontoPoligono } from './PoligonoAreaQueimada'
+import { getAgenteLogado } from './Login'
 import CamposOrgao, {
   nomesCamposOrgao,
   novaProconOcorrencia,
@@ -84,7 +85,7 @@ export default function NovaOcorrencia({ onSalvo, onVoltar, isOnline, orgao = 'd
   const [recomendacao, setRecomendacao] = useState('')
   const [conclusao, setConclusao] = useState('')
   const [agentes, setAgentes] = useState<string[]>(() => {
-    const agenteLogado = sessionStorage.getItem('defesacivil-agente-sessao')
+    const agenteLogado = getAgenteLogado()
     return agenteLogado ? [agenteLogado] : []
   })
   const [buscandoGps, setBuscandoGps] = useState(false)
@@ -185,7 +186,7 @@ export default function NovaOcorrencia({ onSalvo, onVoltar, isOnline, orgao = 'd
     setRua(''); setNumero(''); setBairro('')
     setLat(null); setLng(null)
     setProprietario(''); setSituacao(''); setRecomendacao(''); setConclusao('')
-    const agenteLogado = sessionStorage.getItem('defesacivil-agente-sessao')
+    const agenteLogado = getAgenteLogado()
     setAgentes(agenteLogado ? [agenteLogado] : [])
     setFotos([])
     setFocosIncendio([{ lat: null, lng: null, buscando: false }])
@@ -419,7 +420,7 @@ export default function NovaOcorrencia({ onSalvo, onVoltar, isOnline, orgao = 'd
       recomendacao: recomendacao || null,
       conclusao: conclusao || null,
       agentes,
-      responsavel_registro: sessionStorage.getItem('defesacivil-agente-sessao') || null,
+      responsavel_registro: getAgenteLogado() || null,
       focos_incendio: focosValidos && focosValidos.length > 0 ? focosValidos : null,
       poligono_area_queimada: poligonoArea.length >= 3 ? poligonoArea : null,
     }

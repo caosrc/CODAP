@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { AGENTES, getSenhaAgente, normalizarNomeAgente } from '../types'
 import SelecaoOrgao from './SelecaoOrgao'
+import codapBanner from '../../attached_assets/banner-codap-scaled_1788407707766.jpg'
 
 function useGeolocalizacao() {
   const [pos, setPos] = useState<{ lat: number; lng: number } | null>(null)
@@ -148,7 +149,9 @@ export default function Login({ onLogin, apenasAgente = false }: Props) {
     return (
       <div className="login-tela">
         <div className="login-box">
-          <div className="login-logo-wrap" aria-label="CODAP">CODAP</div>
+          <div className="login-logo-wrap">
+            <img className="login-logo" src={codapBanner} alt="CODAP — Consórcio Público" />
+          </div>
           <div className="login-titulo">CODAP</div>
           <div className="login-subtitulo">Sistema operacional de campo</div>
 
@@ -224,7 +227,9 @@ export default function Login({ onLogin, apenasAgente = false }: Props) {
     return (
       <div className="login-tela">
         <div className="login-box login-box--agente">
-          <div className="login-logo-wrap" aria-label="CODAP">CODAP</div>
+          <div className="login-logo-wrap">
+            <img className="login-logo" src={codapBanner} alt="CODAP — Consórcio Público" />
+          </div>
           <div className="login-titulo">CODAP</div>
           <div className="login-subtitulo">Sistema operacional de campo</div>
 
@@ -258,7 +263,9 @@ export default function Login({ onLogin, apenasAgente = false }: Props) {
   return (
     <div className="login-tela">
       <div className="login-box">
-        <div className="login-logo-wrap" aria-label="CODAP">CODAP</div>
+        <div className="login-logo-wrap">
+          <img className="login-logo" src={codapBanner} alt="CODAP — Consórcio Público" />
+        </div>
         <div className="login-titulo">CODAP</div>
         <div className="login-subtitulo">Sistema operacional de campo</div>
 

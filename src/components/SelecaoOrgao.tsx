@@ -1,5 +1,6 @@
 import type { Orgao } from './Login'
 import { selecionarOrgao } from './Login'
+import codapBanner from '../../attached_assets/banner-codap-scaled_1788407707766.jpg'
 
 interface Props {
   onSelecionar: (orgao: Orgao) => void
@@ -44,7 +45,9 @@ export default function SelecaoOrgao({ onSelecionar }: Props) {
   return (
     <main className="login-tela selecao-orgao-tela">
       <section className="login-box selecao-orgao-box">
-        <div className="login-logo-wrap" aria-label="CODAP">CODAP</div>
+        <div className="login-logo-wrap">
+          <img className="login-logo" src={codapBanner} alt="CODAP — Consórcio Público" />
+        </div>
         <div className="login-titulo">Escolha o órgão</div>
         <div className="login-subtitulo">Entre no ambiente de trabalho que deseja acessar</div>
 

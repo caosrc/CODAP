@@ -471,6 +471,12 @@ export default function CamposOrgao({ orgao, curral, onCurralChange, procon, onP
 
 export function nomesCamposOrgao(orgao: OrgaoOperacional, curral: CurralOcorrenciaCampos, procon: ProconOcorrenciaCampos): string {
   if (orgao === 'curral') {
+    const statusCurral = {
+      encontrado: 'Encontrado',
+      a_caminho: 'A caminho',
+      no_curral: 'No curral',
+      encerrado: 'Encerrado',
+    }[curral.status]
     return [
       '[CURRAL]',
       `Espécie: ${curral.especie || 'Não informada'}`,
@@ -478,12 +484,20 @@ export function nomesCamposOrgao(orgao: OrgaoOperacional, curral: CurralOcorrenc
       `Sexo: ${curral.sexo || 'Não informado'}`,
       `Identificação visível: ${curral.identificacao || 'Não informada'}`,
       `Local da captura: ${curral.localDescricao || 'Não informado'}`,
-      `Status do atendimento: ${curral.status}`,
+      `Status do atendimento: ${statusCurral}`,
       `Observações: ${curral.observacoes || 'Nenhuma'}`,
     ].join('\n')
   }
 
   if (orgao === 'procon') {
+    const documentoProcon = {
+      termo_constatacao: 'Termo de constatação',
+      auto_infracao: 'Auto de infração',
+      auto_apreensao: 'Auto de apreensão',
+      relatorio_visita: 'Relatório de visita',
+    }[procon.tipoDocumento] || procon.tipoDocumento
+    const motivosProcon = procon.motivos.map((motivo) => MOTIVOS.find(([valor]) => valor === motivo)?.[1] || motivo)
+    const estadoSimNao = (valor: string) => valor === 'sim' ? 'Sim' : valor === 'nao' ? 'Não' : 'Não informado'
     const irregularidades = procon.irregularidades.length
       ? procon.irregularidades.map((item, index) => [
         `Irregularidade ${index + 1}:`,
@@ -497,7 +511,7 @@ export function nomesCamposOrgao(orgao: OrgaoOperacional, curral: CurralOcorrenc
     return [
       '[PROCON]',
       `Tipo de visita: ${procon.tipoVisita || 'Não informado'}`,
-      `Documento: ${procon.tipoDocumento}`,
+      `Documento: ${documentoProcon}`,
       `Processo/fiscalização: ${procon.numeroProcesso || 'Não informado'}`,
       `Razão social: ${procon.razaoSocial || 'Não informada'}`,
       `Nome fantasia: ${procon.nomeFantasia || 'Não informado'}`,
@@ -506,19 +520,19 @@ export function nomesCamposOrgao(orgao: OrgaoOperacional, curral: CurralOcorrenc
       `Responsável: ${procon.responsavelEstabelecimento || 'Não informado'} · Cargo: ${procon.cargoEstabelecimento || 'Não informado'}`,
       `CEP: ${procon.cep || 'Não informado'} · Complemento: ${procon.complemento || 'Não informado'}`,
       `Município/UF: ${procon.municipio || 'Não informado'} / ${procon.uf || 'Não informado'}`,
-      `Motivos: ${procon.motivos.join(', ') || procon.motivoOutro || 'Não informado'}`,
+      `Motivos: ${motivosProcon.join(', ') || procon.motivoOutro || 'Não informado'}`,
       `Descrição do motivo: ${procon.descricaoMotivo || 'Não informada'}`,
-      `Estabelecimento funcionando: ${procon.estabelecimentoFuncionando}`,
-      `Responsável presente: ${procon.responsavelPresente}`,
+      `Estabelecimento funcionando: ${estadoSimNao(procon.estabelecimentoFuncionando)}`,
+      `Responsável presente: ${estadoSimNao(procon.responsavelPresente)}`,
       `Responsável encontrado: ${procon.responsavelEncontrado || 'Não informado'} · Cargo: ${procon.cargoResponsavel || 'Não informado'}`,
       `Itens verificados: ${procon.itensVerificados.join(', ') || 'Nenhum informado'}`,
       irregularidades,
-      `Responsável informado: ${procon.responsavelInformado}`,
+      `Responsável informado: ${estadoSimNao(procon.responsavelInformado)}`,
       `Manifestação: ${procon.manifestacao || 'Não informada'}`,
       `Observações do agente: ${procon.observacoesAgente || 'Nenhuma'}`,
       `Resultado: ${procon.resultado.join(', ') || 'Não informado'}`,
       `Prazo: ${procon.prazoDias || 'Não informado'} dias · Data limite: ${procon.dataLimite || 'Não informada'}`,
-      `Nova visita: ${procon.novaVisita}`,
+      `Nova visita: ${estadoSimNao(procon.novaVisita)}`,
       `Assinatura: ${procon.responsavelRecusou ? 'Recusada pelo responsável' : procon.assinaturaResponsavel || 'Não informada'}`,
     ].join('\n')
   }

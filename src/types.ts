@@ -111,6 +111,8 @@ export const NATUREZA_ICONE: Record<string, string> = {
   'Acidente de Trânsito': '🚗',
   'Sinalização de Segurança': '🚦',
   'Eventos': '🎪',
+  'Apreensão de animal': '🐾',
+  'Fiscalização': '⚖️',
   'Fiscalização Procon': '⚖️',
 }
 
@@ -137,5 +139,7 @@ export const NATUREZA_COR: Record<string, string> = {
   'Acidente de Trânsito': '#ef4444',
   'Sinalização de Segurança': '#f59e0b',
   'Eventos': '#0891b2',
+  'Apreensão de animal': '#7c3aed',
+  'Fiscalização': '#0f766e',
   'Fiscalização Procon': '#0f766e',
 }

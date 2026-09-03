@@ -52,13 +52,19 @@ export default function NovaOcorrencia({ onSalvo, onVoltar, isOnline, orgao = 'd
   const hoje = new Date().toISOString().split('T')[0]
   const ehCurral = orgao === 'curral'
   const ehProcon = orgao === 'procon'
+  const naturezasDisponiveis = ehCurral
+    ? ['Apreensão de animal']
+    : ehProcon
+      ? ['Fiscalização']
+      : NATUREZAS
+  const naturezaPadrao = ehCurral ? 'Apreensão de animal' : ehProcon ? 'Fiscalização' : ''
   const [feriadosCustom, setFeriadosCustom] = useState<string[]>([])
   useEffect(() => {
     carregarFeriadosCustom().then(setFeriadosCustom).catch(() => {})
   }, [])
   const [tipo, setTipo] = useState(ehCurral ? 'Diligência' : ehProcon ? 'Fiscalização' : '')
   const [tipoOutro, setTipoOutro] = useState('')
-  const [natureza, setNatureza] = useState(ehCurral ? 'Captura de animal' : ehProcon ? 'Fiscalização Procon' : '')
+  const [natureza, setNatureza] = useState(naturezaPadrao)
   const [subnatureza, setSubnatureza] = useState('')
   const [nivelRisco, setNivelRisco] = useState<NivelRisco>('baixo')
   const [statusOc, setStatusOc] = useState<StatusOc>('ativo')
@@ -113,7 +119,8 @@ export default function NovaOcorrencia({ onSalvo, onVoltar, isOnline, orgao = 'd
       if (d.orgao && d.orgao !== orgao) return
       if (d.tipo) setTipo(d.tipo)
       if (d.tipoOutro) setTipoOutro(d.tipoOutro)
-      if (d.natureza) setNatureza(d.natureza)
+      if (d.natureza && naturezasDisponiveis.includes(d.natureza)) setNatureza(d.natureza)
+      else if (orgao !== 'defesa-civil') setNatureza(naturezaPadrao)
       if (d.subnatureza) setSubnatureza(d.subnatureza)
       if (d.nivelRisco) setNivelRisco(d.nivelRisco)
       if (d.statusOc) setStatusOc(d.statusOc)
@@ -172,7 +179,7 @@ export default function NovaOcorrencia({ onSalvo, onVoltar, isOnline, orgao = 'd
   const descartarRascunho = useCallback(() => {
     localStorage.removeItem(RASCUNHO_KEY)
     setTipo(ehCurral ? 'Diligência' : ehProcon ? 'Fiscalização' : '')
-    setTipoOutro(''); setNatureza(ehCurral ? 'Captura de animal' : ehProcon ? 'Fiscalização Procon' : ''); setSubnatureza('')
+    setTipoOutro(''); setNatureza(naturezaPadrao); setSubnatureza('')
     setNivelRisco('baixo'); setStatusOc('ativo')
     setDataOcorrencia(hoje); setHoraInicio(''); setHoraFim('')
     setRua(''); setNumero(''); setBairro('')
@@ -187,7 +194,7 @@ export default function NovaOcorrencia({ onSalvo, onVoltar, isOnline, orgao = 'd
     setProconCampos(novaProconOcorrencia())
     setRascunhoRestaurado(false)
     setErro('')
-  }, [hoje])
+  }, [hoje, naturezaPadrao, ehCurral, ehProcon])
 
   useEffect(() => {
     function fechar(e: MouseEvent) {
@@ -523,7 +530,7 @@ export default function NovaOcorrencia({ onSalvo, onVoltar, isOnline, orgao = 'd
                 </button>
                 {naturezaAberta && (
                   <div className="campo-dropdown-lista">
-                    {NATUREZAS.map((n) => (
+                    {naturezasDisponiveis.map((n) => (
                       <button
                         key={n}
                         type="button"

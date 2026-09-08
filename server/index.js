@@ -3501,15 +3501,16 @@ app.get('/api/monitoramento-cnl', async (_req, res) => {
     const nivelCatalogo = numeroCemaden(estacaoCatalogo.ultimovalor)
     const dataNivelCatalogo = dataCemadenParaMs(estacaoCatalogo.datahoraUltimovalor)
     const dataUltimaMedidaNivel = dataCemadenParaMs(ultimaMedidaNivel?.dataHora)
-    const nivelAtual = nivelCatalogo != null &&
-      Number.isFinite(dataNivelCatalogo) &&
-      (!Number.isFinite(dataUltimaMedidaNivel) || dataNivelCatalogo >= dataUltimaMedidaNivel)
+    // A série hidrológica é a fonte da cota instantânea (offset - leitura).
+    // O catálogo resumido pode ficar com zero mesmo quando a medição detalhada
+    // mais recente está disponível; por isso ele só entra como fallback.
+    const nivelAtual = ultimaMedidaNivel || (nivelCatalogo != null
       ? {
           dataHora: String(estacaoCatalogo.datahoraUltimovalor || ''),
           valor: nivelCatalogo,
           qualificacao: 'catálogo CEMADEN',
         }
-      : ultimaMedidaNivel
+      : null)
 
     const cotasOficiais = {
       atencao: numeroCemaden(estacaoHorario.cotaAtencao),

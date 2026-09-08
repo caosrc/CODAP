@@ -161,6 +161,10 @@
 .cnl-grafico-eixo-y { fill: #777; font-size: 10px; transform: rotate(-90deg); transform-origin: 14px 190px; }
 .cnl-grafico-label-data { font-size: 9px; }
 .cnl-grafico-tooltip line { stroke: #6f9fca; stroke-width: 1; stroke-dasharray: 2 2; }
+.cnl-grafico-ponto-clicavel { cursor: pointer; outline: none; }
+.cnl-grafico-ponto-clicavel:focus .cnl-grafico-ponto-nivel,
+.cnl-grafico-ponto-clicavel:hover .cnl-grafico-ponto-nivel { stroke-width: 2.4; }
+.cnl-grafico-ponto-area-clique { fill: transparent; stroke: transparent; pointer-events: all; }
 .cnl-grafico-tooltip rect { fill: #fff; stroke: #7da7c8; stroke-width: 1; }
 .cnl-grafico-tooltip text { fill: #555; font-size: 9px; }
 .cnl-grafico-tooltip text:last-child { font-weight: 700; }

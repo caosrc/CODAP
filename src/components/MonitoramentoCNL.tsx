@@ -220,6 +220,7 @@ function formatarHoraNivel(dataHora: string): string {
 function GraficoNivel({ pontos, estacao }: { pontos: PontoNivel[]; estacao: LeituraCNL }) {
   const [periodo, setPeriodo] = useState<6 | 12 | 24>(24)
   const [dataHoraSelecionada, setDataHoraSelecionada] = useState<string | null>(null)
+  const [dataHoraEmFoco, setDataHoraEmFoco] = useState<string | null>(null)
   const pontosVisiveis = pontos.slice(-periodo)
   const largura = 900
   const altura = 370
@@ -238,9 +239,10 @@ function GraficoNivel({ pontos, estacao }: { pontos: PontoNivel[]; estacao: Leit
   const intervaloRotulo = Math.max(1, Math.ceil(pontosVisiveis.length / 8))
   const ultimoPonto = pontosVisiveis.at(-1)
   const pontoSelecionado = pontosVisiveis.find((ponto) => ponto.dataHora === dataHoraSelecionada) || ultimoPonto
-  const indiceSelecionado = pontoSelecionado ? pontosVisiveis.indexOf(pontoSelecionado) : -1
+  const pontoEmFoco = pontosVisiveis.find((ponto) => ponto.dataHora === dataHoraEmFoco) || pontoSelecionado
+  const indiceSelecionado = pontoEmFoco ? pontosVisiveis.indexOf(pontoEmFoco) : -1
   const pontoSelecionadoX = indiceSelecionado >= 0 ? pontoX(indiceSelecionado) : 0
-  const pontoSelecionadoY = pontoSelecionado ? escalaY(pontoSelecionado.valor) : 0
+  const pontoSelecionadoY = pontoEmFoco ? escalaY(pontoEmFoco.valor) : 0
 
   if (pontos.length === 0) {
     return <div className="cnl-grafico-vazio">A estação ainda não retornou pontos de nível para o período.</div>
@@ -301,6 +303,8 @@ function GraficoNivel({ pontos, estacao }: { pontos: PontoNivel[]; estacao: Leit
                   tabIndex={0}
                   aria-label={`Selecionar leitura de ${formatarDataNivel(ponto.dataHora)} às ${formatarHoraNivel(ponto.dataHora)}, nível ${formatarCota(ponto.valor)}`}
                   onClick={selecionarPonto}
+                    onMouseEnter={() => setDataHoraEmFoco(ponto.dataHora)}
+                    onMouseLeave={() => setDataHoraEmFoco(null)}
                   onKeyDown={(evento) => {
                     if (evento.key === 'Enter' || evento.key === ' ') {
                       evento.preventDefault()
@@ -324,11 +328,11 @@ function GraficoNivel({ pontos, estacao }: { pontos: PontoNivel[]; estacao: Leit
           {pontoSelecionado && (
             <g className="cnl-grafico-tooltip">
               <line x1={pontoSelecionadoX} x2={pontoSelecionadoX} y1={pontoSelecionadoY - 7} y2="91" />
-              <rect x="602" y="10" width="278" height="74" rx="5" />
-              <text x="616" y="27" className="cnl-grafico-tooltip-titulo">Leitura selecionada</text>
-              <text x="616" y="44">{formatarDataNivel(pontoSelecionado.dataHora)}</text>
-              <text x="616" y="59">Hora: {formatarHoraNivel(pontoSelecionado.dataHora)} · Horário de Brasília</text>
-              <text x="616" y="76" className="cnl-grafico-tooltip-valor">Nível do rio: {pontoSelecionado.valor.toLocaleString('pt-BR', { maximumFractionDigits: 1 })} m</text>
+              <rect x="530" y="8" width="350" height="86" rx="7" />
+              <text x="546" y="27" className="cnl-grafico-tooltip-titulo">Leitura selecionada</text>
+              <text x="546" y="45">{formatarDataNivel(pontoEmFoco.dataHora)}</text>
+              <text x="546" y="61">Hora: {formatarHoraNivel(pontoEmFoco.dataHora)} · Horário de Brasília</text>
+              <text x="546" y="80" className="cnl-grafico-tooltip-valor">Cota medida: {formatarCota(pontoEmFoco.valor)}</text>
             </g>
           )}
         </svg>

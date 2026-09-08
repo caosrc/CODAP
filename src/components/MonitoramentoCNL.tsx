@@ -17,7 +17,9 @@ type EstacaoCNL = {
     seisHoras: number | null
     dozeHoras: number | null
     vinteQuatroHoras: number | null
+    quarentaEOitoHoras: number | null
     setentaEDuasHoras: number | null
+    noventaESeisHoras: number | null
   }
 }
 
@@ -539,36 +541,65 @@ export default function MonitoramentoCNL({ onAbrirMapa }: Props) {
 
       <section className="cnl-bloco">
         <div className="cnl-bloco-cabecalho">
-          <div><span className="cnl-eyebrow">Precipitação diária</span><h2>Acumulado por estação</h2></div>
+          <div><span className="cnl-eyebrow">Precipitação acumulada</span><h2>Estações de Conselheiro Lafaiete</h2></div>
           <span className="cnl-badge-fonte cnl-badge-ao-vivo"><span className="cnl-badge-ponto" /> atualiza · 5 min</span>
         </div>
-        {diasPrecipitacao.length === 0 ? (
-          <div className="cnl-grafico-vazio">Ainda não há leituras diárias disponíveis.</div>
-        ) : (
-          <div className="cnl-tabela-chuva-wrap">
-            <div className="cnl-tabela-chuva" role="table" aria-label="Acumulado diário de precipitação por estação">
-              <div className="cnl-tabela-chuva-linha cnl-tabela-chuva-cabecalho" role="row" style={{ gridTemplateColumns: `minmax(9rem, 1.6fr) minmax(5.5rem, 0.8fr) repeat(${diasPrecipitacao.length}, minmax(5rem, 1fr))` }}>
-                <strong role="columnheader">Estação</strong>
-                <strong role="columnheader">Agora</strong>
-                {diasPrecipitacao.map((dia) => <strong key={dia} role="columnheader">{formatarDiaPrecipitacao(dia)}</strong>)}
-              </div>
-              {dados.estacoes.map((item) => (
-                <div key={item.id} className="cnl-tabela-chuva-linha" role="row" style={{ gridTemplateColumns: `minmax(9rem, 1.6fr) minmax(5.5rem, 0.8fr) repeat(${diasPrecipitacao.length}, minmax(5rem, 1fr))` }}>
+        <div className="cnl-tabela-chuva-wrap">
+          <div className="cnl-tabela-chuva cnl-tabela-janelas" role="table" aria-label="Precipitação acumulada por estação e janela">
+            <div className="cnl-tabela-chuva-linha cnl-tabela-chuva-cabecalho" role="row">
+              <strong role="columnheader">Estação</strong>
+              <strong role="columnheader">Último</strong>
+              {['1', '6', '12', '24', '48', '72', '96'].map((janela) => <strong key={janela} role="columnheader">{janela}</strong>)}
+            </div>
+            {dados.estacoes.map((item) => {
+              const valores = [
+                item.ultimoValor,
+                item.acumulados.umaHora,
+                item.acumulados.seisHoras,
+                item.acumulados.dozeHoras,
+                item.acumulados.vinteQuatroHoras,
+                item.acumulados.quarentaEOitoHoras,
+                item.acumulados.setentaEDuasHoras,
+                item.acumulados.noventaESeisHoras,
+              ]
+              return (
+                <div key={item.id} className="cnl-tabela-chuva-linha" role="row">
                   <span className="cnl-tabela-chuva-estacao" role="cell">
                     <strong>{item.nome}</strong>
                     <small>{item.codigo || `CEMADEN ${item.id}`}</small>
                   </span>
-                  <span role="cell" className="cnl-tabela-chuva-agora">{formatarMm(item.precipitacaoAtual)}<small>{formatarDataHora(item.precipitacaoDataHora)}</small></span>
-                  {diasPrecipitacao.map((dia) => {
-                    const leitura = item.precipitacaoDiaria.find((itemDia) => itemDia.data === dia)
-                    return <span key={dia} role="cell" className="cnl-tabela-chuva-total">{formatarMm(leitura?.total)}</span>
-                  })}
+                  {valores.map((valor, indice) => (
+                    <span key={`${item.id}-${indice}`} role="cell" className="cnl-tabela-chuva-total">{formatarMm(valor)}</span>
+                  ))}
                 </div>
-              ))}
-            </div>
+              )
+            })}
           </div>
+        </div>
+        <p className="cnl-tabela-chuva-nota">Valores oficiais do CEMADEN em milímetros. “Último” é a leitura pluviométrica mais recente; as demais colunas são acumulados móveis em horas.</p>
+
+        {diasPrecipitacao.length > 0 && (
+          <details className="cnl-diaria-detalhe">
+            <summary>Ver acumulado diário por estação</summary>
+            <div className="cnl-tabela-chuva-wrap">
+              <div className="cnl-tabela-chuva" role="table" aria-label="Acumulado diário de precipitação por estação">
+                <div className="cnl-tabela-chuva-linha cnl-tabela-chuva-cabecalho" role="row" style={{ gridTemplateColumns: `minmax(9rem, 1.6fr) repeat(${diasPrecipitacao.length}, minmax(5rem, 1fr))` }}>
+                  <strong role="columnheader">Estação</strong>
+                  {diasPrecipitacao.map((dia) => <strong key={dia} role="columnheader">{formatarDiaPrecipitacao(dia)}</strong>)}
+                </div>
+                {dados.estacoes.map((item) => (
+                  <div key={item.id} className="cnl-tabela-chuva-linha" role="row" style={{ gridTemplateColumns: `minmax(9rem, 1.6fr) repeat(${diasPrecipitacao.length}, minmax(5rem, 1fr))` }}>
+                    <span className="cnl-tabela-chuva-estacao" role="cell"><strong>{item.nome}</strong></span>
+                    {diasPrecipitacao.map((dia) => {
+                      const leitura = item.precipitacaoDiaria.find((itemDia) => itemDia.data === dia)
+                      return <span key={dia} role="cell" className="cnl-tabela-chuva-total">{formatarMm(leitura?.total)}</span>
+                    })}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </details>
         )}
-        <p className="cnl-tabela-chuva-nota">“Agora” é o acumulado da última hora. Os totais diários são a soma das leituras horárias do CEMADEN no horário de Brasília.</p>
       </section>
 
       <section className="cnl-bloco">

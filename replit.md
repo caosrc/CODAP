@@ -1,4 +1,4 @@
-# Defesa Civil Ouro Branco — App de Gerenciamento de Ocorrências
+# Defesa Civil Conselheiro Lafaiete — App de Gerenciamento de Ocorrências
 
 ## Run & Operate
 - **Development + Production**: `npm install && npm run build && node server/index.js`
@@ -25,7 +25,7 @@ Required env vars (all set in Replit shared env / secrets):
 - **Push Notifications**: Web Push (VAPID) via `web-push` on Express server
 - **Maps**: Leaflet + react-leaflet (tiles proxied via `/api/tiles`)
 - **Incêndios ativos**: NASA FIRMS (VIIRS NOAA-20/S-NPP, MODIS Terra/Aqua) + Google Earth Engine (GOES-19 ABI, MODIS e VIIRS), exibidos como focos e camadas no mapa
-- **Chuva ao vivo**: RainViewer fornece o último quadro de radar meteorológico sobre o Leaflet; o limite oficial de Ouro Branco é desenhado sobre a camada via OpenStreetMap/Nominatim
+- **Chuva ao vivo**: RainViewer fornece o último quadro de radar meteorológico sobre o Leaflet; o limite oficial de Conselheiro Lafaiete é desenhado sobre a camada via OpenStreetMap/Nominatim
 - **Imagens Planet**: consulta protegida pelo servidor em `/api/planet-focos`
 
 ## Where things live
@@ -70,6 +70,8 @@ Required env vars (all set in Replit shared env / secrets):
 - Earth Engine requires the service account to have Earth Engine access and the `Service Usage Consumer` role on the Google Cloud project
 - O botão **Chuva** mostra precipitação observada pelo radar RainViewer, atualizada automaticamente a cada 5 minutos, com legenda e limite municipal tracejado. A leitura em mm do centro é um resumo do Open-Meteo e não substitui pluviômetro local.
 - O monitoramento do Earth Engine usa `FireMask >= 7` para MODIS/VIIRS e `Area > 0` para GOES-19 FDCF (cadência de 10 minutos); não interpreta chuva, radar, vegetação ou cicatriz de queimada como incêndio ativo
+- O mapa consulta os focos NASA FIRMS e as camadas do Earth Engine para Conselheiro Lafaiete; a conta de serviço do Earth Engine precisa do acesso ao projeto e do papel Service Usage Consumer
+- O painel CEMADEN lista todas as estações do município com os acumulados móveis de 1, 6, 12, 24, 48, 72 e 96 horas, além da leitura “Último”
 
 ## Netlify setup
 - Configure the Netlify site base directory as the repository root, build command as `npm run build`, publish directory as `dist`, and Functions directory as `netlify/functions`

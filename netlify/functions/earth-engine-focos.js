@@ -45,12 +45,12 @@ exports.handler = async () => {
     const project = await autenticar();
 
     const municipio = ee.FeatureCollection('FAO/GAUL/2015/level2')
-      .filter(ee.Filter.eq('ADM2_NAME', 'Ouro Branco'))
+      .filter(ee.Filter.eq('ADM2_NAME', 'Conselheiro Lafaiete'))
       .filter(ee.Filter.eq('ADM1_NAME', 'Minas Gerais'))
       .geometry();
 
     const hoje = new Date();
-    const fim = hoje.toISOString().slice(0, 10);
+    const fim = new Date(hoje.getTime() + 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
     const inicioDate = new Date(hoje);
     inicioDate.setUTCDate(inicioDate.getUTCDate() - 3);
     const inicio = inicioDate.toISOString().slice(0, 10);

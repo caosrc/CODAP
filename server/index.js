@@ -3214,7 +3214,9 @@ function normalizarEstacaoCnl(estacao) {
       seisHoras: numeroCemaden(estacao.acc6hr),
       dozeHoras: numeroCemaden(estacao.acc12hr),
       vinteQuatroHoras: numeroCemaden(estacao.acc24hr),
+      quarentaEOitoHoras: numeroCemaden(estacao.acc48hr),
       setentaEDuasHoras: numeroCemaden(estacao.acc72hr),
+      noventaESeisHoras: numeroCemaden(estacao.acc96hr),
     },
   }
 }
@@ -3477,7 +3479,7 @@ app.get('/api/monitoramento-cnl', async (_req, res) => {
         .map((item) => Number(item?.idestacao))
         .filter((id) => Number.isFinite(id) && id !== CNL_ESTACAO_ID)
         .map(async (id) => {
-          const resposta = await fetch(`${CNL_RECURSOS_URL}/horario/${id}/47`, {
+          const resposta = await fetch(`${CNL_RECURSOS_URL}/horario/${id}/96`, {
             signal: controlador.signal,
             headers: { 'User-Agent': 'CODAP/1.0 (Conselheiro Lafaiete, MG)' },
           })

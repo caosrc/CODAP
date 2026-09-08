@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Consultas de monitoramento ambiental do Google Earth Engine para Ouro Branco."""
+"""Consultas de detecção de incêndio do Google Earth Engine para Conselheiro Lafaiete."""
 
 import datetime
 import json
@@ -68,22 +68,22 @@ def inicializar_earth_engine():
 
 
 def obter_municipio():
-    """Retorna a geometria oficial de Ouro Branco no catálogo do Earth Engine."""
+    """Retorna a geometria oficial de Conselheiro Lafaiete no catálogo do Earth Engine."""
     municipios = ee.FeatureCollection("FAO/GAUL/2015/level2")
 
-    ouro_branco = (
+    conselheiro_lafaiete = (
         municipios
-        .filter(ee.Filter.eq("ADM2_NAME", "Ouro Branco"))
+        .filter(ee.Filter.eq("ADM2_NAME", "Conselheiro Lafaiete"))
         .filter(ee.Filter.eq("ADM1_NAME", "Minas Gerais"))
     )
 
-    if ouro_branco.size().getInfo() == 0:
+    if conselheiro_lafaiete.size().getInfo() == 0:
         raise RuntimeError(
-            "Município de Ouro Branco não encontrado "
+            "Município de Conselheiro Lafaiete não encontrado "
             "no catálogo do Earth Engine"
         )
 
-    return ouro_branco.geometry()
+    return conselheiro_lafaiete.geometry()
 
 
 def gerar_url_tiles(imagem, vis_params):
@@ -307,7 +307,11 @@ def consultar_monitoramento():
         datetime.timezone.utc
     ).date()
 
-    fim = hoje.strftime("%Y-%m-%d")
+    # Earth Engine usa intervalo [início, fim); use o dia seguinte para
+    # incluir as imagens disponíveis durante o dia atual.
+    fim = (
+        hoje + datetime.timedelta(days=1)
+    ).strftime("%Y-%m-%d")
     inicio = (
         hoje - datetime.timedelta(days=3)
     ).strftime("%Y-%m-%d")

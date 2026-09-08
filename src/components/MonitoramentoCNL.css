@@ -198,6 +198,12 @@
 .cnl-tabela-chuva-agora small { margin-top: 0.14rem; color: #8a9ba1; font-size: 0.55rem; font-weight: 500; }
 .cnl-tabela-chuva-total { color: #176b62; }
 .cnl-tabela-chuva-nota { margin: 0.55rem 0 0; color: #84949b; font-size: 0.63rem; line-height: 1.35; }
+.cnl-tabela-janelas { min-width: 49rem; }
+.cnl-tabela-janelas .cnl-tabela-chuva-linha { grid-template-columns: minmax(12rem, 1.8fr) repeat(8, minmax(4.5rem, 0.7fr)); }
+.cnl-tabela-janelas .cnl-tabela-chuva-linha > :not(:first-child) { text-align: right; }
+.cnl-diaria-detalhe { margin-top: 0.75rem; border-top: 1px solid #edf2f3; }
+.cnl-diaria-detalhe summary { padding: 0.7rem 0.1rem; color: #176b62; cursor: pointer; font-size: 0.72rem; font-weight: 800; }
+.cnl-diaria-detalhe .cnl-tabela-chuva-wrap { margin-top: 0; }
 
 .cnl-estacoes { display: flex; flex-direction: column; gap: 0.45rem; margin-top: 0.7rem; }
 .cnl-estacao { display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(0, 0.9fr) auto auto; align-items: center; gap: 0.45rem; padding: 0.62rem 0.65rem; border: 1px solid #e4edef; border-radius: 10px; background: #fbfdfd; }

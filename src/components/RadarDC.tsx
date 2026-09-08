@@ -465,7 +465,11 @@ export default function RadarDC() {
   const lembretes = registros.filter(r => r.tipo === 'lembrete')
   const notificacoes = registros.filter(r => r.tipo === 'notificacao')
   const notificacoesDaData = notificacoes.filter(r => r.data === dataSelecionada)
-  const proximasNotificacoes = notificacoes.filter(r => !r.concluido).sort((a, b) => `${a.data}${a.hora}`.localeCompare(`${b.data}${b.hora}`))
+  // Notificações vencidas continuam disponíveis no calendário como histórico,
+  // mas deixam de circular no Radar a partir do dia seguinte à data marcada.
+  const notificacoesDoRadar = notificacoes
+    .filter(r => !r.concluido && r.data >= hoje())
+    .sort((a, b) => `${a.data}${a.hora}`.localeCompare(`${b.data}${b.hora}`))
   const resumosFerramental = useMemo(
     () => resumirFerramental(atividades.checklistsFerramentas, atividades.ferramentasCatalogo),
     [atividades.checklistsFerramentas, atividades.ferramentasCatalogo],
@@ -820,7 +824,7 @@ export default function RadarDC() {
         <span>RADAR CODAP</span>
         <div className="radar-ticker-viewport">
           {(() => {
-            const filaTicker = proximasNotificacoes.length ? proximasNotificacoes : notificacoes
+             const filaTicker = notificacoesDoRadar
             return filaTicker.length > 0 ? (
               <div className="radar-ticker-track" style={{ '--ticker-duration': `${Math.max(12, filaTicker.length * 4.2)}s` } as React.CSSProperties}>
                 {[0, 1].map(copia => (

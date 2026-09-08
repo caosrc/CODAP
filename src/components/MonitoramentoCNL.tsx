@@ -195,26 +195,35 @@ function formatarRotuloEixoNivel(dataHora?: string): string {
   }).replace(',', '')
 }
 
-function formatarTooltipNivel(dataHora: string): string {
+function formatarDataNivel(dataHora: string): string {
   const data = parseDataCemaden(dataHora)
   if (!data) return dataHora
-  return data.toLocaleString('en-US', {
+  return data.toLocaleDateString('pt-BR', {
     weekday: 'long',
-    month: 'short',
     day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+    timeZone: FUSO_HORARIO,
+  })
+}
+
+function formatarHoraNivel(dataHora: string): string {
+  const data = parseDataCemaden(dataHora)
+  if (!data) return '—'
+  return data.toLocaleTimeString('pt-BR', {
     hour: '2-digit',
     minute: '2-digit',
-    hour12: false,
     timeZone: FUSO_HORARIO,
   })
 }
 
 function GraficoNivel({ pontos, estacao }: { pontos: PontoNivel[]; estacao: LeituraCNL }) {
   const [periodo, setPeriodo] = useState<6 | 12 | 24>(24)
+  const [dataHoraSelecionada, setDataHoraSelecionada] = useState<string | null>(null)
   const pontosVisiveis = pontos.slice(-periodo)
   const largura = 900
-  const altura = 330
-  const margem = { topo: 76, direita: 20, baixo: 72, esquerda: 56 }
+  const altura = 370
+  const margem = { topo: 98, direita: 20, baixo: 72, esquerda: 56 }
   const valores = pontosVisiveis.map((ponto) => ponto.valor)
   const maiorValor = Math.max(...valores, 0)
   const maior = Math.max(0.4, Math.ceil((maiorValor * 1.15) / 0.1) * 0.1)
@@ -228,8 +237,10 @@ function GraficoNivel({ pontos, estacao }: { pontos: PontoNivel[]; estacao: Leit
     : ''
   const intervaloRotulo = Math.max(1, Math.ceil(pontosVisiveis.length / 8))
   const ultimoPonto = pontosVisiveis.at(-1)
-  const ultimoPontoX = ultimoPonto ? pontoX(pontosVisiveis.length - 1) : 0
-  const ultimoPontoY = ultimoPonto ? escalaY(ultimoPonto.valor) : 0
+  const pontoSelecionado = pontosVisiveis.find((ponto) => ponto.dataHora === dataHoraSelecionada) || ultimoPonto
+  const indiceSelecionado = pontoSelecionado ? pontosVisiveis.indexOf(pontoSelecionado) : -1
+  const pontoSelecionadoX = indiceSelecionado >= 0 ? pontoX(indiceSelecionado) : 0
+  const pontoSelecionadoY = pontoSelecionado ? escalaY(pontoSelecionado.valor) : 0
 
   if (pontos.length === 0) {
     return <div className="cnl-grafico-vazio">A estação ainda não retornou pontos de nível para o período.</div>
@@ -280,11 +291,28 @@ function GraficoNivel({ pontos, estacao }: { pontos: PontoNivel[]; estacao: Leit
             const x = pontoX(indice)
             const y = escalaY(ponto.valor)
             const mostrarRotulo = indice === 0 || indice === pontosVisiveis.length - 1 || indice % intervaloRotulo === 0
+            const selecionado = ponto.dataHora === pontoSelecionado?.dataHora
+            const selecionarPonto = () => setDataHoraSelecionada(ponto.dataHora)
             return (
               <g key={`${ponto.dataHora}-${indice}`}>
-                <circle cx={x} cy={y} r="3.5" className="cnl-grafico-ponto cnl-grafico-ponto-nivel">
-                  <title>{`${formatarRotuloEixoNivel(ponto.dataHora)} · ${formatarCota(ponto.valor)}`}</title>
-                </circle>
+                <g
+                  className={`cnl-grafico-ponto-clicavel${selecionado ? ' cnl-grafico-ponto-selecionado' : ''}`}
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`Selecionar leitura de ${formatarDataNivel(ponto.dataHora)} às ${formatarHoraNivel(ponto.dataHora)}, nível ${formatarCota(ponto.valor)}`}
+                  onClick={selecionarPonto}
+                  onKeyDown={(evento) => {
+                    if (evento.key === 'Enter' || evento.key === ' ') {
+                      evento.preventDefault()
+                      selecionarPonto()
+                    }
+                  }}
+                >
+                  <circle cx={x} cy={y} r="10" className="cnl-grafico-ponto-area-clique" />
+                  <circle cx={x} cy={y} r="3.5" className="cnl-grafico-ponto cnl-grafico-ponto-nivel">
+                    <title>{`${formatarRotuloEixoNivel(ponto.dataHora)} · ${formatarCota(ponto.valor)}`}</title>
+                  </circle>
+                </g>
                 {mostrarRotulo && (
                   <text x={x} y={margem.topo + areaAltura + 16} textAnchor="end" className="cnl-grafico-label cnl-grafico-label-data" transform={`rotate(-42 ${x} ${margem.topo + areaAltura + 16})`}>
                     {formatarRotuloEixoNivel(ponto.dataHora)}
@@ -293,18 +321,19 @@ function GraficoNivel({ pontos, estacao }: { pontos: PontoNivel[]; estacao: Leit
               </g>
             )
           })}
-          {ultimoPonto && (
-            <g className="cnl-grafico-tooltip" aria-hidden="true">
-              <line x1={ultimoPontoX} x2={ultimoPontoX} y1={ultimoPontoY - 5} y2="52" />
-              <rect x={largura - 137} y="10" width="117" height="39" rx="2" />
-              <text x={largura - 130} y="25">{formatarTooltipNivel(ultimoPonto.dataHora)}</text>
-              <circle cx={largura - 129} cy="37" r="3" />
-              <text x={largura - 121} y="40">Nível (m): {ultimoPonto.valor.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}</text>
+          {pontoSelecionado && (
+            <g className="cnl-grafico-tooltip">
+              <line x1={pontoSelecionadoX} x2={pontoSelecionadoX} y1={pontoSelecionadoY - 7} y2="91" />
+              <rect x="602" y="10" width="278" height="74" rx="5" />
+              <text x="616" y="27" className="cnl-grafico-tooltip-titulo">Leitura selecionada</text>
+              <text x="616" y="44">{formatarDataNivel(pontoSelecionado.dataHora)}</text>
+              <text x="616" y="59">Hora: {formatarHoraNivel(pontoSelecionado.dataHora)} · Horário de Brasília</text>
+              <text x="616" y="76" className="cnl-grafico-tooltip-valor">Nível do rio: {pontoSelecionado.valor.toLocaleString('pt-BR', { maximumFractionDigits: 1 })} m</text>
             </g>
           )}
         </svg>
       </div>
-      <div className="cnl-grafico-cemaden-legenda"><span className="cnl-legenda-area" /> Nível (m)</div>
+      <div className="cnl-grafico-cemaden-legenda"><span className="cnl-legenda-area" /> Nível (m) · Clique nas bolinhas para consultar cada leitura</div>
     </div>
   )
 }

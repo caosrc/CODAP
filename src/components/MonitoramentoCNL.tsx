@@ -363,6 +363,7 @@ export default function MonitoramentoCNL({ onAbrirMapa }: Props) {
   const [cotasSalvas, setCotasSalvas] = useState('')
   const [cotasForm, setCotasForm] = useState({ atencao: '', alerta: '', transbordamento: '' })
   const [audioBloqueado, setAudioBloqueado] = useState(false)
+  const [audioAtivo, setAudioAtivo] = useState(false)
   const audioRef = useRef<ControleAlertaSonoro | null>(null)
   const alertaSonoroPendenteRef = useRef(false)
   const estadoNivelAnteriorRef = useRef<EstadoNivel | null>(null)
@@ -495,6 +496,7 @@ export default function MonitoramentoCNL({ onAbrirMapa }: Props) {
     const contexto = await prepararAudio()
     if (!contexto) {
       alertaSonoroPendenteRef.current = true
+      setAudioAtivo(false)
       return
     }
 
@@ -533,7 +535,13 @@ export default function MonitoramentoCNL({ onAbrirMapa }: Props) {
 
   const ativarAlertasSonoros = useCallback(async () => {
     const contexto = await prepararAudio()
-    if (contexto && alertaSonoroPendenteRef.current) {
+    if (!contexto) {
+      setAudioAtivo(false)
+      return
+    }
+
+    setAudioAtivo(true)
+    if (alertaSonoroPendenteRef.current) {
       await tocarAlertaSonoro()
     }
   }, [prepararAudio, tocarAlertaSonoro])
@@ -575,14 +583,18 @@ export default function MonitoramentoCNL({ onAbrirMapa }: Props) {
     const cotaAtingida = cotas[estadoNivelAtual]
     if (cotaAtingida == null) return
 
-    void tocarAlertaSonoro()
+    if (audioAtivo) {
+      void tocarAlertaSonoro()
+    } else {
+      alertaSonoroPendenteRef.current = true
+    }
     if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
       new Notification(`Rio Bananeiras · ${rotuloNivel(estadoNivelAtual)}`, {
         body: `Nível atual: ${formatarCota(leitura.valor)}. Cota de referência: ${formatarCota(cotaAtingida)}.`,
         tag: `cnl-nivel-${estadoNivelAtual}`,
       })
     }
-  }, [dados, estadoNivelAtual, tocarAlertaSonoro])
+  }, [audioAtivo, dados, estadoNivelAtual, tocarAlertaSonoro])
 
   const acumulado24h = useMemo(() => {
     if (!dados) return null
@@ -769,9 +781,20 @@ export default function MonitoramentoCNL({ onAbrirMapa }: Props) {
             </div>
             <div className="cnl-cotas-rodape">
               <span>{dados.cotasConfiguradas ? 'Referências personalizadas para os alertas do aplicativo.' : 'Referências oficiais atuais do CEMADEN.'}</span>
-              <span className={`cnl-audio-status ${audioBloqueado ? 'cnl-audio-status-bloqueado' : ''}`}>
-                {audioBloqueado ? 'Som bloqueado pelo navegador.' : 'Alerta sonoro de 5 segundos por mudança de cota.'}
-                <button type="button" className="cnl-btn-audio" onClick={ativarAlertasSonoros}>Ativar som</button>
+              <span className={`cnl-audio-status ${audioBloqueado ? 'cnl-audio-status-bloqueado' : ''} ${audioAtivo ? 'cnl-audio-status-ativo' : ''}`}>
+                {audioBloqueado
+                  ? 'Som bloqueado pelo navegador. Clique para tentar novamente.'
+                  : audioAtivo
+                    ? 'Alerta sonoro ativo: 5 segundos ao subir de faixa.'
+                    : 'Ative o som para alertas de mudança de cota.'}
+                <button
+                  type="button"
+                  className={`cnl-btn-audio ${audioAtivo ? 'cnl-btn-audio-ativo' : ''}`}
+                  onClick={ativarAlertasSonoros}
+                  aria-pressed={audioAtivo}
+                >
+                  {audioAtivo ? 'Som ativo' : 'Ativar som'}
+                </button>
               </span>
               {cotasSalvas && <strong>{cotasSalvas}</strong>}
             </div>

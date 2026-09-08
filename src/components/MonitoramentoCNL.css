@@ -209,8 +209,10 @@
 .cnl-cotas-rodape strong { color: #168b80; font-weight: 750; }
 .cnl-audio-status { display: inline-flex; align-items: center; flex-wrap: wrap; gap: 0.3rem; }
 .cnl-audio-status-bloqueado { color: #9f3131; }
+.cnl-audio-status-ativo { color: #147d6e; }
 .cnl-btn-audio { border: 1px solid #b9dfe0; border-radius: 5px; padding: 0.18rem 0.35rem; color: #14737b; background: #effafa; font: inherit; font-size: 0.59rem; font-weight: 800; cursor: pointer; }
 .cnl-btn-audio:hover { background: #d9f5f0; }
+.cnl-btn-audio-ativo { border-color: #8bd5c8; color: #0d725f; background: #dff8f1; }
 .cnl-alerta-alerta { color: #8b3f18; border-color: #f4b18c; background: #fff4eb; }
 .cnl-alerta-alerta .cnl-alerta-icone { background: #e26625; }
 .cnl-alerta-transbordamento { color: #8d2630; border-color: #f39a9a; background: #fff0f0; }

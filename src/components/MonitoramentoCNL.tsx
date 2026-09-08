@@ -182,50 +182,93 @@ function formatarPontoChuva(ponto?: PontoSerie): string {
   return hora ? formatarDataHora(`${ponto.data} ${hora.padStart(2, '0')}:00`) : ponto.hora
 }
 
-function GraficoNivel({ pontos }: { pontos: PontoNivel[] }) {
-  const largura = 620
-  const altura = 190
-  const margem = { topo: 18, direita: 18, baixo: 34, esquerda: 42 }
-  const valores = pontos.map((ponto) => ponto.valor)
-  const maior = Math.max(...valores, 0.5)
+function formatarRotuloEixoNivel(dataHora?: string): string {
+  if (!dataHora) return '—'
+  const data = parseDataCemaden(dataHora)
+  if (!data) return dataHora
+  return data.toLocaleString('pt-BR', {
+    day: '2-digit',
+    month: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    timeZone: FUSO_HORARIO,
+  }).replace(',', '')
+}
+
+function GraficoNivel({ pontos, estacao }: { pontos: PontoNivel[]; estacao: LeituraCNL }) {
+  const [periodo, setPeriodo] = useState<6 | 12 | 24>(24)
+  const pontosVisiveis = pontos.slice(-periodo)
+  const largura = 900
+  const altura = 330
+  const margem = { topo: 76, direita: 20, baixo: 72, esquerda: 56 }
+  const valores = pontosVisiveis.map((ponto) => ponto.valor)
+  const maiorValor = Math.max(...valores, 0)
+  const maior = Math.max(0.4, Math.ceil((maiorValor * 1.15) / 0.1) * 0.1)
   const areaLargura = largura - margem.esquerda - margem.direita
   const areaAltura = altura - margem.topo - margem.baixo
-  const pontosSvg = pontos.map((ponto, indice) => {
-    const x = margem.esquerda + (pontos.length <= 1 ? areaLargura / 2 : indice * areaLargura / (pontos.length - 1))
-    const y = margem.topo + areaAltura - (ponto.valor / maior) * areaAltura
-    return `${x.toFixed(1)},${y.toFixed(1)}`
-  }).join(' ')
+  const escalaY = (valor: number) => margem.topo + areaAltura - (valor / maior) * areaAltura
+  const pontoX = (indice: number) => margem.esquerda + (pontosVisiveis.length <= 1 ? areaLargura / 2 : indice * areaLargura / (pontosVisiveis.length - 1))
+  const pontosSvg = pontosVisiveis.map((ponto, indice) => `${pontoX(indice).toFixed(1)},${escalaY(ponto.valor).toFixed(1)}`).join(' ')
+  const areaSvg = pontosVisiveis.length > 0
+    ? `${margem.esquerda},${margem.topo + areaAltura} ${pontosSvg} ${pontoX(pontosVisiveis.length - 1)},${margem.topo + areaAltura}`
+    : ''
+  const intervaloRotulo = Math.max(1, Math.ceil(pontosVisiveis.length / 8))
 
   if (pontos.length === 0) {
     return <div className="cnl-grafico-vazio">A estação ainda não retornou pontos de nível para o período.</div>
   }
 
   return (
-    <div className="cnl-grafico-wrap">
-      <svg className="cnl-grafico" viewBox={`0 0 ${largura} ${altura}`} role="img" aria-label="Nível do Rio Bananeiras nas últimas 24 horas">
-        {[0, 0.5, 1].map((proporcao) => {
-          const y = margem.topo + areaAltura - proporcao * areaAltura
-          return <line key={proporcao} x1={margem.esquerda} x2={largura - margem.direita} y1={y} y2={y} className="cnl-grafico-grade" />
-        })}
-        <polyline points={pontosSvg} className="cnl-grafico-linha cnl-grafico-linha-nivel" />
-        <polyline points={pontosSvg} className="cnl-grafico-linha-nivel-pulso" aria-hidden="true" />
-        {pontos.map((ponto, indice) => {
-          const x = margem.esquerda + (pontos.length <= 1 ? areaLargura / 2 : indice * areaLargura / (pontos.length - 1))
-          const y = margem.topo + areaAltura - (ponto.valor / maior) * areaAltura
-          const atual = indice === pontos.length - 1
-          return (
-            <g key={`${ponto.dataHora}-${indice}`}>
-              {atual && <circle cx={x} cy={y} r="8" className="cnl-grafico-ponto-atual" aria-hidden="true" />}
-              <circle cx={x} cy={y} r={atual ? '4.5' : '3.5'} className="cnl-grafico-ponto cnl-grafico-ponto-nivel" />
-            </g>
-          )
-        })}
-        <text x={margem.esquerda - 8} y={margem.topo + 4} textAnchor="end" className="cnl-grafico-label">{maior.toLocaleString('pt-BR', { maximumFractionDigits: 2 })} m</text>
-        <text x={margem.esquerda - 8} y={margem.topo + areaAltura + 4} textAnchor="end" className="cnl-grafico-label">0 m</text>
-        <text x={margem.esquerda} y={altura - 8} className="cnl-grafico-label">{formatarDataHora(pontos[0]?.dataHora)}</text>
-        <text x={largura - margem.direita} y={altura - 8} textAnchor="end" className="cnl-grafico-label">{formatarDataHora(pontos.at(-1)?.dataHora)}</text>
-      </svg>
-      <div className="cnl-grafico-legenda">Cota instantânea em metros · cálculo oficial do CEMADEN</div>
+    <div className="cnl-grafico-cemaden">
+      <div className="cnl-grafico-cemaden-controles">
+        <label htmlFor="cnl-periodo-nivel">Período:</label>
+        <select id="cnl-periodo-nivel" value={periodo} onChange={(evento) => setPeriodo(Number(evento.target.value) as 6 | 12 | 24)}>
+          <option value={6}>6 horas</option>
+          <option value={12}>12 horas</option>
+          <option value={24}>24 horas</option>
+        </select>
+      </div>
+      <div className="cnl-grafico-cemaden-cabecalho">
+        <strong>MUNICÍPIO: {estacao.cidade.toUpperCase() || 'CONSELHEIRO LAFAIETE'}/MG</strong>
+        <span>Estação: {estacao.nome} ({estacao.codigo || `CEMADEN ${estacao.id}`})</span>
+        <small>Fonte: Estações Hidrológicas - Cemaden · Horário de Brasília</small>
+      </div>
+      <div className="cnl-grafico-wrap">
+        <svg className="cnl-grafico cnl-grafico-nivel-cemaden" viewBox={`0 0 ${largura} ${altura}`} role="img" aria-label={`Nível do ${estacao.nome} nas últimas ${periodo} horas`}>
+          {[0, 0.25, 0.5, 0.75, 1].map((proporcao) => {
+            const y = margem.topo + areaAltura - proporcao * areaAltura
+            return (
+              <g key={proporcao}>
+                <line x1={margem.esquerda} x2={largura - margem.direita} y1={y} y2={y} className="cnl-grafico-grade" />
+                <text x={margem.esquerda - 9} y={y + 4} textAnchor="end" className="cnl-grafico-label">
+                  {(maior * proporcao).toLocaleString('pt-BR', { maximumFractionDigits: 2 })}
+                </text>
+              </g>
+            )
+          })}
+          <text x="14" y={margem.topo + areaAltura / 2} textAnchor="middle" className="cnl-grafico-eixo-y">Nível (m)</text>
+          <polygon points={areaSvg} className="cnl-grafico-area-nivel" />
+          <polyline points={pontosSvg} className="cnl-grafico-linha cnl-grafico-linha-nivel" />
+          {pontosVisiveis.map((ponto, indice) => {
+            const x = pontoX(indice)
+            const y = escalaY(ponto.valor)
+            const mostrarRotulo = indice === 0 || indice === pontosVisiveis.length - 1 || indice % intervaloRotulo === 0
+            return (
+              <g key={`${ponto.dataHora}-${indice}`}>
+                <circle cx={x} cy={y} r="3.5" className="cnl-grafico-ponto cnl-grafico-ponto-nivel">
+                  <title>{`${formatarRotuloEixoNivel(ponto.dataHora)} · ${formatarCota(ponto.valor)}`}</title>
+                </circle>
+                {mostrarRotulo && (
+                  <text x={x} y={margem.topo + areaAltura + 16} textAnchor="end" className="cnl-grafico-label cnl-grafico-label-data" transform={`rotate(-42 ${x} ${margem.topo + areaAltura + 16})`}>
+                    {formatarRotuloEixoNivel(ponto.dataHora)}
+                  </text>
+                )}
+              </g>
+            )
+          })}
+        </svg>
+      </div>
+      <div className="cnl-grafico-cemaden-legenda"><span className="cnl-legenda-area" /> Nível (m)</div>
     </div>
   )
 }
@@ -604,12 +647,12 @@ export default function MonitoramentoCNL({ onAbrirMapa }: Props) {
         <ChartaChuva pontos={dados.serie} />
       </section>
 
-      <section className="cnl-bloco">
+      <section className="cnl-bloco cnl-bloco-grafico-nivel">
         <div className="cnl-bloco-cabecalho">
           <div><span className="cnl-eyebrow">Cota instantânea</span><h2>Nível do Rio Bananeiras</h2></div>
           <span className="cnl-badge-fonte cnl-badge-ao-vivo"><span className="cnl-badge-ponto" /> ao vivo · 5 min · Brasília</span>
         </div>
-        <GraficoNivel pontos={dados.serieNivel} />
+        <GraficoNivel pontos={dados.serieNivel} estacao={estacao} />
       </section>
 
       <section className="cnl-bloco">

@@ -809,31 +809,6 @@ export default function MonitoramentoCNL({ onAbrirMapa }: Props) {
         )}
       </section>
 
-      <section className="cnl-bloco">
-        <div className="cnl-bloco-cabecalho">
-          <div><span className="cnl-eyebrow">Rede local</span><h2>Estações em Conselheiro Lafaiete</h2></div>
-          <span className="cnl-contador">{dados.estacoes.length} estações</span>
-        </div>
-        <div className="cnl-estacoes">
-          {dados.estacoes.map((item) => {
-            const estado = estadoEstacao(item.dataHora)
-            const selecionada = item.id === estacao.id
-            return (
-              <div key={item.id} className={`cnl-estacao ${selecionada ? 'cnl-estacao-selecionada' : ''}`}>
-                <div className="cnl-estacao-titulo">
-                  <span className={`cnl-estacao-dot cnl-estacao-dot-${estado}`} />
-                  <strong>{item.nome}</strong>
-                  {selecionada && <span className="cnl-tag-rio">RIO</span>}
-                </div>
-                <span className="cnl-estacao-codigo">{item.codigo || `CEMADEN ${item.id}`}</span>
-                <span className="cnl-estacao-leitura">{formatarMm(item.precipitacaoDiaria.at(-1)?.total)} <small>no dia</small></span>
-                <span className={`cnl-estacao-status cnl-estacao-status-${estado}`}>{rotuloEstado(estado)}</span>
-              </div>
-            )
-          })}
-        </div>
-      </section>
-
       <footer className="cnl-rodape">
         <span>Dados públicos do Centro Nacional de Monitoramento e Alertas de Desastres Naturais.</span>
         <a href={dados.fonte} target="_blank" rel="noreferrer">Abrir fonte original ↗</a>

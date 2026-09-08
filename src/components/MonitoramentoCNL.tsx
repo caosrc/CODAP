@@ -195,6 +195,20 @@ function formatarRotuloEixoNivel(dataHora?: string): string {
   }).replace(',', '')
 }
 
+function formatarTooltipNivel(dataHora: string): string {
+  const data = parseDataCemaden(dataHora)
+  if (!data) return dataHora
+  return data.toLocaleString('en-US', {
+    weekday: 'long',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+    timeZone: FUSO_HORARIO,
+  })
+}
+
 function GraficoNivel({ pontos, estacao }: { pontos: PontoNivel[]; estacao: LeituraCNL }) {
   const [periodo, setPeriodo] = useState<6 | 12 | 24>(24)
   const pontosVisiveis = pontos.slice(-periodo)
@@ -213,6 +227,9 @@ function GraficoNivel({ pontos, estacao }: { pontos: PontoNivel[]; estacao: Leit
     ? `${margem.esquerda},${margem.topo + areaAltura} ${pontosSvg} ${pontoX(pontosVisiveis.length - 1)},${margem.topo + areaAltura}`
     : ''
   const intervaloRotulo = Math.max(1, Math.ceil(pontosVisiveis.length / 8))
+  const ultimoPonto = pontosVisiveis.at(-1)
+  const ultimoPontoX = ultimoPonto ? pontoX(pontosVisiveis.length - 1) : 0
+  const ultimoPontoY = ultimoPonto ? escalaY(ultimoPonto.valor) : 0
 
   if (pontos.length === 0) {
     return <div className="cnl-grafico-vazio">A estação ainda não retornou pontos de nível para o período.</div>
@@ -235,6 +252,15 @@ function GraficoNivel({ pontos, estacao }: { pontos: PontoNivel[]; estacao: Leit
       </div>
       <div className="cnl-grafico-wrap">
         <svg className="cnl-grafico cnl-grafico-nivel-cemaden" viewBox={`0 0 ${largura} ${altura}`} role="img" aria-label={`Nível do ${estacao.nome} nas últimas ${periodo} horas`}>
+          <defs>
+            <linearGradient id="cnl-agua-gradiente" x1="0" x2="0" y1="0" y2="1">
+              <stop offset="0%" stopColor="#8fc0e9" />
+              <stop offset="100%" stopColor="#73aee0" />
+            </linearGradient>
+            <pattern id="cnl-agua-ondas" width="34" height="12" patternUnits="userSpaceOnUse">
+              <path d="M0 6 C5 2, 12 2, 17 6 S29 10, 34 6" fill="none" stroke="#fff" strokeOpacity="0.2" strokeWidth="1" />
+            </pattern>
+          </defs>
           {[0, 0.25, 0.5, 0.75, 1].map((proporcao) => {
             const y = margem.topo + areaAltura - proporcao * areaAltura
             return (
@@ -247,7 +273,8 @@ function GraficoNivel({ pontos, estacao }: { pontos: PontoNivel[]; estacao: Leit
             )
           })}
           <text x="14" y={margem.topo + areaAltura / 2} textAnchor="middle" className="cnl-grafico-eixo-y">Nível (m)</text>
-          <polygon points={areaSvg} className="cnl-grafico-area-nivel" />
+          <polygon points={areaSvg} fill="url(#cnl-agua-gradiente)" className="cnl-grafico-area-nivel" />
+          <polygon points={areaSvg} fill="url(#cnl-agua-ondas)" className="cnl-grafico-area-ondas" aria-hidden="true" />
           <polyline points={pontosSvg} className="cnl-grafico-linha cnl-grafico-linha-nivel" />
           {pontosVisiveis.map((ponto, indice) => {
             const x = pontoX(indice)
@@ -266,6 +293,15 @@ function GraficoNivel({ pontos, estacao }: { pontos: PontoNivel[]; estacao: Leit
               </g>
             )
           })}
+          {ultimoPonto && (
+            <g className="cnl-grafico-tooltip" aria-hidden="true">
+              <line x1={ultimoPontoX} x2={ultimoPontoX} y1={ultimoPontoY - 5} y2="52" />
+              <rect x={largura - 137} y="10" width="117" height="39" rx="2" />
+              <text x={largura - 130} y="25">{formatarTooltipNivel(ultimoPonto.dataHora)}</text>
+              <circle cx={largura - 129} cy="37" r="3" />
+              <text x={largura - 121} y="40">Nível (m): {ultimoPonto.valor.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}</text>
+            </g>
+          )}
         </svg>
       </div>
       <div className="cnl-grafico-cemaden-legenda"><span className="cnl-legenda-area" /> Nível (m)</div>

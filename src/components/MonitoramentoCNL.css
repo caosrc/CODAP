@@ -154,11 +154,17 @@
 .cnl-grafico-cemaden-cabecalho small { margin-top: 0.22rem; color: #777; font-size: 0.59rem; }
 .cnl-grafico-nivel-cemaden { margin: 0.25rem 0 0; }
 .cnl-grafico-nivel-cemaden .cnl-grafico-grade { stroke: #d9d9d9; stroke-dasharray: none; }
-.cnl-grafico-area-nivel { fill: #8ebce6; fill-opacity: 0.86; }
+.cnl-grafico-area-nivel { fill-opacity: 0.9; }
+.cnl-grafico-area-ondas { pointer-events: none; }
 .cnl-grafico-nivel-cemaden .cnl-grafico-linha-nivel { stroke: #79aee0; stroke-width: 2; }
 .cnl-grafico-nivel-cemaden .cnl-grafico-ponto-nivel { fill: #8ebce6; stroke: #5b9bd5; stroke-width: 1.4; }
 .cnl-grafico-eixo-y { fill: #777; font-size: 10px; transform: rotate(-90deg); transform-origin: 14px 190px; }
 .cnl-grafico-label-data { font-size: 9px; }
+.cnl-grafico-tooltip line { stroke: #6f9fca; stroke-width: 1; stroke-dasharray: 2 2; }
+.cnl-grafico-tooltip rect { fill: #fff; stroke: #7da7c8; stroke-width: 1; }
+.cnl-grafico-tooltip text { fill: #555; font-size: 9px; }
+.cnl-grafico-tooltip text:last-child { font-weight: 700; }
+.cnl-grafico-tooltip circle { fill: #4f9bd5; }
 .cnl-grafico-cemaden-legenda { display: flex; align-items: center; justify-content: center; gap: 0.3rem; padding: 0 0 0.55rem; color: #666; font-size: 0.66rem; }
 .cnl-legenda-area { width: 0.75rem; height: 0.55rem; background: #8ebce6; }
 

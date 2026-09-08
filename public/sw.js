@@ -18,7 +18,7 @@
  *  - LIMPAR_CACHE_MAPA               → apaga todos os tiles cacheados
  */
 
-const VERSION = 'v14-2026-09-codap-lafaiete'
+const VERSION = 'v15-2026-09-codap-lafaiete'
 const APP_CACHE = `defesacivil-app-${VERSION}`
 const TILES_CACHE = 'defesacivil-tiles-osm'
 const ASSETS_CACHE = `defesacivil-assets-${VERSION}`
@@ -56,8 +56,18 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(
     (async () => {
       const keys = await caches.keys()
-      // Mantém apenas as caches da versão atual + tiles + malha (que persistem entre versões)
-      const validas = new Set([APP_CACHE, ASSETS_CACHE, TILES_CACHE, MALHA_CACHE])
+      // Mantém a versão atual e a anterior dos assets. Uma aba aberta antes
+      // de uma publicação ainda pode pedir um chunk com o hash antigo.
+      const cachesAssets = keys
+        .filter((k) => k.startsWith('defesacivil-assets-'))
+        .sort()
+        .reverse()
+      const validas = new Set([
+        APP_CACHE,
+        ...cachesAssets.slice(0, 2),
+        TILES_CACHE,
+        MALHA_CACHE,
+      ])
       await Promise.all(
         keys
           .filter((k) => !validas.has(k) && k.startsWith('defesacivil-'))
@@ -167,9 +177,20 @@ async function servirNavegacao(req) {
 // ── Estratégia: assets (stale-while-revalidate) ────────────────────
 async function servirAsset(req) {
   const cache = await caches.open(ASSETS_CACHE)
-  const cached = await cache.match(req)
+  let cached = await cache.match(req)
+  if (!cached) {
+    const cachesAnteriores = (await caches.keys())
+      .filter((nome) => nome.startsWith('defesacivil-assets-') && nome !== ASSETS_CACHE)
+      .sort()
+      .reverse()
+    for (const nome of cachesAnteriores) {
+      cached = await (await caches.open(nome)).match(req)
+      if (cached) break
+    }
+  }
   const fetchPromise = fetch(req)
     .then((resp) => {
+      if (!resp.ok) throw new Error(`Asset indisponível: ${resp.status}`)
       if (resp && resp.ok && resp.type !== 'opaque') {
         cache.put(req, resp.clone()).catch(() => {})
       }

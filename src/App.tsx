@@ -30,16 +30,45 @@ interface EquipamentoCampoMapa {
   status: string
 }
 
-const MapaOcorrencias = lazy(() => import('./components/MapaOcorrencias'))
-const NovaOcorrencia = lazy(() => import('./components/NovaOcorrencia'))
-const DetalheOcorrencia = lazy(() => import('./components/DetalheOcorrencia'))
-const ChecklistViatura = lazy(() => import('./components/ChecklistViatura'))
-const EscalaAgentes = lazy(() => import('./components/EscalaAgentes'))
-const Dashboard = lazy(() => import('./components/Dashboard'))
-const SosOverlay = lazy(() => import('./components/SosOverlay'))
-const MateriaisEmprestimos = lazy(() => import('./components/MateriaisEmprestimos'))
-const Planejamento = lazy(() => import('./components/Planejamento'))
-const MonitoramentoCNL = lazy(() => import('./components/MonitoramentoCNL'))
+const CHAVE_RECARREGAMENTO_CHUNK = 'codap-recarregou-chunk-desatualizado'
+
+function carregarChunkComRecuperacao<T>(importador: () => Promise<T>): Promise<T> {
+  return importador()
+    .then((modulo) => {
+      try { sessionStorage.removeItem(CHAVE_RECARREGAMENTO_CHUNK) } catch { /* armazenamento indisponível */ }
+      return modulo
+    })
+    .catch((erro) => {
+      const mensagem = erro instanceof Error ? erro.message : String(erro)
+      const erroDeChunk = /dynamically imported module|importing a module script failed|loading chunk/i.test(mensagem)
+      if (!erroDeChunk || typeof window === 'undefined') throw erro
+
+      let jaRecarregou = false
+      try {
+        jaRecarregou = sessionStorage.getItem(CHAVE_RECARREGAMENTO_CHUNK) === '1'
+        if (!jaRecarregou) sessionStorage.setItem(CHAVE_RECARREGAMENTO_CHUNK, '1')
+      } catch {
+        // Sem sessionStorage, o ErrorBoundary ainda exibirá uma recuperação manual.
+      }
+      if (jaRecarregou) throw erro
+
+      // O HTML novo aponta para os hashes atuais. A recarga resolve abas abertas
+      // durante uma publicação sem criar um loop infinito.
+      window.location.reload()
+      return new Promise<T>(() => {})
+    })
+}
+
+const MapaOcorrencias = lazy(() => carregarChunkComRecuperacao(() => import('./components/MapaOcorrencias')))
+const NovaOcorrencia = lazy(() => carregarChunkComRecuperacao(() => import('./components/NovaOcorrencia')))
+const DetalheOcorrencia = lazy(() => carregarChunkComRecuperacao(() => import('./components/DetalheOcorrencia')))
+const ChecklistViatura = lazy(() => carregarChunkComRecuperacao(() => import('./components/ChecklistViatura')))
+const EscalaAgentes = lazy(() => carregarChunkComRecuperacao(() => import('./components/EscalaAgentes')))
+const Dashboard = lazy(() => carregarChunkComRecuperacao(() => import('./components/Dashboard')))
+const SosOverlay = lazy(() => carregarChunkComRecuperacao(() => import('./components/SosOverlay')))
+const MateriaisEmprestimos = lazy(() => carregarChunkComRecuperacao(() => import('./components/MateriaisEmprestimos')))
+const Planejamento = lazy(() => carregarChunkComRecuperacao(() => import('./components/Planejamento')))
+const MonitoramentoCNL = lazy(() => carregarChunkComRecuperacao(() => import('./components/MonitoramentoCNL')))
 
 type Aba = 'lista' | 'mapa' | 'nova' | 'viatura' | 'escala' | 'materiais' | 'planejamento' | 'monitoramento'
 const NOMES_ORGAOS = {
@@ -153,13 +182,15 @@ class ErrorBoundary extends Component<
   }
   render() {
     if (this.state.erro) {
+      const mensagem = this.state.erro
+      const erroDeChunk = /dynamically imported module|importing a module script failed|loading chunk/i.test(mensagem)
       return this.props.fallback ?? (
         <div style={{ padding: '2rem', textAlign: 'center', color: '#c00' }}>
           <div style={{ fontSize: '2rem' }}>⚠️</div>
           <strong>Algo deu errado</strong>
-          <p style={{ fontSize: '0.85rem', opacity: 0.7, marginTop: '0.5rem' }}>{this.state.erro}</p>
-          <button onClick={() => this.setState({ erro: null })} style={{ marginTop: '1rem', padding: '0.5rem 1.5rem' }}>
-            Tentar novamente
+          <p style={{ fontSize: '0.85rem', opacity: 0.7, marginTop: '0.5rem' }}>{mensagem}</p>
+          <button onClick={() => erroDeChunk ? window.location.reload() : this.setState({ erro: null })} style={{ marginTop: '1rem', padding: '0.5rem 1.5rem' }}>
+            {erroDeChunk ? 'Atualizar aplicativo' : 'Tentar novamente'}
           </button>
         </div>
       )

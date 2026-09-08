@@ -180,6 +180,10 @@
 .cnl-btn-cancelar:disabled, .cnl-btn-salvar:disabled { opacity: 0.6; cursor: wait; }
 .cnl-cotas-rodape { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-top: 0.55rem; color: #84949b; font-size: 0.62rem; }
 .cnl-cotas-rodape strong { color: #168b80; font-weight: 750; }
+.cnl-audio-status { display: inline-flex; align-items: center; flex-wrap: wrap; gap: 0.3rem; }
+.cnl-audio-status-bloqueado { color: #9f3131; }
+.cnl-btn-audio { border: 1px solid #b9dfe0; border-radius: 5px; padding: 0.18rem 0.35rem; color: #14737b; background: #effafa; font: inherit; font-size: 0.59rem; font-weight: 800; cursor: pointer; }
+.cnl-btn-audio:hover { background: #d9f5f0; }
 .cnl-alerta-alerta { color: #8b3f18; border-color: #f4b18c; background: #fff4eb; }
 .cnl-alerta-alerta .cnl-alerta-icone { background: #e26625; }
 .cnl-alerta-transbordamento { color: #8d2630; border-color: #f39a9a; background: #fff0f0; }

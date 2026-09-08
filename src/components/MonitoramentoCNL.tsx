@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import './MonitoramentoCNL.css'
 
 type EstacaoCNL = {
@@ -76,8 +76,15 @@ type Props = {
   onAbrirMapa?: (latitude: number, longitude: number, nome: string) => void
 }
 
+type ControleAlertaSonoro = {
+  contexto: AudioContext
+  osciladores: OscillatorNode[]
+  timer: number | null
+}
+
 const INTERVALO_ATUALIZACAO = 5 * 60 * 1000
 const FUSO_HORARIO = 'America/Sao_Paulo'
+const DURACAO_ALERTA_SONORO_MS = 5000
 
 function formatarMm(valor: number | null | undefined): string {
   return valor == null || !Number.isFinite(valor) ? '—' : `${valor.toLocaleString('pt-BR', { maximumFractionDigits: 2 })} mm`
@@ -243,6 +250,11 @@ export default function MonitoramentoCNL({ onAbrirMapa }: Props) {
   const [erroCotas, setErroCotas] = useState('')
   const [cotasSalvas, setCotasSalvas] = useState('')
   const [cotasForm, setCotasForm] = useState({ atencao: '', alerta: '', transbordamento: '' })
+  const [audioBloqueado, setAudioBloqueado] = useState(false)
+  const audioRef = useRef<ControleAlertaSonoro | null>(null)
+  const alertaSonoroPendenteRef = useRef(false)
+  const estadoNivelAnteriorRef = useRef<EstadoNivel | null>(null)
+  const assinaturaCotasAnteriorRef = useRef('')
 
   const carregar = useCallback(async () => {
     setAtualizando(true)
@@ -328,28 +340,137 @@ export default function MonitoramentoCNL({ onAbrirMapa }: Props) {
 
   const estadoNivelAtual = dados ? estadoNivel(dados.nivelAtual?.valor, dados.estacao.cotas) : 'sem-dados'
 
+  const pararAlertaSonoro = useCallback(() => {
+    const controle = audioRef.current
+    if (!controle) return
+    controle.osciladores.forEach((oscilador) => {
+      try { oscilador.stop() } catch { /* já pode ter parado naturalmente */ }
+    })
+    if (controle.timer != null) window.clearTimeout(controle.timer)
+    audioRef.current = null
+  }, [])
+
+  const prepararAudio = useCallback(async (): Promise<AudioContext | null> => {
+    if (typeof window === 'undefined') return null
+    const AudioContexto = window.AudioContext
+      || (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
+    if (!AudioContexto) {
+      setAudioBloqueado(true)
+      return null
+    }
+
+    let contexto = audioRef.current?.contexto
+    if (!contexto) {
+      contexto = new AudioContexto()
+      audioRef.current = { contexto, osciladores: [], timer: null }
+    }
+
+    try {
+      if (contexto.state !== 'running') await contexto.resume()
+    } catch {
+      setAudioBloqueado(true)
+      return null
+    }
+    if (contexto.state !== 'running') {
+      setAudioBloqueado(true)
+      return null
+    }
+    setAudioBloqueado(false)
+    return contexto
+  }, [])
+
+  const tocarAlertaSonoro = useCallback(async () => {
+    const contexto = await prepararAudio()
+    if (!contexto) {
+      alertaSonoroPendenteRef.current = true
+      return
+    }
+
+    pararAlertaSonoro()
+    const osciladores: OscillatorNode[] = []
+    const inicio = contexto.currentTime
+    const duracao = DURACAO_ALERTA_SONORO_MS / 1000
+    const intervalo = 0.62
+
+    for (let indice = 0; indice < 8; indice += 1) {
+      const inicioNota = inicio + indice * intervalo
+      const fimNota = Math.min(inicio + duracao - 0.05, inicioNota + 0.24)
+      const oscilador = contexto.createOscillator()
+      const ganho = contexto.createGain()
+      oscilador.type = 'sine'
+      oscilador.frequency.setValueAtTime(indice % 2 === 0 ? 880 : 660, inicioNota)
+      ganho.gain.setValueAtTime(0.0001, inicioNota)
+      ganho.gain.exponentialRampToValueAtTime(0.18, inicioNota + 0.025)
+      ganho.gain.exponentialRampToValueAtTime(0.0001, fimNota)
+      oscilador.connect(ganho)
+      ganho.connect(contexto.destination)
+      oscilador.start(inicioNota)
+      oscilador.stop(fimNota)
+      osciladores.push(oscilador)
+    }
+
+    const timer = window.setTimeout(() => {
+      if (audioRef.current?.osciladores === osciladores) {
+        audioRef.current.osciladores = []
+        audioRef.current.timer = null
+      }
+    }, DURACAO_ALERTA_SONORO_MS + 150)
+    audioRef.current = { contexto, osciladores, timer }
+    alertaSonoroPendenteRef.current = false
+  }, [pararAlertaSonoro, prepararAudio])
+
+  const ativarAlertasSonoros = useCallback(async () => {
+    const contexto = await prepararAudio()
+    if (contexto && alertaSonoroPendenteRef.current) {
+      await tocarAlertaSonoro()
+    }
+  }, [prepararAudio, tocarAlertaSonoro])
+
+  useEffect(() => () => pararAlertaSonoro(), [pararAlertaSonoro])
+
   useEffect(() => {
     const leitura = dados?.nivelAtual
     const cotas = dados?.estacao.cotas
-    if (!leitura || leitura.valor == null || estadoNivelAtual === 'normal' || estadoNivelAtual === 'sem-dados') return
-    const cotaAtingida = cotas?.[estadoNivelAtual]
-    if (cotaAtingida == null) return
-
-    const chave = `cnl-notificacao-nivel:${estadoNivelAtual}:${leitura.dataHora}:${cotaAtingida}`
+    if (!leitura || leitura.valor == null || estadoNivelAtual === 'sem-dados' || !cotas) return
+    const assinaturaCotas = [cotas.atencao, cotas.alerta, cotas.transbordamento].join('|')
+    let estadoAnterior: EstadoNivel | null = null
     try {
-      if (localStorage.getItem('cnl-ultima-notificacao-nivel') === chave) return
-      localStorage.setItem('cnl-ultima-notificacao-nivel', chave)
+      const salvo = JSON.parse(localStorage.getItem('cnl-estado-nivel-monitoramento') || 'null') as {
+        estado?: EstadoNivel
+        cotas?: string
+      } | null
+      if (salvo?.cotas === assinaturaCotas) estadoAnterior = salvo.estado || null
     } catch {
-      // O alerta visível na página continua funcionando mesmo sem localStorage.
+      // A referência em memória mantém o comportamento nesta sessão.
     }
 
+    if (assinaturaCotasAnteriorRef.current === assinaturaCotas && estadoNivelAnteriorRef.current) {
+      estadoAnterior = estadoNivelAnteriorRef.current
+    }
+    const deveAlertar = nivelMaior(estadoNivelAtual, estadoAnterior)
+    estadoNivelAnteriorRef.current = estadoNivelAtual
+    assinaturaCotasAnteriorRef.current = assinaturaCotas
+    try {
+      localStorage.setItem('cnl-estado-nivel-monitoramento', JSON.stringify({
+        estado: estadoNivelAtual,
+        cotas: assinaturaCotas,
+      }))
+    } catch {
+      // O alerta visível na página continua funcionando sem localStorage.
+    }
+
+    if (!deveAlertar || estadoNivelAtual === 'normal') return
+    const cotaAtingida = cotas[estadoNivelAtual]
+    if (cotaAtingida == null) return
+
+    void tocarAlertaSonoro()
     if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
       new Notification(`Rio Bananeiras · ${rotuloNivel(estadoNivelAtual)}`, {
         body: `Nível atual: ${formatarCota(leitura.valor)}. Cota de referência: ${formatarCota(cotaAtingida)}.`,
         tag: `cnl-nivel-${estadoNivelAtual}`,
       })
     }
-  }, [dados, estadoNivelAtual])
+  }, [dados, estadoNivelAtual, tocarAlertaSonoro])
 
   const acumulado24h = useMemo(() => {
     if (!dados) return null
@@ -534,7 +655,14 @@ export default function MonitoramentoCNL({ onAbrirMapa }: Props) {
               <div className="cnl-cota cnl-cota-alerta"><span className="cnl-cota-linha" /><span>Alerta</span><strong>{formatarCota(estacao.cotas.alerta)}</strong><small>preparar resposta</small></div>
               <div className="cnl-cota cnl-cota-transbordamento"><span className="cnl-cota-linha" /><span>Transbordamento</span><strong>{formatarCota(estacao.cotas.transbordamento)}</strong><small>risco de cheia</small></div>
             </div>
-            <div className="cnl-cotas-rodape">{dados.cotasConfiguradas ? 'Referências personalizadas para os alertas do aplicativo.' : 'Referências oficiais atuais do CEMADEN.'}{cotasSalvas && <strong>{cotasSalvas}</strong>}</div>
+            <div className="cnl-cotas-rodape">
+              <span>{dados.cotasConfiguradas ? 'Referências personalizadas para os alertas do aplicativo.' : 'Referências oficiais atuais do CEMADEN.'}</span>
+              <span className={`cnl-audio-status ${audioBloqueado ? 'cnl-audio-status-bloqueado' : ''}`}>
+                {audioBloqueado ? 'Som bloqueado pelo navegador.' : 'Alerta sonoro de 5 segundos por mudança de cota.'}
+                <button type="button" className="cnl-btn-audio" onClick={ativarAlertasSonoros}>Ativar som</button>
+              </span>
+              {cotasSalvas && <strong>{cotasSalvas}</strong>}
+            </div>
           </>
         )}
       </section>
@@ -641,6 +769,18 @@ function estacoesAtivas(estacoes: EstacaoCNL[]): number {
 }
 
 type EstadoNivel = 'normal' | 'atencao' | 'alerta' | 'transbordamento' | 'sem-dados'
+
+const PRIORIDADE_NIVEL: Record<EstadoNivel, number> = {
+  'sem-dados': -1,
+  normal: 0,
+  atencao: 1,
+  alerta: 2,
+  transbordamento: 3,
+}
+
+function nivelMaior(atual: EstadoNivel, anterior: EstadoNivel | null): boolean {
+  return PRIORIDADE_NIVEL[atual] > (anterior == null ? PRIORIDADE_NIVEL.normal : PRIORIDADE_NIVEL[anterior])
+}
 
 function estadoNivel(valor: number | null | undefined, cotas: LeituraCNL['cotas']): EstadoNivel {
   if (valor == null || !Number.isFinite(valor)) return 'sem-dados'

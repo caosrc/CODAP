@@ -1,6 +1,13 @@
 # Defesa Civil Ouro Branco — cabeçalhos para Netlify
 
-# Service Worker NUNCA pode ser cacheado, senão atualizações nunca chegam
+# HTML e Service Worker nunca podem ficar cacheados, senão atualizações podem
+# continuar apontando para chunks antigos do Vite.
+/
+  Cache-Control: public, max-age=0, must-revalidate
+
+/index.html
+  Cache-Control: public, max-age=0, must-revalidate
+
 /sw.js
   Cache-Control: public, max-age=0, must-revalidate
   Service-Worker-Allowed: /

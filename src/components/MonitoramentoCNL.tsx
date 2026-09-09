@@ -30,7 +30,7 @@ type PrecipitacaoDia = {
   ultimaDataHora: string
 }
 
-type LeituraCNL = EstacaoCNL & {
+export type LeituraCNL = EstacaoCNL & {
   latitude: number | null
   longitude: number | null
   tipo: string
@@ -50,7 +50,7 @@ type PontoSerie = {
   valor: number
 }
 
-type PontoNivel = {
+export type PontoNivel = {
   dataHora: string
   valor: number
 }
@@ -217,7 +217,7 @@ function formatarHoraNivel(dataHora: string): string {
   })
 }
 
-function GraficoNivel({ pontos, estacao }: { pontos: PontoNivel[]; estacao: LeituraCNL }) {
+export function GraficoNivel({ pontos, estacao }: { pontos: PontoNivel[]; estacao: LeituraCNL }) {
   const [periodo, setPeriodo] = useState<6 | 12 | 24>(24)
   const [dataHoraSelecionada, setDataHoraSelecionada] = useState<string | null>(null)
   const [dataHoraEmFoco, setDataHoraEmFoco] = useState<string | null>(null)

@@ -6,6 +6,8 @@ import { wsOn, wsSend } from '../wsClient'
 import { supabase, supabaseDisponivel } from '../supabaseClient'
 import { AGENTES } from '../types'
 import { ehFerramentalPorLitro } from '../ferramentalUtils'
+import { GraficoNivel, type LeituraCNL, type PontoNivel } from './MonitoramentoCNL'
+import './MonitoramentoCNL.css'
 
 type Prioridade = 'normal' | 'importante' | 'urgente'
 type ConfirmacaoRadar = { agente: string; confirmado: boolean; confirmedAt?: string }
@@ -36,6 +38,7 @@ type ResumoFerramental = {
 type DiaPrevisao = { data: string; codigo: number; temperaturaMax: number; temperaturaMin: number; precipitacao: number; probabilidade: number; umidade: number; vento: number; rajada: number }
 type HoraPrevisao = { time: string; codigo: number; temperatura: number; probabilidade: number; precipitacao: number; vento: number }
 type TempoDC = { atual: { codigo: number; temperatura: number; chuva: number; vento: number; rajada: number; umidade: number }; horas: HoraPrevisao[]; dias: DiaPrevisao[] }
+type DadosRadarCNL = { estacao: LeituraCNL; serieNivel: PontoNivel[] }
 
 const CONSELHEIRO_LAFAIETE = { latitude: -20.6604, longitude: -43.7863 }
 const nomesTempo: Record<number, string> = { 0: 'Céu limpo', 1: 'Predominantemente limpo', 2: 'Parcialmente nublado', 3: 'Nublado', 45: 'Neblina', 48: 'Neblina com gelo', 51: 'Garoa leve', 53: 'Garoa moderada', 55: 'Garoa intensa', 61: 'Chuva leve', 63: 'Chuva moderada', 65: 'Chuva forte', 71: 'Neve leve', 73: 'Neve moderada', 75: 'Neve forte', 80: 'Pancadas leves', 81: 'Pancadas moderadas', 82: 'Pancadas fortes', 95: 'Trovoada', 96: 'Trovoada com granizo', 99: 'Trovoada forte' }
@@ -230,6 +233,7 @@ export default function RadarDC() {
     ocorrencias: Atividade[]
   }>({ checklists: [], checklistsFerramentas: [], ferramentasCatalogo: [], ocorrencias: [] })
   const [tempo, setTempo] = useState<TempoDC | null>(null)
+  const [dadosCNL, setDadosCNL] = useState<DadosRadarCNL | null>(null)
   const [horaAtual, setHoraAtual] = useState(() => new Date())
   const [erroTempo, setErroTempo] = useState('')
   const [salvando, setSalvando] = useState(false)
@@ -430,6 +434,28 @@ export default function RadarDC() {
        window.clearInterval(timer)
        document.removeEventListener('visibilitychange', atualizarAoVoltar)
      }
+  }, [])
+
+  useEffect(() => {
+    let ativo = true
+    const carregarNivelRio = async () => {
+      try {
+        const resposta = await fetch('/api/monitoramento-cnl', { cache: 'no-store' })
+        const corpo = await resposta.json() as { sucesso?: boolean; estacao?: LeituraCNL; serieNivel?: PontoNivel[] }
+        if (!resposta.ok || !corpo.sucesso || !corpo.estacao || !Array.isArray(corpo.serieNivel)) {
+          throw new Error('Dados do Rio Bananeiras indisponíveis.')
+        }
+        if (ativo) setDadosCNL({ estacao: corpo.estacao, serieNivel: corpo.serieNivel })
+      } catch {
+        // O gráfico é complementar ao Radar; a falha não deve ocultar os registros.
+      }
+    }
+    carregarNivelRio()
+    const timer = window.setInterval(carregarNivelRio, 5 * 60 * 1000)
+    return () => {
+      ativo = false
+      window.clearInterval(timer)
+    }
   }, [])
 
   useEffect(() => {
@@ -759,6 +785,17 @@ export default function RadarDC() {
             {erroSalvamento && <p className="radar-save-error" role="alert">{erroSalvamento}</p>}
           </form>}
         </div>
+        <section className="radar-cnl-card" aria-labelledby="radar-nivel-rio-titulo">
+          <div className="radar-cnl-card-heading">
+            <div><span className="card-label">MONITORAMENTO HIDROLÓGICO</span><h2 id="radar-nivel-rio-titulo">Nível do Rio Bananeiras</h2></div>
+            <span className="radar-cnl-live">CEMADEN · ao vivo</span>
+          </div>
+          {dadosCNL ? (
+            <GraficoNivel pontos={dadosCNL.serieNivel} estacao={dadosCNL.estacao} />
+          ) : (
+            <p className="radar-cnl-loading">Consultando a estação Rio Bananeiras…</p>
+          )}
+        </section>
         <section className="radar-activities">
          <div className="radar-list-heading"><div><span className="card-label">REGISTROS OPERACIONAIS</span><h2>Atividades de {dataBonita(dataSelecionada)}</h2></div><strong>{atividades.checklists.length + atividades.checklistsFerramentas.length + atividades.ocorrencias.length} registro(s)</strong></div>
         <div className="radar-activity-columns">

@@ -757,7 +757,7 @@ export default function RadarDC() {
                 <span className="radar-cnl-live">CEMADEN · ao vivo</span>
               </div>
               {dadosCNL ? (
-                <GraficoNivel pontos={dadosCNL.serieNivel} estacao={dadosCNL.estacao} />
+                <GraficoNivel pontos={dadosCNL.serieNivel} estacao={dadosCNL.estacao} mostrarTooltip={false} />
               ) : (
                 <p className="radar-cnl-loading">Consultando a estação Rio Bananeiras…</p>
               )}

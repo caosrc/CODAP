@@ -217,7 +217,7 @@ function formatarHoraNivel(dataHora: string): string {
   })
 }
 
-export function GraficoNivel({ pontos, estacao }: { pontos: PontoNivel[]; estacao: LeituraCNL }) {
+export function GraficoNivel({ pontos, estacao, mostrarTooltip = true }: { pontos: PontoNivel[]; estacao: LeituraCNL; mostrarTooltip?: boolean }) {
   const [periodo, setPeriodo] = useState<6 | 12 | 24>(24)
   const [dataHoraSelecionada, setDataHoraSelecionada] = useState<string | null>(null)
   const [dataHoraEmFoco, setDataHoraEmFoco] = useState<string | null>(null)
@@ -325,7 +325,7 @@ export function GraficoNivel({ pontos, estacao }: { pontos: PontoNivel[]; estaca
               </g>
             )
           })}
-          {pontoSelecionado && (
+          {mostrarTooltip && pontoSelecionado && (
             <g className="cnl-grafico-tooltip">
               <line x1={pontoSelecionadoX} x2={pontoSelecionadoX} y1={pontoSelecionadoY - 7} y2="91" />
               <rect x="530" y="8" width="350" height="86" rx="7" />

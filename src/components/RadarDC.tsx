@@ -553,7 +553,7 @@ export default function RadarDC() {
       .slice(0, 2)
   }, [dadosCNL])
   const resumoPrecipitacao = useMemo(
-    () => dadosCNL?.estacoes.map(estacao => `${estacao.nome} ${formatarMmRadar(estacao.precipitacaoAtual)}`).join(' | ') || '',
+    () => dadosCNL?.estacoes.map(estacao => `${estacao.nome} ${formatarMmRadar(estacao.acumulados.vinteQuatroHoras)}`).join(' | ') || '',
     [dadosCNL],
   )
 

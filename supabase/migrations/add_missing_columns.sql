@@ -4,6 +4,7 @@
 -- ── ocorrencias ─────────────────────────────────────────────────────────────
 ALTER TABLE ocorrencias ADD COLUMN IF NOT EXISTS focos_incendio JSONB DEFAULT NULL;
 ALTER TABLE ocorrencias ADD COLUMN IF NOT EXISTS poligono_area_queimada JSONB DEFAULT NULL;
+ALTER TABLE ocorrencias ADD COLUMN IF NOT EXISTS chuva NUMERIC;
 ALTER TABLE ocorrencias ADD COLUMN IF NOT EXISTS hora_inicio VARCHAR(5);
 ALTER TABLE ocorrencias ADD COLUMN IF NOT EXISTS hora_fim VARCHAR(5);
 ALTER TABLE ocorrencias ADD COLUMN IF NOT EXISTS horas_total NUMERIC(5,2);

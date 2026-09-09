@@ -67,6 +67,7 @@ export default function NovaOcorrencia({ onSalvo, onVoltar, isOnline, orgao = 'd
   const [tipoOutro, setTipoOutro] = useState('')
   const [natureza, setNatureza] = useState(naturezaPadrao)
   const [subnatureza, setSubnatureza] = useState('')
+  const [chuva, setChuva] = useState('')
   const [nivelRisco, setNivelRisco] = useState<NivelRisco>('baixo')
   const [statusOc, setStatusOc] = useState<StatusOc>('ativo')
   const [dataOcorrencia, setDataOcorrencia] = useState(hoje)
@@ -123,6 +124,7 @@ export default function NovaOcorrencia({ onSalvo, onVoltar, isOnline, orgao = 'd
       if (d.natureza && naturezasDisponiveis.includes(d.natureza)) setNatureza(d.natureza)
       else if (orgao !== 'defesa-civil') setNatureza(naturezaPadrao)
       if (d.subnatureza) setSubnatureza(d.subnatureza)
+      if (d.chuva != null) setChuva(String(d.chuva))
       if (d.nivelRisco) setNivelRisco(d.nivelRisco)
       if (d.statusOc) setStatusOc(d.statusOc)
       if (d.dataOcorrencia) setDataOcorrencia(d.dataOcorrencia)
@@ -154,7 +156,7 @@ export default function NovaOcorrencia({ onSalvo, onVoltar, isOnline, orgao = 'd
   useEffect(() => {
     const timer = setTimeout(() => {
       const draft = {
-        tipo, tipoOutro, natureza, subnatureza, nivelRisco, statusOc,
+        tipo, tipoOutro, natureza, subnatureza, chuva, nivelRisco, statusOc,
         dataOcorrencia, horaInicio, horaFim,
         rua, numero, bairro, lat, lng,
         proprietario, situacao, recomendacao, conclusao,
@@ -171,7 +173,7 @@ export default function NovaOcorrencia({ onSalvo, onVoltar, isOnline, orgao = 'd
       }
     }, 800)
     return () => clearTimeout(timer)
-  }, [tipo, tipoOutro, natureza, subnatureza, nivelRisco, statusOc,
+  }, [tipo, tipoOutro, natureza, subnatureza, chuva, nivelRisco, statusOc,
       dataOcorrencia, horaInicio, horaFim,
       rua, numero, bairro, lat, lng,
       proprietario, situacao, recomendacao, conclusao,
@@ -180,7 +182,7 @@ export default function NovaOcorrencia({ onSalvo, onVoltar, isOnline, orgao = 'd
   const descartarRascunho = useCallback(() => {
     localStorage.removeItem(RASCUNHO_KEY)
     setTipo(ehCurral ? 'Diligência' : ehProcon ? 'Fiscalização' : '')
-    setTipoOutro(''); setNatureza(naturezaPadrao); setSubnatureza('')
+    setTipoOutro(''); setNatureza(naturezaPadrao); setSubnatureza(''); setChuva('')
     setNivelRisco('baixo'); setStatusOc('ativo')
     setDataOcorrencia(hoje); setHoraInicio(''); setHoraFim('')
     setRua(''); setNumero(''); setBairro('')
@@ -209,6 +211,7 @@ export default function NovaOcorrencia({ onSalvo, onVoltar, isOnline, orgao = 'd
   const precisaSubnatureza = natureza === 'Queda de Estrutura' || natureza === 'Apreensão e Captura de Animal'
   const labelSubnatureza = natureza === 'Queda de Estrutura' ? 'Qual é a estrutura?' : 'Qual é o animal?'
   const ehIncendio = natureza === 'Incêndio em Área Urbana' || natureza === 'Incêndio em Área Rural'
+  const precisaPrecipitacao = natureza === 'Inundação' || natureza === 'Alagamento'
 
   function obterGps() {
     if (!navigator.geolocation) { setErro('Geolocalização não disponível.'); return }
@@ -404,6 +407,7 @@ export default function NovaOcorrencia({ onSalvo, onVoltar, isOnline, orgao = 'd
       tipo: tipoFinal,
       natureza,
       subnatureza: precisaSubnatureza ? subnatureza : null,
+      chuva: precisaPrecipitacao && chuva !== '' ? Number(chuva) : null,
       nivel_risco: nivelRisco,
       status_oc: statusOc,
       data_ocorrencia: dataOcorrencia || null,
@@ -519,14 +523,14 @@ export default function NovaOcorrencia({ onSalvo, onVoltar, isOnline, orgao = 'd
           {/* 2 - Natureza */}
           {tipo && (
             <div className="campo campo-animado">
-              <label className="campo-label">2 — Natureza da Ocorrência</label>
+              <label className="campo-label">2 — Tipos de Ocorrência</label>
               <div className="campo-dropdown" ref={naturezaRef}>
                 <button
                   type="button"
                   className={`campo-dropdown-trigger ${natureza ? 'selecionado' : ''} ${naturezaAberta ? 'aberto' : ''}`}
                   onClick={() => setNaturezaAberta(v => !v)}
                 >
-                  <span>{natureza || 'Selecione a natureza...'}</span>
+                  <span>{natureza || 'Selecione o tipo de ocorrência...'}</span>
                   <span className="campo-dropdown-chevron">{naturezaAberta ? '▲' : '▼'}</span>
                 </button>
                 {naturezaAberta && (
@@ -557,6 +561,22 @@ export default function NovaOcorrencia({ onSalvo, onVoltar, isOnline, orgao = 'd
                 placeholder={natureza === 'Queda de Estrutura' ? 'Ex: muro, teto, parede...' : 'Ex: cachorro, capivara...'}
                 value={subnatureza}
                 onChange={(e) => setSubnatureza(e.target.value)}
+              />
+            </div>
+          )}
+
+          {precisaPrecipitacao && (
+            <div className="campo campo-animado campo-sub">
+              <label className="campo-label campo-label-sub">↳ Precipitação de chuva (mm)</label>
+              <input
+                className="campo-input"
+                type="number"
+                min="0"
+                step="0.1"
+                inputMode="decimal"
+                placeholder="Informe o volume de chuva"
+                value={chuva}
+                onChange={(e) => setChuva(e.target.value)}
               />
             </div>
           )}

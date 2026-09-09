@@ -13,7 +13,7 @@ CREATE TABLE IF NOT EXISTS public.ocorrencias (
   agentes JSONB DEFAULT '[]'::jsonb,
   responsavel_registro TEXT, vistorias JSONB DEFAULT '[]'::jsonb,
   descricoes_fotos JSONB DEFAULT '[]'::jsonb,
-  focos_incendio JSONB, poligono_area_queimada JSONB,
+  focos_incendio JSONB, poligono_area_queimada JSONB, chuva NUMERIC,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -145,6 +145,7 @@ ALTER TABLE public.ocorrencias ADD COLUMN IF NOT EXISTS horas_sobreaviso NUMERIC
 ALTER TABLE public.ocorrencias ADD COLUMN IF NOT EXISTS descricoes_fotos JSONB DEFAULT '[]'::jsonb;
 ALTER TABLE public.ocorrencias ADD COLUMN IF NOT EXISTS focos_incendio JSONB;
 ALTER TABLE public.ocorrencias ADD COLUMN IF NOT EXISTS poligono_area_queimada JSONB;
+ALTER TABLE public.ocorrencias ADD COLUMN IF NOT EXISTS chuva NUMERIC;
 ALTER TABLE public.materiais ADD COLUMN IF NOT EXISTS categoria TEXT NOT NULL DEFAULT 'escritorio';
 ALTER TABLE public.materiais ADD COLUMN IF NOT EXISTS foto_thumb TEXT;
 ALTER TABLE public.materiais ADD COLUMN IF NOT EXISTS quantidade INTEGER NOT NULL DEFAULT 1;

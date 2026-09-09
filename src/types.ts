@@ -36,6 +36,7 @@ export interface Ocorrencia {
   vistorias: VistoriaAdicional[] | null
   focos_incendio?: { lat: number; lng: number }[] | null
   poligono_area_queimada?: { lat: number; lng: number }[] | null
+  chuva?: number | null
   origem?: 'curral'
   _offline?: boolean
   _localId?: number
@@ -78,32 +79,26 @@ export function getSenhaAgente(nome: string): string | null {
   return AGENTE_SENHAS[normalizarNomeAgente(nome)] ?? null
 }
 
-export const TIPOS_OCORRENCIA = ['Diligência', 'Vistoria de Engenharia', 'Vistoria Ambiental', 'Apoio', 'Fiscalização', 'Outro']
+export const TIPOS_OCORRENCIA = ['Diligência', 'Vistoria de Engenharia', 'Vistoria Ambiental', 'Apoio', 'Outro']
 
 export const NATUREZAS = [
-  'Árvore Gerando Risco (Caída ou Não)',
-  'Rompimento de Cabo de Energia',
-  'Rompimento de Cabo de Telefonia',
-  'Queda de Poste (Total ou Parcial)',
-  'Óleo na Pista',
   'Incêndio em Área Urbana',
   'Incêndio em Área Rural',
-  'Alagamento',
+  'Vistoria Preventiva',
+  'Sistema de Drenagem',
+  'Precariedade em residência',
+  'Pavimentação',
   'Inundação',
-  'Queda de Estrutura',
-  'Deslizamento de Massa/Rocha',
-  'Processo Erosivo',
-  'Apreensão e Captura de Animal',
-  'Captura de animal',
-  'Abelhas/Marimbondo',
-  'Vistoria Residencial',
-  'Talude em Risco',
-  'Interdição de Imóvel',
-  'Interdição de Via',
-  'Acidente de Trânsito',
-  'Sinalização de Segurança',
-  'Eventos',
-  'Fiscalização Procon',
+  'Infiltrações',
+  'Hidrológico/Geológico',
+  'Hidrológico/Estrutural',
+  'Hidrológico',
+  'Geológico',
+  'Estrutural/Geológico',
+  'Estrutural',
+  'Corte/poda árvores',
+  'Colisão veículo/residência',
+  'Alagamento',
 ]
 
 export const NATUREZA_ICONE: Record<string, string> = {
@@ -130,6 +125,19 @@ export const NATUREZA_ICONE: Record<string, string> = {
   'Sinalização de Segurança': '🚦',
   'Eventos': '🎪',
   'Apreensão de animal': '🐾',
+  'Vistoria Preventiva': '🔎',
+  'Sistema de Drenagem': '🕳️',
+  'Precariedade em residência': '🏚️',
+  'Pavimentação': '🛣️',
+  'Infiltrações': '💧',
+  'Hidrológico/Geológico': '🌧️',
+  'Hidrológico/Estrutural': '🌧️',
+  'Hidrológico': '🌧️',
+  'Geológico': '⛰️',
+  'Estrutural/Geológico': '🏚️',
+  'Estrutural': '🏗️',
+  'Corte/poda árvores': '🌳',
+  'Colisão veículo/residência': '🚗',
   'Fiscalização': '⚖️',
   'Fiscalização Procon': '⚖️',
 }
@@ -158,6 +166,19 @@ export const NATUREZA_COR: Record<string, string> = {
   'Sinalização de Segurança': '#f59e0b',
   'Eventos': '#0891b2',
   'Apreensão de animal': '#7c3aed',
+  'Vistoria Preventiva': '#0f766e',
+  'Sistema de Drenagem': '#2563eb',
+  'Precariedade em residência': '#92400e',
+  'Pavimentação': '#64748b',
+  'Infiltrações': '#0284c7',
+  'Hidrológico/Geológico': '#0369a1',
+  'Hidrológico/Estrutural': '#0e7490',
+  'Hidrológico': '#0891b2',
+  'Geológico': '#92400e',
+  'Estrutural/Geológico': '#9f1239',
+  'Estrutural': '#6b7280',
+  'Corte/poda árvores': '#16a34a',
+  'Colisão veículo/residência': '#ef4444',
   'Fiscalização': '#0f766e',
   'Fiscalização Procon': '#0f766e',
 }

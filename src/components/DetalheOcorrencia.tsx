@@ -159,6 +159,7 @@ export default function DetalheOcorrencia({ ocorrencia: oc, onFechar, onDeletado
   const [eTipoOutro, setETipoOutro] = useState(tipoEhOutro && o.tipo !== 'Outro' ? o.tipo : '')
   const [eNatureza, setENatureza] = useState(o.natureza)
   const [eSubnatureza, setESubnatureza] = useState(o.subnatureza ?? '')
+  const [eChuva, setEChuva] = useState(o.chuva != null ? String(o.chuva) : '')
   const [eNivel, setENivel] = useState<NivelRisco>(o.nivel_risco)
   const [eStatus, setEStatus] = useState<StatusOc>(o.status_oc)
   const [eDataOcorrencia, setEDataOcorrencia] = useState(o.data_ocorrencia ?? '')
@@ -185,6 +186,7 @@ export default function DetalheOcorrencia({ ocorrencia: oc, onFechar, onDeletado
 
   const precisaSubnatureza = eNatureza === 'Queda de Estrutura' || eNatureza === 'Apreensão e Captura de Animal'
   const labelSubnatureza = eNatureza === 'Queda de Estrutura' ? 'Qual é a estrutura?' : 'Qual é o animal?'
+  const precisaPrecipitacaoEdicao = eNatureza === 'Inundação' || eNatureza === 'Alagamento'
   const icone = NATUREZA_ICONE[o.natureza] ?? '📋'
   const cor = NATUREZA_COR[o.natureza] ?? '#1a4b8c'
   const dataFormatada = o.created_at ? new Date(o.created_at).toLocaleString('pt-BR') : ''
@@ -195,6 +197,7 @@ export default function DetalheOcorrencia({ ocorrencia: oc, onFechar, onDeletado
     setETipoOutro(eh && o.tipo !== 'Outro' ? o.tipo : '')
     setENatureza(o.natureza)
     setESubnatureza(o.subnatureza ?? '')
+    setEChuva(o.chuva != null ? String(o.chuva) : '')
     setENivel(o.nivel_risco)
     setEStatus(o.status_oc)
     setEDataOcorrencia(o.data_ocorrencia ?? '')
@@ -304,6 +307,7 @@ export default function DetalheOcorrencia({ ocorrencia: oc, onFechar, onDeletado
         natureza: eNatureza,
         created_at: eCreatedAt ? new Date(eCreatedAt).toISOString() : o.created_at,
         subnatureza: precisaSubnatureza ? eSubnatureza || null : null,
+        chuva: precisaPrecipitacaoEdicao && eChuva !== '' ? Number(eChuva) : null,
         nivel_risco: eNivel,
         status_oc: eStatus,
         data_ocorrencia: eDataOcorrencia || null,
@@ -577,6 +581,9 @@ export default function DetalheOcorrencia({ ocorrencia: oc, onFechar, onDeletado
                 </div>
 
                 {o.subnatureza && <InfoRow icone="↳" label="Detalhe" valor={o.subnatureza} />}
+                {o.chuva != null && (
+                  <InfoRow icone="🌧️" label="Precipitação de chuva" valor={`${Number(o.chuva).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} mm`} />
+                )}
 
                 {o.data_ocorrencia && (
                   <InfoRow icone="📅" label="Data da Ocorrência"
@@ -843,6 +850,22 @@ export default function DetalheOcorrencia({ ocorrencia: oc, onFechar, onDeletado
                     {NATUREZAS.map((n) => <option key={n}>{n}</option>)}
                   </select>
                 </div>
+
+                {precisaPrecipitacaoEdicao && (
+                  <div className="campo campo-edit campo-sub">
+                    <label className="campo-label campo-label-sub">↳ Precipitação de chuva (mm)</label>
+                    <input
+                      className="campo-input"
+                      type="number"
+                      min="0"
+                      step="0.1"
+                      inputMode="decimal"
+                      placeholder="Informe o volume de chuva"
+                      value={eChuva}
+                      onChange={(e) => setEChuva(e.target.value)}
+                    />
+                  </div>
+                )}
 
                 {precisaSubnatureza && (
                   <div className="campo campo-edit campo-sub">

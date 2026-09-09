@@ -2,12 +2,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import './RadarDC.css'
 import './RadarDCResponsive.css'
 import { getAgenteLogado } from './Login'
+import { getSenhaAgente } from '../types'
 import { wsOn, wsSend } from '../wsClient'
 import { supabase, supabaseDisponivel } from '../supabaseClient'
 import { AGENTES } from '../types'
 import { ehFerramentalPorLitro } from '../ferramentalUtils'
-import { ChartaChuva, GraficoNivel, type LeituraCNL, type PontoNivel, type PontoSerie } from './MonitoramentoCNL'
+import { ChartaChuva, GraficoNivel, type EstacaoCNL, type LeituraCNL, type PontoNivel, type PontoSerie } from './MonitoramentoCNL'
 import './MonitoramentoCNL.css'
+import ModalSenha from './ModalSenha'
 
 type Prioridade = 'normal' | 'importante' | 'urgente'
 type ConfirmacaoRadar = { agente: string; confirmado: boolean; confirmedAt?: string }
@@ -38,7 +40,7 @@ type ResumoFerramental = {
 type DiaPrevisao = { data: string; codigo: number; temperaturaMax: number; temperaturaMin: number; precipitacao: number; probabilidade: number; umidade: number; vento: number; rajada: number }
 type HoraPrevisao = { time: string; codigo: number; temperatura: number; probabilidade: number; precipitacao: number; vento: number }
 type TempoDC = { atual: { codigo: number; temperatura: number; chuva: number; vento: number; rajada: number; umidade: number }; horas: HoraPrevisao[]; dias: DiaPrevisao[] }
-type DadosRadarCNL = { estacao: LeituraCNL; serie: PontoSerie[]; serieNivel: PontoNivel[] }
+type DadosRadarCNL = { estacao: LeituraCNL; estacoes: EstacaoCNL[]; serie: PontoSerie[]; serieNivel: PontoNivel[] }
 
 const CONSELHEIRO_LAFAIETE = { latitude: -20.6604, longitude: -43.7863 }
 const nomesTempo: Record<number, string> = { 0: 'Céu limpo', 1: 'Predominantemente limpo', 2: 'Parcialmente nublado', 3: 'Nublado', 45: 'Neblina', 48: 'Neblina com gelo', 51: 'Garoa leve', 53: 'Garoa moderada', 55: 'Garoa intensa', 61: 'Chuva leve', 63: 'Chuva moderada', 65: 'Chuva forte', 71: 'Neve leve', 73: 'Neve moderada', 75: 'Neve forte', 80: 'Pancadas leves', 81: 'Pancadas moderadas', 82: 'Pancadas fortes', 95: 'Trovoada', 96: 'Trovoada com granizo', 99: 'Trovoada forte' }
@@ -88,6 +90,12 @@ function disparar(nome: string, detail: unknown) {
 
 function percentual(valor: number, total: number) {
   return total > 0 ? Math.round((valor / total) * 100) : 0
+}
+
+function formatarMmRadar(valor: number | null | undefined) {
+  return valor == null || !Number.isFinite(valor)
+    ? '—'
+    : `${valor.toLocaleString('pt-BR', { maximumFractionDigits: 2 })} mm`
 }
 
 function eSerragem(nome: string) {
@@ -239,6 +247,7 @@ export default function RadarDC() {
   const [salvando, setSalvando] = useState(false)
   const [marcandoCienteId, setMarcandoCienteId] = useState<string | null>(null)
   const [erroSalvamento, setErroSalvamento] = useState('')
+  const [lembreteParaApagar, setLembreteParaApagar] = useState<RegistroRadar | null>(null)
   const carregadoRef = useRef(false)
   const pendentesRef = useRef(new Set<string>())
   const ocorrenciasNotificadasRef = useRef(new Set<number>())
@@ -442,13 +451,14 @@ export default function RadarDC() {
     const carregarNivelRio = async () => {
       try {
         const resposta = await fetch('/api/monitoramento-cnl', { cache: 'no-store' })
-         const corpo = await resposta.json() as { sucesso?: boolean; estacao?: LeituraCNL; serie?: PontoSerie[]; serieNivel?: PontoNivel[] }
+         const corpo = await resposta.json() as { sucesso?: boolean; estacao?: LeituraCNL; estacoes?: EstacaoCNL[]; serie?: PontoSerie[]; serieNivel?: PontoNivel[] }
         if (!resposta.ok || !corpo.sucesso || !corpo.estacao || !Array.isArray(corpo.serieNivel)) {
           throw new Error('Dados do Rio Bananeiras indisponíveis.')
         }
          if (ativo) {
            setDadosCNL({
              estacao: corpo.estacao,
+             estacoes: Array.isArray(corpo.estacoes) ? corpo.estacoes : [corpo.estacao],
              serie: Array.isArray(corpo.serie) ? corpo.serie : [],
              serieNivel: corpo.serieNivel,
            })
@@ -497,8 +507,7 @@ export default function RadarDC() {
   }, [mes])
   const lembretes = registros.filter(r => (
     r.tipo === 'lembrete'
-    && r.agentesEnvolvidos.includes(agente)
-    && !r.confirmacoesAgentes.some(item => item.agente === agente && item.confirmado)
+    && (r.agentesEnvolvidos.includes(agente) || r.criadoPor === agente)
   ))
   const notificacoes = registros.filter(r => r.tipo === 'notificacao')
   const notificacoesDaData = notificacoes.filter(r => r.data === dataSelecionada)
@@ -611,7 +620,8 @@ export default function RadarDC() {
     }
   }
 
-  async function remover(id: string) {
+  async function remover(registro: RegistroRadar, senha?: string) {
+    const id = registro.id
     setErroSalvamento('')
     try {
       if (supabaseDisponivel) {
@@ -619,7 +629,9 @@ export default function RadarDC() {
         if (result.error) throw new Error(result.error.message)
       } else {
         const res = await fetch('/api/radar-bilhetes/' + id, {
-          method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ agente }),
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ agente, senha }),
         })
         if (!res.ok) {
           const detalhe = await res.json().catch(() => null) as { error?: string } | null
@@ -627,6 +639,7 @@ export default function RadarDC() {
         }
       }
       setRegistros(prev => prev.filter(r => r.id !== id))
+      setLembreteParaApagar(null)
       if (supabaseDisponivel) wsSend({ tipo: 'radar_bilhetes_atualizados' })
     } catch (error) {
       setErroSalvamento(error instanceof Error ? error.message : 'Não foi possível remover o registro.')
@@ -767,20 +780,28 @@ export default function RadarDC() {
           <div className="radar-mini-list">
             {lembretes.length === 0 ? (
               <span>Nenhum lembrete pendente para você.</span>
-            ) : lembretes.map(l => (
+           ) : lembretes.map(l => (
               <div className="radar-mini-item" key={l.id}>
-                 <b>{l.agentesEnvolvidos.length > 0 ? l.agentesEnvolvidos.join(', ') : l.criadoPor}</b>
+                 <b>{l.criadoPor === agente ? 'Criado por você' : l.criadoPor}</b>
                 <span>{l.texto}</span>
-                  <button
-                    type="button"
-                    className="radar-reminder-ack"
-                    onClick={() => marcarLembreteCiente(l)}
-                    disabled={marcandoCienteId === l.id}
-                  >
-                    {marcandoCienteId === l.id ? 'Salvando…' : 'Ciente'}
-                  </button>
+                 <div className="radar-reminder-statuses" aria-label="Status de leitura do lembrete">
+                   {(l.criadoPor === agente ? l.agentesEnvolvidos : [agente]).map(nome => {
+                     const ciente = l.confirmacoesAgentes.some(item => item.agente === nome && item.confirmado)
+                     return <small key={nome}><strong>{nome}</strong>: <em className={ciente ? 'radar-reminder-read' : 'radar-reminder-unread'}>{ciente ? 'Ciente' : 'Não lido'}</em></small>
+                   })}
+                 </div>
+                 {l.agentesEnvolvidos.includes(agente) && !l.confirmacoesAgentes.some(item => item.agente === agente && item.confirmado) && (
+                   <button
+                     type="button"
+                     className="radar-reminder-ack"
+                     onClick={() => marcarLembreteCiente(l)}
+                     disabled={marcandoCienteId === l.id}
+                   >
+                     {marcandoCienteId === l.id ? 'Salvando…' : 'Ciente'}
+                   </button>
+                 )}
                  {l.criadoPor === agente && (
-                   <button onClick={() => remover(l.id)} title="Apagar meu lembrete" aria-label="Apagar meu lembrete">×</button>
+                   <button onClick={() => setLembreteParaApagar(l)} title="Apagar meu lembrete" aria-label="Apagar meu lembrete">×</button>
                  )}
               </div>
             ))}
@@ -824,6 +845,28 @@ export default function RadarDC() {
                      </div>
                      <ChartaChuva pontos={dadosCNL.serie} />
                    </section>
+                    <section className="radar-cnl-precipitacao" aria-labelledby="radar-precipitacao-titulo">
+                      <div className="radar-cnl-rain-heading">
+                        <div><span className="card-label">PRECIPITAÇÃO ACUMULADA</span><h3 id="radar-precipitacao-titulo">Estações monitoradas</h3></div>
+                        <span className="radar-cnl-live">CEMADEN · 5 min</span>
+                      </div>
+                      <div className="radar-precipitacao-scroll">
+                        <table className="radar-precipitacao-table">
+                          <thead><tr><th>Estação</th><th>Último</th><th>1h</th><th>6h</th><th>12h</th><th>24h</th><th>48h</th><th>72h</th><th>96h</th></tr></thead>
+                          <tbody>{dadosCNL.estacoes.map(estacao => <tr key={estacao.id}>
+                            <th scope="row"><strong>{estacao.nome || `Estação ${estacao.id}`}</strong><small>{estacao.codigo || `CEMADEN ${estacao.id}`}</small></th>
+                            <td>{formatarMmRadar(estacao.ultimoValor)}</td>
+                            <td>{formatarMmRadar(estacao.acumulados.umaHora)}</td>
+                            <td>{formatarMmRadar(estacao.acumulados.seisHoras)}</td>
+                            <td>{formatarMmRadar(estacao.acumulados.dozeHoras)}</td>
+                            <td>{formatarMmRadar(estacao.acumulados.vinteQuatroHoras)}</td>
+                            <td>{formatarMmRadar(estacao.acumulados.quarentaEOitoHoras)}</td>
+                            <td>{formatarMmRadar(estacao.acumulados.setentaEDuasHoras)}</td>
+                            <td>{formatarMmRadar(estacao.acumulados.noventaESeisHoras)}</td>
+                          </tr>)}</tbody>
+                        </table>
+                      </div>
+                    </section>
                  </>
               ) : (
                 <p className="radar-cnl-loading">Consultando a estação Rio Bananeiras…</p>
@@ -858,7 +901,7 @@ export default function RadarDC() {
                        }).join(' · ')}
                      </small>}
                    </div>
-                   {n.criadoPor === agente && <button type="button" onClick={() => remover(n.id)} aria-label={`Remover notificação: ${n.texto}`} title="Remover notificação">×</button>}
+                    {n.criadoPor === agente && <button type="button" onClick={() => remover(n)} aria-label={`Remover notificação: ${n.texto}`} title="Remover notificação">×</button>}
                  </div>
                ))}
              </div>
@@ -941,6 +984,14 @@ export default function RadarDC() {
           </div>
           <div><h3>⚠️ Ocorrências do dia</h3>{atividades.ocorrencias.length === 0 ? <div className="radar-empty">Nenhuma ocorrência registrada.</div> : atividades.ocorrencias.map(o => <button className="radar-activity" key={o.id} onClick={() => disparar('dc:abrir-ocorrencia', { id: o.id })}><b>{o.agente}</b><span>{o.hora} · {o.natureza || 'Natureza não informada'}</span><small>{o.endereco || 'Endereço não informado'}</small><em>abrir ›</em></button>)}</div>
         </div>
+       {lembreteParaApagar && (
+         <ModalSenha
+           titulo={`Apagar lembrete de ${lembreteParaApagar.criadoPor}`}
+           senhaCorreta={getSenhaAgente(lembreteParaApagar.criadoPor) || ''}
+           onCancelar={() => setLembreteParaApagar(null)}
+           onConfirmar={(senha) => { void remover(lembreteParaApagar, senha) }}
+         />
+       )}
         </section>
         </div>
       </div>

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import './MonitoramentoCNL.css'
 
-type EstacaoCNL = {
+export type EstacaoCNL = {
   id: number
   uf: string
   cidade: string

@@ -1663,7 +1663,19 @@ app.patch('/api/radar-bilhetes/:id', async (req, res) => {
 
 app.delete('/api/radar-bilhetes/:id', async (req, res) => {
   try {
-    const result = await query('DELETE FROM radar_bilhetes WHERE id=$1 AND criado_por=$2 RETURNING id', [req.params.id, req.body.agente])
+    const agente = typeof req.body?.agente === 'string' ? req.body.agente.trim() : ''
+    const senha = typeof req.body?.senha === 'string' ? req.body.senha : ''
+    const registro = await query('SELECT criado_por FROM radar_bilhetes WHERE id=$1', [req.params.id])
+    if (!registro.rows[0]) return res.status(404).json({ error: 'Lembrete não encontrado' })
+    const criador = String(registro.rows[0].criado_por || '')
+    const senhasAgentes = {
+      A: '301067', B: '1234', C: '0620', D: '8228', E: '1210',
+      F: '1122', G: '1234', H: '1950', I: '2806', J: '3004',
+    }
+    if (criador !== agente || senhasAgentes[criador] !== senha) {
+      return res.status(403).json({ error: 'Informe a senha do agente que criou o lembrete' })
+    }
+    const result = await query('DELETE FROM radar_bilhetes WHERE id=$1 AND criado_por=$2 RETURNING id', [req.params.id, agente])
     if (!result.rows[0]) return res.status(403).json({ error: 'Somente o agente que criou o bilhete pode apagá-lo' })
     broadcastParaTodos({ tipo: 'radar_bilhetes_atualizados' })
     res.json({ success: true })

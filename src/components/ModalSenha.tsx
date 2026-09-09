@@ -3,7 +3,7 @@ import { useState, useEffect, useRef } from 'react'
 interface Props {
   titulo: string
   senhaCorreta?: string
-  onConfirmar: () => void
+  onConfirmar: (senha?: string) => void
   onCancelar: () => void
 }
 
@@ -21,7 +21,7 @@ export default function ModalSenha({ titulo, senhaCorreta = SENHA_PADRAO, onConf
 
   function confirmar() {
     if (senha === senhaCorreta) {
-      onConfirmar()
+      onConfirmar(senha)
     } else {
       setErro(true)
       setSenha('')

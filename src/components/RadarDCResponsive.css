@@ -753,6 +753,25 @@ body.radar-tv-active .radar-page {
   font-size: .78rem;
 }
 
+.radar-cnl-inline .radar-cnl-rain,
+.radar-cnl-inline .radar-cnl-precipitacao {
+  margin-top: .55rem;
+  padding-top: .55rem;
+}
+
+.radar-cnl-inline .cnl-grafico-nivel-cemaden {
+  height: 205px;
+}
+
+.radar-cnl-inline .cnl-grafico-wrap {
+  margin-top: .35rem;
+}
+
+.radar-cnl-inline .cnl-grafico-legenda {
+  padding: .2rem .45rem .3rem;
+  font-size: .58rem;
+}
+
 @media (max-width: 700px) {
   .radar-cnl-card {
     border-radius: 12px;
@@ -769,6 +788,20 @@ body.radar-tv-active .radar-page {
   }
 
   .radar-cnl-inline .cnl-grafico-nivel-cemaden {
-    height: 235px;
+    height: 190px;
+  }
+
+  .radar-mini-item {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .radar-mini-item > span {
+    flex: 1 1 55%;
+  }
+
+  .radar-reminder-statuses {
+    flex: 1 1 100%;
+    order: 4;
   }
 }

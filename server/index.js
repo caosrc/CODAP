@@ -3585,6 +3585,16 @@ app.get('/api/monitoramento-cnl', async (_req, res) => {
         }]
       }),
     )
+    const estacaoCentroCatalogo = estacoesCatalogo.find((item) => String(item?.nomeestacao || '').trim().toLocaleLowerCase('pt-BR') === 'centro')
+    const estacaoCentroId = Number(estacaoCentroCatalogo?.idestacao)
+    const payloadCentro = Number.isFinite(estacaoCentroId) ? chuvaPayloads.get(estacaoCentroId) : null
+    const estacaoChuvaCentro = estacaoCentroCatalogo && payloadCentro
+      ? {
+          nome: String(estacaoCentroCatalogo.nomeestacao || payloadCentro.estacao?.nome || 'Centro'),
+          codigo: String(payloadCentro.estacao?.codEstacao || estacaoCentroCatalogo.codEstacao || ''),
+        }
+      : null
+    const serieChuvaCentro = payloadCentro ? montarSerieHorariaCnl(payloadCentro) : []
     const estacoes = estacoesCatalogo
       .map(normalizarEstacaoCnl)
       .map((item) => {
@@ -3629,6 +3639,8 @@ app.get('/api/monitoramento-cnl', async (_req, res) => {
       cotasConfiguradas: Boolean(cotasConfiguradas),
       atualizadoEm: new Date().toISOString(),
       fonte: CNL_FONTE_URL,
+      estacaoChuvaCentro,
+      serieChuvaCentro,
       aviso: [
         'Nível calculado pelo recurso oficial MedidaResource do CEMADEN: offset - valor.',
         falhasChuva.length ? `Precipitação diária indisponível para ${falhasChuva.length} estação(ões) neste ciclo.` : '',

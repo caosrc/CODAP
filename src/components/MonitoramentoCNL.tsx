@@ -135,53 +135,111 @@ function rotuloEstado(estado: ReturnType<typeof estadoEstacao>): string {
   return 'Sem dados recentes'
 }
 
-export function ChartaChuva({ pontos }: { pontos: PontoSerie[] }) {
-  const largura = 620
-  const altura = 190
-  const margem = { topo: 18, direita: 18, baixo: 34, esquerda: 36 }
-  const valores = pontos.map((ponto) => ponto.valor)
-  const maior = Math.max(...valores, 1)
+export function ChartaChuva({
+  pontos,
+  estacao,
+  mostrarControles = false,
+}: {
+  pontos: PontoSerie[]
+  estacao?: { nome: string; codigo?: string } | null
+  mostrarControles?: boolean
+}) {
+  const [periodo, setPeriodo] = useState<6 | 12 | 24>(24)
+  const pontosVisiveis = pontos.slice(-periodo)
+  const largura = 900
+  const altura = 330
+  const margem = { topo: 42, direita: 20, baixo: 58, esquerda: 56 }
+  const acumulados = pontosVisiveis.reduce<number[]>((totais, ponto) => {
+    totais.push((totais.at(-1) || 0) + ponto.valor)
+    return totais
+  }, [])
+  const maior = Math.max(...acumulados, 1)
   const areaLargura = largura - margem.esquerda - margem.direita
   const areaAltura = altura - margem.topo - margem.baixo
-  const pontosSvg = pontos.map((ponto, indice) => {
-    const x = margem.esquerda + (pontos.length <= 1 ? areaLargura / 2 : indice * areaLargura / (pontos.length - 1))
-    const y = margem.topo + areaAltura - (ponto.valor / maior) * areaAltura
+  const pontoX = (indice: number) => margem.esquerda + (pontosVisiveis.length <= 1 ? areaLargura / 2 : indice * areaLargura / (pontosVisiveis.length - 1))
+  const escalaY = (valor: number) => margem.topo + areaAltura - (valor / maior) * areaAltura
+  const pontosSvg = acumulados.map((valor, indice) => {
+    const x = pontoX(indice)
+    const y = escalaY(valor)
     return `${x.toFixed(1)},${y.toFixed(1)}`
   }).join(' ')
+  const dataMaisRecente = pontosVisiveis.at(-1)?.data
+  const larguraBarra = Math.max(4, Math.min(22, areaLargura / Math.max(pontosVisiveis.length, 1) * .58))
 
-  if (pontos.length === 0) {
+  if (pontosVisiveis.length === 0) {
     return <div className="cnl-grafico-vazio">A estação ainda não retornou pontos horários para o período.</div>
   }
 
   return (
     <div className="cnl-grafico-wrap">
-      <svg className="cnl-grafico" viewBox={`0 0 ${largura} ${altura}`} role="img" aria-label="Chuva acumulada por hora nas últimas 24 horas">
-        {[0, 0.5, 1].map((proporcao) => {
-          const y = margem.topo + areaAltura - proporcao * areaAltura
-          return <line key={proporcao} x1={margem.esquerda} x2={largura - margem.direita} y1={y} y2={y} className="cnl-grafico-grade" />
+      {mostrarControles && (
+        <div className="cnl-chuva-controles">
+          <label>Horas:
+            <select value={periodo} onChange={(evento) => setPeriodo(Number(evento.target.value) as 6 | 12 | 24)}>
+              <option value={6}>6</option>
+              <option value={12}>12</option>
+              <option value={24}>24</option>
+            </select>
+          </label>
+        </div>
+      )}
+      <svg className="cnl-grafico cnl-grafico-chuva" viewBox={`0 0 ${largura} ${altura}`} role="img" aria-label={`Precipitação acumulada em ${periodo} horas${estacao?.nome ? ` na estação ${estacao.nome}` : ''}`}>
+        <text x={largura / 2} y="18" textAnchor="middle" className="cnl-grafico-chuva-titulo">
+          {`Precipitação Acumulada em ${periodo}h${estacao?.nome ? ` | Estação: ${estacao.nome}${estacao.codigo ? ` (${estacao.codigo})` : ''}` : ''}`}
+        </text>
+        {[0, 0.25, 0.5, 0.75, 1].map((proporcao) => {
+          const y = escalaY(maior * proporcao)
+          return (
+            <g key={proporcao}>
+              <line x1={margem.esquerda} x2={largura - margem.direita} y1={y} y2={y} className="cnl-grafico-grade" />
+              <text x={margem.esquerda - 9} y={y + 4} textAnchor="end" className="cnl-grafico-label">{formatarMm(maior * proporcao)}</text>
+            </g>
+          )
         })}
-        <polyline points={pontosSvg} className="cnl-grafico-linha" />
-        {pontos.map((ponto, indice) => {
-          const x = margem.esquerda + (pontos.length <= 1 ? areaLargura / 2 : indice * areaLargura / (pontos.length - 1))
-          const y = margem.topo + areaAltura - (ponto.valor / maior) * areaAltura
-          const rotuloY = Math.max(margem.topo + 10, y - 8)
+        {pontosVisiveis.map((ponto, indice) => {
+          const x = pontoX(indice)
+          const y = margem.topo + areaAltura
+          const alturaBarra = Math.max(0, (ponto.valor / maior) * areaAltura)
+          return (
+            <rect
+              key={`${ponto.data}-${ponto.hora}-${indice}`}
+              x={x - larguraBarra / 2}
+              y={y - alturaBarra}
+              width={larguraBarra}
+              height={alturaBarra}
+              rx="1"
+              className={`cnl-grafico-chuva-bar${ponto.data === dataMaisRecente ? ' cnl-grafico-chuva-bar-atual' : ''}`}
+            >
+              <title>{`${formatarPontoChuva(ponto)} · chuva da hora: ${formatarMm(ponto.valor)}`}</title>
+            </rect>
+          )
+        })}
+        <polyline points={pontosSvg} className="cnl-grafico-linha cnl-grafico-linha-chuva" />
+        {pontosVisiveis.map((ponto, indice) => {
+          const x = pontoX(indice)
+          const y = escalaY(acumulados[indice])
+          const rotuloY = Math.max(margem.topo + 30, y - 9)
+          const hora = formatarHoraPontoChuva(ponto)
           return (
             <g key={`${ponto.data}-${ponto.hora}-${indice}`}>
-              <circle cx={x} cy={y} r="3.5" className="cnl-grafico-ponto">
-                <title>{`${formatarPontoChuva(ponto)} · ${formatarMm(ponto.valor)}`}</title>
+              <circle cx={x} cy={y} r="4" className="cnl-grafico-ponto cnl-grafico-ponto-chuva">
+                <title>{`${formatarPontoChuva(ponto)} · chuva: ${formatarMm(ponto.valor)} · acumulado: ${formatarMm(acumulados[indice])}`}</title>
               </circle>
               <text x={x} y={rotuloY} textAnchor="middle" className="cnl-grafico-label cnl-grafico-label-chuva">
-                {formatarMm(ponto.valor)}
+                {formatarMm(acumulados[indice])}
+              </text>
+              <text x={x} y={altura - margem.baixo + 18} textAnchor="end" className="cnl-grafico-label cnl-grafico-label-data" transform={`rotate(-42 ${x} ${altura - margem.baixo + 18})`}>
+                {hora}
               </text>
             </g>
           )
         })}
-        <text x={margem.esquerda - 8} y={margem.topo + 4} textAnchor="end" className="cnl-grafico-label">{maior.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}</text>
-        <text x={margem.esquerda - 8} y={margem.topo + areaAltura + 4} textAnchor="end" className="cnl-grafico-label">0</text>
-        <text x={margem.esquerda} y={altura - 8} className="cnl-grafico-label">{formatarPontoChuva(pontos[0])}</text>
-        <text x={largura - margem.direita} y={altura - 8} textAnchor="end" className="cnl-grafico-label">{formatarPontoChuva(pontos.at(-1))}</text>
       </svg>
-      <div className="cnl-grafico-legenda">Acumulado horário em milímetros · horário informado pelo CEMADEN</div>
+      <div className="cnl-chuva-legenda">
+        <span><i className="cnl-chuva-legenda-bar" /> Chuva por hora</span>
+        <span><i className="cnl-chuva-legenda-linha" /> Acumulado</span>
+        <small>Valores em milímetros · horário informado pelo CEMADEN</small>
+      </div>
     </div>
   )
 }
@@ -190,6 +248,11 @@ function formatarPontoChuva(ponto?: PontoSerie): string {
   if (!ponto) return '—'
   const hora = ponto.hora.match(/\d{1,2}/)?.[0]
   return hora ? formatarDataHora(`${ponto.data} ${hora.padStart(2, '0')}:00`) : ponto.hora
+}
+
+function formatarHoraPontoChuva(ponto: PontoSerie): string {
+  const hora = ponto.hora.match(/\d{1,2}/)?.[0]
+  return hora ? `${hora.padStart(2, '0')}h` : ponto.hora
 }
 
 function formatarRotuloEixoNivel(dataHora?: string): string {

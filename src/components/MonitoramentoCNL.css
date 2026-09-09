@@ -143,6 +143,20 @@
 .cnl-grafico-ponto-atual { fill: #8be3ef; opacity: 0.65; animation: cnl-ponto-grafico-pulsando 1.6s ease-out infinite; transform-box: fill-box; transform-origin: center; }
 .cnl-grafico-label { fill: #78909b; font-size: 10px; }
 .cnl-grafico-label-chuva { font-size: 8px; font-weight: 800; paint-order: stroke; stroke: #fff; stroke-width: 3px; stroke-linejoin: round; }
+.cnl-grafico-chuva-titulo { fill: #4f6269; font-size: 13px; font-weight: 700; }
+.cnl-grafico-chuva-bar { fill: #b44c4c; opacity: .9; }
+.cnl-grafico-chuva-bar-atual { fill: #4c76aa; }
+.cnl-grafico-linha-chuva { stroke: #4f8c68; stroke-width: 2.5; }
+.cnl-grafico-ponto-chuva { fill: #5f9b75; stroke: #397352; stroke-width: 1.4; }
+.cnl-chuva-controles { display: flex; justify-content: flex-start; padding: .1rem .15rem 0; color: #444; font-size: .7rem; }
+.cnl-chuva-controles label { display: flex; align-items: center; gap: .3rem; }
+.cnl-chuva-controles select { min-width: 3.4rem; padding: .16rem .25rem; border: 1px solid #aaa; border-radius: 2px; color: #333; background: #fff; font: inherit; }
+.cnl-chuva-legenda { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: .35rem .7rem; color: #687d84; font-size: .62rem; }
+.cnl-chuva-legenda span { display: inline-flex; align-items: center; gap: .25rem; }
+.cnl-chuva-legenda i { display: inline-block; width: .7rem; height: .5rem; }
+.cnl-chuva-legenda-bar { background: #b44c4c; }
+.cnl-chuva-legenda-linha { height: .16rem !important; background: #4f8c68; }
+.cnl-chuva-legenda small { flex-basis: 100%; text-align: center; }
 .cnl-grafico-legenda { color: #8799a2; text-align: center; font-size: 0.65rem; }
 .cnl-grafico-vazio, .cnl-carregando { padding: 2rem 0.8rem; color: #71858e; text-align: center; font-size: 0.8rem; }
 .cnl-bloco-grafico-nivel { padding: 0.9rem 0.7rem 1rem; }

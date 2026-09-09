@@ -797,6 +797,34 @@ body.radar-tv-active .radar-page {
   margin-top: .2rem;
 }
 
+.radar-cnl-inline .cnl-grafico-chuva-titulo {
+  fill: #e7f2ff;
+  font-size: 12px;
+}
+
+.radar-cnl-inline .cnl-grafico-label {
+  fill: #a9c6dc;
+}
+
+.radar-cnl-inline .cnl-grafico-label-chuva {
+  fill: #e7f2ff;
+  stroke: #0d3151;
+}
+
+.radar-cnl-inline .cnl-chuva-controles {
+  color: #c3dced;
+}
+
+.radar-cnl-inline .cnl-chuva-controles select {
+  border-color: #4a7290;
+  color: #e7f2ff;
+  background: #123a5a;
+}
+
+.radar-cnl-inline .cnl-chuva-legenda {
+  color: #a9c6dc;
+}
+
 .radar-cnl-inline .cnl-grafico-legenda {
   padding: .2rem .45rem .3rem;
   font-size: .58rem;

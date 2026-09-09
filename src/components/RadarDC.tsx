@@ -40,7 +40,14 @@ type ResumoFerramental = {
 type DiaPrevisao = { data: string; codigo: number; temperaturaMax: number; temperaturaMin: number; precipitacao: number; probabilidade: number; umidade: number; vento: number; rajada: number }
 type HoraPrevisao = { time: string; codigo: number; temperatura: number; probabilidade: number; precipitacao: number; vento: number }
 type TempoDC = { atual: { codigo: number; temperatura: number; chuva: number; vento: number; rajada: number; umidade: number }; horas: HoraPrevisao[]; dias: DiaPrevisao[] }
-type DadosRadarCNL = { estacao: LeituraCNL; estacoes: EstacaoCNL[]; serie: PontoSerie[]; serieNivel: PontoNivel[] }
+type DadosRadarCNL = {
+  estacao: LeituraCNL
+  estacoes: EstacaoCNL[]
+  serie: PontoSerie[]
+  serieChuvaCentro?: PontoSerie[]
+  estacaoChuvaCentro?: { nome: string; codigo?: string } | null
+  serieNivel: PontoNivel[]
+}
 
 const CONSELHEIRO_LAFAIETE = { latitude: -20.6604, longitude: -43.7863 }
 const nomesTempo: Record<number, string> = { 0: 'Céu limpo', 1: 'Predominantemente limpo', 2: 'Parcialmente nublado', 3: 'Nublado', 45: 'Neblina', 48: 'Neblina com gelo', 51: 'Garoa leve', 53: 'Garoa moderada', 55: 'Garoa intensa', 61: 'Chuva leve', 63: 'Chuva moderada', 65: 'Chuva forte', 71: 'Neve leve', 73: 'Neve moderada', 75: 'Neve forte', 80: 'Pancadas leves', 81: 'Pancadas moderadas', 82: 'Pancadas fortes', 95: 'Trovoada', 96: 'Trovoada com granizo', 99: 'Trovoada forte' }
@@ -451,7 +458,15 @@ export default function RadarDC() {
     const carregarNivelRio = async () => {
       try {
         const resposta = await fetch('/api/monitoramento-cnl', { cache: 'no-store' })
-         const corpo = await resposta.json() as { sucesso?: boolean; estacao?: LeituraCNL; estacoes?: EstacaoCNL[]; serie?: PontoSerie[]; serieNivel?: PontoNivel[] }
+         const corpo = await resposta.json() as {
+           sucesso?: boolean
+           estacao?: LeituraCNL
+           estacoes?: EstacaoCNL[]
+           serie?: PontoSerie[]
+           serieChuvaCentro?: PontoSerie[]
+           estacaoChuvaCentro?: { nome: string; codigo?: string } | null
+           serieNivel?: PontoNivel[]
+         }
         if (!resposta.ok || !corpo.sucesso || !corpo.estacao || !Array.isArray(corpo.serieNivel)) {
           throw new Error('Dados do Rio Bananeiras indisponíveis.')
         }
@@ -460,6 +475,8 @@ export default function RadarDC() {
              estacao: corpo.estacao,
              estacoes: Array.isArray(corpo.estacoes) ? corpo.estacoes : [corpo.estacao],
              serie: Array.isArray(corpo.serie) ? corpo.serie : [],
+              serieChuvaCentro: Array.isArray(corpo.serieChuvaCentro) ? corpo.serieChuvaCentro : [],
+              estacaoChuvaCentro: corpo.estacaoChuvaCentro || null,
              serieNivel: corpo.serieNivel,
            })
          }
@@ -850,7 +867,11 @@ export default function RadarDC() {
                        <div><span className="card-label">CHUVA ACUMULADA</span><h3 id="radar-chuva-24h-titulo">Últimas 24 horas</h3></div>
                        <span className="radar-cnl-live">CEMADEN · 5 min</span>
                      </div>
-                     <ChartaChuva pontos={dadosCNL.serie} />
+                     <ChartaChuva
+                       pontos={dadosCNL.serieChuvaCentro || []}
+                       estacao={dadosCNL.estacaoChuvaCentro}
+                       mostrarControles
+                     />
                    </section>
                     {diasPrecipitacao.length > 0 && (
                       <details className="radar-cnl-diaria-detalhe">

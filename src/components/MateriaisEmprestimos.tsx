@@ -262,17 +262,17 @@ export default function MateriaisEmprestimos({ onIrParaMapa, abrirCampoId, onAbr
 
     function disparar() {
       empVencidos.forEach(e => {
-        mostrarNotificacao('📦 Prazo de devolução — CODAP', {
+        mostrarNotificacao('📦 Prazo de devolução — Defesa Civil', {
           body: `${e.material_nome} emprestado a ${e.responsavel} está no prazo de devolução.`,
           tag: `emp-prazo-${e.id}`,
-          icon: '/icons/icon-192.png',
+          icon: '/icon-192.png',
         })
       })
       campoVencidos.forEach(c => {
-        mostrarNotificacao('🚧 Prazo de recolha — CODAP', {
+        mostrarNotificacao('🚧 Prazo de recolha — Defesa Civil', {
           body: `${c.material_nome ?? 'Equipamento'} em campo atingiu o prazo de recolha.`,
           tag: `campo-prazo-${c.id}`,
-          icon: '/icons/icon-192.png',
+          icon: '/icon-192.png',
         })
       })
     }
@@ -2171,7 +2171,7 @@ function gerarTermoEmprestimoPdf(e: Emprestimo, tipoOperacao: 'emprestimo' | 'ma
   <div class="cabecalho">
     <span style="font-size:22px;font-weight:900;color:#1a4b8c">C</span>
     <div class="cabecalho-textos">
-      <strong>CODAP — CONSELHEIRO LAFAIETE — MG</strong>
+      <strong>DEFESA CIVIL — CONSELHEIRO LAFAIETE — MG</strong>
       <span>Sistema operacional de campo</span>
     </div>
   </div>
@@ -2210,7 +2210,7 @@ function gerarTermoEmprestimoPdf(e: Emprestimo, tipoOperacao: 'emprestimo' | 'ma
 
   ${e.observacoes ? `<div class="condicao-box" style="margin-top:30px"><strong>Observações:</strong><p>${htmlEscape(e.observacoes)}</p></div>` : ''}
 
-  <div class="rodape">Termo gerado pelo aplicativo CODAP — registro nº ${e.id}.</div>
+  <div class="rodape">Termo gerado pelo aplicativo Defesa Civil — registro nº ${e.id}.</div>
 </body></html>`
   win.document.write(html)
   win.document.close()

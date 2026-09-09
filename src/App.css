@@ -574,6 +574,15 @@ input, select, textarea { font-family: inherit; }
   line-height: 1;
 }
 
+.header-logo-imagem {
+  width: 44px;
+  height: 44px;
+  object-fit: contain;
+  border-radius: 8px;
+  flex-shrink: 0;
+  background: white;
+}
+
 .header-textos { display: flex; flex-direction: column; }
 
 .header-nome {
@@ -2591,6 +2600,15 @@ input, select, textarea { font-family: inherit; }
   font-size: 1.05rem;
   font-weight: 900;
   line-height: 1;
+}
+
+.header-logo-mini-imagem {
+  width: 32px;
+  height: 32px;
+  object-fit: contain;
+  border-radius: 6px;
+  flex-shrink: 0;
+  background: white;
 }
 
 .header-titulo-texto {

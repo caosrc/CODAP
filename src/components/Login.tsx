@@ -89,7 +89,7 @@ export default function Login({ onLogin, apenasAgente = false }: Props) {
   const senhaAgenteRef = useRef<HTMLInputElement>(null)
   const orgaoAcesso = getOrgaoSelecionado()
   const logoAcessoAgente = orgaoAcesso === 'defesa-civil'
-    ? defesaCivilLogo
+    ? '/defesa-civil-logo.png'
     : orgaoAcesso === 'procon' ? proconLogo : codapBanner
 
   useEffect(() => {
@@ -159,10 +159,10 @@ export default function Login({ onLogin, apenasAgente = false }: Props) {
             <img
               className="login-logo"
               src={logoAcessoAgente}
-              alt={orgaoAcesso === 'defesa-civil' ? 'Defesa Civil' : orgaoAcesso === 'procon' ? 'Procon' : 'CODAP — Consórcio Público'}
+              alt={orgaoAcesso === 'defesa-civil' ? 'Defesa Civil' : orgaoAcesso === 'procon' ? 'Procon' : 'Consórcio Público'}
             />
           </div>
-          <div className="login-titulo">CODAP</div>
+          <div className="login-titulo">Defesa Civil</div>
           <div className="login-subtitulo">Sistema operacional de campo</div>
 
           <div style={{ textAlign: 'center', marginBottom: '1rem' }}>
@@ -238,9 +238,9 @@ export default function Login({ onLogin, apenasAgente = false }: Props) {
       <div className="login-tela">
         <div className="login-box login-box--agente">
           <div className="login-logo-wrap">
-            <img className="login-logo" src={codapBanner} alt="CODAP — Consórcio Público" />
+            <img className="login-logo" src="/defesa-civil-logo.png" alt="Defesa Civil" />
           </div>
-          <div className="login-titulo">CODAP</div>
+          <div className="login-titulo">Defesa Civil</div>
           <div className="login-subtitulo">Sistema operacional de campo</div>
 
           <div className="login-agente-titulo">Quem está acessando?</div>
@@ -274,9 +274,9 @@ export default function Login({ onLogin, apenasAgente = false }: Props) {
     <div className="login-tela">
       <div className="login-box">
         <div className="login-logo-wrap">
-          <img className="login-logo" src={codapBanner} alt="CODAP — Consórcio Público" />
+          <img className="login-logo" src="/defesa-civil-logo.png" alt="Defesa Civil" />
         </div>
-        <div className="login-titulo">CODAP</div>
+        <div className="login-titulo">Defesa Civil</div>
         <div className="login-subtitulo">Sistema operacional de campo</div>
 
         <form className="login-form" onSubmit={entrar} autoComplete="off">

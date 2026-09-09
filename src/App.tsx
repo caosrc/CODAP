@@ -464,17 +464,17 @@ export default function App() {
 
         async function disparar() {
           for (const e of empVencidos) {
-            await dispararNotif('📦 Prazo vencido — CODAP', {
+            await dispararNotif('📦 Prazo vencido — Defesa Civil', {
               body: `${e.material_nome} emprestado a ${e.responsavel} está com prazo vencido.`,
               tag: `app-emp-prazo-${e.id}`,
-              icon: '/icons/icon-192.png',
+              icon: '/icon-192.png',
             })
           }
           for (const c of campoVencidos) {
-            await dispararNotif('🚧 Recolha pendente — CODAP', {
+            await dispararNotif('🚧 Recolha pendente — Defesa Civil', {
               body: `${c.material_nome ?? 'Equipamento'} em campo atingiu o prazo de recolha.`,
               tag: `app-campo-prazo-${c.id}`,
-              icon: '/icons/icon-192.png',
+              icon: '/icon-192.png',
             })
           }
         }
@@ -789,7 +789,7 @@ export default function App() {
     const kml = `<?xml version="1.0" encoding="UTF-8"?>
 <kml xmlns="http://www.opengis.net/kml/2.2">
   <Document>
-    <name>CODAP — Conselheiro Lafaiete — Todas as Ocorrências</name>
+    <name>Defesa Civil — Conselheiro Lafaiete — Todas as Ocorrências</name>
     <Style id="areaQueimada">
       <LineStyle>
         <color>ff0000ff</color>
@@ -815,7 +815,7 @@ export default function App() {
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `codap_conselheiro_lafaiete_${Date.now()}.kmz`
+    a.download = `defesa_civil_conselheiro_lafaiete_${Date.now()}.kmz`
     a.click()
     URL.revokeObjectURL(url)
   }
@@ -993,9 +993,9 @@ export default function App() {
 
       <header className="header">
         <div className="header-logo">
-          <div className="header-logo-texto" aria-label="CODAP">C</div>
+          <img className="header-logo-imagem" src="/defesa-civil-logo.png" alt="Defesa Civil" />
           <div className="header-textos">
-            <span className="header-nome">CODAP</span>
+            <span className="header-nome">Defesa Civil</span>
             <span className="header-cidade">Conselheiro Lafaiete — MG · {nomeOrgaoAtual}</span>
           </div>
         </div>

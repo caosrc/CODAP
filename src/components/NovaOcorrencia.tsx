@@ -450,7 +450,7 @@ export default function NovaOcorrencia({ onSalvo, onVoltar, isOnline, orgao = 'd
       <header className="header">
         <button className="btn-voltar" onClick={onVoltar}>‹</button>
         <div className="header-logo-mini">
-          <span className="header-logo-mini-texto" aria-label="CODAP">C</span>
+          <img className="header-logo-mini-imagem" src="/defesa-civil-logo.png" alt="Defesa Civil" />
           <span className="header-titulo-texto">Nova Ocorrência</span>
         </div>
         <div style={{ width: 36 }}>

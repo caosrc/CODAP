@@ -51,7 +51,7 @@ export default function SelecaoOrgao({ onSelecionar }: Props) {
     <main className="login-tela selecao-orgao-tela">
       <section className="login-box selecao-orgao-box">
         <div className="login-logo-wrap">
-          <img className="login-logo" src={codapBanner} alt="CODAP — Consórcio Público" />
+          <img className="login-logo" src="/defesa-civil-logo.png" alt="Defesa Civil" />
         </div>
         <div className="login-titulo">Escolha o órgão</div>
         <div className="login-subtitulo">Entre no ambiente de trabalho que deseja acessar</div>

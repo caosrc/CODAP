@@ -292,7 +292,7 @@ async function mostrarNotificacaoSos(a: SosAlerta) {
   const opcoes: NotificationOptions = {
     body: corpo,
     tag: `sos-${a.id}`,
-    icon: '/icons/icon-192.png',
+    icon: '/icon-192.png',
     requireInteraction: true,
   }
 

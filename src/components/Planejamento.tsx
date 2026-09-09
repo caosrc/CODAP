@@ -27,7 +27,7 @@ const ORGAOS_EMPENHO: { categoria: string; emoji: string; orgaos: { emoji: strin
     { emoji: '🚒', nome: 'Corpo de Bombeiros' },
     { emoji: '🚑', nome: 'SAMU' },
     { emoji: '🧯', nome: 'Brigada de Incêndio' },
-    { emoji: '⛑️', nome: 'CODAP' },
+    { emoji: '⛑️', nome: 'Defesa Civil' },
     { emoji: '🏥', nome: 'Equipe Médica' },
     { emoji: '🩺', nome: 'Vigilância Sanitária' },
     { emoji: '🛟', nome: 'Resgate Aquático' },
@@ -1081,7 +1081,7 @@ function MapaDetalhe({
                       const ativo = itemSelecionado === key
                       return (
                         <button key={orgao} onClick={() => setItemSelecionado(ativo ? null : key)} style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', background: ativo ? '#1e40af' : '#dbeafe', color: ativo ? 'white' : '#1e3a8a', border: ativo ? '1.5px solid #1e40af' : '1.5px solid #bfdbfe', borderRadius: 20, padding: '0.22rem 0.6rem', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer', boxShadow: ativo ? '0 0 0 2px #93c5fd' : 'none' }}>
-                          {orgaoInfo?.nome === 'CODAP' ? <span style={{ fontSize: '0.78rem', fontWeight: 900 }}>C</span> : <span style={{ fontSize: '0.88rem' }}>{emoji}</span>}
+                          {orgaoInfo?.nome === 'Defesa Civil' ? <img src="/icon-192.png" alt="" style={{ width: 16, height: 16, objectFit: 'contain', borderRadius: 3 }} /> : <span style={{ fontSize: '0.88rem' }}>{emoji}</span>}
                           {orgaoInfo?.nome ?? orgao}{ativo && <span style={{ fontSize: '0.6rem' }}>📍</span>}
                         </button>
                       )
@@ -1092,14 +1092,14 @@ function MapaDetalhe({
           )}
         </div>
 
-        {/* ── Seção: Agentes do CODAP (recolhível) ── */}
+        {/* ── Seção: Agentes da Defesa Civil (recolhível) ── */}
         <div style={{ borderBottom: '1px solid #e5e7eb' }}>
           <button
             onClick={() => setSecaoAberta(secaoAberta === 'agentes' ? null : 'agentes')}
             style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.4rem 0.75rem', background: secaoAberta === 'agentes' ? 'linear-gradient(90deg,#065f46,#059669)' : '#f0fdf4', border: 'none', cursor: 'pointer', textAlign: 'left' }}
           >
             <span style={{ fontSize: '0.88rem' }}>🧑‍🚒</span>
-            <span style={{ fontSize: '0.72rem', fontWeight: 800, color: secaoAberta === 'agentes' ? 'white' : '#166534', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Agentes do CODAP</span>
+            <span style={{ fontSize: '0.72rem', fontWeight: 800, color: secaoAberta === 'agentes' ? 'white' : '#166534', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Agentes da Defesa Civil</span>
             <span style={{ marginLeft: 'auto', background: secaoAberta === 'agentes' ? 'rgba(255,255,255,0.22)' : '#bbf7d0', color: secaoAberta === 'agentes' ? 'white' : '#166534', borderRadius: 10, fontSize: '0.62rem', fontWeight: 700, padding: '0.05rem 0.4rem' }}>
               {(plano.agentesDefesaCivil ?? []).length}
             </span>
@@ -1627,8 +1627,8 @@ function OrgaosPanel({ selecionados, onChange }: { selecionados: string[]; onCha
                       onClick={() => toggle(k)}
                       style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', background: sel ? '#1e40af' : '#f1f5ff', color: sel ? 'white' : '#1e3a8a', border: sel ? '1.5px solid #1e40af' : '1.5px solid #dbeafe', borderRadius: 7, padding: '0.3rem 0.45rem', fontSize: '0.73rem', fontWeight: 600, cursor: 'pointer', textAlign: 'left' }}
                     >
-                      {o.nome === 'CODAP' ? (
-                        <span style={{ fontSize: '0.78rem', fontWeight: 900, flexShrink: 0 }}>C</span>
+                      {o.nome === 'Defesa Civil' ? (
+                        <img src="/icon-192.png" alt="" style={{ width: 16, height: 16, objectFit: 'contain', borderRadius: 3, flexShrink: 0 }} />
                       ) : (
                         <span style={{ fontSize: '0.9rem', lineHeight: 1, flexShrink: 0 }}>{o.emoji}</span>
                       )}
@@ -2246,7 +2246,7 @@ function FormularioPlano({
           <div className="plan-form-secao">🏛️ Órgãos Empenhados</div>
           <OrgaosPanel selecionados={equipe} onChange={setEquipe} />
 
-          <div className="plan-form-secao">🧑‍🚒 Agentes do CODAP</div>
+          <div className="plan-form-secao">🧑‍🚒 Agentes da Defesa Civil</div>
           <div style={{ background: '#f0fdf4', border: '1.5px solid #bbf7d0', borderRadius: 10, padding: '0.6rem 0.7rem', marginBottom: '0.3rem' }}>
             <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#166534', marginBottom: '0.45rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
               Selecione os agentes escalados para este planejamento
@@ -4373,8 +4373,8 @@ export default function Planejamento() {
           className={`plan-subtab radar-subtab ${subAba === 'radar' ? 'ativo' : ''}`}
           onClick={() => setSubAba('radar')}
         >
-          <img className="radar-tab-icon" src="/codap-icon.svg" alt="" />
-          Radar Codap
+          <img className="radar-tab-icon" src="/defesa-civil-logo.png" alt="" />
+          Radar Defesa Civil
         </button>
         {(['evento', 'operacao', 'simulado', 'emergencia'] as TipoPlano[]).map(t => {
           const c = TIPOS_CONFIG[t]

@@ -1,4 +1,4 @@
-/* CODAP — Service Worker
+/* Defesa Civil — Service Worker
  * PWA + Offline First + Web Push
  *
  * Estratégias:
@@ -18,7 +18,7 @@
  *  - LIMPAR_CACHE_MAPA               → apaga todos os tiles cacheados
  */
 
-const VERSION = 'v15-2026-09-codap-lafaiete'
+const VERSION = 'v16-2026-09-defesa-civil-lafaiete'
 const APP_CACHE = `defesacivil-app-${VERSION}`
 const TILES_CACHE = 'defesacivil-tiles-osm'
 const ASSETS_CACHE = `defesacivil-assets-${VERSION}`
@@ -29,7 +29,9 @@ const APP_SHELL = [
   '/',
   '/index.html',
   '/manifest.json',
-  '/codap-icon.svg',
+  '/defesa-civil-logo.png',
+  '/icon-192.png',
+  '/icon-512.png',
   '/icons.svg',
 ]
 
@@ -223,7 +225,7 @@ self.addEventListener('push', (event) => {
   } catch {
     try { data = { body: event.data?.text() || '' } } catch { /* ignore */ }
   }
-  const titulo = data.title || '🆘 SOS — CODAP'
+  const titulo = data.title || '🆘 SOS — Defesa Civil'
   const corpo = data.body || 'Um agente acionou o SOS. Abra o app imediatamente.'
   const tag = data.tag || 'sos'
   const url = data.url || '/'
@@ -247,8 +249,8 @@ self.addEventListener('push', (event) => {
 
       await self.registration.showNotification(titulo, {
         body: corpo,
-        icon: '/codap-icon.svg',
-        badge: '/codap-icon.svg',
+        icon: '/icon-192.png',
+        badge: '/icon-192.png',
         tag,
         renotify: true,
         requireInteraction: ehSos || tipo === 'escala' || ehRadar,

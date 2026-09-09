@@ -670,6 +670,23 @@ body.radar-tv-active .radar-page {
   text-align: center;
 }
 
+.radar-precipitacao-resumo {
+  display: block;
+  padding: .35rem .15rem 0;
+  color: #b9f4d5;
+  font-size: .68rem;
+  font-weight: 700;
+  line-height: 1.55;
+  text-align: left;
+}
+
+.radar-cnl-diaria-detalhe .radar-precipitacao-resumo {
+  margin: 0;
+  padding: .28rem .35rem;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
 .radar-cnl-inline {
   min-width: 0;
   width: 100%;

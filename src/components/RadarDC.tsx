@@ -552,6 +552,10 @@ export default function RadarDC() {
       .reverse()
       .slice(0, 2)
   }, [dadosCNL])
+  const resumoPrecipitacao = useMemo(
+    () => dadosCNL?.estacoes.map(estacao => `${estacao.nome} ${formatarMmRadar(estacao.precipitacaoAtual)}`).join(' | ') || '',
+    [dadosCNL],
+  )
 
 
   async function salvarRegistro(tipo: RegistroRadar['tipo'], texto: string, data: string, horaRegistro: string) {
@@ -873,33 +877,37 @@ export default function RadarDC() {
                        mostrarControles
                      />
                    </section>
-                    {diasPrecipitacao.length > 0 && (
+                     {dadosCNL && (
                       <details className="radar-cnl-diaria-detalhe">
-                        <summary>Ver acumulado diário por estação</summary>
-                        <div className="radar-precipitacao-scroll">
-                          <table className="radar-precipitacao-table radar-precipitacao-diaria-table">
-                            <thead>
-                              <tr>
-                                <th>Estação</th>
-                                {diasPrecipitacao.map(dia => <th key={dia}>{dia.split('-').reverse().slice(0, 2).join('/')}</th>)}
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {dadosCNL.estacoes.map(estacao => (
-                                <tr key={estacao.id}>
-                                  <th scope="row">
-                                    <strong>{estacao.nome || `Estação ${estacao.id}`}</strong>
-                                    <small>{estacao.codigo || `CEMADEN ${estacao.id}`}</small>
-                                  </th>
-                                  {diasPrecipitacao.map(dia => {
-                                    const leitura = estacao.precipitacaoDiaria.find(item => item.data === dia)
-                                    return <td key={dia}>{formatarMmRadar(leitura?.total)}</td>
-                                  })}
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
+                         <summary className="radar-precipitacao-resumo" aria-label="Precipitação atual por estação">
+                           {resumoPrecipitacao || 'Consultando precipitações...'}
+                         </summary>
+                         {diasPrecipitacao.length > 0 && (
+                           <div className="radar-precipitacao-scroll">
+                             <table className="radar-precipitacao-table radar-precipitacao-diaria-table">
+                               <thead>
+                                 <tr>
+                                   <th>Estação</th>
+                                   {diasPrecipitacao.map(dia => <th key={dia}>{dia.split('-').reverse().slice(0, 2).join('/')}</th>)}
+                                 </tr>
+                               </thead>
+                               <tbody>
+                                 {dadosCNL.estacoes.map(estacao => (
+                                   <tr key={estacao.id}>
+                                     <th scope="row">
+                                       <strong>{estacao.nome || `Estação ${estacao.id}`}</strong>
+                                       <small>{estacao.codigo || `CEMADEN ${estacao.id}`}</small>
+                                     </th>
+                                     {diasPrecipitacao.map(dia => {
+                                       const leitura = estacao.precipitacaoDiaria.find(item => item.data === dia)
+                                       return <td key={dia}>{formatarMmRadar(leitura?.total)}</td>
+                                     })}
+                                   </tr>
+                                 ))}
+                               </tbody>
+                             </table>
+                           </div>
+                         )}
                       </details>
                     )}
                  </>
@@ -908,7 +916,6 @@ export default function RadarDC() {
               )}
             </section>
           )}
-          {!lembreteEditorAberto && <small className="radar-note-hint">Clique em “Lembrete” para anotar uma nova mensagem.</small>}
         </div>
 
         <div className="radar-right-column">

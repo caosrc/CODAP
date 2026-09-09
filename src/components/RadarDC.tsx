@@ -703,8 +703,17 @@ export default function RadarDC() {
       </section>
       <div className="radar-layout">
         <div className="radar-note-card radar-bilhete-large">
-          <div className="card-label"><span className="label-dot" /> LEMBRETE</div>
-          <h2>Lembrete</h2>
+          <div className="radar-note-heading">
+            <div className="card-label"><span className="label-dot" /> LEMBRETE</div>
+            <button
+              type="button"
+              className={`radar-reminder-trigger${lembreteEditorAberto ? ' ativo' : ''}`}
+              onClick={() => setLembreteEditorAberto(prev => !prev)}
+              aria-expanded={lembreteEditorAberto}
+            >
+              {lembreteEditorAberto ? 'Fechar lembrete' : 'Lembrete'} {lembreteEditorAberto ? '×' : '+'}
+            </button>
+          </div>
           <div className="radar-mini-list">
             {lembretes.length === 0 ? (
               <span>Nenhum lembrete cadastrado.</span>
@@ -718,21 +727,43 @@ export default function RadarDC() {
               </div>
             ))}
           </div>
-          <textarea value={textoLembrete} onFocus={() => setLembreteEditorAberto(true)} onChange={e => setTextoLembrete(e.target.value)} placeholder="Deixe um lembrete para a equipe..." rows={7} />
-           {lembreteEditorAberto && <fieldset className="radar-agentes-fieldset radar-lembrete-agentes">
-             <legend>Agentes que receberão o lembrete</legend>
-             <div className="radar-agentes-grid">
-               {AGENTES.map(nome => (
-                 <label key={nome} className="radar-agente-option">
-                   <input type="checkbox" checked={agentesLembrete.includes(nome)} onChange={e => setAgentesLembrete(prev => e.target.checked ? [...prev, nome] : prev.filter(item => item !== nome))} />
-                   <span>{nome}</span>
-                 </label>
-               ))}
-             </div>
-           </fieldset>}
-           <button className="radar-add" onClick={() => salvarRegistro('lembrete', textoLembrete, hoje(), horaAgora())} disabled={!textoLembrete.trim() || agentesLembrete.length === 0 || salvando}>{salvando ? 'Salvando...' : '+ Salvar lembrete'}</button>
-          {erroSalvamento && <p className="radar-save-error" role="alert">{erroSalvamento}</p>}
-          <small>O lembrete fica visível até o agente que o criou removê-lo.</small>
+          {lembreteEditorAberto ? (
+            <div className="radar-reminder-editor">
+              <textarea
+                value={textoLembrete}
+                onChange={e => setTextoLembrete(e.target.value)}
+                placeholder="Anote um lembrete..."
+                rows={2}
+                aria-label="Texto do lembrete"
+              />
+              <fieldset className="radar-agentes-fieldset radar-lembrete-agentes">
+                <legend>Agentes que receberão o lembrete</legend>
+                <div className="radar-agentes-grid">
+                  {AGENTES.map(nome => (
+                    <label key={nome} className="radar-agente-option">
+                      <input type="checkbox" checked={agentesLembrete.includes(nome)} onChange={e => setAgentesLembrete(prev => e.target.checked ? [...prev, nome] : prev.filter(item => item !== nome))} />
+                      <span>{nome}</span>
+                    </label>
+                  ))}
+                </div>
+              </fieldset>
+              <button className="radar-add" onClick={() => salvarRegistro('lembrete', textoLembrete, hoje(), horaAgora())} disabled={!textoLembrete.trim() || agentesLembrete.length === 0 || salvando}>{salvando ? 'Salvando...' : '+ Salvar lembrete'}</button>
+              {erroSalvamento && <p className="radar-save-error" role="alert">{erroSalvamento}</p>}
+            </div>
+          ) : (
+            <section className="radar-cnl-inline" aria-labelledby="radar-nivel-rio-titulo">
+              <div className="radar-cnl-card-heading">
+                <div><span className="card-label">MONITORAMENTO HIDROLÓGICO</span><h2 id="radar-nivel-rio-titulo">Nível do Rio Bananeiras</h2></div>
+                <span className="radar-cnl-live">CEMADEN · ao vivo</span>
+              </div>
+              {dadosCNL ? (
+                <GraficoNivel pontos={dadosCNL.serieNivel} estacao={dadosCNL.estacao} />
+              ) : (
+                <p className="radar-cnl-loading">Consultando a estação Rio Bananeiras…</p>
+              )}
+            </section>
+          )}
+          {!lembreteEditorAberto && <small className="radar-note-hint">Clique em “Lembrete” para anotar uma nova mensagem.</small>}
         </div>
 
         <div className="radar-right-column">
@@ -785,17 +816,6 @@ export default function RadarDC() {
             {erroSalvamento && <p className="radar-save-error" role="alert">{erroSalvamento}</p>}
           </form>}
         </div>
-        <section className="radar-cnl-card" aria-labelledby="radar-nivel-rio-titulo">
-          <div className="radar-cnl-card-heading">
-            <div><span className="card-label">MONITORAMENTO HIDROLÓGICO</span><h2 id="radar-nivel-rio-titulo">Nível do Rio Bananeiras</h2></div>
-            <span className="radar-cnl-live">CEMADEN · ao vivo</span>
-          </div>
-          {dadosCNL ? (
-            <GraficoNivel pontos={dadosCNL.serieNivel} estacao={dadosCNL.estacao} />
-          ) : (
-            <p className="radar-cnl-loading">Consultando a estação Rio Bananeiras…</p>
-          )}
-        </section>
         <section className="radar-activities">
          <div className="radar-list-heading"><div><span className="card-label">REGISTROS OPERACIONAIS</span><h2>Atividades de {dataBonita(dataSelecionada)}</h2></div><strong>{atividades.checklists.length + atividades.checklistsFerramentas.length + atividades.ocorrencias.length} registro(s)</strong></div>
         <div className="radar-activity-columns">

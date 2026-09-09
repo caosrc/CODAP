@@ -628,9 +628,67 @@ body.radar-tv-active .radar-page {
   text-align: center;
 }
 
+.radar-note-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .65rem;
+}
+
+.radar-reminder-trigger {
+  border: 1px solid #4f89ae;
+  border-radius: 8px;
+  padding: .35rem .55rem;
+  color: #dff4ff;
+  background: #153f61;
+  font: inherit;
+  font-size: .7rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.radar-reminder-trigger:hover,
+.radar-reminder-trigger.ativo {
+  color: #062542;
+  background: #8fe5ff;
+}
+
+.radar-reminder-editor {
+  margin-top: .8rem;
+}
+
+.radar-reminder-editor textarea {
+  min-height: 0;
+  resize: vertical;
+}
+
+.radar-note-hint {
+  display: block;
+  margin-top: .6rem;
+  color: #8294a7;
+  font-size: .65rem;
+  text-align: center;
+}
+
+.radar-cnl-inline {
+  min-width: 0;
+  margin-top: .85rem;
+  overflow: hidden;
+  border-top: 1px solid #245174;
+  padding-top: .8rem;
+}
+
+.radar-cnl-inline .cnl-grafico-cemaden {
+  margin-top: .5rem;
+}
+
 @media (max-width: 700px) {
   .radar-cnl-card {
     border-radius: 12px;
     padding: .7rem;
+  }
+
+  .radar-cnl-inline .cnl-grafico-cemaden-cabecalho strong {
+    font-size: .62rem;
   }
 }

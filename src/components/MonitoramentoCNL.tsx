@@ -44,7 +44,7 @@ type CotasCNL = {
   transbordamento: number | null
 }
 
-type PontoSerie = {
+export type PontoSerie = {
   data: string
   hora: string
   valor: number
@@ -135,7 +135,7 @@ function rotuloEstado(estado: ReturnType<typeof estadoEstacao>): string {
   return 'Sem dados recentes'
 }
 
-function ChartaChuva({ pontos }: { pontos: PontoSerie[] }) {
+export function ChartaChuva({ pontos }: { pontos: PontoSerie[] }) {
   const largura = 620
   const altura = 190
   const margem = { topo: 18, direita: 18, baixo: 34, esquerda: 36 }

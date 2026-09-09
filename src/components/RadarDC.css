@@ -153,6 +153,37 @@
 .radar-mini-item b { flex: 0 0 auto; color: #3970a8; font-size: .68rem; }
 .radar-mini-item span { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .radar-mini-item button { border: 0; color: #879aae; background: transparent; font-size: 1.2rem; cursor: pointer; }
+.radar-mini-item .radar-reminder-ack {
+  flex: 0 0 auto;
+  border: 1px solid #3e8eaa;
+  border-radius: 6px;
+  padding: .28rem .48rem;
+  color: #c7f4ff;
+  background: #154d6b;
+  font-size: .68rem;
+  font-weight: 800;
+}
+.radar-mini-item .radar-reminder-ack:hover { background: #1b6b8d; }
+.radar-mini-item .radar-reminder-ack:disabled { cursor: wait; opacity: .65; }
+
+.radar-cnl-rain {
+  margin-top: .85rem;
+  padding-top: .75rem;
+  border-top: 1px solid rgba(91, 157, 192, .35);
+}
+.radar-cnl-rain-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: .6rem;
+}
+.radar-cnl-rain-heading h3 {
+  margin: .24rem 0 0;
+  color: #f3f9ff;
+  font-size: .95rem;
+}
+.radar-cnl-rain .cnl-grafico-wrap { margin-top: .55rem; }
+.radar-cnl-rain .cnl-grafico-legenda { color: #a9c6dc; }
 
 .calendar-top { display: flex; align-items: flex-start; justify-content: space-between; gap: .5rem; }
 .calendar-top > div > span { color: #7c8da1; font-size: .63rem; font-weight: 900; letter-spacing: .1em; }

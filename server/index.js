@@ -1512,6 +1512,46 @@ app.post('/api/radar-bilhetes/:id/confirmar', async (req, res) => {
   }
 })
 
+app.post('/api/radar-bilhetes/:id/ciente', async (req, res) => {
+  try {
+    const agente = typeof req.body?.agente === 'string' ? req.body.agente.trim() : ''
+    if (!agente) return res.status(400).json({ error: 'Agente obrigatório' })
+
+    const existente = await query('SELECT * FROM radar_bilhetes WHERE id = $1', [req.params.id])
+    const registro = existente.rows[0]
+    if (!registro) return res.status(404).json({ error: 'Lembrete não encontrado' })
+
+    const envolvidos = Array.isArray(registro.agentes_envolvidos) ? registro.agentes_envolvidos : []
+    if (!envolvidos.includes(agente)) {
+      return res.status(403).json({ error: 'Este agente não foi marcado no lembrete' })
+    }
+
+    const confirmacoesAtuais = Array.isArray(registro.confirmacoes_agentes)
+      ? registro.confirmacoes_agentes
+      : []
+    const confirmacoes = [
+      ...confirmacoesAtuais.filter((item) => item?.agente !== agente),
+      { agente, confirmado: true, confirmedAt: new Date().toISOString() },
+    ]
+    const atualizado = await query(
+      `UPDATE radar_bilhetes
+       SET confirmacoes_agentes = $1::jsonb
+       WHERE id = $2
+       RETURNING *`,
+      [JSON.stringify(confirmacoes), req.params.id],
+    )
+
+    broadcastParaTodos({
+      tipo: 'radar_bilhetes_atualizados',
+      id: req.params.id,
+      agente,
+    })
+    res.json(atualizado.rows[0])
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
 app.post('/api/push/radar', async (req, res) => {
   try {
     const { agentes, texto, data, hora, prioridade, remetente, notificacaoId } = req.body || {}

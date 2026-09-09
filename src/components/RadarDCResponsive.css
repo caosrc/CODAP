@@ -672,22 +672,80 @@ body.radar-tv-active .radar-page {
 
 .radar-cnl-inline {
   min-width: 0;
-  width: min(100%, 410px);
+  width: 100%;
   margin-top: .85rem;
-  margin-right: auto;
-  margin-left: auto;
   overflow: hidden;
-  border-top: 1px solid #245174;
-  padding-top: .8rem;
+  border: 1px solid #245174;
+  border-radius: 14px;
+  padding: .85rem .75rem .7rem;
+  background: linear-gradient(180deg, #0d3151 0%, #0a2743 100%);
+  box-shadow: inset 0 1px 0 rgba(142, 215, 245, .08), 0 8px 20px rgba(2, 13, 29, .2);
   box-sizing: border-box;
 }
 
+.radar-cnl-inline .radar-cnl-card-heading {
+  padding: 0 .1rem .65rem;
+  border-bottom: 1px solid rgba(91, 157, 192, .35);
+}
+
+.radar-cnl-inline .radar-cnl-card-heading .card-label {
+  color: #64d5bd;
+  font-size: .62rem;
+  letter-spacing: .15em;
+}
+
+.radar-cnl-inline .radar-cnl-card-heading h2 {
+  margin-top: .24rem;
+  color: #f3f9ff;
+  font-size: 1.08rem;
+  letter-spacing: -.02em;
+}
+
+.radar-cnl-inline .radar-cnl-live {
+  margin-top: .1rem;
+  padding: .28rem .52rem;
+  color: #baffdd;
+  background: linear-gradient(135deg, #187452, #239a6a);
+  box-shadow: 0 4px 10px rgba(17, 104, 71, .24);
+  font-size: .57rem;
+  letter-spacing: .02em;
+}
+
 .radar-cnl-inline .cnl-grafico-cemaden {
-  margin-top: .5rem;
+  margin-top: .7rem;
+  overflow: hidden;
+  border: 1px solid #d6dce0;
+  border-radius: 4px;
+  box-shadow: 0 7px 18px rgba(1, 13, 28, .25);
+}
+
+.radar-cnl-inline .cnl-grafico-cemaden-controles {
+  padding: .55rem .65rem 0;
+}
+
+.radar-cnl-inline .cnl-grafico-cemaden-cabecalho {
+  padding-top: .3rem;
+}
+
+.radar-cnl-inline .cnl-grafico-cemaden-cabecalho strong {
+  color: #24465f;
+  font-size: .76rem;
+}
+
+.radar-cnl-inline .cnl-grafico-cemaden-cabecalho span {
+  color: #526d7b;
+  font-size: .7rem;
+}
+
+.radar-cnl-inline .cnl-grafico-leitura-atual {
+  margin-top: .08rem;
+  color: #16748b;
+  font-size: .72rem;
+  font-weight: 800;
 }
 
 .radar-cnl-inline .cnl-grafico-nivel-cemaden {
-  height: 310px;
+  height: 245px;
 }
 
 .radar-cnl-inline .cnl-grafico-leitura-atual {
@@ -707,5 +765,10 @@ body.radar-tv-active .radar-page {
 
   .radar-cnl-inline {
     width: 100%;
+    padding: .75rem .6rem .6rem;
+  }
+
+  .radar-cnl-inline .cnl-grafico-nivel-cemaden {
+    height: 235px;
   }
 }

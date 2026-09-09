@@ -4374,7 +4374,7 @@ export default function Planejamento() {
           onClick={() => setSubAba('radar')}
         >
           <img className="radar-tab-icon" src="/defesa-civil-logo.png" alt="" />
-          Radar Defesa Civil
+          Radar DC
         </button>
         {(['evento', 'operacao', 'simulado', 'emergencia'] as TipoPlano[]).map(t => {
           const c = TIPOS_CONFIG[t]

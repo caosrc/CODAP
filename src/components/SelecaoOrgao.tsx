@@ -1,8 +1,5 @@
 import type { Orgao } from './Login'
 import { selecionarOrgao } from './Login'
-import codapBanner from '../../attached_assets/banner-codap-scaled_1788407707766.jpg'
-import defesaCivilLogo from '../../attached_assets/bandeira-logo_1788407973835.jpg'
-import proconLogo from '../../attached_assets/images_(18)_1788408031391.jpeg'
 
 interface Props {
   onSelecionar: (orgao: Orgao) => void
@@ -19,25 +16,10 @@ const opcoes: Array<{
   {
     id: 'defesa-civil',
     icone: '🛡️',
-    logo: defesaCivilLogo,
+    logo: '/defesa-civil-logo.png',
     nome: 'Defesa Civil',
     descricao: 'Ocorrências, monitoramento e operações de campo.',
     destaque: 'Operações gerais',
-  },
-  {
-    id: 'curral',
-    icone: '🐎',
-    nome: 'Curral',
-    descricao: 'Registro e acompanhamento de apreensão de animais.',
-    destaque: 'Apreensão de animais',
-  },
-  {
-    id: 'procon',
-    icone: 'P',
-    logo: proconLogo,
-    nome: 'Procon',
-    descricao: 'Fiscalização, autos e acompanhamento de processos.',
-    destaque: 'Fiscalização',
   },
 ]
 

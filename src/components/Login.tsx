@@ -1,9 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
 import { AGENTES, getSenhaAgente, normalizarNomeAgente } from '../types'
-import SelecaoOrgao from './SelecaoOrgao'
-import codapBanner from '../../attached_assets/banner-codap-scaled_1788407707766.jpg'
-import defesaCivilLogo from '../../attached_assets/bandeira-logo_1788407973835.jpg'
-import proconLogo from '../../attached_assets/images_(18)_1788408031391.jpeg'
 
 function useGeolocalizacao() {
   const [pos, setPos] = useState<{ lat: number; lng: number } | null>(null)
@@ -42,12 +38,12 @@ export function agenteEscolhido(): boolean {
 }
 
 export function orgaoEscolhido(): boolean {
-  return !!sessionStorage.getItem(ORGAO_SESSION_KEY)
+  return sessionStorage.getItem(ORGAO_SESSION_KEY) === 'defesa-civil'
 }
 
 export function getOrgaoSelecionado(): Orgao | null {
   const orgao = sessionStorage.getItem(ORGAO_SESSION_KEY)
-  return orgao === 'defesa-civil' || orgao === 'curral' || orgao === 'procon' ? orgao : null
+  return orgao === 'defesa-civil' ? orgao : null
 }
 
 export function selecionarOrgao(orgao: Orgao) {
@@ -74,7 +70,7 @@ type Etapa = 'credenciais' | 'orgao' | 'agente' | 'senha'
 
 export default function Login({ onLogin, apenasAgente = false }: Props) {
   const [etapa, setEtapa] = useState<Etapa>(
-    apenasAgente ? (orgaoEscolhido() ? 'agente' : 'orgao') : 'credenciais'
+    apenasAgente ? 'agente' : 'credenciais'
   )
   const [usuario, setUsuario] = useState('')
   const [senha, setSenha] = useState('')
@@ -87,10 +83,6 @@ export default function Login({ onLogin, apenasAgente = false }: Props) {
   const [erroSenhaAgente, setErroSenhaAgente] = useState(false)
   const [mostrarSenhaAgente, setMostrarSenhaAgente] = useState(false)
   const senhaAgenteRef = useRef<HTMLInputElement>(null)
-  const orgaoAcesso = getOrgaoSelecionado()
-  const logoAcessoAgente = orgaoAcesso === 'defesa-civil'
-    ? '/defesa-civil-logo.png'
-    : orgaoAcesso === 'procon' ? proconLogo : codapBanner
 
   useEffect(() => {
     if (etapa === 'credenciais') {
@@ -114,8 +106,8 @@ export default function Login({ onLogin, apenasAgente = false }: Props) {
       ) {
         localStorage.setItem(LOGIN_KEY, '1')
         sessionStorage.removeItem(AGENTE_SESSION_KEY)
-        sessionStorage.removeItem(ORGAO_SESSION_KEY)
-        setEtapa('orgao')
+        selecionarOrgao('defesa-civil')
+        setEtapa('agente')
         setCarregando(false)
       } else {
         setErro('Usuário ou senha incorretos.')
@@ -129,6 +121,7 @@ export default function Login({ onLogin, apenasAgente = false }: Props) {
     e.preventDefault()
     const senhaEsperada = getSenhaAgente(agenteSelecionado)
     if (senhaAgente === senhaEsperada) {
+      selecionarOrgao('defesa-civil')
       sessionStorage.setItem(AGENTE_SESSION_KEY, agenteSelecionado)
       localStorage.setItem(AGENTE_NOME_KEY, agenteSelecionado)
       onLogin()
@@ -145,6 +138,7 @@ export default function Login({ onLogin, apenasAgente = false }: Props) {
       setAgenteSelecionado(nome)
       setEtapa('senha')
     } else {
+      selecionarOrgao('defesa-civil')
       sessionStorage.setItem(AGENTE_SESSION_KEY, nome)
       localStorage.setItem(AGENTE_NOME_KEY, nome)
       onLogin()
@@ -158,8 +152,8 @@ export default function Login({ onLogin, apenasAgente = false }: Props) {
           <div className="login-logo-wrap">
             <img
               className="login-logo"
-              src={logoAcessoAgente}
-              alt={orgaoAcesso === 'defesa-civil' ? 'Defesa Civil' : orgaoAcesso === 'procon' ? 'Procon' : 'Consórcio Público'}
+              src="/defesa-civil-logo.png"
+              alt="Defesa Civil"
             />
           </div>
           <div className="login-titulo">Defesa Civil</div>
@@ -261,12 +255,6 @@ export default function Login({ onLogin, apenasAgente = false }: Props) {
 
         </div>
       </div>
-    )
-  }
-
-  if (etapa === 'orgao') {
-    return (
-      <SelecaoOrgao onSelecionar={() => setEtapa('agente')} />
     )
   }
 

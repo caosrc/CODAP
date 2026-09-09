@@ -759,6 +759,36 @@ body.radar-tv-active .radar-page {
   padding-top: .38rem;
 }
 
+.radar-cnl-inline .radar-cnl-diaria-detalhe {
+  margin-top: .42rem;
+  padding-top: .38rem;
+  border-top: 1px solid rgba(91, 157, 192, .35);
+}
+
+.radar-cnl-inline .radar-cnl-diaria-detalhe summary {
+  padding: .28rem .35rem;
+  border-radius: 6px;
+  color: #b9f4d5;
+  background: rgba(20, 91, 78, .45);
+  cursor: pointer;
+  font-size: .65rem;
+  font-weight: 800;
+  list-style-position: inside;
+}
+
+.radar-cnl-inline .radar-cnl-diaria-detalhe[open] summary {
+  margin-bottom: .35rem;
+}
+
+.radar-cnl-inline .radar-precipitacao-diaria-table th,
+.radar-cnl-inline .radar-precipitacao-diaria-table td {
+  font-size: .62rem;
+}
+
+.radar-cnl-inline .radar-precipitacao-diaria-table th:first-child {
+  width: 55%;
+}
+
 .radar-cnl-inline .cnl-grafico-nivel-cemaden {
   height: 165px;
 }

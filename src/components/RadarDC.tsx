@@ -528,6 +528,13 @@ export default function RadarDC() {
       rajada: tempo.dias.reduce((maior, dia) => dia.rajada > maior.rajada ? dia : maior),
     }
   }, [tempo])
+  const diasPrecipitacao = useMemo(() => {
+    if (!dadosCNL) return []
+    return [...new Set(dadosCNL.estacoes.flatMap(estacao => estacao.precipitacaoDiaria.map(dia => dia.data)))]
+      .sort()
+      .reverse()
+      .slice(0, 2)
+  }, [dadosCNL])
 
 
   async function salvarRegistro(tipo: RegistroRadar['tipo'], texto: string, data: string, horaRegistro: string) {
@@ -845,28 +852,35 @@ export default function RadarDC() {
                      </div>
                      <ChartaChuva pontos={dadosCNL.serie} />
                    </section>
-                    <section className="radar-cnl-precipitacao" aria-labelledby="radar-precipitacao-titulo">
-                      <div className="radar-cnl-rain-heading">
-                        <div><span className="card-label">PRECIPITAÇÃO ACUMULADA</span><h3 id="radar-precipitacao-titulo">Estações monitoradas</h3></div>
-                        <span className="radar-cnl-live">CEMADEN · 5 min</span>
-                      </div>
-                      <div className="radar-precipitacao-scroll">
-                        <table className="radar-precipitacao-table">
-                          <thead><tr><th>Estação</th><th>Último</th><th>1h</th><th>6h</th><th>12h</th><th>24h</th><th>48h</th><th>72h</th><th>96h</th></tr></thead>
-                          <tbody>{dadosCNL.estacoes.map(estacao => <tr key={estacao.id}>
-                            <th scope="row"><strong>{estacao.nome || `Estação ${estacao.id}`}</strong><small>{estacao.codigo || `CEMADEN ${estacao.id}`}</small></th>
-                            <td>{formatarMmRadar(estacao.ultimoValor)}</td>
-                            <td>{formatarMmRadar(estacao.acumulados.umaHora)}</td>
-                            <td>{formatarMmRadar(estacao.acumulados.seisHoras)}</td>
-                            <td>{formatarMmRadar(estacao.acumulados.dozeHoras)}</td>
-                            <td>{formatarMmRadar(estacao.acumulados.vinteQuatroHoras)}</td>
-                            <td>{formatarMmRadar(estacao.acumulados.quarentaEOitoHoras)}</td>
-                            <td>{formatarMmRadar(estacao.acumulados.setentaEDuasHoras)}</td>
-                            <td>{formatarMmRadar(estacao.acumulados.noventaESeisHoras)}</td>
-                          </tr>)}</tbody>
-                        </table>
-                      </div>
-                    </section>
+                    {diasPrecipitacao.length > 0 && (
+                      <details className="radar-cnl-diaria-detalhe">
+                        <summary>Ver acumulado diário por estação</summary>
+                        <div className="radar-precipitacao-scroll">
+                          <table className="radar-precipitacao-table radar-precipitacao-diaria-table">
+                            <thead>
+                              <tr>
+                                <th>Estação</th>
+                                {diasPrecipitacao.map(dia => <th key={dia}>{dia.split('-').reverse().slice(0, 2).join('/')}</th>)}
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {dadosCNL.estacoes.map(estacao => (
+                                <tr key={estacao.id}>
+                                  <th scope="row">
+                                    <strong>{estacao.nome || `Estação ${estacao.id}`}</strong>
+                                    <small>{estacao.codigo || `CEMADEN ${estacao.id}`}</small>
+                                  </th>
+                                  {diasPrecipitacao.map(dia => {
+                                    const leitura = estacao.precipitacaoDiaria.find(item => item.data === dia)
+                                    return <td key={dia}>{formatarMmRadar(leitura?.total)}</td>
+                                  })}
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </details>
+                    )}
                  </>
               ) : (
                 <p className="radar-cnl-loading">Consultando a estação Rio Bananeiras…</p>

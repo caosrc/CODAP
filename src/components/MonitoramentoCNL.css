@@ -142,6 +142,7 @@
 .cnl-grafico-linha-nivel-pulso { fill: none; stroke: #66c6df; stroke-width: 5; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 2 17; opacity: 0.85; animation: cnl-linha-andando 1.8s linear infinite; }
 .cnl-grafico-ponto-atual { fill: #8be3ef; opacity: 0.65; animation: cnl-ponto-grafico-pulsando 1.6s ease-out infinite; transform-box: fill-box; transform-origin: center; }
 .cnl-grafico-label { fill: #78909b; font-size: 10px; }
+.cnl-grafico-label-chuva { font-size: 8px; font-weight: 800; paint-order: stroke; stroke: #fff; stroke-width: 3px; stroke-linejoin: round; }
 .cnl-grafico-legenda { color: #8799a2; text-align: center; font-size: 0.65rem; }
 .cnl-grafico-vazio, .cnl-carregando { padding: 2rem 0.8rem; color: #71858e; text-align: center; font-size: 0.8rem; }
 .cnl-bloco-grafico-nivel { padding: 0.9rem 0.7rem 1rem; }

@@ -164,7 +164,17 @@ export function ChartaChuva({ pontos }: { pontos: PontoSerie[] }) {
         {pontos.map((ponto, indice) => {
           const x = margem.esquerda + (pontos.length <= 1 ? areaLargura / 2 : indice * areaLargura / (pontos.length - 1))
           const y = margem.topo + areaAltura - (ponto.valor / maior) * areaAltura
-          return <circle key={`${ponto.data}-${ponto.hora}-${indice}`} cx={x} cy={y} r="3.5" className="cnl-grafico-ponto" />
+          const rotuloY = Math.max(margem.topo + 10, y - 8)
+          return (
+            <g key={`${ponto.data}-${ponto.hora}-${indice}`}>
+              <circle cx={x} cy={y} r="3.5" className="cnl-grafico-ponto">
+                <title>{`${formatarPontoChuva(ponto)} · ${formatarMm(ponto.valor)}`}</title>
+              </circle>
+              <text x={x} y={rotuloY} textAnchor="middle" className="cnl-grafico-label cnl-grafico-label-chuva">
+                {formatarMm(ponto.valor)}
+              </text>
+            </g>
+          )
         })}
         <text x={margem.esquerda - 8} y={margem.topo + 4} textAnchor="end" className="cnl-grafico-label">{maior.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}</text>
         <text x={margem.esquerda - 8} y={margem.topo + areaAltura + 4} textAnchor="end" className="cnl-grafico-label">0</text>

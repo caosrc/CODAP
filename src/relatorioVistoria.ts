@@ -1,7 +1,8 @@
 import JSZip from 'jszip'
 import type { Ocorrencia } from './types'
 
-const TEMPLATE_URL = '/relatorio-vistoria-template.docx'
+// Versão explícita evita que o navegador reutilize um modelo DOCX antigo do cache.
+const TEMPLATE_URL = '/relatorio-vistoria-template.docx?v=conselheiro-lafaiete-20260909'
 
 const MESES = [
   'janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho',
@@ -110,7 +111,7 @@ let templateCache: ArrayBuffer | null = null
 
 async function carregarTemplate(): Promise<ArrayBuffer> {
   if (templateCache) return templateCache
-  const res = await fetch(TEMPLATE_URL, { cache: 'force-cache' })
+  const res = await fetch(TEMPLATE_URL, { cache: 'no-store' })
   if (!res.ok) {
     throw new Error(`Não foi possível carregar o modelo do relatório (${res.status}). Verifique sua conexão.`)
   }

@@ -672,7 +672,7 @@ body.radar-tv-active .radar-page {
 
 .radar-cnl-inline {
   min-width: 0;
-  width: min(100%, 500px);
+  width: min(100%, 460px);
   margin-top: .85rem;
   margin-right: auto;
   margin-left: auto;
@@ -684,6 +684,15 @@ body.radar-tv-active .radar-page {
 
 .radar-cnl-inline .cnl-grafico-cemaden {
   margin-top: .5rem;
+}
+
+.radar-cnl-inline .cnl-grafico-nivel-cemaden {
+  height: 255px;
+}
+
+.radar-cnl-inline .cnl-grafico-leitura-atual {
+  color: #1a6695;
+  font-size: .78rem;
 }
 
 @media (max-width: 700px) {

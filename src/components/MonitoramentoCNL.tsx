@@ -217,7 +217,7 @@ function formatarHoraNivel(dataHora: string): string {
   })
 }
 
-export function GraficoNivel({ pontos, estacao, mostrarTooltip = true }: { pontos: PontoNivel[]; estacao: LeituraCNL; mostrarTooltip?: boolean }) {
+export function GraficoNivel({ pontos, estacao, mostrarTooltip = true, mostrarFonte = true, mostrarLeituraAtual = false }: { pontos: PontoNivel[]; estacao: LeituraCNL; mostrarTooltip?: boolean; mostrarFonte?: boolean; mostrarLeituraAtual?: boolean }) {
   const [periodo, setPeriodo] = useState<6 | 12 | 24>(24)
   const [dataHoraSelecionada, setDataHoraSelecionada] = useState<string | null>(null)
   const [dataHoraEmFoco, setDataHoraEmFoco] = useState<string | null>(null)
@@ -261,7 +261,8 @@ export function GraficoNivel({ pontos, estacao, mostrarTooltip = true }: { ponto
       <div className="cnl-grafico-cemaden-cabecalho">
         <strong>MUNICÍPIO: {estacao.cidade.toUpperCase() || 'CONSELHEIRO LAFAIETE'}/MG</strong>
         <span>Estação: {estacao.nome} ({estacao.codigo || `CEMADEN ${estacao.id}`})</span>
-        <small>Fonte: Estações Hidrológicas - Cemaden · Horário de Brasília</small>
+        {mostrarLeituraAtual && <strong className="cnl-grafico-leitura-atual">Leitura atual: {formatarCota(ultimoPonto?.valor)}</strong>}
+        {mostrarFonte && <small>Fonte: Estações Hidrológicas - Cemaden · Horário de Brasília</small>}
       </div>
       <div className="cnl-grafico-wrap">
         <svg className="cnl-grafico cnl-grafico-nivel-cemaden" viewBox={`0 0 ${largura} ${altura}`} role="img" aria-label={`Nível do ${estacao.nome} nas últimas ${periodo} horas`}>

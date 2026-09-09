@@ -69,8 +69,9 @@ export default function BannerRadarNotificacao() {
         if (supabaseDisponivel) {
           const result = await supabase
             .from('radar_bilhetes')
-            .select('id,texto,data,hora,prioridade,criado_por,agentes_envolvidos,confirmacoes_agentes')
+            .select('id,texto,data,hora,prioridade,criado_por,tipo,agentes_envolvidos,confirmacoes_agentes')
             .eq('concluido', false)
+            .eq('tipo', 'notificacao')
             .order('criado_em', { ascending: false })
           if (result.error) throw result.error
           rows = (result.data || []) as Array<Record<string, unknown>>
@@ -83,6 +84,7 @@ export default function BannerRadarNotificacao() {
         const hoje = dataLocalISO()
         const novas: NotificacaoRadar[] = []
         rows.forEach(row => {
+          if (row.tipo !== 'notificacao') return
           const envolvidos = Array.isArray(row.agentes_envolvidos)
             ? row.agentes_envolvidos.map(String)
             : Array.isArray(row.agentesEnvolvidos) ? row.agentesEnvolvidos.map(String) : []
@@ -136,6 +138,7 @@ export default function BannerRadarNotificacao() {
     }
 
     const off = wsOn('radar_notificacao_agente', (mensagem) => {
+      if (mensagem.registroTipo !== 'notificacao') return
       const envolvidos = Array.isArray(mensagem.agentesEnvolvidos)
         ? mensagem.agentesEnvolvidos.map(String)
         : []

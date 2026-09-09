@@ -193,7 +193,7 @@
 .radar-cnl-rain-heading h3 {
   margin: .24rem 0 0;
   color: #f3f9ff;
-  font-size: .95rem;
+  font-size: .86rem;
 }
 .radar-cnl-rain .cnl-grafico-wrap { margin-top: .55rem; }
 .radar-cnl-rain .cnl-grafico-legenda { color: #a9c6dc; }
@@ -204,42 +204,45 @@
 }
 .radar-precipitacao-scroll {
   margin-top: .55rem;
-  overflow-x: auto;
+  overflow-x: hidden;
   border: 1px solid #35617f;
   border-radius: 8px;
 }
 .radar-precipitacao-table {
   width: 100%;
-  min-width: 650px;
+  min-width: 0;
+  table-layout: fixed;
   border-collapse: collapse;
   color: #d9efff;
-  font-size: .62rem;
+  font-size: .56rem;
 }
 .radar-precipitacao-table th,
 .radar-precipitacao-table td {
-  padding: .38rem .3rem;
+  overflow: hidden;
+  padding: .3rem .12rem;
   border-bottom: 1px solid rgba(91, 157, 192, .23);
   text-align: right;
   white-space: nowrap;
 }
+.radar-precipitacao-table th:first-child { width: 25%; }
 .radar-precipitacao-table thead th {
   color: #9bc9e4;
   background: #123b5b;
-  font-size: .58rem;
+  font-size: .54rem;
   font-weight: 900;
 }
 .radar-precipitacao-table tbody tr:last-child th,
 .radar-precipitacao-table tbody tr:last-child td { border-bottom: 0; }
 .radar-precipitacao-table tbody tr:nth-child(even) { background: rgba(20, 69, 101, .3); }
 .radar-precipitacao-table tbody th {
-  min-width: 8.5rem;
+  min-width: 0;
   color: #f3f9ff;
   text-align: left;
   white-space: normal;
 }
 .radar-precipitacao-table tbody th strong,
 .radar-precipitacao-table tbody th small { display: block; }
-.radar-precipitacao-table tbody th small { margin-top: .12rem; color: #8eabc2; font-size: .55rem; }
+.radar-precipitacao-table tbody th small { margin-top: .1rem; color: #8eabc2; font-size: .5rem; }
 .radar-precipitacao-table tbody td { color: #b9f4d5; font-weight: 800; }
 
 .calendar-top { display: flex; align-items: flex-start; justify-content: space-between; gap: .5rem; }

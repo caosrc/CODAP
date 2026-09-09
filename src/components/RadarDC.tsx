@@ -797,7 +797,7 @@ export default function RadarDC() {
                      onClick={() => marcarLembreteCiente(l)}
                      disabled={marcandoCienteId === l.id}
                    >
-                     {marcandoCienteId === l.id ? 'Salvando…' : 'Ciente'}
+                     {marcandoCienteId === l.id ? 'Salvando…' : 'Marcar Ciente'}
                    </button>
                  )}
                  {l.criadoPor === agente && (

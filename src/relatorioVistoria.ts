@@ -2,7 +2,7 @@ import JSZip from 'jszip'
 import type { Ocorrencia } from './types'
 
 // Versão explícita evita que o navegador reutilize um modelo DOCX antigo do cache.
-const TEMPLATE_URL = '/relatorio-vistoria-template.docx?v=conselheiro-lafaiete-20260909'
+const TEMPLATE_URL = '/relatorio-vistoria-template.docx?v=modelo-1788970852985'
 
 const MESES = [
   'janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho',
@@ -16,6 +16,75 @@ function xmlEscape(value: unknown): string {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&apos;')
+}
+
+function textoDoParagrafo(paragrafo: string): string {
+  return (paragrafo.match(/<w:t\b[^>]*>[\s\S]*?<\/w:t>/g) ?? [])
+    .map((trecho) => trecho.replace(/^<w:t\b[^>]*>|<\/w:t>$/g, ''))
+    .join('')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+}
+
+function atributosTexto(atributos: string): string {
+  return atributos.replace(/\s+xml:space="[^"]*"/g, '')
+}
+
+function substituirTextoDoParagrafo(
+  documentXml: string,
+  localizar: (texto: string) => boolean,
+  novoTexto: string,
+  incluirParagrafosVazios = false,
+): string {
+  let encontrado = false
+  return documentXml.replace(/<w:p\b[^>]*>[\s\S]*?<\/w:p>/g, (paragrafo) => {
+    if (encontrado || !localizar(textoDoParagrafo(paragrafo))) return paragrafo
+    const textos = paragrafo.match(/<w:t\b[^>]*>[\s\S]*?<\/w:t>/g) ?? []
+    if (!incluirParagrafosVazios && textos.length === 0) return paragrafo
+    encontrado = true
+    let primeiro = true
+    return paragrafo.replace(/<w:t\b([^>]*)>[\s\S]*?<\/w:t>/g, (_trecho, atributos: string) => {
+      if (!primeiro) return ''
+      primeiro = false
+      return `<w:t${atributosTexto(atributos)} xml:space="preserve">${xmlEscape(novoTexto)}</w:t>`
+    })
+  })
+}
+
+function substituirPrimeiroParagrafoApos(
+  documentXml: string,
+  marcador: string,
+  novoTexto: string,
+): string {
+  let aposMarcador = false
+  let preenchido = false
+  return documentXml.replace(/<w:p\b[^>]*>[\s\S]*?<\/w:p>/g, (paragrafo) => {
+    const texto = textoDoParagrafo(paragrafo)
+    if (texto.includes(marcador)) {
+      aposMarcador = true
+      return paragrafo
+    }
+    if (!aposMarcador || preenchido) return paragrafo
+
+    const textos = paragrafo.match(/<w:t\b[^>]*>[\s\S]*?<\/w:t>/g) ?? []
+    const vazio = texto.trim() === ''
+    if (!vazio && !texto.includes('(informações da')) return paragrafo
+
+    preenchido = true
+    if (textos.length === 0) {
+      const insercao = `<w:r><w:t xml:space="preserve">${xmlEscape(novoTexto)}</w:t></w:r>`
+      return paragrafo.replace('</w:p>', `${insercao}</w:p>`)
+    }
+    let primeiro = true
+    return paragrafo.replace(/<w:t\b([^>]*)>[\s\S]*?<\/w:t>/g, (_trecho, atributos: string) => {
+      if (!primeiro) return ''
+      primeiro = false
+      return `<w:t${atributosTexto(atributos)} xml:space="preserve">${xmlEscape(novoTexto)}</w:t>`
+    })
+  })
 }
 
 function formatarDataCurta(data: Date = new Date()): string {
@@ -126,13 +195,73 @@ export async function gerarRelatorioVistoria(ocorrencia: Ocorrencia): Promise<Bl
   const natureza = ocorrencia.natureza || 'Não informada'
   const requerente = ocorrencia.proprietario || 'Não informado'
   const endereco = ocorrencia.endereco || 'Não informado'
+  const protocolo = String(ocorrencia.id || '').trim() || 'Não informado'
   const docFile = zip.file('word/document.xml')
   if (!docFile) throw new Error('Modelo de relatório inválido (document.xml ausente).')
   let documentXml = await docFile.async('string')
 
-  const situacao = ocorrencia.situacao || ''
-  const recomendacao = ocorrencia.recomendacao || ''
-  const conclusao = ocorrencia.conclusao || ''
+  const situacao = String(ocorrencia.situacao || '').trim()
+  const recomendacao = String(ocorrencia.recomendacao || '').trim()
+  const conclusao = String(ocorrencia.conclusao || '').trim()
+  const dataExtenso = formatarDataExtenso(hoje)
+  const enderecoFormatado = formatarEnderecoRelatorio(ocorrencia.endereco)
+  const coordenadas = formatarCoordenadas(ocorrencia.lat, ocorrencia.lng)
+  const textoSituacao = situacao ? `Durante a vistoria, ${situacao}` : 'Durante a vistoria,'
+  const textoConclusao = conclusao
+    ? `Diante de todas as informações presentes nesse relatório conclui-se que ${conclusao.replace(/[.!?]+$/, '')}. Faz-se necessário que se atente às recomendações listadas nesse relatório para garantir o bem estar, segurança e a tranquilidade de todos.`
+    : 'Diante de todas as informações presentes nesse relatório. Faz-se necessário que se atente às recomendações listadas nesse relatório para garantir o bem estar, segurança e a tranquilidade de todos.'
+
+  // O modelo enviado é um documento preenchido como exemplo. Estes trechos
+  // transformam o exemplo em campos sem alterar a diagramação do arquivo.
+  documentXml = substituirTextoDoParagrafo(
+    documentXml,
+    (texto) => texto.startsWith('Conselheiro Lafaiete,'),
+    `Conselheiro Lafaiete, ${formatarDataCurta(hoje)}`,
+  )
+  documentXml = substituirTextoDoParagrafo(
+    documentXml,
+    (texto) => texto.startsWith('Protocolo:'),
+    `Protocolo: ${protocolo}`,
+  )
+  documentXml = substituirTextoDoParagrafo(
+    documentXml,
+    (texto) => texto.startsWith('REQUERENTE:'),
+    `REQUERENTE: ${requerente}`,
+  )
+  documentXml = substituirTextoDoParagrafo(
+    documentXml,
+    (texto) => texto.trimStart().startsWith('Análise de segurança de'),
+    `Análise de segurança de ${natureza}`,
+  )
+  documentXml = substituirTextoDoParagrafo(
+    documentXml,
+    (texto) => texto.trimStart().startsWith('Foi promovida vistoria em'),
+    `Foi promovida vistoria em ${dataExtenso} pela equipe da Coordenadoria Municipal de Proteção e Defesa Civil do município de Ouro Branco, conforme solicitação supramencionada na ${enderecoFormatado}, coordenadas ${coordenadas}.`,
+  )
+  documentXml = substituirTextoDoParagrafo(
+    documentXml,
+    (texto) => texto.trimStart().startsWith('Durante a vistoria,'),
+    textoSituacao,
+  )
+  documentXml = substituirPrimeiroParagrafoApos(documentXml, 'Recomendação:', recomendacao)
+  documentXml = substituirTextoDoParagrafo(
+    documentXml,
+    (texto) => texto.startsWith('Diante de todas as informações presentes'),
+    textoConclusao,
+  )
+  const nomeResponsavel = ocorrencia.tipo === 'Vistoria Ambiental'
+    ? 'Talita Oliveira de Araújo'
+    : 'Cristiane Caroline Campos Lopes'
+  documentXml = substituirTextoDoParagrafo(
+    documentXml,
+    (texto) => texto.trim() === 'Nome',
+    nomeResponsavel,
+  )
+  documentXml = substituirTextoDoParagrafo(
+    documentXml,
+    (texto) => texto.trim() === 'Nome',
+    'Moisés Pinto dos Santos',
+  )
 
   const substituicoes: Record<string, string> = {
     '“data 1”': formatarDataCurta(hoje),
@@ -140,9 +269,9 @@ export async function gerarRelatorioVistoria(ocorrencia: Ocorrencia): Promise<Bl
     '“Natureza da Ocorrência”': xmlEscape(natureza),
     'Natureza da Ocorrência': xmlEscape(natureza),
     '“data 2”': xmlEscape(formatarDataExtenso(hoje)),
-    '\u201cEndere\u00e7o\u201d': xmlEscape(formatarEnderecoRelatorio(ocorrencia.endereco)),
-    '"coordenadas do local"': xmlEscape(formatarCoordenadas(ocorrencia.lat, ocorrencia.lng)),
-    'coordenadas do local': xmlEscape(formatarCoordenadas(ocorrencia.lat, ocorrencia.lng)),
+    '\u201cEndere\u00e7o\u201d': xmlEscape(enderecoFormatado),
+    '"coordenadas do local"': xmlEscape(coordenadas),
+    'coordenadas do local': xmlEscape(coordenadas),
     '(informações da situação descrita na ocorrência, quadro 9)': xmlEscape(situacao),
     '(informações da recomendação descrita na ocorrência, quadro 10)': xmlEscape(recomendacao),
     '(informações da situação descrita na conclusão, quadro 11)': xmlEscape(conclusao),
@@ -158,7 +287,7 @@ export async function gerarRelatorioVistoria(ocorrencia: Ocorrencia): Promise<Bl
 
     const paragrafoCargo = '<w:p><w:pPr><w:keepNext w:val="false" /><w:keepLines w:val="false" /><w:pageBreakBefore w:val="false" /><w:widowControl w:val="true" /><w:pBdr></w:pBdr><w:spacing w:after="0" /><w:ind /><w:jc w:val="center" /><w:rPr><w:rFonts w:hint="default" w:ascii="Arial" w:hAnsi="Arial" w:cs="Arial" /><w:sz w:val="20" /><w:szCs w:val="20" /></w:rPr></w:pPr><w:r><w:rPr><w:rFonts w:hint="default" w:ascii="Arial" w:hAnsi="Arial" w:cs="Arial" /><w:sz w:val="20" /><w:szCs w:val="20" /></w:rPr><w:t>Analista Ambiental</w:t></w:r></w:p>'
     documentXml = documentXml.replace(
-      /<w:p\b[^>]*>(?:(?!<\/w:p>)[\s\S])*?Engenheira Civil - (?:(?!<\/w:p>)[\s\S])*?<\/w:p>/,
+      /<w:p\b[^>]*>(?:(?!<\/w:p>)[\s\S])*?Engenheiro\(a\) Civil - (?:(?!<\/w:p>)[\s\S])*?<\/w:p>/,
       paragrafoCargo
     )
   } else {

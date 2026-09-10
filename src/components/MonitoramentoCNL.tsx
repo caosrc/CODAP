@@ -183,7 +183,7 @@ export function ChartaChuva({
           </label>
         </div>
       )}
-      <svg className="cnl-grafico cnl-grafico-chuva" viewBox={`0 0 ${largura} ${altura}`} role="img" aria-label={`Precipitação acumulada em ${periodo} horas${estacao?.nome ? ` na estação ${estacao.nome}` : ''}`}>
+        <svg className="cnl-grafico cnl-grafico-chuva" viewBox={`0 0 ${largura} ${altura}`} preserveAspectRatio="none" role="img" aria-label={`Precipitação acumulada em ${periodo} horas${estacao?.nome ? ` na estação ${estacao.nome}` : ''}`}>
         <text x={largura / 2} y="18" textAnchor="middle" className="cnl-grafico-chuva-titulo">
           {`Precipitação Acumulada em ${periodo}h${estacao?.nome ? ` | Estação: ${estacao.nome}${estacao.codigo ? ` (${estacao.codigo})` : ''}` : ''}`}
         </text>
@@ -338,7 +338,7 @@ export function GraficoNivel({ pontos, estacao, mostrarTooltip = true, mostrarFo
         {mostrarFonte && <small>Fonte: Estações Hidrológicas - Cemaden · Horário de Brasília</small>}
       </div>
       <div className="cnl-grafico-wrap">
-        <svg className="cnl-grafico cnl-grafico-nivel-cemaden" viewBox={`0 0 ${largura} ${altura}`} role="img" aria-label={`Nível do ${estacao.nome} nas últimas ${periodo} horas`}>
+        <svg className="cnl-grafico cnl-grafico-nivel-cemaden" viewBox={`0 0 ${largura} ${altura}`} preserveAspectRatio="none" role="img" aria-label={`Nível do ${estacao.nome} nas últimas ${periodo} horas`}>
           <defs>
             <linearGradient id="cnl-agua-gradiente" x1="0" x2="0" y1="0" y2="1">
               <stop offset="0%" stopColor="#8fc0e9" />

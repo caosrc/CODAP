@@ -3701,8 +3701,6 @@ app.get('/api/radar-chuva', async (_req, res) => {
     )
     const quadrosObservados = (Array.isArray(dados?.radar?.past) ? dados.radar.past : [])
       .filter(validarQuadro)
-    // O painel representa apenas precipitação observada; nowcast é previsão e
-    // não deve ser apresentado como chuva medida.
     const ultimo = quadrosObservados.at(-1)
 
     if (!host || !ultimo) throw new Error('RainViewer não retornou quadros de radar')
@@ -3727,37 +3725,15 @@ app.get('/api/radar-chuva', async (_req, res) => {
   }
 })
 
-// ── RRQPE do GOES-16 ────────────────────────────────────────────────────────
-// O produto ABI-L2-RRQPEF original da NOAA é um NetCDF georreferenciado, não
-// um tile que o Leaflet consiga desenhar diretamente. O processamento desse
-// arquivo precisa acontecer em um serviço de rasterização separado. Quando
-// esse serviço for configurado, ele publica um template XYZ em
-// RRQPE_TILES_URL (com {z}, {x} e {y}); o app então sobrepõe a camada no mapa.
+// ── RRQPE NOAA ──────────────────────────────────────────────────────────────
+// O produto original é NetCDF georreferenciado. Sem um serviço explícito de
+// rasterização para tiles HTTPS, ele permanece desativado e nunca é tratado
+// como uma camada GOES ou como uma URL XYZ configurada por engano.
 app.get('/api/rrqpe', (_req, res) => {
-  const tileUrl = String(
-    process.env.RRQPE_TILES_URL ||
-    process.env.RRQPE_TILE_URL ||
-    '',
-  ).trim()
-
-  if (!tileUrl) {
-    return res.json({
-      disponivel: false,
-      fonte: 'GOES-16 RRQPE / NOAA',
-      configuracaoNecessaria: 'RRQPE_TILES_URL',
-      mensagem: 'A camada RRQPE precisa de um serviço de tiles HTTPS configurado no ambiente de produção. A NOAA distribui o produto original como NetCDF, não como tiles XYZ.',
-    })
-  }
-
-  if (!/^https:\/\//i.test(tileUrl) || !tileUrl.includes('{z}') || !tileUrl.includes('{x}') || !tileUrl.includes('{y}')) {
-    return res.status(503).json({ erro: 'RRQPE_TILES_URL deve ser um template HTTPS com {z}, {x} e {y}.' })
-  }
-
   return res.json({
-    disponivel: true,
-    tileUrl,
-    atualizadoEm: new Date().toISOString(),
-    fonte: 'GOES-16 RRQPE / NOAA',
+    disponivel: false,
+    fonte: 'RRQPE NOAA',
+    mensagem: 'RRQPE NOAA: indisponível no mapa no momento. O produto NetCDF ainda não possui serviço de rasterização para tiles HTTPS.',
   })
 })
 

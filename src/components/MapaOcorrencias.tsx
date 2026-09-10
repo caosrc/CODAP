@@ -718,7 +718,7 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
   } | null>(null)
   const [monitoramentoCarregando, setMonitoramentoCarregando] = useState(false)
 
-  // ── Chuva ao vivo — RainViewer + resumo do ponto central ─────────
+  // ── Chuva ao vivo — RainViewer + estimativa interpolada CEMADEN ──
   const buscarRadarChuva = useCallback(async () => {
     setRadarChuvaCarregando(true)
     setRadarChuvaErro(null)
@@ -1578,9 +1578,9 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
             }}
           >
             <Popup>
-              <strong>Centro de Conselheiro Lafaiete</strong>
+              <strong>Centro da área de observação</strong>
               <br />
-              Ponto usado para consultar a precipitação local.
+              Conselheiro Lafaiete — raio de 10 km
             </Popup>
           </CircleMarker>
         )}
@@ -1863,10 +1863,6 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
               const proximoEstado = !mostrarChuva
               setMostrarChuva(proximoEstado)
               setPainelChuvaAberto(proximoEstado)
-              if (!proximoEstado) {
-                setMostrarNuvensGoes(false)
-                setMostrarIntensidadeCemaden(false)
-              }
             }}
             aria-pressed={mostrarChuva}
             title="Mostrar radar de chuva ao vivo em Conselheiro Lafaiete"
@@ -1943,61 +1939,65 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
               {radarChuvaErro && (
                 <div className="mapa-chuva-status mapa-chuva-status--erro">{radarChuvaErro}</div>
               )}
-              {(radarChuva || estacoesCemaden.length > 0 || cemadenErro) && (
-                <>
-                  <div className="mapa-chuva-resumo">
-                    <div>
-                      <span className="mapa-chuva-resumo-label">Radar</span>
-                      <strong>
-                        {radarChuva ? horaChuva(radarChuva.atualizadoEm) : '—'}
-                        <small className="mapa-chuva-quadro-tipo">RainViewer · observado</small>
-                      </strong>
-                    </div>
-                    <div>
-                      <span className="mapa-chuva-resumo-label">CEMADEN</span>
-                      <strong>
-                        {horaChuva(cemadenAtualizadoEm)}
-                        <small className="mapa-chuva-quadro-tipo">última atualização</small>
-                      </strong>
-                    </div>
-                    <div>
-                      <span className="mapa-chuva-resumo-label">Nuvens</span>
-                      <strong>
-                        {templateTilesHttpsValido(GOES_CLOUD_TILE_URL) ? 'Fonte configurada' : 'Indisponível'}
-                        <small className="mapa-chuva-quadro-tipo">
-                          {templateTilesHttpsValido(GOES_CLOUD_TILE_URL) ? 'GOES · imagem' : 'sem tiles HTTPS'}
-                        </small>
-                      </strong>
-                    </div>
-                    <div>
-                      <span className="mapa-chuva-resumo-label">Intensidade estimada</span>
-                      <strong className={intensidadeEstimada && intensidadeEstimada > 0 ? 'chovendo' : ''}>
-                        {intensidadeEstimada != null ? `${intensidadeEstimada.toFixed(1)} mm/h` : '—'}
-                        <small className="mapa-chuva-quadro-tipo">{situacaoChuva(intensidadeEstimada)}</small>
-                      </strong>
-                    </div>
-                  </div>
-                  <div className="mapa-chuva-legenda">
-                    <span><i className="chuva-cor chuva-cor--fraca" /> fraca</span>
-                    <span><i className="chuva-cor chuva-cor--moderada" /> moderada</span>
-                    <span><i className="chuva-cor chuva-cor--forte" /> forte</span>
-                    <span><i className="chuva-cor chuva-cor--muito-forte" /> muito forte</span>
-                    <span><i className="chuva-cor chuva-cor--intensa" /> intensa</span>
-                    <span><i className="chuva-cor chuva-cor--extrema" /> extrema</span>
-                  </div>
-                  <p className="mapa-chuva-ajuda">
-                    Radar: Weather data by RainViewer. A intensidade CEMADEN é uma estimativa interpolada entre estações, não uma medição contínua. RRQPE NOAA: indisponível no mapa no momento.
-                  </p>
-                  {cemadenCarregando && <div className="mapa-chuva-status">⏳ Atualizando estações CEMADEN…</div>}
-                  {cemadenErro && <div className="mapa-chuva-status mapa-chuva-status--erro">{cemadenErro}. O mapa continua disponível.</div>}
-                  <div className="mapa-chuva-rodape">
-                    <span>{radarChuva?.erroAtualizacao ? 'Último radar salvo' : 'Weather data by RainViewer'}</span>
-                    <button onClick={buscarRadarChuva} disabled={radarChuvaCarregando}>
-                      {radarChuvaCarregando ? '⏳' : '↻'} Atualizar
-                    </button>
-                  </div>
-                </>
-              )}
+              <div className="mapa-chuva-resumo">
+                <div>
+                  <span className="mapa-chuva-resumo-label">Radar</span>
+                  <strong>
+                    {radarChuva ? horaChuva(radarChuva.atualizadoEm) : '—'}
+                    <small className="mapa-chuva-quadro-tipo">RainViewer · observado</small>
+                  </strong>
+                </div>
+                <div>
+                  <span className="mapa-chuva-resumo-label">CEMADEN</span>
+                  <strong>
+                    {horaChuva(cemadenAtualizadoEm)}
+                    <small className="mapa-chuva-quadro-tipo">última atualização</small>
+                  </strong>
+                </div>
+                <div>
+                  <span className="mapa-chuva-resumo-label">Nuvens</span>
+                  <strong>
+                    {templateTilesHttpsValido(GOES_CLOUD_TILE_URL) ? 'Fonte configurada' : 'Indisponível'}
+                    <small className="mapa-chuva-quadro-tipo">
+                      {templateTilesHttpsValido(GOES_CLOUD_TILE_URL)
+                        ? 'GOES · horário não informado pela fonte'
+                        : 'sem tiles HTTPS'}
+                    </small>
+                  </strong>
+                </div>
+                <div>
+                  <span className="mapa-chuva-resumo-label">Intensidade estimada</span>
+                  <strong className={intensidadeEstimada && intensidadeEstimada > 0 ? 'chovendo' : ''}>
+                    {intensidadeEstimada != null ? `${intensidadeEstimada.toFixed(1)} mm/h` : '—'}
+                    <small className="mapa-chuva-quadro-tipo">{situacaoChuva(intensidadeEstimada)}</small>
+                  </strong>
+                </div>
+              </div>
+              <div className="mapa-chuva-legenda">
+                <span><i className="chuva-cor chuva-cor--fraca" /> fraca</span>
+                <span><i className="chuva-cor chuva-cor--moderada" /> moderada</span>
+                <span><i className="chuva-cor chuva-cor--forte" /> forte</span>
+                <span><i className="chuva-cor chuva-cor--muito-forte" /> muito forte</span>
+                <span><i className="chuva-cor chuva-cor--intensa" /> intensa</span>
+                <span><i className="chuva-cor chuva-cor--extrema" /> extrema</span>
+              </div>
+              <p className="mapa-chuva-ajuda">
+                Radar: Weather data by RainViewer. A intensidade CEMADEN é uma estimativa interpolada entre estações, não uma medição contínua. RRQPE NOAA: indisponível no mapa no momento.
+              </p>
+              {cemadenCarregando && <div className="mapa-chuva-status">⏳ Atualizando estações CEMADEN…</div>}
+              {cemadenErro && <div className="mapa-chuva-status mapa-chuva-status--erro">{cemadenErro}. O mapa continua disponível.</div>}
+              <div className="mapa-chuva-rodape">
+                <span>{radarChuva?.erroAtualizacao ? 'Último radar salvo' : 'Weather data by RainViewer'}</span>
+                <button
+                  onClick={() => {
+                    buscarRadarChuva()
+                    buscarCemadenMapa()
+                  }}
+                  disabled={radarChuvaCarregando || cemadenCarregando}
+                >
+                  {radarChuvaCarregando || cemadenCarregando ? '⏳' : '↻'} Atualizar
+                </button>
+              </div>
             </div>
           )}
         </div>

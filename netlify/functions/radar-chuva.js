@@ -10,8 +10,6 @@ export const handler = async () => {
     const valido = quadro => Number.isFinite(Number(quadro?.time)) &&
       typeof quadro?.path === 'string' && quadro.path.startsWith('/v2/')
     const observados = (dados?.radar?.past || []).filter(valido)
-    // O painel deve mostrar somente radar observado. Nowcast é uma previsão
-    // diferente e não deve ser apresentado como chuva medida.
     const ultimo = observados.at(-1)
     if (!host || !ultimo) throw new Error('RainViewer não retornou quadros de radar')
     const tileUrl = `${host}${ultimo.path}/256/{z}/{x}/{y}/2/1_0.png`

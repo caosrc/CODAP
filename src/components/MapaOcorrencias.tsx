@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
-import { MapContainer, TileLayer, Marker, Popup, useMapEvents, useMap, Circle, Polyline, CircleMarker } from 'react-leaflet'
+import { MapContainer, TileLayer, Marker, Popup, useMapEvents, useMap, Circle, Polyline, CircleMarker, Pane } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import type { Ocorrencia } from '../types'
@@ -129,22 +129,185 @@ interface DadosRadarChuva {
   frameTime: number
   atualizadoEm: string
   fonte: string
-  tipoQuadro?: 'observado' | 'nowcast'
+  tipoQuadro?: 'observado'
   cache?: boolean
   erroAtualizacao?: boolean
 }
 
-interface DadosRRQPE {
-  disponivel: boolean
-  tileUrl?: string
-  atualizadoEm?: string
-  fonte: string
-  mensagem?: string
+interface EstacaoCemadenMapa {
+  id: number
+  nome: string
+  codigo: string
+  latitude: number | null
+  longitude: number | null
+  precipitacaoAtual: number | null
+  precipitacaoDataHora: string
 }
 
-interface ChuvaNoPonto {
-  precipitacao: number | null
-  fonte?: string
+const GOES_CLOUD_TILE_URL = String(import.meta.env.VITE_GOES_CLOUD_TILES_URL || '').trim()
+const ESTIMATIVA_CEMADEN_RAIO_METROS = 10_000
+const CEMADEN_ESTACOES_ESPERADAS = new Set([4146, 4144, 3121, 6622, 4145, 4143, 4142])
+
+function templateTilesHttpsValido(url: string): boolean {
+  return /^https:\/\//i.test(url) && ['{z}', '{x}', '{y}'].every(token => url.includes(token))
+}
+
+function intensidadeCemaden(valor: number): { cor: string; alpha: number } {
+  if (!Number.isFinite(valor) || valor <= 0) return { cor: '#38bdf8', alpha: 0 }
+  if (valor <= 2) return { cor: '#38bdf8', alpha: 0.46 }
+  if (valor <= 10) return { cor: '#22c55e', alpha: 0.48 }
+  if (valor <= 30) return { cor: '#facc15', alpha: 0.5 }
+  if (valor <= 50) return { cor: '#f97316', alpha: 0.54 }
+  if (valor <= 80) return { cor: '#ef4444', alpha: 0.58 }
+  return { cor: '#a855f7', alpha: 0.62 }
+}
+
+function distanciaMetros(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const raioTerra = 6_371_000
+  const dLat = (lat2 - lat1) * Math.PI / 180
+  const dLng = (lng2 - lng1) * Math.PI / 180
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLng / 2) ** 2
+  return 2 * raioTerra * Math.asin(Math.sqrt(a))
+}
+
+function situacaoChuva(valor: number | null): string {
+  if (valor == null || !Number.isFinite(valor) || valor <= 0) return 'Sem chuva'
+  if (valor <= 2) return 'Fraca'
+  if (valor <= 10) return 'Moderada'
+  if (valor <= 30) return 'Forte'
+  if (valor <= 80) return 'Muito forte'
+  return 'Extrema'
+}
+
+function horaChuva(iso?: string | null): string {
+  if (!iso) return '—'
+  const data = new Date(iso)
+  return Number.isNaN(data.getTime())
+    ? '—'
+    : data.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+}
+
+function CemadenIntensityLayer({
+  estacoes,
+  opacidade,
+}: {
+  estacoes: EstacaoCemadenMapa[]
+  opacidade: number
+}) {
+  const map = useMap()
+
+  useEffect(() => {
+    const canvas = document.createElement('canvas')
+    canvas.className = 'mapa-cemaden-superficie'
+    canvas.setAttribute('aria-hidden', 'true')
+    Object.assign(canvas.style, {
+      position: 'absolute',
+      inset: '0',
+      width: '100%',
+      height: '100%',
+      pointerEvents: 'none',
+      zIndex: '430',
+      opacity: String(opacidade),
+    })
+    map.getContainer().appendChild(canvas)
+    const contexto = canvas.getContext('2d')
+    if (!contexto) return () => canvas.remove()
+
+    const pontos = estacoes
+      .filter((estacao) =>
+        Number.isFinite(estacao.latitude) &&
+        Number.isFinite(estacao.longitude) &&
+        Number.isFinite(estacao.precipitacaoAtual) &&
+        (estacao.precipitacaoAtual || 0) >= 0,
+      )
+      .map((estacao) => ({
+        lat: estacao.latitude as number,
+        lng: estacao.longitude as number,
+        valor: estacao.precipitacaoAtual as number,
+      }))
+    const centro = CONSELHEIRO_LAFAIETE
+    const raio = ESTIMATIVA_CEMADEN_RAIO_METROS
+    const passos = 72
+
+    const desenhar = () => {
+      const tamanho = map.getSize()
+      const dpr = Math.min(window.devicePixelRatio || 1, 2)
+      canvas.width = Math.max(1, Math.round(tamanho.x * dpr))
+      canvas.height = Math.max(1, Math.round(tamanho.y * dpr))
+      contexto.setTransform(dpr, 0, 0, dpr, 0, 0)
+      contexto.clearRect(0, 0, tamanho.x, tamanho.y)
+      if (pontos.length === 0) return
+
+      const deltaLat = raio / 111_320
+      const deltaLng = raio / (111_320 * Math.cos(centro[0] * Math.PI / 180))
+      const noroeste = map.latLngToContainerPoint([centro[0] + deltaLat, centro[1] - deltaLng])
+      const sudeste = map.latLngToContainerPoint([centro[0] - deltaLat, centro[1] + deltaLng])
+      const largura = sudeste.x - noroeste.x
+      const altura = sudeste.y - noroeste.y
+      if (largura <= 0 || altura <= 0) return
+
+      const centroTela = map.latLngToContainerPoint(centro)
+      const bordaTela = map.latLngToContainerPoint([centro[0] + deltaLat, centro[1]])
+      const raioTela = Math.abs(centroTela.y - bordaTela.y)
+      contexto.save()
+      contexto.beginPath()
+      contexto.arc(centroTela.x, centroTela.y, raioTela, 0, Math.PI * 2)
+      contexto.clip()
+
+      const larguraCelula = largura / passos + 1
+      const alturaCelula = altura / passos + 1
+      for (let y = 0; y < passos; y += 1) {
+        for (let x = 0; x < passos; x += 1) {
+          const lat = centro[0] + deltaLat * (1 - (y + 0.5) * 2 / passos)
+          const lng = centro[1] + deltaLng * ((x + 0.5) * 2 / passos - 1)
+          let numerador = 0
+          let denominador = 0
+          for (const ponto of pontos) {
+            const distancia = distanciaMetros(lat, lng, ponto.lat, ponto.lng)
+            if (distancia < 1) {
+              numerador = ponto.valor
+              denominador = 1
+              break
+            }
+            const peso = 1 / (distancia * distancia)
+            numerador += ponto.valor * peso
+            denominador += peso
+          }
+          const valor = denominador > 0 ? numerador / denominador : 0
+          const estilo = intensidadeCemaden(valor)
+          if (estilo.alpha === 0) continue
+          contexto.globalAlpha = estilo.alpha
+          contexto.fillStyle = estilo.cor
+          contexto.fillRect(
+            noroeste.x + x * largura / passos,
+            noroeste.y + y * altura / passos,
+            larguraCelula,
+            alturaCelula,
+          )
+        }
+      }
+      contexto.restore()
+      contexto.globalAlpha = 1
+    }
+
+    let frame = 0
+    const agendarDesenho = () => {
+      window.cancelAnimationFrame(frame)
+      frame = window.requestAnimationFrame(desenhar)
+    }
+    map.on('move zoom resize', agendarDesenho)
+    agendarDesenho()
+    return () => {
+      window.cancelAnimationFrame(frame)
+      map.off('move zoom resize', agendarDesenho)
+      canvas.remove()
+    }
+  }, [estacoes, map, opacidade])
+
+  return null
 }
 
 // ── Cache de ícones no nível do módulo ──────────────────────────
@@ -478,13 +641,17 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
   const [mostrarChuva, setMostrarChuva] = useState(false)
   const [painelChuvaAberto, setPainelChuvaAberto] = useState(false)
   const [radarChuva, setRadarChuva] = useState<DadosRadarChuva | null>(null)
-  const [chuvaNoPonto, setChuvaNoPonto] = useState<ChuvaNoPonto | null>(null)
   const [radarChuvaCarregando, setRadarChuvaCarregando] = useState(false)
   const [radarChuvaErro, setRadarChuvaErro] = useState<string | null>(null)
-  const [mostrarRRQPE, setMostrarRRQPE] = useState(false)
-  const [rrqpe, setRRQPE] = useState<DadosRRQPE | null>(null)
-  const [rrqpeCarregando, setRRQPECarregando] = useState(false)
-  const [rrqpeErro, setRRQPEErro] = useState<string | null>(null)
+  const [mostrarNuvensGoes, setMostrarNuvensGoes] = useState(false)
+  const [mostrarIntensidadeCemaden, setMostrarIntensidadeCemaden] = useState(false)
+  const [opacidadeNuvensGoes, setOpacidadeNuvensGoes] = useState(0.5)
+  const [opacidadeRadar, setOpacidadeRadar] = useState(0.72)
+  const [opacidadeCemaden, setOpacidadeCemaden] = useState(0.52)
+  const [estacoesCemaden, setEstacoesCemaden] = useState<EstacaoCemadenMapa[]>([])
+  const [cemadenAtualizadoEm, setCemadenAtualizadoEm] = useState<string | null>(null)
+  const [cemadenCarregando, setCemadenCarregando] = useState(false)
+  const [cemadenErro, setCemadenErro] = useState<string | null>(null)
   const [mostrarOcorrencias, setMostrarOcorrencias] = useState(false)
   const [mostrarMateriais, setMostrarMateriais] = useState(false)
   const [painelMaterialAberto, setPainelMaterialAberto] = useState(false)
@@ -556,10 +723,7 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
     setRadarChuvaCarregando(true)
     setRadarChuvaErro(null)
     try {
-      const [respostaRadar, respostaTempo] = await Promise.all([
-        fetch(`/api/radar-chuva?_ts=${Date.now()}`, { cache: 'no-store' }),
-        fetch(`/api/tempo?_ts=${Date.now()}`, { cache: 'no-store' }),
-      ])
+      const respostaRadar = await fetch(`/api/radar-chuva?_ts=${Date.now()}`, { cache: 'no-store' })
       if (!respostaRadar.ok) throw new Error('Radar indisponível')
 
       const dadosRadar = await respostaRadar.json()
@@ -570,33 +734,11 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
         frameTime: Number(dadosRadar?.frameTime),
         atualizadoEm: typeof dadosRadar?.atualizadoEm === 'string' ? dadosRadar.atualizadoEm : '',
         fonte: typeof dadosRadar?.fonte === 'string' ? dadosRadar.fonte : 'RainViewer',
-        tipoQuadro: dadosRadar?.tipoQuadro === 'nowcast' ? 'nowcast' : 'observado',
+         tipoQuadro: 'observado',
         cache: dadosRadar?.cache === true,
         erroAtualizacao: dadosRadar?.erroAtualizacao === true,
       })
 
-      if (respostaTempo.ok) {
-        const dadosTempo = await respostaTempo.json()
-        const agora = Date.now()
-        const precipitacaoAtual = Number(dadosTempo?.atual?.precipitacao)
-        const horas = Array.isArray(dadosTempo?.horas) ? dadosTempo.horas : []
-        const maisProxima = horas
-          .filter((hora: { time?: string }) => hora?.time)
-          .sort((a: { time: string }, b: { time: string }) => (
-            Math.abs(new Date(a.time).getTime() - agora) - Math.abs(new Date(b.time).getTime() - agora)
-          ))[0]
-        setChuvaNoPonto(Number.isFinite(precipitacaoAtual)
-          ? {
-              precipitacao: precipitacaoAtual,
-              fonte: 'condição atual no ponto central',
-            }
-          : {
-              precipitacao: Number.isFinite(Number(maisProxima?.precipitacao))
-                ? Number(maisProxima.precipitacao)
-                : null,
-              fonte: 'previsão horária mais próxima',
-            })
-      }
     } catch {
       setRadarChuvaErro('Não foi possível atualizar o radar agora.')
     } finally {
@@ -618,35 +760,48 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
     }
   }, [mostrarChuva, buscarRadarChuva])
 
-  const buscarRRQPE = useCallback(async () => {
-    setRRQPECarregando(true)
-    setRRQPEErro(null)
+  const buscarCemadenMapa = useCallback(async () => {
+    setCemadenCarregando(true)
+    setCemadenErro(null)
     try {
-      const resposta = await fetch(`/api/rrqpe?_ts=${Date.now()}`, { cache: 'no-store' })
+      const resposta = await fetch(`/api/monitoramento-cnl?_ts=${Date.now()}`, { cache: 'no-store' })
       const dados = await resposta.json().catch(() => ({}))
-      if (!resposta.ok) {
-        throw new Error(typeof dados?.erro === 'string' ? dados.erro : 'RRQPE indisponível')
-      }
-      setRRQPE({
-        disponivel: dados?.disponivel === true,
-        tileUrl: typeof dados?.tileUrl === 'string' ? dados.tileUrl : undefined,
-        atualizadoEm: typeof dados?.atualizadoEm === 'string' ? dados.atualizadoEm : undefined,
-        fonte: typeof dados?.fonte === 'string' ? dados.fonte : 'GOES-16 RRQPE / NOAA',
-        mensagem: typeof dados?.mensagem === 'string' ? dados.mensagem : undefined,
-      })
+      if (!resposta.ok || !dados?.sucesso) throw new Error(typeof dados?.erro === 'string' ? dados.erro : 'CEMADEN indisponível')
+      const estacoes = (Array.isArray(dados?.estacoes) ? dados.estacoes : [])
+        .filter((estacao: EstacaoCemadenMapa) => CEMADEN_ESTACOES_ESPERADAS.has(Number(estacao?.id)))
+        .map((estacao: EstacaoCemadenMapa) => ({
+          id: Number(estacao.id),
+          nome: String(estacao.nome || ''),
+          codigo: String(estacao.codigo || ''),
+          latitude: Number.isFinite(Number(estacao.latitude)) ? Number(estacao.latitude) : null,
+          longitude: Number.isFinite(Number(estacao.longitude)) ? Number(estacao.longitude) : null,
+          precipitacaoAtual: Number.isFinite(Number(estacao.precipitacaoAtual))
+            ? Number(estacao.precipitacaoAtual)
+            : null,
+          precipitacaoDataHora: String(estacao.precipitacaoDataHora || ''),
+        }))
+      setEstacoesCemaden(estacoes)
+      setCemadenAtualizadoEm(typeof dados?.atualizadoEm === 'string' ? dados.atualizadoEm : null)
     } catch (erro) {
-      setRRQPEErro(erro instanceof Error && erro.message ? erro.message : 'Não foi possível consultar o RRQPE agora.')
+      setCemadenErro(erro instanceof Error && erro.message ? erro.message : 'Não foi possível consultar o CEMADEN agora.')
     } finally {
-      setRRQPECarregando(false)
+      setCemadenCarregando(false)
     }
   }, [])
 
   useEffect(() => {
-    if (!mostrarRRQPE) return
-    buscarRRQPE()
-    const intervalo = setInterval(buscarRRQPE, 10 * 60 * 1000)
-    return () => clearInterval(intervalo)
-  }, [mostrarRRQPE, buscarRRQPE])
+    if (!mostrarIntensidadeCemaden && !painelChuvaAberto) return
+    buscarCemadenMapa()
+    const intervalo = setInterval(buscarCemadenMapa, 5 * 60 * 1000)
+    const atualizarAoVoltar = () => {
+      if (document.visibilityState === 'visible') buscarCemadenMapa()
+    }
+    document.addEventListener('visibilitychange', atualizarAoVoltar)
+    return () => {
+      clearInterval(intervalo)
+      document.removeEventListener('visibilitychange', atualizarAoVoltar)
+    }
+  }, [mostrarIntensidadeCemaden, painelChuvaAberto, buscarCemadenMapa])
 
   // Mapa offline — inicializa tiles do localStorage para mostrar status imediatamente
   const [statusOffline, setStatusOffline] = useState<StatusOffline>('idle')
@@ -1287,6 +1442,12 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
   )
   const dispositivosArray = useMemo(() => Array.from(dispositivos.values()), [dispositivos])
   const totalOnline = dispositivosArray.length + (statusGps === 'ativo' ? 1 : 0)
+  const intensidadeEstimada = useMemo(() => {
+    const valores = estacoesCemaden
+      .map(estacao => estacao.precipitacaoAtual)
+      .filter((valor): valor is number => Number.isFinite(valor))
+    return valores.length > 0 ? Math.max(...valores) : null
+  }, [estacoesCemaden])
 
   // ── Viewport culling ─────────────────────────────────────────────
   // Só renderiza marcadores dentro da área visível do mapa + 15% de margem.
@@ -1352,33 +1513,38 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
             zIndex={10}
           />
         )}
-        {mostrarChuva && radarChuva && (
-          <TileLayer
-            key={`radar-chuva-${radarChuva.frameTime}`}
-            url={radarChuva.tileUrl || `${radarChuva.host}${radarChuva.path}/256/{z}/{x}/{y}/2/1_1.png`}
-            opacity={0.72}
-            attribution='Radar meteorológico: <a href="https://www.rainviewer.com/" target="_blank" rel="noreferrer">RainViewer</a>'
-            maxNativeZoom={7}
-            maxZoom={19}
-            tileSize={256}
-            zIndex={20}
-            updateWhenZooming={false}
-            updateWhenIdle={true}
-          />
+        {mostrarNuvensGoes && templateTilesHttpsValido(GOES_CLOUD_TILE_URL) && (
+          <Pane name="nuvensGoesPane" style={{ zIndex: 410 }}>
+            <TileLayer
+              key={`nuvens-goes-${GOES_CLOUD_TILE_URL}`}
+              url={GOES_CLOUD_TILE_URL}
+              opacity={opacidadeNuvensGoes}
+              attribution='Imagens de nuvens: <a href="https://www.noaa.gov/" target="_blank" rel="noreferrer">NOAA / GOES</a>'
+              maxNativeZoom={8}
+              maxZoom={19}
+              tileSize={256}
+              updateWhenZooming={false}
+              updateWhenIdle={true}
+            />
+          </Pane>
         )}
-        {mostrarChuva && mostrarRRQPE && rrqpe?.disponivel && rrqpe.tileUrl && (
-          <TileLayer
-            key={`rrqpe-${rrqpe.atualizadoEm || rrqpe.tileUrl}`}
-            url={rrqpe.tileUrl}
-            opacity={0.5}
-            attribution='RRQPE: <a href="https://www.noaa.gov/" target="_blank" rel="noreferrer">NOAA / GOES-16</a>'
-            maxNativeZoom={8}
-            maxZoom={19}
-            tileSize={256}
-            zIndex={21}
-            updateWhenZooming={false}
-            updateWhenIdle={true}
-          />
+        {mostrarChuva && radarChuva && (
+          <Pane name="radarRainViewerPane" style={{ zIndex: 420 }}>
+            <TileLayer
+              key={`radar-chuva-${radarChuva.frameTime}`}
+              url={radarChuva.tileUrl || `${radarChuva.host}${radarChuva.path}/256/{z}/{x}/{y}/2/1_0.png`}
+              opacity={opacidadeRadar}
+              attribution='Weather data by <a href="https://www.rainviewer.com/" target="_blank" rel="noreferrer">RainViewer</a>'
+              maxNativeZoom={7}
+              maxZoom={19}
+              tileSize={256}
+              updateWhenZooming={false}
+              updateWhenIdle={true}
+            />
+          </Pane>
+        )}
+        {mostrarIntensidadeCemaden && (
+          <CemadenIntensityLayer estacoes={estacoesCemaden} opacidade={opacidadeCemaden} />
         )}
         {mostrarChuva && (
           <Circle
@@ -1697,7 +1863,10 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
               const proximoEstado = !mostrarChuva
               setMostrarChuva(proximoEstado)
               setPainelChuvaAberto(proximoEstado)
-              if (!proximoEstado) setMostrarRRQPE(false)
+              if (!proximoEstado) {
+                setMostrarNuvensGoes(false)
+                setMostrarIntensidadeCemaden(false)
+              }
             }}
             aria-pressed={mostrarChuva}
             title="Mostrar radar de chuva ao vivo em Conselheiro Lafaiete"
@@ -1718,15 +1887,55 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
               </div>
               <div className="mapa-chuva-fontes">
                 <button
-                  className={`mapa-chuva-fonte-btn ${mostrarRRQPE ? 'ativo' : ''}`}
-                  onClick={() => setMostrarRRQPE(v => !v)}
-                  aria-pressed={mostrarRRQPE}
-                  disabled={rrqpeCarregando}
-                  title="Sobrepor a estimativa de precipitação do satélite GOES-16"
+                  className={`mapa-chuva-fonte-btn ${mostrarNuvensGoes ? 'ativo' : ''}`}
+                  onClick={() => setMostrarNuvensGoes(v => !v)}
+                  aria-pressed={mostrarNuvensGoes}
+                  disabled={!templateTilesHttpsValido(GOES_CLOUD_TILE_URL)}
+                  title={templateTilesHttpsValido(GOES_CLOUD_TILE_URL)
+                    ? 'Mostrar imagens de nuvens GOES'
+                    : 'Configure VITE_GOES_CLOUD_TILES_URL com um template HTTPS de tiles'}
                 >
-                  ☁️ RRQPE
+                  ☁️ Nuvens GOES
                 </button>
-                <span>Estimativa por satélite · GOES-16</span>
+                <span>
+                  {templateTilesHttpsValido(GOES_CLOUD_TILE_URL)
+                    ? 'Imagem de nuvens · independente da chuva'
+                    : 'Fonte de tiles GOES não configurada'}
+                </span>
+              </div>
+              <div className="mapa-chuva-fontes">
+                <button
+                  className={`mapa-chuva-fonte-btn ${mostrarChuva ? 'ativo' : ''}`}
+                  onClick={() => setMostrarChuva(v => !v)}
+                  aria-pressed={mostrarChuva}
+                >
+                  🌧️ Radar RainViewer
+                </button>
+                <span>Radar observado · Weather data by RainViewer</span>
+              </div>
+              <div className="mapa-chuva-fontes">
+                <button
+                  className={`mapa-chuva-fonte-btn ${mostrarIntensidadeCemaden ? 'ativo' : ''}`}
+                  onClick={() => setMostrarIntensidadeCemaden(v => !v)}
+                  aria-pressed={mostrarIntensidadeCemaden}
+                >
+                  🌈 Intensidade CEMADEN
+                </button>
+                <span>Estimativa interpolada entre estações CEMADEN</span>
+              </div>
+              <div className="mapa-chuva-opacidades">
+                <label>
+                  Nuvens <input type="range" min="0.35" max="0.70" step="0.05" value={opacidadeNuvensGoes} onChange={e => setOpacidadeNuvensGoes(Number(e.target.value))} />
+                  <output>{Math.round(opacidadeNuvensGoes * 100)}%</output>
+                </label>
+                <label>
+                  Radar <input type="range" min="0.35" max="0.90" step="0.05" value={opacidadeRadar} onChange={e => setOpacidadeRadar(Number(e.target.value))} />
+                  <output>{Math.round(opacidadeRadar * 100)}%</output>
+                </label>
+                <label>
+                  CEMADEN <input type="range" min="0.35" max="0.70" step="0.05" value={opacidadeCemaden} onChange={e => setOpacidadeCemaden(Number(e.target.value))} />
+                  <output>{Math.round(opacidadeCemaden * 100)}%</output>
+                </label>
               </div>
               {radarChuvaCarregando && !radarChuva && (
                 <div className="mapa-chuva-status">⏳ Carregando o último quadro do radar…</div>
@@ -1734,29 +1943,37 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
               {radarChuvaErro && (
                 <div className="mapa-chuva-status mapa-chuva-status--erro">{radarChuvaErro}</div>
               )}
-              {radarChuva && (
+              {(radarChuva || estacoesCemaden.length > 0 || cemadenErro) && (
                 <>
                   <div className="mapa-chuva-resumo">
                     <div>
-                        <span className="mapa-chuva-resumo-label">Ponto central · Conselheiro Lafaiete</span>
-                      <strong className={chuvaNoPonto?.precipitacao && chuvaNoPonto.precipitacao > 0 ? 'chovendo' : ''}>
-                        {chuvaNoPonto?.precipitacao != null
-                          ? chuvaNoPonto.precipitacao > 0
-                            ? `🌧️ ${chuvaNoPonto.precipitacao.toFixed(1)} mm`
-                            : '☀️ Sem chuva no ponto'
-                          : '–'}
+                      <span className="mapa-chuva-resumo-label">Radar</span>
+                      <strong>
+                        {radarChuva ? horaChuva(radarChuva.atualizadoEm) : '—'}
+                        <small className="mapa-chuva-quadro-tipo">RainViewer · observado</small>
                       </strong>
-                      <small className="mapa-chuva-ponto-fonte">
-                        {chuvaNoPonto?.fonte || 'consulta local'}
-                      </small>
                     </div>
                     <div>
-                      <span className="mapa-chuva-resumo-label">Quadro do radar</span>
+                      <span className="mapa-chuva-resumo-label">CEMADEN</span>
                       <strong>
-                        {new Date(radarChuva.frameTime * 1000).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                        {horaChuva(cemadenAtualizadoEm)}
+                        <small className="mapa-chuva-quadro-tipo">última atualização</small>
+                      </strong>
+                    </div>
+                    <div>
+                      <span className="mapa-chuva-resumo-label">Nuvens</span>
+                      <strong>
+                        {templateTilesHttpsValido(GOES_CLOUD_TILE_URL) ? 'Fonte configurada' : 'Indisponível'}
                         <small className="mapa-chuva-quadro-tipo">
-                          {radarChuva.tipoQuadro === 'nowcast' ? 'estimativa' : 'observado'}
+                          {templateTilesHttpsValido(GOES_CLOUD_TILE_URL) ? 'GOES · imagem' : 'sem tiles HTTPS'}
                         </small>
+                      </strong>
+                    </div>
+                    <div>
+                      <span className="mapa-chuva-resumo-label">Intensidade estimada</span>
+                      <strong className={intensidadeEstimada && intensidadeEstimada > 0 ? 'chovendo' : ''}>
+                        {intensidadeEstimada != null ? `${intensidadeEstimada.toFixed(1)} mm/h` : '—'}
+                        <small className="mapa-chuva-quadro-tipo">{situacaoChuva(intensidadeEstimada)}</small>
                       </strong>
                     </div>
                   </div>
@@ -1769,28 +1986,12 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
                     <span><i className="chuva-cor chuva-cor--extrema" /> extrema</span>
                   </div>
                   <p className="mapa-chuva-ajuda">
-                     As manchas coloridas mostram os núcleos e a área da precipitação no radar. O contorno azul tracejado indica um raio de observação de 10 km; o radar continua visível além dele. O ponto escuro marca a consulta local.
+                    Radar: Weather data by RainViewer. A intensidade CEMADEN é uma estimativa interpolada entre estações, não uma medição contínua. RRQPE NOAA: indisponível no mapa no momento.
                   </p>
-                  {mostrarRRQPE && (
-                    <div className={`mapa-rrqpe-status ${rrqpe?.disponivel ? 'disponivel' : ''}`}>
-                      <strong>☁️ RRQPE · GOES-16</strong>
-                      {rrqpeCarregando && <span>Consultando a última imagem…</span>}
-                      {!rrqpeCarregando && rrqpe?.disponivel && (
-                        <span>
-                          Camada ativa
-                          {rrqpe.atualizadoEm
-                            ? ` · ${new Date(rrqpe.atualizadoEm).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`
-                            : ''}
-                        </span>
-                      )}
-                      {!rrqpeCarregando && !rrqpe?.disponivel && (
-                        <span>{rrqpe?.mensagem || rrqpeErro || 'A camada RRQPE não está publicada neste ambiente.'}</span>
-                      )}
-                      {rrqpeErro && rrqpe?.disponivel !== true && <small>{rrqpeErro}</small>}
-                    </div>
-                  )}
+                  {cemadenCarregando && <div className="mapa-chuva-status">⏳ Atualizando estações CEMADEN…</div>}
+                  {cemadenErro && <div className="mapa-chuva-status mapa-chuva-status--erro">{cemadenErro}. O mapa continua disponível.</div>}
                   <div className="mapa-chuva-rodape">
-                    <span>{radarChuva.erroAtualizacao ? 'Último radar salvo' : 'RainViewer · ao vivo'}</span>
+                    <span>{radarChuva?.erroAtualizacao ? 'Último radar salvo' : 'Weather data by RainViewer'}</span>
                     <button onClick={buscarRadarChuva} disabled={radarChuvaCarregando}>
                       {radarChuvaCarregando ? '⏳' : '↻'} Atualizar
                     </button>

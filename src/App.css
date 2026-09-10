@@ -1249,6 +1249,29 @@ input, select, textarea { font-family: inherit; }
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.mapa-chuva-opacidades {
+  display: grid;
+  gap: 0.22rem;
+  padding: 0.35rem 0.5rem 0.25rem;
+  border-top: 1px solid #f1f5f9;
+  color: #475569;
+  font-size: 0.5rem;
+}
+.mapa-chuva-opacidades label {
+  display: grid;
+  grid-template-columns: 54px 1fr 30px;
+  align-items: center;
+  gap: 0.3rem;
+}
+.mapa-chuva-opacidades input[type="range"] {
+  width: 100%;
+  accent-color: #0369a1;
+}
+.mapa-chuva-opacidades output {
+  text-align: right;
+  color: #64748b;
+  font-variant-numeric: tabular-nums;
+}
 .mapa-chuva-status {
   padding: 0.58rem;
   font-size: 0.62rem;
@@ -1282,6 +1305,9 @@ input, select, textarea { font-family: inherit; }
 }
 .mapa-chuva-resumo strong.chovendo {
   color: #0369a1;
+}
+.mapa-cemaden-superficie {
+  mix-blend-mode: multiply;
 }
 .mapa-chuva-ponto-fonte {
   color: #94a3b8;

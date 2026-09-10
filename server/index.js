@@ -3237,6 +3237,7 @@ app.get('/api/tempo', async (_req, res) => {
 // A página pública do CEMADEN usa dois serviços: um catálogo com os
 // acumulados mais recentes e o MapaInterativoWS para a série horária.
 const CNL_ESTACAO_ID = 6622
+const CNL_ESTACOES_CHUVA_IDS = new Set([4146, 4144, 3121, 6622, 4145, 4143, 4142])
 const CNL_CATALOGO_URL = 'https://resources.cemaden.gov.br/graficos/interativo/getJson2.php?uf=MG'
 const CNL_RECURSOS_URL = 'https://mapservices.cemaden.gov.br/MapaInterativoWS/resources'
 const CNL_NIVEL_URL = 'https://resources.cemaden.gov.br/graficos/cemaden/hidro/resources/json/MedidaResource.php?est=6622&sen=20&pag=24'
@@ -3527,7 +3528,10 @@ app.get('/api/monitoramento-cnl', async (_req, res) => {
     const estacaoHorario = horario?.estacao || {}
     if (!estacaoCatalogo || !estacaoHorario) throw new Error('Estação Rio Bananeiras não encontrada no CEMADEN')
     const estacoesCatalogo = (Array.isArray(catalogo) ? catalogo : [])
-      .filter((item) => Number(item?.codibge) === Number(estacaoCatalogo.codibge))
+      .filter((item) =>
+        Number(item?.codibge) === Number(estacaoCatalogo.codibge) &&
+        CNL_ESTACOES_CHUVA_IDS.has(Number(item?.idestacao)),
+      )
     const chuvaPayloads = new Map([[CNL_ESTACAO_ID, horario]])
     const falhasChuva = []
     const respostasChuva = await Promise.allSettled(
@@ -3600,8 +3604,12 @@ app.get('/api/monitoramento-cnl', async (_req, res) => {
       .map((item) => {
         const chuva = dadosChuvaPorEstacao.get(item.id)
         const ultimaChuva = chuva?.pontos.at(-1)
+        const estacaoOficial = chuvaPayloads.get(item.id)?.estacao || {}
         return {
           ...item,
+          codigo: String(estacaoOficial.codEstacao || item.codigo || item.id),
+          latitude: numeroCemaden(estacaoOficial.latitude),
+          longitude: numeroCemaden(estacaoOficial.longitude),
           dataHora: item.dataHora || item.precipitacaoDataHora,
           precipitacaoAtual: item.precipitacaoAtual ?? ultimaChuva?.valor ?? null,
           precipitacaoDataHora: item.precipitacaoDataHora || ultimaChuva?.dataHora || '',
@@ -3693,22 +3701,20 @@ app.get('/api/radar-chuva', async (_req, res) => {
     )
     const quadrosObservados = (Array.isArray(dados?.radar?.past) ? dados.radar.past : [])
       .filter(validarQuadro)
-    const quadrosPrevisao = (Array.isArray(dados?.radar?.nowcast) ? dados.radar.nowcast : [])
-      .filter(validarQuadro)
-    // A imagem observada é preferível ao nowcast para representar chuva atual.
-    const quadros = quadrosObservados.length > 0 ? quadrosObservados : quadrosPrevisao
-    const ultimo = quadros.at(-1)
+    // O painel representa apenas precipitação observada; nowcast é previsão e
+    // não deve ser apresentado como chuva medida.
+    const ultimo = quadrosObservados.at(-1)
 
     if (!host || !ultimo) throw new Error('RainViewer não retornou quadros de radar')
 
     radarChuvaCache = {
       host,
       path: ultimo.path,
-      tileUrl: `${host}${ultimo.path}/256/{z}/{x}/{y}/2/1_1.png`,
+      tileUrl: `${host}${ultimo.path}/256/{z}/{x}/{y}/2/1_0.png`,
       frameTime: Number(ultimo.time),
       atualizadoEm: new Date(Number(ultimo.time) * 1000).toISOString(),
       fonte: 'RainViewer',
-      tipoQuadro: quadrosObservados.length > 0 ? 'observado' : 'nowcast',
+      tipoQuadro: 'observado',
     }
     radarChuvaCacheTs = agora
     return res.json(radarChuvaCache)

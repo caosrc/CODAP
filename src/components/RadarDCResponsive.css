@@ -1743,14 +1743,22 @@ html:-webkit-full-screen {
   }
 
   body.radar-tv-active .radar-tv .radar-cnl-inline .cnl-grafico-label {
-    fill: #344d5d;
-    font-size: 16px;
-    font-weight: 700;
+    fill: #486270;
+    font-size: 13px;
+    font-weight: 600;
   }
 
   body.radar-tv-active .radar-tv .radar-cnl-inline .cnl-grafico-label-data {
-    font-size: 15px;
-    font-weight: 800;
+    fill: #526c79;
+    font-size: 12px;
+    font-weight: 600;
+    opacity: .92;
+  }
+
+  body.radar-tv-active .radar-tv .radar-cnl-inline .cnl-grafico-label-chuva {
+    font-size: 12px;
+    font-weight: 600;
+    stroke-width: 2px;
   }
 
   body.radar-tv-active .radar-tv .radar-cnl-inline .cnl-grafico-eixo-y {
@@ -1772,8 +1780,8 @@ html:-webkit-full-screen {
 
   body.radar-tv-active .radar-tv .radar-cnl-inline .cnl-grafico-chuva-titulo {
     fill: #274454;
-    font-size: 18px;
-    font-weight: 900;
+    font-size: 16px;
+    font-weight: 700;
   }
 
   body.radar-tv-active .radar-tv .radar-cnl-inline .cnl-grafico-chuva-bar {

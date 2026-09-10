@@ -69,6 +69,12 @@ function intensidadeCemaden(valor: number): { cor: string; alpha: number } {
   return { cor: '#a855f7', alpha: 0.62 }
 }
 
+function valorChuvaFormatado(valor: number | null): string {
+  return valor == null || !Number.isFinite(valor)
+    ? 'Sem leitura'
+    : `${valor.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} mm`
+}
+
 function distanciaMetros(lat1: number, lng1: number, lat2: number, lng2: number): number {
   const raioTerra = 6_371_000
   const dLat = (lat2 - lat1) * Math.PI / 180
@@ -95,6 +101,48 @@ function horaChuva(iso?: string | null): string {
   return Number.isNaN(data.getTime())
     ? '—'
     : data.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+}
+
+function dataCemadenMapa(valor?: string | null): Date | null {
+  const texto = String(valor || '').trim()
+  if (!texto) return null
+  const brasileiro = texto.match(/^(\d{2})\/(\d{2})\/(\d{2,4})\s+(\d{2}):(\d{2})(?::(\d{2}))?$/)
+  if (brasileiro) {
+    const ano = Number(brasileiro[3].length === 2 ? `20${brasileiro[3]}` : brasileiro[3])
+    const data = new Date(Date.UTC(
+      ano,
+      Number(brasileiro[2]) - 1,
+      Number(brasileiro[1]),
+      Number(brasileiro[4]),
+      Number(brasileiro[5]),
+      Number(brasileiro[6] || 0),
+    ))
+    return Number.isNaN(data.getTime()) ? null : data
+  }
+  const isoSemFuso = texto.match(/^(\d{4}-\d{2}-\d{2})\s+(\d{2}:\d{2}(?::\d{2})?)/)
+  const data = new Date(isoSemFuso ? `${isoSemFuso[1]}T${isoSemFuso[2]}Z` : texto)
+  return Number.isNaN(data.getTime()) ? null : data
+}
+
+function idadeLeituraCemadenHoras(valor?: string | null): number | null {
+  const data = dataCemadenMapa(valor)
+  if (!data) return null
+  return Math.max(0, (Date.now() - data.getTime()) / (60 * 60 * 1000))
+}
+
+function statusLeituraCemaden(valor?: string | null): 'atualizada' | 'atrasada' | 'sem-dados' {
+  const idade = idadeLeituraCemadenHoras(valor)
+  if (idade == null) return 'sem-dados'
+  if (idade <= 3) return 'atualizada'
+  if (idade <= 24) return 'atrasada'
+  return 'sem-dados'
+}
+
+function dataHoraCemadenFormatada(valor?: string | null): string {
+  const data = dataCemadenMapa(valor)
+  return data
+    ? data.toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short', timeZone: 'America/Sao_Paulo' })
+    : valor || 'Sem horário'
 }
 
 function CemadenIntensityLayer({
@@ -1197,6 +1245,7 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
   const totalOnline = dispositivosArray.length + (statusGps === 'ativo' ? 1 : 0)
   const intensidadeEstimada = useMemo(() => {
     const valores = estacoesCemaden
+      .filter(estacao => statusLeituraCemaden(estacao.precipitacaoDataHora) === 'atualizada')
       .map(estacao => estacao.precipitacaoAtual)
       .filter((valor): valor is number => Number.isFinite(valor))
     return valores.length > 0 ? Math.max(...valores) : null
@@ -1289,6 +1338,51 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
         {mostrarIntensidadeCemaden && (
           <CemadenIntensityLayer estacoes={estacoesCemaden} opacidade={opacidadeCemaden} />
         )}
+        {mostrarChuva && estacoesCemaden
+          .filter(estacao => estacao.latitude != null && estacao.longitude != null)
+          .map(estacao => {
+            const estadoLeitura = statusLeituraCemaden(estacao.precipitacaoDataHora)
+            const cor = estadoLeitura === 'atualizada'
+              ? intensidadeCemaden(estacao.precipitacaoAtual ?? 0).cor
+              : '#94a3b8'
+            return (
+              <CircleMarker
+                key={`cemaden-estacao-${estacao.id}`}
+                center={[estacao.latitude!, estacao.longitude!]}
+                radius={9}
+                pathOptions={{
+                  color: '#ffffff',
+                  weight: 2,
+                  fillColor: cor,
+                  fillOpacity: 0.95,
+                }}
+              >
+                <Popup>
+                  <div style={{ minWidth: 190, fontFamily: 'inherit' }}>
+                    <strong style={{ display: 'block', marginBottom: 4 }}>
+                      🌧️ {estacao.nome || 'Estação CEMADEN'}
+                    </strong>
+                    <div style={{ fontSize: '0.8rem', color: '#374151', marginBottom: 3 }}>
+                      <strong>Última hora:</strong> {valorChuvaFormatado(estacao.precipitacaoAtual)}
+                    </div>
+                    <div style={{ fontSize: '0.76rem', color: estadoLeitura === 'atualizada' ? '#166534' : '#b45309', marginBottom: 3 }}>
+                      {estadoLeitura === 'atualizada'
+                        ? situacaoChuva(estacao.precipitacaoAtual)
+                        : estadoLeitura === 'atrasada' ? 'Leitura atrasada' : 'Sem dados recentes'}
+                    </div>
+                    <div style={{ fontSize: '0.72rem', color: '#6b7280' }}>
+                      Leitura: {dataHoraCemadenFormatada(estacao.precipitacaoDataHora)} · CEMADEN
+                    </div>
+                    {estacao.codigo && (
+                      <div style={{ fontSize: '0.7rem', color: '#9ca3af', marginTop: 3 }}>
+                        Estação {estacao.codigo}
+                      </div>
+                    )}
+                  </div>
+                </Popup>
+              </CircleMarker>
+            )
+          })}
         {mostrarChuva && (
           <Circle
             center={CONSELHEIRO_LAFAIETE}
@@ -1587,9 +1681,9 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
                   onClick={() => setMostrarIntensidadeCemaden(v => !v)}
                   aria-pressed={mostrarIntensidadeCemaden}
                 >
-                  🌈 Intensidade CEMADEN
+                  🌈 Estações CEMADEN
                 </button>
-                <span>Estimativa interpolada entre estações CEMADEN</span>
+                <span>Leituras oficiais · acumulado na última hora (mm)</span>
               </div>
               <div className="mapa-chuva-opacidades">
                 <label>
@@ -1601,7 +1695,7 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
                   <output>{Math.round(opacidadeRadar * 100)}%</output>
                 </label>
                 <label>
-                  CEMADEN <input type="range" min="0.35" max="0.70" step="0.05" value={opacidadeCemaden} onChange={e => setOpacidadeCemaden(Number(e.target.value))} />
+                   Superfície <input type="range" min="0.35" max="0.70" step="0.05" value={opacidadeCemaden} onChange={e => setOpacidadeCemaden(Number(e.target.value))} />
                   <output>{Math.round(opacidadeCemaden * 100)}%</output>
                 </label>
               </div>
@@ -1638,9 +1732,9 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
                   </strong>
                 </div>
                 <div>
-                  <span className="mapa-chuva-resumo-label">Intensidade estimada</span>
+                  <span className="mapa-chuva-resumo-label">Maior leitura (1h)</span>
                   <strong className={intensidadeEstimada && intensidadeEstimada > 0 ? 'chovendo' : ''}>
-                    {intensidadeEstimada != null ? `${intensidadeEstimada.toFixed(1)} mm/h` : '—'}
+                    {valorChuvaFormatado(intensidadeEstimada)}
                     <small className="mapa-chuva-quadro-tipo">{situacaoChuva(intensidadeEstimada)}</small>
                   </strong>
                 </div>
@@ -1657,7 +1751,8 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
                 O radar mostra a chuva que já foi observada se deslocando em direção à cidade.
                 Para acompanhar se ela está chegando, observe as áreas coloridas se aproximando do círculo tracejado de 10 km.
                 Ele não calcula sozinho o horário de chegada nem substitui uma previsão meteorológica.
-                A intensidade CEMADEN é uma estimativa interpolada entre estações, não uma medição contínua.
+                Os pontos no mapa são leituras reais das estações CEMADEN de Lafaiete, em mm acumulados na última hora.
+                A superfície colorida é uma interpolação entre essas estações e não uma medição contínua.
               </p>
               {cemadenCarregando && <div className="mapa-chuva-status">⏳ Atualizando estações CEMADEN…</div>}
               {cemadenErro && <div className="mapa-chuva-status mapa-chuva-status--erro">{cemadenErro}. O mapa continua disponível.</div>}

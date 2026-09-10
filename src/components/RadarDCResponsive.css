@@ -1736,4 +1736,11 @@ html:-webkit-full-screen {
     padding: .12rem .2rem;
     font-size: .48rem;
   }
+
+  /* Os gráficos ocupam toda a largura útil dos seus quadros. */
+  body.radar-tv-active .radar-tv .radar-cnl-inline .cnl-grafico-wrap {
+    width: calc(100% + .5rem);
+    margin-right: -.25rem;
+    margin-left: -.25rem;
+  }
 }

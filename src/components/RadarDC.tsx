@@ -872,8 +872,8 @@ export default function RadarDC() {
                        <span className="radar-cnl-live">CEMADEN · 5 min</span>
                      </div>
                      <ChartaChuva
-                       pontos={dadosCNL.serieChuvaCentro || []}
-                       estacao={dadosCNL.estacaoChuvaCentro}
+                        pontos={dadosCNL.serie}
+                        estacao={dadosCNL.estacao}
                        mostrarControles
                      />
                    </section>

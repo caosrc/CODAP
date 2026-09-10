@@ -1756,9 +1756,7 @@ html:-webkit-full-screen {
   }
 
   body.radar-tv-active .radar-tv .radar-cnl-inline .cnl-grafico-label-chuva {
-    font-size: 12px;
-    font-weight: 600;
-    stroke-width: 2px;
+    display: none;
   }
 
   body.radar-tv-active .radar-tv .radar-cnl-inline .cnl-grafico-eixo-y {

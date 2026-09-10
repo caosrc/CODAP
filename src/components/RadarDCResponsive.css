@@ -1254,6 +1254,58 @@ body.radar-tv-active .radar-tv .radar-ticker-empty {
   overflow-x: hidden;
 }
 
+.radar-tv-launcher {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .75rem;
+  min-width: 0;
+  padding: .5rem clamp(.65rem, 3vw, 2.6rem);
+  border-bottom: 1px solid #245174;
+  color: #dff4ff;
+  background: #0a2845;
+}
+
+.radar-tv-launcher-copy {
+  display: flex;
+  align-items: baseline;
+  gap: .55rem;
+  min-width: 0;
+}
+
+.radar-tv-launcher-label {
+  color: #8fe5ff;
+  font-size: .72rem;
+  font-weight: 900;
+  letter-spacing: .16em;
+}
+
+.radar-tv-launcher-hint {
+  color: #8daec4;
+  font-size: .68rem;
+}
+
+.radar-tv-launcher-btn {
+  flex: 0 0 auto;
+  border: 1px solid #63d6f5;
+  border-radius: 8px;
+  padding: .48rem .8rem;
+  color: #062542;
+  background: #8fe5ff;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, .18);
+  font: inherit;
+  font-size: .72rem;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.radar-tv-launcher-btn:hover,
+.radar-tv-launcher-btn:focus-visible {
+  background: #c2f3ff;
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
+
 .radar-overview,
 .radar-layout {
   min-width: 0;
@@ -1342,6 +1394,21 @@ body.radar-tv-active .radar-tv .radar-overview {
   gap: clamp(.25rem, .5vw, .45rem);
 }
 
+body.radar-tv-active .radar-tv .radar-tv-launcher {
+  flex: 0 0 auto;
+  padding-top: .3rem;
+  padding-bottom: .3rem;
+}
+
+body.radar-tv-active .radar-tv .radar-tv-launcher-hint {
+  display: none;
+}
+
+body.radar-tv-active .radar-tv .radar-tv-launcher-btn {
+  padding: .28rem .55rem;
+  font-size: .58rem;
+}
+
 body.radar-tv-active .radar-tv .radar-weather,
 body.radar-tv-active .radar-tv .radar-calendar-card {
   min-width: 0;
@@ -1402,6 +1469,19 @@ html:-webkit-full-screen {
   .radar-overview {
     grid-template-columns: minmax(0, 1fr);
     padding-inline: .65rem;
+  }
+
+  .radar-tv-launcher {
+    padding: .45rem .65rem;
+  }
+
+  .radar-tv-launcher-hint {
+    display: none;
+  }
+
+  .radar-tv-launcher-btn {
+    padding: .45rem .6rem;
+    font-size: .65rem;
   }
 
   .radar-overview .radar-weather {

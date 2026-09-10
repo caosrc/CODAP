@@ -778,6 +778,20 @@ export default function RadarDC() {
 
   return (
        <section className={`radar-page ${tv ? 'radar-tv' : ''}`}>
+       <div className="radar-tv-launcher">
+         <div className="radar-tv-launcher-copy">
+           <span className="radar-tv-launcher-label">RADAR DC</span>
+           <span className="radar-tv-launcher-hint">Painel operacional</span>
+         </div>
+         <button
+           className="radar-tv-launcher-btn"
+           type="button"
+           aria-pressed={tv}
+           onClick={() => { void alternarModoTv() }}
+         >
+           {tv ? '↙ Voltar ao app' : '⛶ Modo TV — Tela cheia'}
+         </button>
+       </div>
        <div className="radar-overview">
        <section className="radar-weather radar-weather-compact" aria-labelledby="radar-weather-title">
          <div className="radar-weather-bar">
@@ -786,8 +800,7 @@ export default function RadarDC() {
            {!tempo && !erroTempo && <span className="radar-weather-loading">Carregando previsão...</span>}
            {tempo && <div className="radar-weather-condition"><span>{iconeTempo(tempo.atual.codigo)}</span><div><strong>{Math.round(tempo.atual.temperatura)}°C</strong><b>{nomesTempo[tempo.atual.codigo] || 'Condição variável'}</b></div></div>}
            {tempo && <div className="radar-weather-metrics"><span>🌧️ Chuva <b>{tempo.atual.chuva.toFixed(1)} mm</b></span><span>☔ Prob. hoje <b>{tempo.dias[0]?.probabilidade ?? 0}%</b></span><span>💨 Vento <b>{Math.round(tempo.atual.vento)} km/h</b></span><span>💨 Rajadas <b>{Math.round(tempo.atual.rajada)} km/h</b></span><span>💧 Umidade <b>{Math.round(tempo.atual.umidade)}%</b></span></div>}
-           <div className="radar-clock" aria-label="Hora atual"><span>HORA ATUAL</span><strong>{horaAtual.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</strong></div>
-            <div className="radar-weather-actions"><button className="radar-tv-btn" type="button" aria-pressed={tv} onClick={() => { void alternarModoTv() }}>{tv ? '↙ Voltar ao app' : '⛶ Modo TV'}</button></div>
+            <div className="radar-clock" aria-label="Hora atual"><span>HORA ATUAL</span><strong>{horaAtual.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</strong></div>
          </div>
         {erroTempo && <p className="radar-save-error" role="alert">{erroTempo}</p>}
         {tempo && (

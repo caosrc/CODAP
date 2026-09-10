@@ -3704,6 +3704,7 @@ app.get('/api/radar-chuva', async (_req, res) => {
     radarChuvaCache = {
       host,
       path: ultimo.path,
+      tileUrl: `${host}${ultimo.path}/256/{z}/{x}/{y}/2/1_1.png`,
       frameTime: Number(ultimo.time),
       atualizadoEm: new Date(Number(ultimo.time) * 1000).toISOString(),
       fonte: 'RainViewer',
@@ -3727,13 +3728,18 @@ app.get('/api/radar-chuva', async (_req, res) => {
 // esse serviço for configurado, ele publica um template XYZ em
 // RRQPE_TILES_URL (com {z}, {x} e {y}); o app então sobrepõe a camada no mapa.
 app.get('/api/rrqpe', (_req, res) => {
-  const tileUrl = String(process.env.RRQPE_TILES_URL || '').trim()
+  const tileUrl = String(
+    process.env.RRQPE_TILES_URL ||
+    process.env.RRQPE_TILE_URL ||
+    '',
+  ).trim()
 
   if (!tileUrl) {
     return res.json({
       disponivel: false,
       fonte: 'GOES-16 RRQPE / NOAA',
-      mensagem: 'A camada RRQPE precisa de um serviço de tiles georreferenciados; ele ainda não está configurado neste ambiente.',
+      configuracaoNecessaria: 'RRQPE_TILES_URL',
+      mensagem: 'A camada RRQPE precisa de um serviço de tiles HTTPS configurado no ambiente de produção. A NOAA distribui o produto original como NetCDF, não como tiles XYZ.',
     })
   }
 

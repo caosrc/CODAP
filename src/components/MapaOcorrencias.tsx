@@ -125,6 +125,7 @@ interface IndicadorMonitoramento {
 interface DadosRadarChuva {
   host: string
   path: string
+  tileUrl?: string
   frameTime: number
   atualizadoEm: string
   fonte: string
@@ -562,7 +563,17 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
       if (!respostaRadar.ok) throw new Error('Radar indisponível')
 
       const dadosRadar = await respostaRadar.json()
-      setRadarChuva(dadosRadar)
+      setRadarChuva({
+        host: typeof dadosRadar?.host === 'string' ? dadosRadar.host : '',
+        path: typeof dadosRadar?.path === 'string' ? dadosRadar.path : '',
+        tileUrl: typeof dadosRadar?.tileUrl === 'string' ? dadosRadar.tileUrl : undefined,
+        frameTime: Number(dadosRadar?.frameTime),
+        atualizadoEm: typeof dadosRadar?.atualizadoEm === 'string' ? dadosRadar.atualizadoEm : '',
+        fonte: typeof dadosRadar?.fonte === 'string' ? dadosRadar.fonte : 'RainViewer',
+        tipoQuadro: dadosRadar?.tipoQuadro === 'nowcast' ? 'nowcast' : 'observado',
+        cache: dadosRadar?.cache === true,
+        erroAtualizacao: dadosRadar?.erroAtualizacao === true,
+      })
 
       if (respostaTempo.ok) {
         const dadosTempo = await respostaTempo.json()
@@ -612,8 +623,10 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
     setRRQPEErro(null)
     try {
       const resposta = await fetch(`/api/rrqpe?_ts=${Date.now()}`, { cache: 'no-store' })
-      if (!resposta.ok) throw new Error('RRQPE indisponível')
-      const dados = await resposta.json()
+      const dados = await resposta.json().catch(() => ({}))
+      if (!resposta.ok) {
+        throw new Error(typeof dados?.erro === 'string' ? dados.erro : 'RRQPE indisponível')
+      }
       setRRQPE({
         disponivel: dados?.disponivel === true,
         tileUrl: typeof dados?.tileUrl === 'string' ? dados.tileUrl : undefined,
@@ -621,8 +634,8 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
         fonte: typeof dados?.fonte === 'string' ? dados.fonte : 'GOES-16 RRQPE / NOAA',
         mensagem: typeof dados?.mensagem === 'string' ? dados.mensagem : undefined,
       })
-    } catch {
-      setRRQPEErro('Não foi possível consultar o RRQPE agora.')
+    } catch (erro) {
+      setRRQPEErro(erro instanceof Error && erro.message ? erro.message : 'Não foi possível consultar o RRQPE agora.')
     } finally {
       setRRQPECarregando(false)
     }
@@ -1342,7 +1355,7 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
         {mostrarChuva && radarChuva && (
           <TileLayer
             key={`radar-chuva-${radarChuva.frameTime}`}
-            url={`${radarChuva.host}${radarChuva.path}/256/{z}/{x}/{y}/2/1_1.png`}
+            url={radarChuva.tileUrl || `${radarChuva.host}${radarChuva.path}/256/{z}/{x}/{y}/2/1_1.png`}
             opacity={0.72}
             attribution='Radar meteorológico: <a href="https://www.rainviewer.com/" target="_blank" rel="noreferrer">RainViewer</a>'
             maxNativeZoom={7}

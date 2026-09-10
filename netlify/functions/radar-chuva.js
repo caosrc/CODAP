@@ -14,12 +14,14 @@ export const handler = async () => {
     const quadros = observados.length ? observados : nowcast
     const ultimo = quadros.at(-1)
     if (!host || !ultimo) throw new Error('RainViewer não retornou quadros de radar')
+    const tileUrl = `${host}${ultimo.path}/256/{z}/{x}/{y}/2/1_1.png`
     return {
       statusCode: 200,
       headers: { 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=120' },
       body: JSON.stringify({
         host,
         path: ultimo.path,
+          tileUrl,
         frameTime: Number(ultimo.time),
         atualizadoEm: new Date(Number(ultimo.time) * 1000).toISOString(),
         fonte: 'RainViewer',

@@ -17,6 +17,7 @@ Required env vars (all set in Replit shared env / secrets):
 - `EARTH_ENGINE_PROJECT` — optional Earth Engine/Google Cloud project ID; when omitted, uses the `project_id` from the JSON key
 - `FIRMS_MAP_KEY` — Secret for NASA FIRMS active-fire data
 - `PLANET_API_KEY` — Secret for Planet satellite imagery queries
+- `RRQPE_TILES_URL` — HTTPS XYZ tile template for a rasterized RRQPE service, containing `{z}`, `{x}` and `{y}`; the NOAA source itself is NetCDF and cannot be used directly by Leaflet
 
 ## Stack
 - **Frontend**: React 19 + TypeScript + Vite
@@ -69,6 +70,7 @@ Required env vars (all set in Replit shared env / secrets):
 - Push notifications require `VAPID_PRIVATE_KEY` secret to be set in Replit secrets
 - Earth Engine requires the service account to have Earth Engine access and the `Service Usage Consumer` role on the Google Cloud project
 - O botão **Chuva** mostra precipitação observada pelo radar RainViewer, atualizada automaticamente a cada 5 minutos, com legenda e limite municipal tracejado. A leitura em mm do centro é um resumo do Open-Meteo e não substitui pluviômetro local.
+- A camada **RRQPE** só é desenhada quando `RRQPE_TILES_URL` está configurada no ambiente de produção; ela deve apontar para um serviço que rasterize o produto NOAA GOES-16 RRQPE em tiles XYZ HTTPS.
 - O monitoramento do Earth Engine usa `FireMask >= 7` para MODIS/VIIRS e `Area > 0` para GOES-19 FDCF (cadência de 10 minutos); não interpreta chuva, radar, vegetação ou cicatriz de queimada como incêndio ativo
 - O mapa consulta os focos NASA FIRMS e as camadas do Earth Engine para Conselheiro Lafaiete; a conta de serviço do Earth Engine precisa do acesso ao projeto e do papel Service Usage Consumer
 - O painel CEMADEN lista todas as estações do município com os acumulados móveis de 1, 6, 12, 24, 48, 72 e 96 horas, além da leitura “Último”

@@ -1,5 +1,5 @@
 export const handler = async () => {
-  const tileUrl = String(process.env.RRQPE_TILES_URL || '').trim()
+  const tileUrl = String(process.env.RRQPE_TILES_URL || process.env.RRQPE_TILE_URL || '').trim()
   if (!tileUrl) {
     return {
       statusCode: 200,
@@ -7,7 +7,8 @@ export const handler = async () => {
       body: JSON.stringify({
         disponivel: false,
         fonte: 'GOES-16 RRQPE / NOAA',
-        mensagem: 'A camada RRQPE precisa de um serviço de tiles HTTPS configurado no Netlify.',
+        configuracaoNecessaria: 'RRQPE_TILES_URL',
+        mensagem: 'A camada RRQPE precisa de um serviço de tiles HTTPS configurado no Netlify. A NOAA distribui o produto original como NetCDF, não como tiles XYZ.',
       }),
     }
   }

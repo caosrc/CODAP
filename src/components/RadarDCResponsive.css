@@ -1691,40 +1691,109 @@ html:-webkit-full-screen {
   }
 
   body.radar-tv-active .radar-tv .radar-cnl-inline .cnl-grafico-nivel-cemaden {
-    height: clamp(115px, 17vh, 150px);
+    height: clamp(175px, 24vh, 245px);
+    border: 2px solid #b6cbd8;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(4, 24, 43, .28);
   }
 
   body.radar-tv-active .radar-tv .radar-cnl-inline .radar-cnl-rain,
   body.radar-tv-active .radar-tv .radar-cnl-inline .radar-cnl-precipitacao {
-    margin-top: .16rem;
-    padding-top: .16rem;
+    margin-top: .42rem;
+    padding-top: .34rem;
   }
 
   body.radar-tv-active .radar-tv .radar-cnl-inline .radar-cnl-rain-heading h3 {
-    margin-top: .08rem;
-    font-size: .6rem;
+    margin-top: .1rem;
+    font-size: .78rem;
   }
 
   body.radar-tv-active .radar-tv .radar-cnl-inline .cnl-grafico-chuva {
-    height: clamp(95px, 14vh, 125px);
+    height: clamp(135px, 18vh, 185px);
+    border: 2px solid #b6cbd8;
+    border-radius: 8px;
+    background: #fff;
+    box-shadow: 0 2px 8px rgba(4, 24, 43, .24);
   }
 
   body.radar-tv-active .radar-tv .radar-cnl-inline .cnl-chuva-controles {
-    padding-top: 0;
-    font-size: .5rem;
+    padding-top: .05rem;
+    color: #e8f5ff;
+    font-size: .62rem;
   }
 
   body.radar-tv-active .radar-tv .radar-cnl-inline .cnl-chuva-controles select {
-    min-width: 2.8rem;
-    padding: .06rem .12rem;
-    font-size: .5rem;
+    min-width: 3.2rem;
+    padding: .1rem .16rem;
+    font-size: .62rem;
   }
 
   body.radar-tv-active .radar-tv .radar-cnl-inline .cnl-chuva-legenda,
   body.radar-tv-active .radar-tv .radar-cnl-inline .cnl-grafico-legenda {
-    gap: .2rem .4rem;
-    padding: .08rem .2rem .12rem;
-    font-size: .42rem;
+    gap: .24rem .55rem;
+    padding: .14rem .2rem .18rem;
+    color: #d5eafa;
+    font-size: .56rem;
+  }
+
+  /* Contraste reforçado para leitura a distância na tela da TV. */
+  body.radar-tv-active .radar-tv .radar-cnl-inline .cnl-grafico-grade {
+    stroke: #c5d3dc;
+    stroke-width: 1.4;
+  }
+
+  body.radar-tv-active .radar-tv .radar-cnl-inline .cnl-grafico-label {
+    fill: #344d5d;
+    font-size: 16px;
+    font-weight: 700;
+  }
+
+  body.radar-tv-active .radar-tv .radar-cnl-inline .cnl-grafico-label-data {
+    font-size: 15px;
+    font-weight: 800;
+  }
+
+  body.radar-tv-active .radar-tv .radar-cnl-inline .cnl-grafico-eixo-y {
+    fill: #3c596a;
+    font-size: 15px;
+    font-weight: 800;
+  }
+
+  body.radar-tv-active .radar-tv .radar-cnl-inline .cnl-grafico-nivel-cemaden .cnl-grafico-linha-nivel {
+    stroke: #176fa8;
+    stroke-width: 4;
+  }
+
+  body.radar-tv-active .radar-tv .radar-cnl-inline .cnl-grafico-nivel-cemaden .cnl-grafico-ponto-nivel {
+    fill: #e5f7ff;
+    stroke: #176fa8;
+    stroke-width: 2.4;
+  }
+
+  body.radar-tv-active .radar-tv .radar-cnl-inline .cnl-grafico-chuva-titulo {
+    fill: #274454;
+    font-size: 18px;
+    font-weight: 900;
+  }
+
+  body.radar-tv-active .radar-tv .radar-cnl-inline .cnl-grafico-chuva-bar {
+    fill: #c2414d;
+    opacity: 1;
+  }
+
+  body.radar-tv-active .radar-tv .radar-cnl-inline .cnl-grafico-chuva-bar-atual {
+    fill: #176fa8;
+  }
+
+  body.radar-tv-active .radar-tv .radar-cnl-inline .cnl-grafico-linha-chuva {
+    stroke: #16734e;
+    stroke-width: 4;
+  }
+
+  body.radar-tv-active .radar-tv .radar-cnl-inline .cnl-grafico-ponto-chuva {
+    fill: #e6fff1;
+    stroke: #12613f;
+    stroke-width: 2.2;
   }
 
   body.radar-tv-active .radar-tv .radar-cnl-inline .radar-cnl-diaria-detalhe {

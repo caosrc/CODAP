@@ -601,11 +601,14 @@ function relatorioFileName(ocorrencia) {
 }
 
 function getRelatorioTemplatePath() {
+  const templatePublico = join(__dirname, '..', 'public', 'relatorio-vistoria-template.docx')
+  if (existsSync(templatePublico)) return templatePublico
+
   const assetsPath = join(__dirname, '..', 'attached_assets')
   const arquivos = readdirSync(assetsPath)
-    .filter((nome) => nome.startsWith('RelVist_') && nome.endsWith('.docx'))
+    .filter((nome) => /^Modelo_.*\.docx$/i.test(nome))
     .sort()
-  if (!arquivos.length) throw new Error('Modelo de relatório não encontrado em attached_assets')
+  if (!arquivos.length) throw new Error('Modelo de relatório não encontrado')
   return join(assetsPath, arquivos[arquivos.length - 1])
 }
 

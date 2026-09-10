@@ -2,7 +2,7 @@ import JSZip from 'jszip'
 import type { Ocorrencia } from './types'
 
 // Versão explícita evita que o navegador reutilize um modelo DOCX antigo do cache.
-const TEMPLATE_URL = '/relatorio-vistoria-template.docx?v=modelo-1788970852985'
+const TEMPLATE_URL = '/relatorio-vistoria-template.docx?v=modelo-1789057943437'
 
 const MESES = [
   'janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho',

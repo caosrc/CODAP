@@ -1,5 +1,6 @@
 import JSZip from 'jszip'
 import type { Ocorrencia } from './types'
+import { gerarRelatorioVistoria } from './relatorioVistoria'
 
 const MESES = [
   'janeiro','fevereiro','março','abril','maio','junho',
@@ -137,27 +138,8 @@ function gerarDocxXml(o: Ocorrencia): string {
 }
 
 async function gerarDocxBlob(o: Ocorrencia): Promise<Uint8Array> {
-  const docZip = new JSZip()
-
-  docZip.file('[Content_Types].xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
-  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
-  <Default Extension="xml" ContentType="application/xml"/>
-  <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
-</Types>`)
-
-  docZip.file('_rels/.rels', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
-  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
-</Relationships>`)
-
-  docZip.file('word/document.xml', gerarDocxXml(o))
-
-  docZip.file('word/_rels/document.xml.rels', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
-</Relationships>`)
-
-  return docZip.generateAsync({ type: 'uint8array' })
+  const blob = await gerarRelatorioVistoria(o)
+  return new Uint8Array(await blob.arrayBuffer())
 }
 
 interface ArquivoParaSalvar {

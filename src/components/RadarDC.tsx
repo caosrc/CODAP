@@ -522,10 +522,7 @@ export default function RadarDC() {
     const inicio = new Date(primeiro); inicio.setDate(1 - primeiro.getDay())
     return Array.from({ length: 42 }, (_, i) => { const d = new Date(inicio); d.setDate(inicio.getDate() + i); return d })
   }, [mes])
-  const lembretes = registros.filter(r => (
-    r.tipo === 'lembrete'
-    && (r.agentesEnvolvidos.includes(agente) || r.criadoPor === agente)
-  ))
+  const lembretes = registros.filter(r => r.tipo === 'lembrete')
   const notificacoes = registros.filter(r => r.tipo === 'notificacao')
   const notificacoesDaData = notificacoes.filter(r => r.data === dataSelecionada)
   // Notificações vencidas continuam disponíveis no calendário como histórico,
@@ -896,15 +893,15 @@ export default function RadarDC() {
           </div>
           <div className="radar-mini-list">
             {lembretes.length === 0 ? (
-              <span>Nenhum lembrete pendente para você.</span>
+              <span>Nenhum lembrete criado.</span>
            ) : lembretes.map(l => (
               <div className="radar-mini-item" key={l.id}>
-                 <b>{l.criadoPor === agente ? 'Criado por você' : l.criadoPor}</b>
+                 <b>{l.criadoPor === agente ? 'Criado por você' : `Criado por ${l.criadoPor}`}</b>
                 <span>{l.texto}</span>
-                 <div className="radar-reminder-statuses" aria-label="Status de leitura do lembrete">
-                   {(l.criadoPor === agente ? l.agentesEnvolvidos : [agente]).map(nome => {
+                 <div className="radar-reminder-statuses" aria-label="Status de visualização do lembrete">
+                   {l.agentesEnvolvidos.map(nome => {
                      const ciente = l.confirmacoesAgentes.some(item => item.agente === nome && item.confirmado)
-                     return <small key={nome}><strong>{nome}</strong>: <em className={ciente ? 'radar-reminder-read' : 'radar-reminder-unread'}>{ciente ? 'Ciente' : 'Não lido'}</em></small>
+                     return <small key={nome}><strong>{nome}</strong>: <em className={ciente ? 'radar-reminder-read' : 'radar-reminder-unread'}>{ciente ? 'Ciente' : 'Não visualizou'}</em></small>
                    })}
                  </div>
                  {l.agentesEnvolvidos.includes(agente) && !l.confirmacoesAgentes.some(item => item.agente === agente && item.confirmado) && (

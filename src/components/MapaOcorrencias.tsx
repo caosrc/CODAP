@@ -29,99 +29,6 @@ import {
 } from '../gpsService'
 
 
-// ── Tipos ───────────────────────────────────────────────────────
-interface FocoIncendio {
-  lat: number
-  lng: number
-  confidence: string  // 'l' | 'n' | 'h'
-  frp: number         // Fire Radiative Power (MW)
-  data: string
-  hora: string
-  satelite: string
-  fonte: string       // FIRMS ou EARTH-ENGINE-MULTISATELITE
-}
-
-interface CamadaMonitoramento {
-  id: string
-  nome: string
-  descricao: string
-  url: string | null
-  periodo: string
-  frequencia?: string
-  tipo?: string
-  quantidade?: number
-  disponivel?: boolean
-  configuracaoNecessaria?: string | null
-  status?: 'disponivel' | 'sem-dados' | 'aguardando'
-}
-
-interface FonteMonitoramento {
-  id: string
-  nome: string
-  descricao: string
-  frequencia: string
-  tipo: string
-  disponivel: boolean
-  quantidade: number
-  atualizadoEm?: string | null
-  configuracaoNecessaria?: string | null
-}
-
-const FERRAMENTAS_SATELITE: CamadaMonitoramento[] = [
-  {
-    id: 'goes-19-fire',
-    nome: 'GOES-R / GOES-19 ABI',
-    descricao: 'Evolução temporal do fogo pelo produto Fire/Hot Spot Characterization.',
-    periodo: 'Últimas 24 horas',
-    url: null,
-    frequencia: '10 min',
-    tipo: 'Earth Engine',
-  },
-  {
-    id: 'viirs-noaa20-fire',
-    nome: 'NOAA-20 VIIRS',
-    descricao: 'Focos de alta resolução espacial em passagem orbital.',
-    periodo: 'Últimos 3 dias',
-    url: null,
-    frequencia: 'NRT',
-    tipo: 'NASA FIRMS',
-  },
-  {
-    id: 'viirs-snpp-fire',
-    nome: 'S-NPP VIIRS',
-    descricao: 'Focos de alta resolução espacial em passagem orbital.',
-    periodo: 'Últimos 3 dias',
-    url: null,
-    frequencia: 'NRT',
-    tipo: 'NASA FIRMS',
-  },
-  {
-    id: 'modis-terra-fire',
-    nome: 'Terra MODIS',
-    descricao: 'Confirmação e complemento das detecções de fogo ativo.',
-    periodo: 'Últimos 3 dias',
-    url: null,
-    frequencia: 'NRT',
-    tipo: 'NASA FIRMS',
-  },
-  {
-    id: 'modis-aqua-fire',
-    nome: 'Aqua MODIS',
-    descricao: 'Confirmação e complemento das detecções de fogo ativo.',
-    periodo: 'Últimos 3 dias',
-    url: null,
-    frequencia: 'NRT',
-    tipo: 'NASA FIRMS',
-  },
-]
-
-interface IndicadorMonitoramento {
-  id: string
-  nome: string
-  valor: number
-  unidade: string
-}
-
 interface DadosRadarChuva {
   host: string
   path: string
@@ -444,28 +351,6 @@ function corParaDispositivo(_id: string, idx: number) {
   return CORES_EQUIPES[idx % CORES_EQUIPES.length]
 }
 
-function criarIconeFogo(confidence: string, fonte: string): L.DivIcon {
-  const isGoes = fonte === 'GOES'
-  // VIIRS: vermelho/laranja — menor resolução, mais preciso
-  // GOES:  âmbar/laranja — resolução ~2km, atualiza a cada 10min
-  const bg = isGoes
-    ? (confidence === 'h' ? '#b45309' : confidence === 'n' ? '#d97706' : '#f59e0b')
-    : (confidence === 'h' ? '#dc2626' : confidence === 'n' ? '#ea580c' : '#f97316')
-  const size = isGoes ? 34 : 30
-  const label = isGoes ? `<div style="position:absolute;top:-1px;right:-1px;width:12px;height:12px;
-    background:#1e40af;border-radius:50%;border:1px solid white;font-size:7px;
-    display:flex;align-items:center;justify-content:center;color:white;font-weight:700;">G</div>` : ''
-  return L.divIcon({
-    className: '',
-    html: `<div style="position:relative;font-size:${isGoes ? 18 : 16}px;width:${size}px;height:${size}px;
-      display:flex;align-items:center;justify-content:center;background:${bg};border-radius:50%;
-      border:2px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.5);
-      animation:pulsoFogo 1.8s ease-in-out infinite;">🔥${label}</div>`,
-    iconSize: [size, size],
-    iconAnchor: [size / 2, size / 2],
-  })
-}
-
 // ── Componentes auxiliares ──────────────────────────────────────
 function MapClickHandler({ onMapClick }: { onMapClick: () => void }) {
   useMapEvents({ click: onMapClick })
@@ -616,7 +501,6 @@ type StatusGps = 'inativo' | 'aguardando' | 'ativo' | 'erro'
 type StatusOffline = 'idle' | 'baixando' | 'concluido' | 'erro'
 type StatusWs = 'desconectado' | 'conectando' | 'conectado'
 type CamadaMapa = 'padrao' | 'satelite'
-type CamadaMonitoramentoId = string | null
 
 
 function nomeDiaSemana(dateStr: string): string {
@@ -636,8 +520,6 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
   const [selecionada, setSelecionada] = useState<Ocorrencia | null>(null)
   const [legendaAberta, setLegendaAberta] = useState(false)
   const [camadaMapa, setCamadaMapa] = useState<CamadaMapa>('padrao')
-  const [camadaMonitoramento, setCamadaMonitoramento] = useState<CamadaMonitoramentoId>(null)
-  const [painelMonitoramentoAberto, setPainelMonitoramentoAberto] = useState(false)
   const [mostrarChuva, setMostrarChuva] = useState(false)
   const [painelChuvaAberto, setPainelChuvaAberto] = useState(false)
   const [radarChuva, setRadarChuva] = useState<DadosRadarChuva | null>(null)
@@ -693,30 +575,6 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
   const nomeLocalRef = useRef(nomeLocal)
   const dispositivoId = useRef(getDispositivoId())
 
-
-  // Focos de incêndio (NASA FIRMS + Earth Engine — somente fogo ativo)
-  const [focosIncendio, setFocosIncendio] = useState<FocoIncendio[]>([])
-  const [mostrarFocos, setMostrarFocos] = useState(false)
-  const [focosConfigurado, setFocosConfigurado] = useState<boolean | null>(null)
-  const [focosFontes, setFocosFontes] = useState<string[]>([])
-  const [focosAtualizadoEm, setFocosAtualizadoEm] = useState<string | null>(null)
-  const [focosCarregando, setFocosCarregando] = useState(false)
-  const [focosMonitoramento, setFocosMonitoramento] = useState<{
-    firms: boolean
-    earthEngine?: { configurado?: boolean; erro?: string | null }
-    catalogo?: FonteMonitoramento[]
-  } | null>(null)
-  const [alertaFocosVisto, setAlertaFocosVisto] = useState(false)
-  const [monitoramentoEE, setMonitoramentoEE] = useState<{
-    configurado: boolean
-    camadas: CamadaMonitoramento[]
-    indicadores: IndicadorMonitoramento[]
-    erros: string[]
-    semDados?: Array<{ id: string; nome: string; periodo?: string }>
-    atualizadoEm?: string
-    periodo?: { inicio: string; fim: string }
-  } | null>(null)
-  const [monitoramentoCarregando, setMonitoramentoCarregando] = useState(false)
 
   // ── Chuva ao vivo — RainViewer + estimativa interpolada CEMADEN ──
   const buscarRadarChuva = useCallback(async () => {
@@ -825,113 +683,8 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
   useEffect(() => { nomeLocalRef.current = nomeLocal }, [nomeLocal])
 
 
-  // ── Focos de Incêndio (NASA FIRMS + Earth Engine) ─────────────
-  const buscarFocos = useCallback(async () => {
-    setFocosCarregando(true)
-    try {
-      const focosUrl = import.meta.env.VITE_FOCOS_API_URL || '/api/focos-incendio'
-      const separador = focosUrl.includes('?') ? '&' : '?'
-      const resp = await fetch(`${focosUrl}${separador}_ts=${Date.now()}`, {
-        cache: 'no-store',
-      })
-      if (!resp.ok) return
-      const data = await resp.json()
-      setFocosConfigurado(data.configurado ?? false)
-      if (Array.isArray(data.fontes)) setFocosFontes(data.fontes)
-      if (data.atualizadoEm) setFocosAtualizadoEm(data.atualizadoEm)
-      if (data.fontesMonitoramento) setFocosMonitoramento(data.fontesMonitoramento)
-      if (Array.isArray(data.focos)) {
-        setFocosIncendio(data.focos)
-        if (data.focos.length > 0) setAlertaFocosVisto(false)
-      }
-    } catch { /* ignora */ }
-    finally {
-      setFocosCarregando(false)
-    }
-  }, [])
-
-  const visualizarFocos = useCallback(async () => {
-    setMostrarFocos(true)
-    setAlertaFocosVisto(true)
-    await buscarFocos()
-  }, [buscarFocos])
-
-  useEffect(() => {
-    buscarFocos()
-    const intervalo = setInterval(buscarFocos, 60 * 1000)
-
-    const atualizarAoVoltar = () => {
-      if (document.visibilityState === 'visible') {
-        buscarFocos()
-      }
-    }
-
-    document.addEventListener('visibilitychange', atualizarAoVoltar)
-
-    return () => {
-      clearInterval(intervalo)
-      document.removeEventListener('visibilitychange', atualizarAoVoltar)
-    }
-  }, [buscarFocos])
-
-  // ── Análise ambiental do Earth Engine ─────────────────────────
-  const buscarMonitoramento = useCallback(async () => {
-    setMonitoramentoCarregando(true)
-    try {
-      // Usa a rota pública para funcionar no Replit e no Netlify.
-      const resp = await fetch(`/api/monitoramento-incendio?_ts=${Date.now()}`, {
-        cache: 'no-store',
-      })
-      if (!resp.ok) return
-      const data = await resp.json()
-      setMonitoramentoEE({
-        ...data,
-        camadas: Array.isArray(data.camadas) ? data.camadas : [],
-        indicadores: Array.isArray(data.indicadores) ? data.indicadores : [],
-        erros: Array.isArray(data.erros) ? data.erros : [],
-      })
-    } catch {
-      setMonitoramentoEE(prev => prev ?? {
-        configurado: false,
-        camadas: [],
-        indicadores: [],
-        erros: ['Não foi possível consultar o Earth Engine'],
-      })
-    } finally {
-      setMonitoramentoCarregando(false)
-    }
-  }, [])
-
-  useEffect(() => {
-    buscarMonitoramento()
-    const intervalo = setInterval(buscarMonitoramento, 10 * 60 * 1000)
-    return () => clearInterval(intervalo)
-  }, [buscarMonitoramento])
-
   const comGeo = useMemo(() => ocorrencias.filter((o) => o.lat && o.lng), [ocorrencias])
   const semGeo = ocorrencias.length - comGeo.length
-
-  // Mantém as ferramentas de fogo visíveis mesmo quando o Earth
-  // Engine ainda não está autenticado. As URLs reais substituem o catálogo
-  // assim que o endpoint retorna as camadas assinadas.
-  const camadasMonitoramento = useMemo(() => {
-    const reais = new Map((monitoramentoEE?.camadas ?? []).map(camada => [camada.id, camada]))
-    const catalogo = new Map((focosMonitoramento?.catalogo ?? []).map(fonte => [fonte.id, fonte]))
-    const principais = FERRAMENTAS_SATELITE.map(camada => ({
-      ...camada,
-      ...(reais.get(camada.id) ?? {}),
-      ...(catalogo.get(camada.id) ?? {}),
-      status: (reais.get(camada.id)?.url || catalogo.get(camada.id)?.disponivel)
-        ? 'disponivel'
-        : catalogo.has(camada.id) && !catalogo.get(camada.id)?.configuracaoNecessaria
-          ? 'sem-dados'
-          : 'aguardando',
-    }))
-    const extras = (monitoramentoEE?.camadas ?? []).filter(
-      camada => !FERRAMENTAS_SATELITE.some(principal => principal.id === camada.id),
-    )
-    return [...principais, ...extras]
-  }, [monitoramentoEE, focosMonitoramento])
 
   // Persiste contagem de tiles no localStorage para mostrar status entre recargas
   useEffect(() => {
@@ -1503,16 +1256,6 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
             updateWhenIdle={true}
           />
         )}
-        {camadaMonitoramento && camadasMonitoramento.find(c => c.id === camadaMonitoramento)?.url && (
-          <TileLayer
-            key={`earth-engine-${camadaMonitoramento}`}
-            url={camadasMonitoramento.find(c => c.id === camadaMonitoramento)!.url!}
-            opacity={0.62}
-            attribution="Dados ambientais: Google Earth Engine"
-            maxZoom={18}
-            zIndex={10}
-          />
-        )}
         {mostrarNuvensGoes && templateTilesHttpsValido(GOES_CLOUD_TILE_URL) && (
           <Pane name="nuvensGoesPane" style={{ zIndex: 410 }}>
             <TileLayer
@@ -1694,56 +1437,6 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
 
         {destino && <FocoDestino destino={destino} rota={rota} />}
 
-        {/* Focos de incêndio — NASA FIRMS + Earth Engine (fogo ativo) */}
-        {mostrarFocos && focosIncendio.map((f, i) => {
-          const fonte = f.fonte || ''
-          const isGoes = fonte === 'GOES'
-          const isEarthEngine = fonte.startsWith('EARTH-ENGINE-')
-          const corTitulo = isGoes ? '#b45309' : isEarthEngine ? '#7c2d12' : '#dc2626'
-          return (
-            <Marker
-              key={`fogo-${i}`}
-              position={[f.lat, f.lng]}
-              icon={criarIconeFogo(f.confidence, f.fonte)}
-              zIndexOffset={1500}
-            >
-              <Popup>
-                <div style={{ minWidth: 200, fontFamily: 'inherit' }}>
-                  <div style={{ fontWeight: 700, fontSize: '0.92rem', color: corTitulo, marginBottom: 4 }}>
-                    🔥 Foco de Incêndio
-                  </div>
-                  <div style={{ fontSize: '0.72rem', background: isGoes ? '#fef3c7' : '#fee2e2',
-                    color: isGoes ? '#92400e' : '#991b1b', borderRadius: 5, padding: '2px 7px',
-                    display: 'inline-block', marginBottom: 6, fontWeight: 600 }}>
-                    {isEarthEngine
-                      ? `🛰️ ${f.satelite || 'Multissatélite'} / Earth Engine — fogo ativo`
-                      : `🛰️ ${f.satelite || (isGoes ? 'GOES' : 'VIIRS')} / NASA FIRMS — fogo ativo`}
-                  </div>
-                  <div style={{ fontSize: '0.78rem', color: '#374151', marginBottom: 3 }}>
-                    <strong>Confiança:</strong>{' '}
-                    {f.confidence === 'h' ? '🔴 Alta' : f.confidence === 'n' ? '🟠 Nominal' : '🟡 Baixa'}
-                  </div>
-                  {f.frp > 0 && (
-                    <div style={{ fontSize: '0.78rem', color: '#374151', marginBottom: 3 }}>
-                      <strong>Potência radiativa:</strong> {f.frp.toFixed(1)} MW
-                    </div>
-                  )}
-                  <div style={{ fontSize: '0.78rem', color: '#374151', marginBottom: 3 }}>
-                    <strong>Data e hora do registro:</strong> {f.data || 'Não informada'}
-                    {f.hora ? ` às ${f.hora.slice(0,2)}:${f.hora.slice(2,4)} UTC` : ' · horário não informado pela fonte'}
-                  </div>
-                  <div style={{ fontSize: '0.78rem', color: '#6b7280', marginBottom: 2 }}>
-                    <strong>Satélite:</strong> {f.satelite || f.fonte}
-                  </div>
-                  <div style={{ fontSize: '0.7rem', color: '#9ca3af' }}>
-                    {f.lat.toFixed(5)}, {f.lng.toFixed(5)}
-                  </div>
-                </div>
-              </Popup>
-            </Marker>
-          )
-        })}
-
         {/* Ocorrências — ícones individuais, viewport culling ativo */}
         {mostrarOcorrencias && !mapaEmMovimento && ocorrenciasVisiveis.map(o => {
           const temGps = !!(o.lat && o.lng)
@@ -1798,27 +1491,6 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
           </Marker>
         ))}
       </MapContainer>
-
-      {/* Banner de alerta — focos de incêndio detectados */}
-      {focosIncendio.length > 0 && !alertaFocosVisto && (
-        <div className="mapa-fogo-alerta">
-          <span className="mapa-fogo-alerta-icone">🔥</span>
-          <div className="mapa-fogo-alerta-texto">
-            <strong>{focosIncendio.length} foco{focosIncendio.length > 1 ? 's' : ''} de incêndio</strong>
-            <span>detectado{focosIncendio.length > 1 ? 's' : ''} em Conselheiro Lafaiete</span>
-          </div>
-          <button
-            className="mapa-fogo-alerta-ver"
-            onClick={() => { setMostrarFocos(true); setAlertaFocosVisto(true) }}
-          >
-            Ver no mapa
-          </button>
-          <button
-            className="mapa-fogo-alerta-fechar"
-            onClick={() => setAlertaFocosVisto(true)}
-          >✕</button>
-        </div>
-      )}
 
       {/* Top stats bar */}
       <div className="mapa-topbar">
@@ -1907,7 +1579,7 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
                 >
                   🌧️ Radar RainViewer
                 </button>
-                <span>Radar observado · Weather data by RainViewer</span>
+                <span>Precipitação observada · atualização automática a cada 5 min</span>
               </div>
               <div className="mapa-chuva-fontes">
                 <button
@@ -1982,7 +1654,10 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
                 <span><i className="chuva-cor chuva-cor--extrema" /> extrema</span>
               </div>
               <p className="mapa-chuva-ajuda">
-                Radar: Weather data by RainViewer. A intensidade CEMADEN é uma estimativa interpolada entre estações, não uma medição contínua. RRQPE NOAA: indisponível no mapa no momento.
+                O radar mostra a chuva que já foi observada se deslocando em direção à cidade.
+                Para acompanhar se ela está chegando, observe as áreas coloridas se aproximando do círculo tracejado de 10 km.
+                Ele não calcula sozinho o horário de chegada nem substitui uma previsão meteorológica.
+                A intensidade CEMADEN é uma estimativa interpolada entre estações, não uma medição contínua.
               </p>
               {cemadenCarregando && <div className="mapa-chuva-status">⏳ Atualizando estações CEMADEN…</div>}
               {cemadenErro && <div className="mapa-chuva-status mapa-chuva-status--erro">{cemadenErro}. O mapa continua disponível.</div>}
@@ -2076,162 +1751,7 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
             </div>
           )}
         </div>
-        <div className="mapa-incendios-wrap">
-          <button
-            className={`mapa-camada-btn mapa-fogo-btn ${mostrarFocos || painelMonitoramentoAberto ? 'ativo' : ''} ${focosIncendio.length > 0 ? 'tem-focos' : ''}`}
-            onClick={() => {
-              setPainelMonitoramentoAberto(v => !v)
-            }}
-            title={
-              focosConfigurado === false && !focosMonitoramento?.earthEngine?.configurado
-                ? 'Configure FIRMS_MAP_KEY ou autentique o Google Earth Engine para ativar'
-                : focosIncendio.length > 0
-                  ? `${focosIncendio.length} foco(s) — ${focosFontes.join(' + ')} — ${focosAtualizadoEm ? new Date(focosAtualizadoEm).toLocaleTimeString('pt-BR') : ''}`
-                  : `Monitoramento via ${focosFontes.length > 0 ? focosFontes.join(' + ') : 'NASA FIRMS + Earth Engine'} — área oficial de Conselheiro Lafaiete`
-            }
-          >
-            🔥 Incêndios{focosIncendio.length > 0 ? ` (${focosIncendio.length})` : ''}{focosConfigurado === false && !focosMonitoramento?.earthEngine?.configurado ? ' ⚠️' : ''}
-          </button>
-        </div>
       </div>
-
-      {painelMonitoramentoAberto && (
-        <div className="mapa-monitoramento-painel">
-          <div className="mapa-monitoramento-header">
-            <div>
-              <strong>🛰️ Detecção de incêndio por satélite</strong>
-              <span>
-  NASA FIRMS · Conselheiro Lafaiete/MG
-  {focosAtualizadoEm
-    ? ` · atualizado às ${new Date(focosAtualizadoEm).toLocaleTimeString('pt-BR')}`
-    : ''}
-</span>
-            </div>
-            <button
-              onClick={() => setPainelMonitoramentoAberto(false)}
-              aria-label="Fechar análise ambiental"
-            >✕</button>
-          </div>
-            {!monitoramentoEE?.configurado && (
-            <div className="mapa-monitoramento-vazio">
-              Earth Engine ainda não está autenticado neste ambiente. As ferramentas aparecem abaixo,
-              mas as sobreposições precisam do Secret <strong>EARTH_ENGINE_SERVICE_ACCOUNT_JSON</strong>.
-                {focosMonitoramento?.firms
-                  ? ' Os focos NASA FIRMS continuam ativos e são exibidos no mapa.'
-                  : ' A detecção NASA FIRMS também não está disponível neste momento.'}
-              {monitoramentoEE?.erros?.[0] && <small>{monitoramentoEE.erros[0]}</small>}
-            </div>
-          )}
-          <>
-            {(monitoramentoEE?.configurado || focosMonitoramento?.firms) && (
-              <p className="mapa-monitoramento-ajuda">
-                 {monitoramentoEE?.configurado
-                   ? 'Selecione uma camada para sobrepor ao mapa. Todas as camadas abaixo representam somente detecções de fogo ativo no município.'
-                   : 'Os focos ativos da NASA FIRMS já estão exibidos no mapa. As camadas de sobreposição aguardam a autenticação do Earth Engine.'}
-              </p>
-            )}
-            {(monitoramentoEE?.configurado || focosMonitoramento?.firms) && (
-              <div className="mapa-monitoramento-fontes">
-                <span>🔥 Focos ativos</span>
-                <strong>
-                  {focosMonitoramento?.firms || focosConfigurado
-                    ? `${focosIncendio.length} foco(s) · ${focosFontes.join(' + ') || 'NASA FIRMS'}`
-                    : 'MODIS + VIIRS · Earth Engine'}
-                </strong>
-              </div>
-            )}
-              <div className="mapa-monitoramento-camadas">
-                {camadasMonitoramento.map(camada => {
-                  const status = camada.status
-                  const statusTexto = camada.url
-                    ? `${camada.periodo}${camada.frequencia ? ` · ${camada.frequencia}` : ''}`
-                    : camada.configuracaoNecessaria
-                      ? 'Coleção não configurada'
-                      : status === 'sem-dados'
-                        ? `Sem detecções agora · ${camada.tipo || 'fonte'}`
-                        : camada.tipo === 'NASA FIRMS'
-                          ? `Focos pontuais · ${camada.frequencia || 'NRT'}`
-                          : 'Aguardando Earth Engine'
-                  return (
-                    <button
-                      key={camada.id}
-                      className={`${camadaMonitoramento === camada.id ? 'selecionada' : ''} ${camada.url ? '' : 'indisponivel'} ${status === 'disponivel' ? 'disponivel' : ''}`}
-                      onClick={() => camada.url && setCamadaMonitoramento(prev => prev === camada.id ? null : camada.id)}
-                      title={camada.configuracaoNecessaria || camada.descricao}
-                    >
-                      <span className="mapa-monitoramento-camada-icone">{
-                        camada.id.includes('modis') || camada.id.includes('viirs') || camada.id.includes('goes')
-                          ? '🔥'
-                          : '🛰️'
-                      }</span>
-                      <span className="mapa-monitoramento-camada-conteudo">
-                        <strong>{camada.nome}</strong>
-                        <small>{statusTexto}</small>
-                        {typeof camada.quantidade === 'number' && (
-                          <em>{camada.quantidade} detecção{camada.quantidade === 1 ? '' : 'ões'} no mapa</em>
-                        )}
-                      </span>
-                      <i className={`mapa-monitoramento-camada-status status-${status || 'aguardando'}`} aria-label={status || 'aguardando'} />
-                      {camadaMonitoramento === camada.id && <b>✓</b>}
-                    </button>
-                  )
-                })}
-              </div>
-              {monitoramentoEE?.configurado && (monitoramentoEE.indicadores ?? []).length > 0 && (
-                <div className="mapa-monitoramento-indicadores">
-                  <div className="mapa-monitoramento-subtitulo">Indicadores médios do município</div>
-                  {monitoramentoEE.indicadores.map(indicador => (
-                    <div key={indicador.id} className="mapa-monitoramento-indicador">
-                      <span>{indicador.nome}</span>
-                      <strong>{indicador.valor.toLocaleString('pt-BR', { maximumFractionDigits: 2 })} <small>{indicador.unidade}</small></strong>
-                    </div>
-                  ))}
-                </div>
-              )}
-              {monitoramentoEE?.configurado && (monitoramentoEE.erros ?? []).length > 0 && (
-                <div className="mapa-monitoramento-aviso">
-                  Falha temporária em {(monitoramentoEE.erros ?? []).length} fonte{monitoramentoEE.erros.length === 1 ? '' : 's'}. As demais detecções continuam sendo combinadas.
-                </div>
-              )}
-              <div className="mapa-monitoramento-focos-acao">
-                <div>
-                  <strong>🔥 Focos dos últimos 3 dias</strong>
-                  <span>
-                    {focosCarregando
-                      ? 'Consultando as fontes de incêndio...'
-                      : `${focosIncendio.length} foco${focosIncendio.length === 1 ? '' : 's'} de incêndio encontrado${focosIncendio.length === 1 ? '' : 's'}`}
-                  </span>
-                </div>
-                <button
-                  type="button"
-                  onClick={visualizarFocos}
-                  disabled={focosCarregando}
-                >
-                  {focosCarregando
-                    ? '⏳ Consultando…'
-                    : mostrarFocos
-                      ? '✓ Focos visíveis'
-                      : 'Ver no mapa'}
-                </button>
-              </div>
-              <div className="mapa-monitoramento-rodape">
-                <span>
-                  {monitoramentoEE?.atualizadoEm || focosAtualizadoEm
-                    ? `Atualizado ${new Date(monitoramentoEE?.atualizadoEm || focosAtualizadoEm || '').toLocaleString('pt-BR')}`
-                    : 'Atualização automática'}
-                </span>
-                <div className="mapa-monitoramento-acoes">
-                  <button onClick={buscarFocos} disabled={focosCarregando}>
-                    {focosCarregando ? '⏳' : '🔥'} Focos
-                  </button>
-                  <button onClick={buscarMonitoramento} disabled={monitoramentoCarregando}>
-                    {monitoramentoCarregando ? '⏳' : '🛰️'} Camadas
-                  </button>
-                </div>
-              </div>
-          </>
-        </div>
-      )}
 
       {/* Painel de equipamentos em campo — aparece quando o botão Material está ativo */}
       {mostrarMateriais && painelMaterialAberto && (

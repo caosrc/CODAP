@@ -752,7 +752,8 @@ export default function RadarDC() {
   }, [tv])
 
   return (
-    <section className={`radar-page ${tv ? 'radar-tv' : ''}`}>
+       <section className={`radar-page ${tv ? 'radar-tv' : ''}`}>
+       <div className="radar-overview">
        <section className="radar-weather radar-weather-compact" aria-labelledby="radar-weather-title">
          <div className="radar-weather-bar">
            <strong className="radar-weather-place" id="radar-weather-title">Conselheiro Lafaiete – MG</strong>
@@ -792,6 +793,56 @@ export default function RadarDC() {
           </div>
         )}
       </section>
+       <div className="radar-calendar-card" ref={calendarioRef}>
+         <div className="calendar-top"><div><span>CALENDÁRIO DE NOTIFICAÇÕES</span><h2>{mes.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}</h2></div><div className="month-buttons"><button type="button" aria-label="Mês anterior" onClick={() => setMes(new Date(mes.getFullYear(), mes.getMonth() - 1, 1))}>‹</button><button type="button" aria-label="Próximo mês" onClick={() => setMes(new Date(mes.getFullYear(), mes.getMonth() + 1, 1))}>›</button></div></div>
+         <div className="weekdays">{['DOM', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SÁB'].map(d => <span key={d}>{d}</span>)}</div>
+         <div className="calendar-grid">{dias.map(d => { const key = dataLocalISO(d); const count = notificacoes.filter(n => n.data === key && !n.concluido).length; return <button type="button" key={key} aria-label={dataBonita(key)} className={`${d.getMonth() !== mes.getMonth() ? 'other-month ' : ''}${key === dataSelecionada ? 'selected ' : ''}${key === hoje() ? 'today' : ''}`} onClick={() => { setDataSelecionada(key); setEditorAberto(true) }}><span>{d.getDate()}</span>{count > 0 && <i>{count}</i>}</button> })}</div>
+         <div className="calendar-legend"><span><i className="legend-red" /> notificações</span></div>
+         {editorAberto && <form className="radar-calendar-editor" onSubmit={e => { e.preventDefault(); salvarRegistro('notificacao', textoNotificacao, dataSelecionada, hora) }}>
+           <strong>Notificar em {dataBonita(dataSelecionada)}</strong>
+           <div className="radar-date-notifications">
+             <span className="radar-date-notifications-title">Notificações desta data</span>
+             {notificacoesDaData.length === 0 ? (
+               <span className="radar-date-notifications-empty">Nenhuma notificação cadastrada.</span>
+             ) : notificacoesDaData.map(n => (
+               <div className="radar-date-notification" key={n.id}>
+                 <div>
+                   <b>{n.hora} · {n.prioridade}</b>
+                   <span>{n.texto}</span>
+                   <small>Por {n.criadoPor}</small>
+                   {n.criadoPor === agente && <small className="radar-confirmacoes-status">
+                     {n.agentesEnvolvidos.map(nome => {
+                       const confirmacao = n.confirmacoesAgentes.find(item => item.agente === nome)
+                       return `${nome}: ${confirmacao ? confirmacao.confirmado ? 'vai ✅' : 'não vai ❌' : 'aguardando…'}`
+                     }).join(' · ')}
+                   </small>}
+                 </div>
+                 {n.criadoPor === agente && <button type="button" onClick={() => remover(n)} aria-label={`Remover notificação: ${n.texto}`} title="Remover notificação">×</button>}
+               </div>
+             ))}
+           </div>
+           <textarea value={textoNotificacao} onChange={e => setTextoNotificacao(e.target.value)} placeholder="Escreva a notificação..." rows={3} />
+           <div className="radar-form-row"><label>⏰ Hora<input type="time" value={hora} onChange={e => setHora(e.target.value)} /></label><label>Nível<select value={prioridade} onChange={e => setPrioridade(e.target.value as Prioridade)}>{Object.entries(prioridadeConfig).map(([key, c]) => <option key={key} value={key}>{c.emoji} {c.label}</option>)}</select></label></div>
+           <fieldset className="radar-agentes-fieldset">
+             <legend>Agentes envolvidos</legend>
+             <div className="radar-agentes-grid">
+               {AGENTES.map(nome => (
+                 <label key={nome} className="radar-agente-option">
+                   <input
+                     type="checkbox"
+                     checked={agentesEnvolvidos.includes(nome)}
+                     onChange={e => setAgentesEnvolvidos(prev => e.target.checked ? [...prev, nome] : prev.filter(item => item !== nome))}
+                   />
+                   <span>{nome}</span>
+                 </label>
+               ))}
+             </div>
+           </fieldset>
+           <button className="radar-add" type="submit" disabled={!textoNotificacao.trim() || salvando}>{salvando ? 'Salvando...' : '+ Colocar no Radar DC'}</button>
+           {erroSalvamento && <p className="radar-save-error" role="alert">{erroSalvamento}</p>}
+         </form>}
+       </div>
+       </div>
       <div className="radar-layout">
         <div className="radar-note-card radar-bilhete-large">
           <div className="radar-note-heading">
@@ -919,55 +970,6 @@ export default function RadarDC() {
         </div>
 
         <div className="radar-right-column">
-        <div className="radar-calendar-card" ref={calendarioRef}>
-          <div className="calendar-top"><div><span>CALENDÁRIO DE NOTIFICAÇÕES</span><h2>{mes.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}</h2></div><div className="month-buttons"><button type="button" aria-label="Mês anterior" onClick={() => setMes(new Date(mes.getFullYear(), mes.getMonth() - 1, 1))}>‹</button><button type="button" aria-label="Próximo mês" onClick={() => setMes(new Date(mes.getFullYear(), mes.getMonth() + 1, 1))}>›</button></div></div>
-          <div className="weekdays">{['DOM', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SÁB'].map(d => <span key={d}>{d}</span>)}</div>
-          <div className="calendar-grid">{dias.map(d => { const key = dataLocalISO(d); const count = notificacoes.filter(n => n.data === key && !n.concluido).length; return <button type="button" key={key} aria-label={dataBonita(key)} className={`${d.getMonth() !== mes.getMonth() ? 'other-month ' : ''}${key === dataSelecionada ? 'selected ' : ''}${key === hoje() ? 'today' : ''}`} onClick={() => { setDataSelecionada(key); setEditorAberto(true) }}><span>{d.getDate()}</span>{count > 0 && <i>{count}</i>}</button> })}</div>
-          <div className="calendar-legend"><span><i className="legend-red" /> notificações</span></div>
-          {editorAberto && <form className="radar-calendar-editor" onSubmit={e => { e.preventDefault(); salvarRegistro('notificacao', textoNotificacao, dataSelecionada, hora) }}>
-            <strong>Notificar em {dataBonita(dataSelecionada)}</strong>
-             <div className="radar-date-notifications">
-               <span className="radar-date-notifications-title">Notificações desta data</span>
-               {notificacoesDaData.length === 0 ? (
-                 <span className="radar-date-notifications-empty">Nenhuma notificação cadastrada.</span>
-               ) : notificacoesDaData.map(n => (
-                 <div className="radar-date-notification" key={n.id}>
-                   <div>
-                     <b>{n.hora} · {n.prioridade}</b>
-                     <span>{n.texto}</span>
-                     <small>Por {n.criadoPor}</small>
-                     {n.criadoPor === agente && <small className="radar-confirmacoes-status">
-                       {n.agentesEnvolvidos.map(nome => {
-                         const confirmacao = n.confirmacoesAgentes.find(item => item.agente === nome)
-                         return `${nome}: ${confirmacao ? confirmacao.confirmado ? 'vai ✅' : 'não vai ❌' : 'aguardando…'}`
-                       }).join(' · ')}
-                     </small>}
-                   </div>
-                    {n.criadoPor === agente && <button type="button" onClick={() => remover(n)} aria-label={`Remover notificação: ${n.texto}`} title="Remover notificação">×</button>}
-                 </div>
-               ))}
-             </div>
-            <textarea value={textoNotificacao} onChange={e => setTextoNotificacao(e.target.value)} placeholder="Escreva a notificação..." rows={3} />
-             <div className="radar-form-row"><label>⏰ Hora<input type="time" value={hora} onChange={e => setHora(e.target.value)} /></label><label>Nível<select value={prioridade} onChange={e => setPrioridade(e.target.value as Prioridade)}>{Object.entries(prioridadeConfig).map(([key, c]) => <option key={key} value={key}>{c.emoji} {c.label}</option>)}</select></label></div>
-             <fieldset className="radar-agentes-fieldset">
-               <legend>Agentes envolvidos</legend>
-               <div className="radar-agentes-grid">
-                 {AGENTES.map(nome => (
-                   <label key={nome} className="radar-agente-option">
-                     <input
-                       type="checkbox"
-                       checked={agentesEnvolvidos.includes(nome)}
-                       onChange={e => setAgentesEnvolvidos(prev => e.target.checked ? [...prev, nome] : prev.filter(item => item !== nome))}
-                     />
-                     <span>{nome}</span>
-                   </label>
-                 ))}
-               </div>
-             </fieldset>
-              <button className="radar-add" type="submit" disabled={!textoNotificacao.trim() || salvando}>{salvando ? 'Salvando...' : '+ Colocar no Radar DC'}</button>
-            {erroSalvamento && <p className="radar-save-error" role="alert">{erroSalvamento}</p>}
-          </form>}
-        </div>
         <section className="radar-activities">
          <div className="radar-list-heading"><div><span className="card-label">REGISTROS OPERACIONAIS</span><h2>Atividades de {dataBonita(dataSelecionada)}</h2></div><strong>{atividades.checklists.length + atividades.checklistsFerramentas.length + atividades.ocorrencias.length} registro(s)</strong></div>
         <div className="radar-activity-columns">

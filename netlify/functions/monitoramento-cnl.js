@@ -3,6 +3,7 @@ const RECURSOS = 'https://mapservices.cemaden.gov.br/MapaInterativoWS/resources'
 const NIVEL = 'https://resources.cemaden.gov.br/graficos/cemaden/hidro/resources/json/MedidaResource.php?est=6622&sen=20&pag=24'
 const FONTE = 'https://resources.cemaden.gov.br/graficos/interativo/grafico_CEMADEN.php?idpcd=6622&uf=MG'
 const CNL_ID = 6622
+const ESTACOES_CHUVA_IDS = new Set([4146, 4144, 3121, 6622, 4145, 4143, 4142])
 const COTAS_PADRAO = { atencao: 2.55, alerta: 3.4, transbordamento: 4.25 }
 
 const json = (statusCode, body) => ({
@@ -65,12 +66,15 @@ function diaria(serie) {
 function normalizar(item, payload) {
   const serie = extrairSerie(payload)
   const ultimo = serie.at(-1)
+  const dadosEstacao = payload?.estacao || {}
   return {
     id: Number(item.idestacao),
     uf: String(item.uf || 'MG'),
     cidade: String(item.cidade || 'CONSELHEIRO LAFAIETE'),
     nome: String(item.nomeestacao || ''),
-    codigo: String(item.codEstacao || ''),
+    codigo: String(dadosEstacao.codEstacao || item.codEstacao || ''),
+    latitude: number(dadosEstacao.latitude),
+    longitude: number(dadosEstacao.longitude),
     ultimoValor: number(item.ultimovalor),
     dataHora: String(item.datahoraUltimovalor || ''),
     precipitacaoAtual: number(item.acc1hr) ?? ultimo?.valor ?? null,
@@ -99,7 +103,7 @@ export const handler = async () => {
     const [catalogo, medidas] = await Promise.all([catalogoResponse.json(), nivelResponse.json()])
     const principalRaw = Array.isArray(catalogo) ? catalogo.find(row => Number(row?.idestacao) === CNL_ID) : null
     if (!principalRaw) throw new Error('Estação Rio Bananeiras não encontrada')
-    const estacoesCatalogo = catalogo.filter(row => Number(row?.codibge) === Number(principalRaw.codibge))
+    const estacoesCatalogo = catalogo.filter(row => ESTACOES_CHUVA_IDS.has(Number(row?.idestacao)))
     const chuva = await Promise.allSettled(estacoesCatalogo.map(async item => {
       const id = Number(item.idestacao)
       const response = await fetch(`${RECURSOS}/horario/${id}/96`, { signal: AbortSignal.timeout(15000) })

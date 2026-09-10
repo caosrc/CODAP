@@ -10,22 +10,22 @@ export const handler = async () => {
     const valido = quadro => Number.isFinite(Number(quadro?.time)) &&
       typeof quadro?.path === 'string' && quadro.path.startsWith('/v2/')
     const observados = (dados?.radar?.past || []).filter(valido)
-    const nowcast = (dados?.radar?.nowcast || []).filter(valido)
-    const quadros = observados.length ? observados : nowcast
-    const ultimo = quadros.at(-1)
+    // O painel deve mostrar somente radar observado. Nowcast é uma previsão
+    // diferente e não deve ser apresentado como chuva medida.
+    const ultimo = observados.at(-1)
     if (!host || !ultimo) throw new Error('RainViewer não retornou quadros de radar')
-    const tileUrl = `${host}${ultimo.path}/256/{z}/{x}/{y}/2/1_1.png`
+    const tileUrl = `${host}${ultimo.path}/256/{z}/{x}/{y}/2/1_0.png`
     return {
       statusCode: 200,
       headers: { 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=120' },
       body: JSON.stringify({
         host,
         path: ultimo.path,
-          tileUrl,
+        tileUrl,
         frameTime: Number(ultimo.time),
         atualizadoEm: new Date(Number(ultimo.time) * 1000).toISOString(),
         fonte: 'RainViewer',
-        tipoQuadro: observados.length ? 'observado' : 'nowcast',
+        tipoQuadro: 'observado',
       }),
     }
   } catch (error) {

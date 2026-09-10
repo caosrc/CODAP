@@ -1654,3 +1654,86 @@ html:-webkit-full-screen {
     stroke-width: 3;
   }
 }
+
+/* O painel TV deve exibir os dois gráficos no mesmo quadro, sem rolagem. */
+@media (min-width: 701px) {
+  body.radar-tv-active .radar-tv .radar-cnl-inline {
+    overflow: hidden;
+  }
+
+  body.radar-tv-active .radar-tv .radar-cnl-inline .cnl-grafico-cemaden {
+    margin-top: .16rem;
+  }
+
+  body.radar-tv-active .radar-tv .radar-cnl-inline .cnl-grafico-cemaden-controles {
+    padding: .18rem .3rem 0;
+    font-size: .52rem;
+  }
+
+  body.radar-tv-active .radar-tv .radar-cnl-inline .cnl-grafico-cemaden-controles select {
+    min-width: 3.6rem;
+    padding: .08rem .15rem;
+    font-size: .52rem;
+  }
+
+  body.radar-tv-active .radar-tv .radar-cnl-inline .cnl-grafico-cemaden-cabecalho {
+    gap: .02rem;
+    padding-top: .12rem;
+  }
+
+  body.radar-tv-active .radar-tv .radar-cnl-inline .cnl-grafico-cemaden-cabecalho strong {
+    font-size: .58rem;
+  }
+
+  body.radar-tv-active .radar-tv .radar-cnl-inline .cnl-grafico-cemaden-cabecalho span,
+  body.radar-tv-active .radar-tv .radar-cnl-inline .cnl-grafico-leitura-atual {
+    font-size: .54rem;
+  }
+
+  body.radar-tv-active .radar-tv .radar-cnl-inline .cnl-grafico-nivel-cemaden {
+    height: clamp(115px, 17vh, 150px);
+  }
+
+  body.radar-tv-active .radar-tv .radar-cnl-inline .radar-cnl-rain,
+  body.radar-tv-active .radar-tv .radar-cnl-inline .radar-cnl-precipitacao {
+    margin-top: .16rem;
+    padding-top: .16rem;
+  }
+
+  body.radar-tv-active .radar-tv .radar-cnl-inline .radar-cnl-rain-heading h3 {
+    margin-top: .08rem;
+    font-size: .6rem;
+  }
+
+  body.radar-tv-active .radar-tv .radar-cnl-inline .cnl-grafico-chuva {
+    height: clamp(95px, 14vh, 125px);
+  }
+
+  body.radar-tv-active .radar-tv .radar-cnl-inline .cnl-chuva-controles {
+    padding-top: 0;
+    font-size: .5rem;
+  }
+
+  body.radar-tv-active .radar-tv .radar-cnl-inline .cnl-chuva-controles select {
+    min-width: 2.8rem;
+    padding: .06rem .12rem;
+    font-size: .5rem;
+  }
+
+  body.radar-tv-active .radar-tv .radar-cnl-inline .cnl-chuva-legenda,
+  body.radar-tv-active .radar-tv .radar-cnl-inline .cnl-grafico-legenda {
+    gap: .2rem .4rem;
+    padding: .08rem .2rem .12rem;
+    font-size: .42rem;
+  }
+
+  body.radar-tv-active .radar-tv .radar-cnl-inline .radar-cnl-diaria-detalhe {
+    margin-top: .12rem;
+    padding-top: .12rem;
+  }
+
+  body.radar-tv-active .radar-tv .radar-cnl-inline .radar-cnl-diaria-detalhe summary {
+    padding: .12rem .2rem;
+    font-size: .48rem;
+  }
+}

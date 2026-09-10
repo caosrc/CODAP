@@ -1237,3 +1237,208 @@ body.radar-tv-active .radar-tv .radar-ticker-group > b,
 body.radar-tv-active .radar-tv .radar-ticker-empty {
   font-size: .78rem;
 }
+
+/*
+ * Layout final do Radar DC
+ * Mantém a previsão e o calendário no mesmo bloco superior, como no painel
+ * de referência, e garante que nenhum cartão crie uma largura mínima maior
+ * que a viewport.
+ */
+.radar-page,
+.radar-page * {
+  box-sizing: border-box;
+}
+
+.radar-page {
+  min-width: 0;
+  overflow-x: hidden;
+}
+
+.radar-overview,
+.radar-layout {
+  min-width: 0;
+}
+
+.radar-overview > *,
+.radar-layout > *,
+.radar-right-column,
+.radar-activity-columns > * {
+  min-width: 0;
+}
+
+.radar-overview {
+  grid-template-columns: minmax(0, 2.35fr) minmax(245px, .95fr);
+  align-items: start;
+}
+
+.radar-overview .radar-weather {
+  width: 100%;
+  max-width: none;
+  min-width: 0;
+  margin: 0;
+}
+
+.radar-overview .radar-calendar-card {
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+}
+
+.radar-weather-detail,
+.weather-hourly,
+.weather-days {
+  min-width: 0;
+}
+
+.radar-weather-detail {
+  overflow: hidden;
+}
+
+.weather-hourly,
+.weather-days {
+  width: 100%;
+}
+
+.weather-hour,
+.weather-day {
+  min-width: 0;
+}
+
+.radar-layout {
+  grid-template-columns: minmax(0, 1.18fr) minmax(0, 1fr);
+}
+
+.radar-note-card,
+.radar-calendar-card,
+.radar-activities {
+  min-width: 0;
+}
+
+/* Modo TV: a tela é o limite do painel. Nenhuma barra de rolagem é criada. */
+body.radar-tv-active,
+body.radar-tv-active #root,
+body.radar-tv-active .app-shell,
+body.radar-tv-active .app-content,
+body.radar-tv-active .radar-page.radar-tv {
+  width: 100%;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+body.radar-tv-active .radar-page.radar-tv {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  min-height: 0;
+  padding-bottom: 0;
+}
+
+body.radar-tv-active .radar-tv .radar-overview {
+  flex: 0 0 auto;
+  grid-template-columns: minmax(0, 2.35fr) minmax(220px, .95fr);
+  width: 100%;
+  padding: clamp(.3rem, 1vh, .55rem) clamp(.45rem, 1.2vw, .85rem) .3rem;
+  gap: clamp(.25rem, .5vw, .45rem);
+}
+
+body.radar-tv-active .radar-tv .radar-weather,
+body.radar-tv-active .radar-tv .radar-calendar-card {
+  min-width: 0;
+  max-width: none;
+}
+
+body.radar-tv-active .radar-tv .radar-weather {
+  padding: clamp(.25rem, .55vh, .4rem) clamp(.35rem, .6vw, .55rem);
+}
+
+body.radar-tv-active .radar-tv .radar-layout {
+  flex: 1 1 auto;
+  grid-template-columns: minmax(0, 1.18fr) minmax(0, 1fr);
+  width: 100%;
+  height: auto;
+  min-height: 0;
+  padding: .1rem clamp(.45rem, 1.2vw, .85rem) calc(3rem + 1vh);
+  gap: clamp(.25rem, .5vw, .45rem);
+  overflow: hidden;
+}
+
+body.radar-tv-active .radar-tv .radar-note-card,
+body.radar-tv-active .radar-tv .radar-right-column,
+body.radar-tv-active .radar-tv .radar-activities {
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
+body.radar-tv-active .radar-tv .radar-right-column {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr);
+}
+
+body.radar-tv-active .radar-tv .radar-ticker {
+  flex: 0 0 auto;
+  width: 100%;
+}
+
+@media (max-width: 700px) {
+  .radar-overview {
+    grid-template-columns: minmax(0, 1fr);
+    padding-inline: .65rem;
+  }
+
+  .radar-overview .radar-weather {
+    order: 1;
+  }
+
+  .radar-overview .radar-calendar-card {
+    order: 2;
+  }
+
+  .radar-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .radar-weather-bar {
+    min-width: 0;
+  }
+
+  .radar-weather-place,
+  .radar-weather-condition,
+  .radar-weather-metrics {
+    min-width: 0;
+  }
+
+  .radar-weather-metrics {
+    width: 100%;
+  }
+
+  .weather-hour,
+  .weather-day {
+    flex: 1 1 0;
+  }
+
+  body.radar-tv-active .radar-page.radar-tv {
+    height: 100dvh;
+  }
+
+  body.radar-tv-active .radar-tv .radar-overview,
+  body.radar-tv-active .radar-tv .radar-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  body.radar-tv-active .radar-tv .radar-overview {
+    overflow: hidden;
+  }
+
+  body.radar-tv-active .radar-tv .radar-layout {
+    overflow: hidden;
+  }
+
+  body.radar-tv-active .radar-tv .radar-note-card,
+  body.radar-tv-active .radar-tv .radar-right-column,
+  body.radar-tv-active .radar-tv .radar-activities {
+    height: auto;
+  }
+}

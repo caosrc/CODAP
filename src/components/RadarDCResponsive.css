@@ -1460,6 +1460,37 @@ body.radar-tv-active .radar-tv .radar-ticker {
   width: 100%;
 }
 
+/* Proporção do painel de TV baseada na referência 1024 × 768:
+   previsão ampla no topo, calendário compacto e operação dividida em duas
+   colunas equilibradas. O gráfico de nível ganha altura sem criar rolagem. */
+@media (min-width: 701px) {
+  body.radar-tv-active .radar-tv .radar-overview {
+    grid-template-columns: minmax(0, 3.45fr) minmax(205px, 1fr);
+  }
+
+  body.radar-tv-active .radar-tv .radar-layout {
+    grid-template-columns: minmax(0, 1.16fr) minmax(0, 1fr);
+  }
+
+  body.radar-tv-active .radar-tv .radar-note-card,
+  body.radar-tv-active .radar-tv .radar-activities {
+    padding: .48rem;
+  }
+
+  body.radar-tv-active .radar-tv .radar-cnl-inline .cnl-grafico-nivel-cemaden {
+    height: clamp(140px, 19vh, 180px);
+  }
+
+  body.radar-tv-active .radar-tv .radar-cnl-inline .cnl-grafico-cemaden {
+    margin-top: .3rem;
+  }
+
+  body.radar-tv-active .radar-tv .radar-cnl-inline .radar-cnl-rain {
+    margin-top: .3rem;
+    padding-top: .3rem;
+  }
+}
+
 html:fullscreen,
 html:-webkit-full-screen {
   background: #071c34;

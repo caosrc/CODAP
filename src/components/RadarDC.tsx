@@ -751,6 +751,31 @@ export default function RadarDC() {
     return () => document.body.classList.remove('radar-tv-active')
   }, [tv])
 
+  const alternarModoTv = useCallback(async () => {
+    if (tv) {
+      if (document.fullscreenElement && document.exitFullscreen) {
+        await document.exitFullscreen().catch(() => {})
+      }
+      setTv(false)
+      return
+    }
+
+    setTv(true)
+    if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
+      await document.documentElement.requestFullscreen().catch(() => {
+        // O modo TV continua disponível mesmo quando o navegador bloqueia a tela cheia.
+      })
+    }
+  }, [tv])
+
+  useEffect(() => {
+    const sincronizarTelaCheia = () => {
+      if (!document.fullscreenElement) setTv(false)
+    }
+    document.addEventListener('fullscreenchange', sincronizarTelaCheia)
+    return () => document.removeEventListener('fullscreenchange', sincronizarTelaCheia)
+  }, [])
+
   return (
        <section className={`radar-page ${tv ? 'radar-tv' : ''}`}>
        <div className="radar-overview">
@@ -762,7 +787,7 @@ export default function RadarDC() {
            {tempo && <div className="radar-weather-condition"><span>{iconeTempo(tempo.atual.codigo)}</span><div><strong>{Math.round(tempo.atual.temperatura)}°C</strong><b>{nomesTempo[tempo.atual.codigo] || 'Condição variável'}</b></div></div>}
            {tempo && <div className="radar-weather-metrics"><span>🌧️ Chuva <b>{tempo.atual.chuva.toFixed(1)} mm</b></span><span>☔ Prob. hoje <b>{tempo.dias[0]?.probabilidade ?? 0}%</b></span><span>💨 Vento <b>{Math.round(tempo.atual.vento)} km/h</b></span><span>💨 Rajadas <b>{Math.round(tempo.atual.rajada)} km/h</b></span><span>💧 Umidade <b>{Math.round(tempo.atual.umidade)}%</b></span></div>}
            <div className="radar-clock" aria-label="Hora atual"><span>HORA ATUAL</span><strong>{horaAtual.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</strong></div>
-           <div className="radar-weather-actions"><button className="radar-tv-btn" onClick={() => setTv(!tv)}>{tv ? '↙ Voltar ao app' : '▣ Modo TV'}</button></div>
+            <div className="radar-weather-actions"><button className="radar-tv-btn" type="button" aria-pressed={tv} onClick={() => { void alternarModoTv() }}>{tv ? '↙ Voltar ao app' : '⛶ Modo TV'}</button></div>
          </div>
         {erroTempo && <p className="radar-save-error" role="alert">{erroTempo}</p>}
         {tempo && (

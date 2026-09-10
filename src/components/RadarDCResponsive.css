@@ -1377,9 +1377,25 @@ body.radar-tv-active .radar-tv .radar-right-column {
   grid-template-rows: minmax(0, 1fr);
 }
 
+body.radar-tv-active .radar-tv .radar-note-card {
+  display: flex;
+  flex-direction: column;
+}
+
+body.radar-tv-active .radar-tv .radar-cnl-inline {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
 body.radar-tv-active .radar-tv .radar-ticker {
   flex: 0 0 auto;
   width: 100%;
+}
+
+html:fullscreen,
+html:-webkit-full-screen {
+  background: #071c34;
 }
 
 @media (max-width: 700px) {

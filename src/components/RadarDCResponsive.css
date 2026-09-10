@@ -1569,3 +1569,88 @@ html:-webkit-full-screen {
     height: auto;
   }
 }
+
+/*
+ * Ajuste do painel TV conforme a referência:
+ * calendário compacto no topo direito e gráfico do Rio Bananeiras
+ * com área vertical suficiente para a leitura da curva/área de água.
+ */
+@media (min-width: 701px) {
+  body.radar-tv-active .radar-tv .radar-overview {
+    grid-template-columns: minmax(0, 4.1fr) minmax(180px, .75fr);
+  }
+
+  body.radar-tv-active .radar-tv .radar-calendar-card {
+    align-self: start;
+    max-height: 150px;
+    padding: .3rem .4rem;
+  }
+
+  body.radar-tv-active .radar-tv .radar-calendar-card .calendar-top > div > span {
+    font-size: .42rem;
+  }
+
+  body.radar-tv-active .radar-tv .radar-calendar-card h2 {
+    margin: .08rem 0 .12rem;
+    font-size: .68rem;
+  }
+
+  body.radar-tv-active .radar-tv .radar-calendar-card .month-buttons {
+    gap: .15rem;
+  }
+
+  body.radar-tv-active .radar-tv .radar-calendar-card .month-buttons button {
+    width: 19px;
+    height: 19px;
+    font-size: .72rem;
+  }
+
+  body.radar-tv-active .radar-tv .radar-calendar-card .weekdays {
+    margin-bottom: 1px;
+    font-size: .4rem;
+  }
+
+  body.radar-tv-active .radar-tv .radar-calendar-card .calendar-grid {
+    gap: 1px;
+  }
+
+  body.radar-tv-active .radar-tv .radar-calendar-card .calendar-grid button {
+    min-height: 16px;
+    border-radius: 3px;
+    font-size: .44rem;
+  }
+
+  body.radar-tv-active .radar-tv .radar-calendar-card .calendar-grid i {
+    top: 0;
+    right: 0;
+    padding: 0 1px;
+    font-size: .32rem;
+  }
+
+  body.radar-tv-active .radar-tv .radar-calendar-card .calendar-legend {
+    margin-top: .14rem;
+    font-size: .38rem;
+  }
+
+  body.radar-tv-active .radar-tv .radar-cnl-inline {
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: #397fa5 #0b2947;
+  }
+
+  body.radar-tv-active .radar-tv .radar-cnl-inline .cnl-grafico-nivel-cemaden {
+    height: clamp(190px, 29vh, 260px);
+  }
+
+  body.radar-tv-active .radar-tv .radar-cnl-inline .cnl-grafico-area-nivel {
+    fill-opacity: 1;
+  }
+
+  body.radar-tv-active .radar-tv .radar-cnl-inline .cnl-grafico-area-ondas {
+    opacity: .9;
+  }
+
+  body.radar-tv-active .radar-tv .radar-cnl-inline .cnl-grafico-linha-nivel {
+    stroke-width: 3;
+  }
+}

@@ -67,6 +67,7 @@ function iconeTempo(codigo: number, time?: string) {
 function dataTempo(data: string) { return new Date(data + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) }
 
 const STORAGE_KEY = 'defesacivil-radar-dc-v2'
+const RADAR_TICKER_SPEED = 1.5
 const prioridadeConfig: Record<Prioridade, { label: string; emoji: string }> = {
   normal: { label: 'Normal', emoji: '🟢' },
   importante: { label: 'Importante', emoji: '🟠' },
@@ -1079,7 +1080,7 @@ export default function RadarDC() {
           {(() => {
              const filaTicker = notificacoesDoRadar
             return filaTicker.length > 0 ? (
-              <div className="radar-ticker-track" style={{ '--ticker-duration': `${Math.max(8, filaTicker.length * 2.8)}s` } as React.CSSProperties}>
+               <div className="radar-ticker-track" style={{ '--ticker-duration': `${Math.max(8 / RADAR_TICKER_SPEED, (filaTicker.length * 2.8) / RADAR_TICKER_SPEED)}s` } as React.CSSProperties}>
                 {[0, 1].map(copia => (
                   <div className="radar-ticker-group" key={copia} aria-hidden={copia === 1}>
                     {filaTicker.map(n => <b key={`${copia}-${n.id}`}>● {dataBonita(n.data)} · {n.texto}</b>)}

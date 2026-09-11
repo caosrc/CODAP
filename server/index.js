@@ -3240,6 +3240,8 @@ app.get('/api/tempo', async (_req, res) => {
 // A página pública do CEMADEN usa dois serviços: um catálogo com os
 // acumulados mais recentes e o MapaInterativoWS para a série horária.
 const CNL_ESTACAO_ID = 6622
+const CNL_ESTACAO_CHUVA_CENTRO_ID = 3121
+const CNL_ESTACAO_CHUVA_CENTRO_CODIGO = '311830401H'
 const CNL_ESTACOES_CHUVA_IDS = new Set([4146, 4144, 3121, 6622, 4145, 4143, 4142])
 const CNL_CATALOGO_URL = 'https://resources.cemaden.gov.br/graficos/interativo/getJson2.php?uf=MG'
 const CNL_RECURSOS_URL = 'https://mapservices.cemaden.gov.br/MapaInterativoWS/resources'
@@ -3592,13 +3594,13 @@ app.get('/api/monitoramento-cnl', async (_req, res) => {
         }]
       }),
     )
-    const estacaoCentroCatalogo = estacoesCatalogo.find((item) => String(item?.nomeestacao || '').trim().toLocaleLowerCase('pt-BR') === 'centro')
+    const estacaoCentroCatalogo = estacoesCatalogo.find((item) => Number(item?.idestacao) === CNL_ESTACAO_CHUVA_CENTRO_ID)
     const estacaoCentroId = Number(estacaoCentroCatalogo?.idestacao)
     const payloadCentro = Number.isFinite(estacaoCentroId) ? chuvaPayloads.get(estacaoCentroId) : null
     const estacaoChuvaCentro = estacaoCentroCatalogo && payloadCentro
       ? {
           nome: String(estacaoCentroCatalogo.nomeestacao || payloadCentro.estacao?.nome || 'Centro'),
-          codigo: String(payloadCentro.estacao?.codEstacao || estacaoCentroCatalogo.codEstacao || ''),
+          codigo: CNL_ESTACAO_CHUVA_CENTRO_CODIGO,
         }
       : null
     const serieChuvaCentro = payloadCentro ? montarSerieHorariaCnl(payloadCentro) : []

@@ -64,6 +64,8 @@ type DadosCNL = {
   estacao: LeituraCNL
   estacoes: EstacaoCNL[]
   serie: PontoSerie[]
+  serieChuvaCentro?: PontoSerie[]
+  estacaoChuvaCentro?: { nome: string; codigo?: string } | null
   nivelAtual: NivelAtual | null
   serieNivel: PontoNivel[]
   cotasConfiguradas?: boolean
@@ -799,7 +801,10 @@ export default function MonitoramentoCNL({ onAbrirMapa }: Props) {
           <div><span className="cnl-eyebrow">Chuva acumulada</span><h2>Últimas 24 horas</h2></div>
           <span className="cnl-badge-fonte">Atualização automática · 5 min</span>
         </div>
-        <ChartaChuva pontos={dados.serie} />
+        <ChartaChuva
+          pontos={dados.serieChuvaCentro || []}
+          estacao={dados.estacaoChuvaCentro}
+        />
       </section>
 
       <section className="cnl-bloco cnl-bloco-grafico-nivel">

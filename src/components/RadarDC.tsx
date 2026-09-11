@@ -960,7 +960,6 @@ export default function RadarDC() {
                      <ChartaChuva
                          pontos={dadosCNL.serieChuvaCentro || []}
                          estacao={dadosCNL.estacaoChuvaCentro}
-                       mostrarControles
                      />
                    </section>
                      {dadosCNL && (

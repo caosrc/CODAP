@@ -1309,6 +1309,21 @@ input, select, textarea { font-family: inherit; }
 .mapa-cemaden-superficie {
   mix-blend-mode: multiply;
 }
+.mapa-chuva-estacao-tooltip {
+  border: 0;
+  border-radius: 999px;
+  padding: 0.16rem 0.32rem;
+  background: #0f3d56;
+  box-shadow: 0 1px 4px rgba(15, 61, 86, 0.35);
+  color: #fff;
+  font-size: 0.58rem;
+  font-weight: 800;
+  line-height: 1.1;
+  white-space: nowrap;
+}
+.mapa-chuva-estacao-tooltip::before {
+  border-top-color: #0f3d56;
+}
 .mapa-chuva-ponto-fonte {
   color: #94a3b8;
   font-size: 0.44rem;

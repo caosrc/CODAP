@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
-import { MapContainer, TileLayer, Marker, Popup, useMapEvents, useMap, Circle, Polyline, CircleMarker, Pane } from 'react-leaflet'
+import { MapContainer, TileLayer, Marker, Popup, Tooltip, useMapEvents, useMap, Circle, Polyline, CircleMarker, Pane } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import type { Ocorrencia } from '../types'
@@ -73,6 +73,11 @@ function valorChuvaFormatado(valor: number | null): string {
   return valor == null || !Number.isFinite(valor)
     ? 'Sem leitura'
     : `${valor.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} mm`
+}
+
+function valorChuvaMarcadorFormatado(valor: number | null): string {
+  const valorSeguro = valor != null && Number.isFinite(valor) ? valor : 0
+  return `${valorSeguro.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} mm`
 }
 
 function distanciaMetros(lat1: number, lng1: number, lat2: number, lng2: number): number {
@@ -1376,6 +1381,15 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
                   fillOpacity: 0.95,
                 }}
               >
+                <Tooltip
+                  permanent
+                  direction="top"
+                  offset={[0, -8]}
+                  opacity={0.96}
+                  className="mapa-chuva-estacao-tooltip"
+                >
+                  {valorChuvaMarcadorFormatado(estacao.precipitacaoAtual)}
+                </Tooltip>
                 <Popup>
                   <div style={{ minWidth: 190, fontFamily: 'inherit' }}>
                     <strong style={{ display: 'block', marginBottom: 4 }}>

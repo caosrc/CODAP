@@ -847,6 +847,47 @@ body.radar-tv-active .radar-page {
   font-size: .58rem;
 }
 
+/* A chuva do Radar usa o mesmo cartão e a mesma leitura visual do Monitoramento. */
+.radar-cnl-inline .radar-cnl-rain-monitoramento {
+  margin-top: .7rem;
+  padding: .9rem;
+  border: 1px solid #dbe8ea;
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 2px 8px rgba(18, 48, 71, .035);
+}
+
+.radar-cnl-inline .radar-cnl-rain-monitoramento .cnl-eyebrow {
+  color: #168b8c;
+}
+
+.radar-cnl-inline .radar-cnl-rain-monitoramento .cnl-bloco-cabecalho h2 {
+  color: #123047;
+}
+
+.radar-cnl-inline .radar-cnl-rain-monitoramento .cnl-grafico-wrap {
+  margin: .55rem -.25rem 0;
+}
+
+.radar-cnl-inline .radar-cnl-rain-monitoramento .cnl-grafico-chuva-titulo {
+  fill: #4f6269;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.radar-cnl-inline .radar-cnl-rain-monitoramento .cnl-grafico-label {
+  fill: #78909b;
+}
+
+.radar-cnl-inline .radar-cnl-rain-monitoramento .cnl-grafico-label-chuva {
+  fill: #78909b;
+  stroke: #fff;
+}
+
+.radar-cnl-inline .radar-cnl-rain-monitoramento .cnl-chuva-legenda {
+  color: #687d84;
+}
+
 @media (max-width: 700px) {
   .radar-cnl-card {
     border-radius: 12px;

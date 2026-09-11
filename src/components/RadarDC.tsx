@@ -952,10 +952,10 @@ export default function RadarDC() {
               {dadosCNL ? (
                  <>
                    <GraficoNivel pontos={dadosCNL.serieNivel} estacao={dadosCNL.estacao} mostrarTooltip={false} mostrarFonte={false} mostrarLeituraAtual />
-                   <section className="radar-cnl-rain" aria-labelledby="radar-chuva-24h-titulo">
-                     <div className="radar-cnl-rain-heading">
-                       <div><span className="card-label">CHUVA ACUMULADA</span><h3 id="radar-chuva-24h-titulo">Últimas 24 horas</h3></div>
-                       <span className="radar-cnl-live">CEMADEN · 5 min</span>
+                    <section className="cnl-bloco radar-cnl-rain-monitoramento" aria-labelledby="radar-chuva-24h-titulo">
+                      <div className="cnl-bloco-cabecalho">
+                        <div><span className="cnl-eyebrow">Chuva acumulada</span><h2 id="radar-chuva-24h-titulo">Últimas 24 horas</h2></div>
+                        <span className="cnl-badge-fonte">Atualização automática · 5 min</span>
                      </div>
                      <ChartaChuva
                          pontos={dadosCNL.serieChuvaCentro || []}

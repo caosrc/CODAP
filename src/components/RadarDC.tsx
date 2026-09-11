@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Circle, CircleMarker, MapContainer, Pane, Popup, TileLayer, Tooltip, useMap } from 'react-leaflet'
 import './RadarDC.css'
 import './RadarDCResponsive.css'
+import 'leaflet/dist/leaflet.css'
 import { getAgenteLogado } from './Login'
 import { getSenhaAgente } from '../types'
 import { wsOn, wsSend } from '../wsClient'
@@ -42,14 +44,31 @@ type HoraPrevisao = { time: string; codigo: number; temperatura: number; probabi
 type TempoDC = { atual: { codigo: number; temperatura: number; chuva: number; vento: number; rajada: number; umidade: number }; horas: HoraPrevisao[]; dias: DiaPrevisao[] }
 type DadosRadarCNL = {
   estacao: LeituraCNL
-  estacoes: EstacaoCNL[]
+  estacoes: RadarEstacaoCNL[]
   serie: PontoSerie[]
   serieChuvaCentro?: PontoSerie[]
   estacaoChuvaCentro?: { nome: string; codigo?: string } | null
   serieNivel: PontoNivel[]
 }
+type RadarEstacaoCNL = EstacaoCNL & {
+  latitude: number | null
+  longitude: number | null
+}
+
+type DadosRadarChuvaLive = {
+  host: string
+  path: string
+  tileUrl?: string
+  frameTime: number
+  atualizadoEm: string
+  erroAtualizacao?: boolean
+}
 
 const CONSELHEIRO_LAFAIETE = { latitude: -20.6604, longitude: -43.7863 }
+const RADAR_MAP_CENTER: [number, number] = [CONSELHEIRO_LAFAIETE.latitude, CONSELHEIRO_LAFAIETE.longitude]
+const RADAR_MAP_ZOOM = 12
+const RADAR_CHUVA_RAIO_METROS = 10_000
+const GOES_CLOUD_TILE_URL = String(import.meta.env.VITE_GOES_CLOUD_TILES_URL || '').trim()
 const nomesTempo: Record<number, string> = { 0: 'Céu limpo', 1: 'Predominantemente limpo', 2: 'Parcialmente nublado', 3: 'Nublado', 45: 'Neblina', 48: 'Neblina com gelo', 51: 'Garoa leve', 53: 'Garoa moderada', 55: 'Garoa intensa', 61: 'Chuva leve', 63: 'Chuva moderada', 65: 'Chuva forte', 71: 'Neve leve', 73: 'Neve moderada', 75: 'Neve forte', 80: 'Pancadas leves', 81: 'Pancadas moderadas', 82: 'Pancadas fortes', 95: 'Trovoada', 96: 'Trovoada com granizo', 99: 'Trovoada forte' }
 function horarioNoturno(time?: string) {
   const hora = Number(time?.slice(11, 13))
@@ -104,6 +123,235 @@ function formatarMmRadar(valor: number | null | undefined) {
   return valor == null || !Number.isFinite(valor)
     ? '—'
     : `${valor.toLocaleString('pt-BR', { maximumFractionDigits: 2 })} mm`
+}
+
+function formatarMmMapaRadar(valor: number | null | undefined) {
+  const numero = valor != null && Number.isFinite(valor) ? valor : 0
+  return `${numero.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} mm`
+}
+
+function templateTilesHttpsValido(url: string) {
+  return /^https:\/\//i.test(url) && ['{z}', '{x}', '{y}'].every(token => url.includes(token))
+}
+
+function intensidadeCemadenRadar(valor: number | null | undefined) {
+  if (valor == null || !Number.isFinite(valor) || valor <= 0) return { cor: '#38bdf8', alpha: 0 }
+  if (valor <= 2) return { cor: '#38bdf8', alpha: 0.48 }
+  if (valor <= 10) return { cor: '#22c55e', alpha: 0.5 }
+  if (valor <= 30) return { cor: '#facc15', alpha: 0.52 }
+  if (valor <= 50) return { cor: '#f97316', alpha: 0.56 }
+  if (valor <= 80) return { cor: '#ef4444', alpha: 0.6 }
+  return { cor: '#a855f7', alpha: 0.64 }
+}
+
+function dataHoraRadar(valor?: string | null) {
+  if (!valor) return 'Sem leitura'
+  const brasileiro = valor.match(/^(\d{2})\/(\d{2})\/(\d{2,4})\s+(\d{2}):(\d{2})/)
+  if (brasileiro) {
+    const ano = brasileiro[3].length === 2 ? `20${brasileiro[3]}` : brasileiro[3]
+    return `${brasileiro[1]}/${brasileiro[2]}/${ano} ${brasileiro[4]}:${brasileiro[5]}`
+  }
+  return valor
+}
+
+function RadarMapInvalidateSize({ tv }: { tv: boolean }) {
+  const map = useMap()
+  useEffect(() => {
+    const frame = window.requestAnimationFrame(() => map.invalidateSize())
+    return () => window.cancelAnimationFrame(frame)
+  }, [map, tv])
+  return null
+}
+
+function RadarMapaTempoReal({ dadosCNL, tv }: { dadosCNL: DadosRadarCNL | null; tv: boolean }) {
+  const [camadaBase, setCamadaBase] = useState<'mapa' | 'satelite'>('mapa')
+  const [radarChuva, setRadarChuva] = useState<DadosRadarChuvaLive | null>(null)
+  const [radarErro, setRadarErro] = useState('')
+  const [radarCarregando, setRadarCarregando] = useState(false)
+  const [mostrarChuva, setMostrarChuva] = useState(true)
+  const [mostrarNuvens, setMostrarNuvens] = useState(templateTilesHttpsValido(GOES_CLOUD_TILE_URL))
+
+  const carregarRadarChuva = useCallback(async () => {
+    setRadarCarregando(true)
+    try {
+      const resposta = await fetch(`/api/radar-chuva?_ts=${Date.now()}`, { cache: 'no-store' })
+      const corpo = await resposta.json().catch(() => ({}))
+      if (!resposta.ok || typeof corpo?.host !== 'string' || typeof corpo?.path !== 'string') {
+        throw new Error('Radar indisponível')
+      }
+      setRadarChuva({
+        host: corpo.host,
+        path: corpo.path,
+        tileUrl: typeof corpo.tileUrl === 'string' ? corpo.tileUrl : undefined,
+        frameTime: Number(corpo.frameTime),
+        atualizadoEm: typeof corpo.atualizadoEm === 'string' ? corpo.atualizadoEm : '',
+        erroAtualizacao: corpo.erroAtualizacao === true,
+      })
+      setRadarErro('')
+    } catch (error) {
+      setRadarErro(error instanceof Error ? error.message : 'Radar indisponível')
+    } finally {
+      setRadarCarregando(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    carregarRadarChuva()
+    const timer = window.setInterval(carregarRadarChuva, 5 * 60 * 1000)
+    const atualizarAoVoltar = () => {
+      if (document.visibilityState === 'visible') carregarRadarChuva()
+    }
+    document.addEventListener('visibilitychange', atualizarAoVoltar)
+    return () => {
+      window.clearInterval(timer)
+      document.removeEventListener('visibilitychange', atualizarAoVoltar)
+    }
+  }, [carregarRadarChuva])
+
+  const estacoes = dadosCNL?.estacoes || []
+  const tileRadar = radarChuva?.tileUrl || (radarChuva ? `${radarChuva.host}${radarChuva.path}/256/{z}/{x}/{y}/2/1_0.png` : '')
+
+  return (
+    <section className="radar-live-map-card" aria-labelledby="radar-live-map-title">
+      <div className="radar-live-map-heading">
+        <div>
+          <span className="card-label">MAPA METEOROLÓGICO</span>
+          <h3 id="radar-live-map-title">Conselheiro Lafaiete em tempo real</h3>
+        </div>
+        <span className="radar-live-map-updated">
+          {radarCarregando ? 'Atualizando…' : radarChuva?.erroAtualizacao ? 'Último quadro salvo' : 'Atualização automática · 5 min'}
+        </span>
+      </div>
+      <div className="radar-live-map-toolbar" role="toolbar" aria-label="Controles do mapa meteorológico">
+        <div className="radar-live-map-base-buttons">
+          <button type="button" className={camadaBase === 'mapa' ? 'ativo' : ''} onClick={() => setCamadaBase('mapa')}>Mapa</button>
+          <button type="button" className={camadaBase === 'satelite' ? 'ativo' : ''} onClick={() => setCamadaBase('satelite')}>Satélite</button>
+        </div>
+        <button type="button" className={`radar-live-map-layer-button ${mostrarChuva ? 'ativo chuva' : ''}`} onClick={() => setMostrarChuva(prev => !prev)} aria-pressed={mostrarChuva}>
+          🌧️ Chuva {mostrarChuva ? 'ativa' : 'desativada'}
+        </button>
+        <button
+          type="button"
+          className={`radar-live-map-layer-button ${mostrarNuvens ? 'ativo nuvens' : ''}`}
+          onClick={() => setMostrarNuvens(prev => !prev)}
+          disabled={!templateTilesHttpsValido(GOES_CLOUD_TILE_URL)}
+          aria-pressed={mostrarNuvens}
+          title={templateTilesHttpsValido(GOES_CLOUD_TILE_URL) ? 'Mostrar camada de nuvens GOES' : 'Configure VITE_GOES_CLOUD_TILES_URL para exibir as nuvens'}
+        >
+          ☁️ Nuvens
+        </button>
+      </div>
+      <div className="radar-live-map-status">
+        <span><i className="radar-live-map-status-dot radar-live-map-status-dot-rain" /> Chuva observada</span>
+        <span><i className="radar-live-map-status-dot radar-live-map-status-dot-station" /> Estações CEMADEN</span>
+        <span><i className="radar-live-map-status-dot radar-live-map-status-dot-area" /> Raio de 10 km</span>
+        {radarErro && <strong>{radarErro}</strong>}
+      </div>
+      <MapContainer
+        className="radar-live-map"
+        center={RADAR_MAP_CENTER}
+        zoom={RADAR_MAP_ZOOM}
+        minZoom={8}
+        maxZoom={18}
+        scrollWheelZoom
+        zoomControl
+      >
+        <RadarMapInvalidateSize tv={tv} />
+        {camadaBase === 'mapa' ? (
+          <TileLayer
+            key="radar-live-base-map"
+            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+            subdomains={['a', 'b', 'c']}
+            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+            maxZoom={19}
+          />
+        ) : (
+          <TileLayer
+            key="radar-live-base-satellite"
+            url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+            attribution="Tiles &copy; Esri — Source: Esri, Maxar, Earthstar Geographics"
+            maxNativeZoom={17}
+            maxZoom={18}
+          />
+        )}
+        {mostrarNuvens && templateTilesHttpsValido(GOES_CLOUD_TILE_URL) && (
+          <Pane name="radarLiveClouds" style={{ zIndex: 410 }}>
+            <TileLayer
+              key={`radar-live-clouds-${GOES_CLOUD_TILE_URL}`}
+              url={GOES_CLOUD_TILE_URL}
+              opacity={0.55}
+              maxNativeZoom={8}
+              maxZoom={18}
+              attribution="GOES"
+            />
+          </Pane>
+        )}
+        {mostrarChuva && tileRadar && (
+          <Pane name="radarLiveRain" style={{ zIndex: 420 }}>
+            <TileLayer
+              key={`radar-live-rain-${radarChuva?.frameTime || 'none'}`}
+              url={tileRadar}
+              opacity={0.72}
+              maxNativeZoom={7}
+              maxZoom={18}
+              tileSize={256}
+              attribution='Weather data by <a href="https://www.rainviewer.com/" target="_blank" rel="noreferrer">RainViewer</a>'
+            />
+          </Pane>
+        )}
+        {mostrarChuva && (
+          <Circle
+            center={RADAR_MAP_CENTER}
+            radius={RADAR_CHUVA_RAIO_METROS}
+            pathOptions={{ color: '#1d4ed8', weight: 2, opacity: 0.9, dashArray: '7 5', fillColor: '#60a5fa', fillOpacity: 0.05 }}
+          >
+            <Popup>
+              <strong>Área de observação da chuva</strong>
+              <br />
+              Raio de 10 km a partir do centro de Conselheiro Lafaiete
+            </Popup>
+          </Circle>
+        )}
+        {mostrarChuva && estacoes.filter(estacao => Number.isFinite(estacao.latitude) && Number.isFinite(estacao.longitude)).map(estacao => {
+          const intensidade = intensidadeCemadenRadar(estacao.precipitacaoAtual)
+          return (
+            <CircleMarker
+              key={`radar-live-station-${estacao.id}`}
+              center={[estacao.latitude, estacao.longitude]}
+              radius={8}
+              pathOptions={{ color: '#fff', weight: 2, fillColor: intensidade.cor, fillOpacity: 0.95 }}
+            >
+              <Tooltip permanent direction="top" offset={[0, -7]} opacity={0.96} className="radar-live-map-tooltip">
+                {formatarMmMapaRadar(estacao.precipitacaoAtual)}
+              </Tooltip>
+              <Popup>
+                <strong>🌧️ {estacao.nome || 'Estação CEMADEN'}</strong>
+                <br />
+                Precipitação atual: <b>{formatarMmMapaRadar(estacao.precipitacaoAtual)}</b>
+                <br />
+                Leitura: {dataHoraRadar(estacao.precipitacaoDataHora)}
+                {estacao.codigo ? <><br />Estação {estacao.codigo}</> : null}
+              </Popup>
+            </CircleMarker>
+          )
+        })}
+        {mostrarChuva && (
+          <CircleMarker center={RADAR_MAP_CENTER} radius={5} pathOptions={{ color: '#0f172a', weight: 2, fillColor: '#f8fafc', fillOpacity: 1 }}>
+            <Popup>
+              <strong>Centro de Conselheiro Lafaiete</strong>
+              <br />
+              Chuva observada e estações CEMADEN atualizadas automaticamente.
+            </Popup>
+          </CircleMarker>
+        )}
+      </MapContainer>
+      <div className="radar-live-map-footer">
+        <span>{dadosCNL ? `${estacoes.length} estação(ões) CEMADEN` : 'Consultando estações CEMADEN…'}</span>
+        <span>{radarChuva?.atualizadoEm ? `Radar: ${new Date(radarChuva.atualizadoEm).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}` : 'Radar: —'}</span>
+        {!templateTilesHttpsValido(GOES_CLOUD_TILE_URL) && <span>Nuvens GOES: fonte não configurada</span>}
+      </div>
+    </section>
+  )
 }
 
 function eSerragem(nome: string) {
@@ -462,7 +710,7 @@ export default function RadarDC() {
          const corpo = await resposta.json() as {
            sucesso?: boolean
            estacao?: LeituraCNL
-           estacoes?: EstacaoCNL[]
+           estacoes?: RadarEstacaoCNL[]
            serie?: PontoSerie[]
            serieChuvaCentro?: PontoSerie[]
            estacaoChuvaCentro?: { nome: string; codigo?: string } | null
@@ -749,6 +997,19 @@ export default function RadarDC() {
     return () => document.body.classList.remove('radar-tv-active')
   }, [tv])
 
+  useEffect(() => {
+    if (!tv) return
+    let diaConhecido = hoje()
+    const timer = window.setInterval(() => {
+      const novoDia = hoje()
+      if (novoDia === diaConhecido) return
+      diaConhecido = novoDia
+      setDataSelecionada(novoDia)
+      setMes(new Date(`${novoDia}T12:00:00`))
+    }, 15 * 1000)
+    return () => window.clearInterval(timer)
+  }, [tv])
+
   const alternarModoTv = useCallback(async () => {
     if (tv) {
       if (document.fullscreenElement && document.exitFullscreen) {
@@ -758,6 +1019,9 @@ export default function RadarDC() {
       return
     }
 
+    const dataAtual = hoje()
+    setDataSelecionada(dataAtual)
+    setMes(new Date(`${dataAtual}T12:00:00`))
     setTv(true)
     if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
       await document.documentElement.requestFullscreen().catch(() => {
@@ -1063,6 +1327,7 @@ export default function RadarDC() {
           </div>
           <div><h3>⚠️ Ocorrências do dia</h3>{atividades.ocorrencias.length === 0 ? <div className="radar-empty">Nenhuma ocorrência registrada.</div> : atividades.ocorrencias.map(o => <button className="radar-activity" key={o.id} onClick={() => disparar('dc:abrir-ocorrencia', { id: o.id })}><b>{o.agente}</b><span>{o.hora} · {o.natureza || 'Natureza não informada'}</span><small>{o.endereco || 'Endereço não informado'}</small><em>abrir ›</em></button>)}</div>
         </div>
+        <RadarMapaTempoReal dadosCNL={dadosCNL} tv={tv} />
        {lembreteParaApagar && (
          <ModalSenha
            titulo={`Apagar lembrete de ${lembreteParaApagar.criadoPor}`}

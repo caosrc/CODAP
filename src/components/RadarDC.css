@@ -316,6 +316,138 @@
 .radar-ferramental-alerta-serragem strong { color: #ffb86b; }
 .radar-ferramental-alerta-pendente strong { color: #b8eaff; }
 
+.radar-live-map-card {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid #2a5877;
+}
+.radar-live-map-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: .8rem;
+  margin-bottom: .55rem;
+}
+.radar-live-map-heading h3 {
+  margin: .25rem 0 0;
+  color: #e9f5ff;
+  font-size: .95rem;
+}
+.radar-live-map-updated {
+  flex-shrink: 0;
+  color: #8db3ce;
+  font-size: .62rem;
+  font-weight: 700;
+}
+.radar-live-map-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: .4rem;
+  margin-bottom: .45rem;
+}
+.radar-live-map-base-buttons {
+  display: inline-flex;
+  overflow: hidden;
+  border: 1px solid #39718f;
+  border-radius: 7px;
+}
+.radar-live-map-toolbar button {
+  border: 1px solid #39718f;
+  border-radius: 7px;
+  padding: .34rem .55rem;
+  color: #c9e7fa;
+  background: #123652;
+  font: inherit;
+  font-size: .62rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+.radar-live-map-base-buttons button {
+  border: 0;
+  border-radius: 0;
+}
+.radar-live-map-toolbar button:hover,
+.radar-live-map-toolbar button.ativo {
+  color: #fff;
+  background: #087cae;
+}
+.radar-live-map-toolbar button.chuva.ativo {
+  border-color: #f97316;
+  color: #fff;
+  background: #c2410c;
+}
+.radar-live-map-toolbar button.nuvens.ativo {
+  border-color: #7c8cf8;
+  color: #fff;
+  background: #4f46a5;
+}
+.radar-live-map-toolbar button:disabled {
+  cursor: not-allowed;
+  opacity: .48;
+}
+.radar-live-map-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: .25rem .65rem;
+  min-height: 1.1rem;
+  margin-bottom: .35rem;
+  color: #9ebbd0;
+  font-size: .58rem;
+}
+.radar-live-map-status span {
+  display: inline-flex;
+  align-items: center;
+  gap: .22rem;
+}
+.radar-live-map-status strong {
+  color: #ffb27a;
+  font-size: .58rem;
+}
+.radar-live-map-status-dot {
+  display: inline-block;
+  width: .42rem;
+  height: .42rem;
+  border-radius: 50%;
+}
+.radar-live-map-status-dot-rain { background: #5b9cff; }
+.radar-live-map-status-dot-station { background: #f97316; }
+.radar-live-map-status-dot-area { border: 1px dashed #7db8ff; }
+.radar-live-map {
+  z-index: 0;
+  width: 100%;
+  height: 360px;
+  overflow: hidden;
+  border: 1px solid #39718f;
+  border-radius: 10px;
+  background: #dbeafe;
+}
+.radar-live-map .leaflet-control-zoom a {
+  color: #123652;
+}
+.radar-live-map-tooltip {
+  border: 0 !important;
+  padding: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: #f97316 !important;
+  font-size: .62rem;
+  font-weight: 900;
+  line-height: 1.1;
+  text-shadow: -1px -1px 0 #fff, 1px -1px 0 #fff, -1px 1px 0 #fff, 1px 1px 0 #fff;
+  white-space: nowrap;
+}
+.radar-live-map-tooltip::before { display: none; }
+.radar-live-map-footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .25rem .8rem;
+  padding-top: .35rem;
+  color: #8db3ce;
+  font-size: .57rem;
+}
+
 .radar-ticker { position: fixed; right: 0; bottom: 0; left: 0; z-index: 20; display: flex; align-items: center; height: 48px; overflow: hidden; color: #d6edff; background: #0b2545; }
 .radar-ticker > span { display: flex; align-items: center; align-self: stretch; flex-shrink: 0; padding: 0 1rem; color: #fff; background: #0a8bc1; font-size: .78rem; font-weight: 900; letter-spacing: .08em; }
 .radar-ticker-viewport { min-width: 0; flex: 1; overflow: hidden; }
@@ -329,6 +461,15 @@
 .radar-tv .radar-layout { max-width: 1500px; margin: auto; padding: 3vh 4vw; }
 .radar-tv .radar-note-card, .radar-tv .radar-calendar-card, .radar-tv .radar-activities { border-color: #235073; color: #e9f5ff; background: #102d4b; }
 .radar-tv .calendar-grid button, .radar-tv .radar-activity { color: #cae7ff; background: #163957; }
+body.radar-tv-active .radar-tv .radar-live-map-card { margin-top: .55rem; padding-top: .55rem; }
+body.radar-tv-active .radar-tv .radar-live-map-heading { margin-bottom: .28rem; }
+body.radar-tv-active .radar-tv .radar-live-map-heading h3 { font-size: .78rem; }
+body.radar-tv-active .radar-tv .radar-live-map-toolbar { gap: .25rem; margin-bottom: .25rem; }
+body.radar-tv-active .radar-tv .radar-live-map-toolbar button { padding: .22rem .38rem; font-size: .5rem; }
+body.radar-tv-active .radar-tv .radar-live-map-status,
+body.radar-tv-active .radar-tv .radar-live-map-updated,
+body.radar-tv-active .radar-tv .radar-live-map-footer { font-size: .48rem; }
+body.radar-tv-active .radar-tv .radar-live-map { height: clamp(210px, 27vh, 320px); min-height: 210px; }
 
 @media (max-width: 700px) {
   .radar-page { padding-bottom: 4rem; }
@@ -340,6 +481,9 @@
   .radar-note-card, .radar-calendar-card, .radar-activities { padding: .8rem; border-radius: 12px; }
   .radar-note-card textarea { min-height: 150px; }
   .radar-activity-columns { grid-template-columns: 1fr; gap: .35rem; }
+  .radar-live-map-heading { align-items: flex-start; flex-direction: column; gap: .25rem; }
+  .radar-live-map { height: 300px; }
+  .radar-live-map-toolbar button { padding: .3rem .45rem; }
   .radar-list-heading { align-items: flex-start; flex-direction: column; }
   .calendar-grid { gap: 3px; }
   .calendar-grid button { min-height: 36px; }

@@ -51,7 +51,12 @@ interface EstacaoCemadenMapa {
   precipitacaoDataHora: string
 }
 
-const GOES_CLOUD_TILE_URL = String(import.meta.env.VITE_GOES_CLOUD_TILES_URL || '').trim()
+// Serviço público NOAA/NNVL com imagens infravermelhas diárias do GOES.
+// A variável de ambiente continua disponível para substituir a fonte padrão.
+const GOES_CLOUD_TILE_URL = String(
+  import.meta.env.VITE_GOES_CLOUD_TILES_URL
+    || 'https://gis.nnvl.noaa.gov/arcgis/rest/services/GOES/GOES_current/ImageServer/tile/{z}/{y}/{x}',
+).trim()
 const ESTIMATIVA_CEMADEN_RAIO_METROS = 10_000
 const CEMADEN_ESTACOES_ESPERADAS = new Set([4146, 4144, 3121, 6622, 4145, 4143, 4142])
 
@@ -1335,7 +1340,7 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
               key={`nuvens-goes-${GOES_CLOUD_TILE_URL}`}
               url={GOES_CLOUD_TILE_URL}
               opacity={opacidadeNuvensGoes}
-              attribution='Imagens de nuvens: <a href="https://www.noaa.gov/" target="_blank" rel="noreferrer">NOAA / GOES</a>'
+              attribution='Imagens de nuvens &copy; <a href="https://gis.nnvl.noaa.gov/arcgis/rest/services/GOES/GOES_current/ImageServer" target="_blank" rel="noreferrer">NOAA / GOES</a>'
               maxNativeZoom={8}
               maxZoom={19}
               tileSize={256}

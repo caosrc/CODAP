@@ -550,7 +550,6 @@ type StatusOffline = 'idle' | 'baixando' | 'concluido' | 'erro'
 type StatusWs = 'desconectado' | 'conectando' | 'conectado'
 type CamadaMapa = 'padrao' | 'satelite'
 
-
 function nomeDiaSemana(dateStr: string): string {
   const dias = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
   const d = new Date(dateStr + 'T12:00:00')
@@ -560,8 +559,26 @@ function nomeDiaSemana(dateStr: string): string {
 // Centro de Conselheiro Lafaiete; zoom 12 enquadra a cidade e suas ruas.
 const CONSELHEIRO_LAFAIETE: [number, number] = [-20.6604, -43.7863]
 const RAIO_RADAR_CHUVA_METROS = 10_000
+const MAX_ZOOM_MAPA_PADRAO = 19
+// Acima deste nível a cobertura Esri da região exibe "Map data not yet available".
+const MAX_ZOOM_SATELITE = 18
 
 const MAX_TRILHA = 300
+
+function LimiteZoomCamada({ camada }: { camada: CamadaMapa }) {
+  const map = useMap()
+
+  useEffect(() => {
+    const maxZoom = camada === 'satelite' ? MAX_ZOOM_SATELITE : MAX_ZOOM_MAPA_PADRAO
+    map.setMaxZoom(maxZoom)
+
+    if (map.getZoom() > maxZoom) {
+      map.setZoom(maxZoom, { animate: false })
+    }
+  }, [camada, map])
+
+  return null
+}
 
 // ── Componente principal ────────────────────────────────────────
 export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExterno, onDestinoExternoConsumido, equipamentosCampo = [], onVerDetalheCampo }: Props) {
@@ -1283,13 +1300,14 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
         zoomControl={true}
         whenReady={() => {}}
       >
+        <LimiteZoomCamada camada={camadaMapa} />
         {camadaMapa === 'padrao' ? (
           <TileLayer
             key="mapa-padrao"
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
             subdomains={['a', 'b', 'c']}
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-            maxZoom={19}
+            maxZoom={MAX_ZOOM_MAPA_PADRAO}
             keepBuffer={2}
             updateWhenZooming={false}
             updateWhenIdle={true}
@@ -1299,7 +1317,8 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
             key="mapa-satelite"
             url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
             attribution='Tiles &copy; Esri — Source: Esri, Maxar, Earthstar Geographics'
-            maxZoom={19}
+            maxNativeZoom={MAX_ZOOM_SATELITE}
+            maxZoom={MAX_ZOOM_SATELITE}
             keepBuffer={2}
             updateWhenZooming={false}
             updateWhenIdle={true}

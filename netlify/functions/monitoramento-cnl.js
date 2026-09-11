@@ -3,6 +3,8 @@ const RECURSOS = 'https://mapservices.cemaden.gov.br/MapaInterativoWS/resources'
 const NIVEL = 'https://resources.cemaden.gov.br/graficos/cemaden/hidro/resources/json/MedidaResource.php?est=6622&sen=20&pag=24'
 const FONTE = 'https://resources.cemaden.gov.br/graficos/interativo/grafico_CEMADEN.php?idpcd=6622&uf=MG'
 const CNL_ID = 6622
+const CNL_ESTACAO_CHUVA_CENTRO_ID = 3121
+const CNL_ESTACAO_CHUVA_CENTRO_CODIGO = '311830401H'
 const ESTACOES_CHUVA_IDS = new Set([4146, 4144, 3121, 6622, 4145, 4143, 4142])
 const COTAS_PADRAO = { atencao: 2.55, alerta: 3.4, transbordamento: 4.25 }
 
@@ -63,6 +65,10 @@ function diaria(serie) {
   return [...porDia.values()].sort((a, b) => a.data.localeCompare(b.data))
 }
 
+function serieHoraria(serie) {
+  return serie.slice(-24)
+}
+
 function normalizar(item, payload) {
   const serie = extrairSerie(payload)
   const ultimo = serie.at(-1)
@@ -113,6 +119,15 @@ export const handler = async () => {
     const payloadPorId = new Map()
     chuva.forEach(result => { if (result.status === 'fulfilled') payloadPorId.set(result.value.id, result.value.payload) })
     const principalPayload = payloadPorId.get(CNL_ID) || {}
+    const estacaoCentroCatalogo = estacoesCatalogo.find(row => Number(row?.idestacao) === CNL_ESTACAO_CHUVA_CENTRO_ID)
+    const payloadCentro = payloadPorId.get(CNL_ESTACAO_CHUVA_CENTRO_ID) || {}
+    const serieChuvaCentro = serieHoraria(extrairSerie(payloadCentro))
+    const estacaoChuvaCentro = estacaoCentroCatalogo && serieChuvaCentro.length > 0
+      ? {
+          nome: String(estacaoCentroCatalogo.nomeestacao || payloadCentro.estacao?.nome || 'Centro'),
+          codigo: CNL_ESTACAO_CHUVA_CENTRO_CODIGO,
+        }
+      : null
     const estacoes = estacoesCatalogo.map(item => normalizar(item, payloadPorId.get(Number(item.idestacao)) || {})).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
     const estacaoHorario = principalPayload.estacao || {}
     const nivelSerie = (Array.isArray(medidas) ? medidas : []).map(medida => {
@@ -141,7 +156,9 @@ export const handler = async () => {
       sucesso: true,
       estacao,
       estacoes,
-      serie: extrairSerie(principalPayload).slice(-24),
+      serie: serieHoraria(extrairSerie(principalPayload)),
+      estacaoChuvaCentro,
+      serieChuvaCentro,
       nivelAtual,
       serieNivel: nivelSerie.slice(-24),
       cotasConfiguradas: cotasSalvas.configuradas,

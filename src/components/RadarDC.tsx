@@ -174,7 +174,7 @@ function RadarMapaTempoReal({ dadosCNL, tv }: { dadosCNL: DadosRadarCNL | null; 
   const [radarErro, setRadarErro] = useState('')
   const [radarCarregando, setRadarCarregando] = useState(false)
   const [mostrarChuva, setMostrarChuva] = useState(true)
-  const [mostrarNuvens, setMostrarNuvens] = useState(templateTilesHttpsValido(GOES_CLOUD_TILE_URL))
+  const [mostrarNuvens] = useState(false)
 
   const carregarRadarChuva = useCallback(async () => {
     setRadarCarregando(true)
@@ -238,10 +238,9 @@ function RadarMapaTempoReal({ dadosCNL, tv }: { dadosCNL: DadosRadarCNL | null; 
         <button
           type="button"
           className={`radar-live-map-layer-button ${mostrarNuvens ? 'ativo nuvens' : ''}`}
-          onClick={() => setMostrarNuvens(prev => !prev)}
-          disabled={!templateTilesHttpsValido(GOES_CLOUD_TILE_URL)}
+          disabled
           aria-pressed={mostrarNuvens}
-          title={templateTilesHttpsValido(GOES_CLOUD_TILE_URL) ? 'Mostrar camada de nuvens GOES' : 'Configure VITE_GOES_CLOUD_TILES_URL para exibir as nuvens'}
+          title="Camada de nuvens desabilitada neste mapa"
         >
           ☁️ Nuvens
         </button>

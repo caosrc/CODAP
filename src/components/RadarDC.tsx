@@ -1059,44 +1059,87 @@ export default function RadarDC() {
          </button>
        </div>
        <div className="radar-overview">
-       <section className="radar-weather radar-weather-compact" aria-labelledby="radar-weather-title">
-         <div className="radar-weather-bar">
-           <strong className="radar-weather-place" id="radar-weather-title">Conselheiro Lafaiete – MG</strong>
-           {erroTempo && <span className="radar-weather-error">{erroTempo}</span>}
-           {!tempo && !erroTempo && <span className="radar-weather-loading">Carregando previsão...</span>}
-           {tempo && <div className="radar-weather-condition"><span>{iconeTempo(tempo.atual.codigo)}</span><div><strong>{Math.round(tempo.atual.temperatura)}°C</strong><b>{nomesTempo[tempo.atual.codigo] || 'Condição variável'}</b></div></div>}
-           {tempo && <div className="radar-weather-metrics"><span>🌧️ Chuva <b>{tempo.atual.chuva.toFixed(1)} mm</b></span><span>☔ Prob. hoje <b>{tempo.dias[0]?.probabilidade ?? 0}%</b></span><span>💨 Vento <b>{Math.round(tempo.atual.vento)} km/h</b></span><span>💨 Rajadas <b>{Math.round(tempo.atual.rajada)} km/h</b></span><span>💧 Umidade <b>{Math.round(tempo.atual.umidade)}%</b></span></div>}
-            <div className="radar-clock" aria-label="Hora atual"><span>HORA ATUAL</span><strong>{horaAtual.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</strong></div>
-         </div>
-        {erroTempo && <p className="radar-save-error" role="alert">{erroTempo}</p>}
-        {tempo && (
-          <div className="radar-weather-detail">
-             <div className="weather-section-title">Previsão nas próximas horas</div>
-            <div className="weather-hourly" aria-label="Previsão do tempo nas próximas horas">
-              {tempo.horas.map(hora => (
-                <div className="weather-hour" key={hora.time} title={`${nomesTempo[hora.codigo] || 'Condição variável'} · ${hora.probabilidade}% de chuva`}>
-                  <b>{new Date(hora.time).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</b>
-                   <span className="weather-hour-icon">{iconeTempo(hora.codigo, hora.time)}</span>
-                  <strong>{Math.round(hora.probabilidade)}%</strong>
-                  <div className="weather-probability"><i style={{ height: `${Math.max(3, hora.probabilidade)}%` }} /></div>
-                  <small>{Math.round(hora.temperatura)}° · {hora.precipitacao.toFixed(1)} mm</small>
-                </div>
-              ))}
+        <section className="radar-weather radar-weather-compact radar-google-weather" aria-labelledby="radar-weather-title">
+          <div className="weather-google-header">
+            <div>
+              <span className="weather-google-kicker">CLIMA</span>
+              <h2 id="radar-weather-title">Conselheiro Lafaiete</h2>
+              <p>Minas Gerais · atualização automática</p>
             </div>
-            <div className="weather-section-title weather-days-title">Previsão para os próximos dias</div>
-            <div className="weather-days" aria-label="Previsão do tempo para os próximos dias">
-              {tempo.dias.map((dia, indice) => (
-                <div className="weather-day" key={dia.data}>
-                  <b>{indice === 0 ? 'Hoje' : new Date(`${dia.data}T12:00:00`).toLocaleDateString('pt-BR', { weekday: 'short' }).replace('.', '')}</b>
-                  <span>{iconeTempo(dia.codigo)}</span>
-                  <strong>{Math.round(dia.temperaturaMax)}° <small>{Math.round(dia.temperaturaMin)}°</small></strong>
-                  <em>☔ {Math.round(dia.probabilidade)}%</em>
-                </div>
-              ))}
+            <div className="weather-google-header-actions">
+              <div className="radar-clock" aria-label="Hora atual">
+                <span>HORA ATUAL</span>
+                <strong>{horaAtual.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</strong>
+              </div>
+              <span className="weather-google-menu" aria-hidden="true">⋮</span>
             </div>
           </div>
-        )}
-      </section>
+          {erroTempo && <p className="radar-weather-error" role="alert">{erroTempo}</p>}
+          {!tempo && !erroTempo && <p className="radar-weather-loading">Carregando previsão...</p>}
+          {tempo && (
+            <>
+              <div className="weather-google-current">
+                <div className="weather-google-temperature">
+                  <span>Agora</span>
+                  <strong>{Math.round(tempo.atual.temperatura)}°</strong>
+                </div>
+                <div className="weather-google-current-icon" aria-label={nomesTempo[tempo.atual.codigo] || 'Condição variável'}>
+                  <span className="weather-google-sun" />
+                  <span className="weather-google-cloud">{iconeTempo(tempo.atual.codigo)}</span>
+                </div>
+                <div className="weather-google-summary">
+                  <strong>{nomesTempo[tempo.atual.codigo] || 'Condição variável'}</strong>
+                  <span>Umidade {Math.round(tempo.atual.umidade)}% · vento {Math.round(tempo.atual.vento)} km/h</span>
+                </div>
+              </div>
+              <div className="weather-google-metrics" aria-label="Resumo das condições atuais">
+                <span>🌧️ Chuva <b>{tempo.atual.chuva.toFixed(1)} mm</b></span>
+                <span>☔ Prob. hoje <b>{tempo.dias[0]?.probabilidade ?? 0}%</b></span>
+                <span>💨 Rajadas <b>{Math.round(tempo.atual.rajada)} km/h</b></span>
+              </div>
+              <div className="weather-google-hours-heading">
+                <strong>Previsão por hora</strong>
+                <span>Próximas horas</span>
+              </div>
+              <div className="weather-google-hourly" aria-label="Previsão do tempo nas próximas horas">
+                {tempo.horas.slice(0, 7).map((hora, indice) => (
+                  <div className="weather-google-hour" key={hora.time} title={`${nomesTempo[hora.codigo] || 'Condição variável'} · ${hora.probabilidade}% de chuva`}>
+                    <strong>{indice === 0 ? 'Agora' : new Date(hora.time).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</strong>
+                    <span className="weather-google-hour-temperature">{Math.round(hora.temperatura)}°</span>
+                    <span className="weather-google-hour-icon">{iconeTempo(hora.codigo, hora.time)}</span>
+                    <small>{Math.round(hora.probabilidade)}%</small>
+                  </div>
+                ))}
+              </div>
+              <div className="weather-google-frog-scene" aria-label="Sapinho observando a previsão do tempo">
+                <span className="weather-google-sky-glow" />
+                <span className="weather-google-hill weather-google-hill-back" />
+                <span className="weather-google-hill weather-google-hill-front" />
+                <span className="weather-google-reed weather-google-reed-one" />
+                <span className="weather-google-reed weather-google-reed-two" />
+                <span className="weather-google-frog">
+                  <i className="weather-google-frog-eye weather-google-frog-eye-left" />
+                  <i className="weather-google-frog-eye weather-google-frog-eye-right" />
+                  <b className="weather-google-frog-mouth" />
+                </span>
+                <span className="weather-google-frog-sign">☁</span>
+              </div>
+              <div className="weather-google-days-heading">
+                <strong>Previsão para os próximos dias</strong>
+              </div>
+              <div className="weather-google-days" aria-label="Previsão do tempo para os próximos dias">
+                {tempo.dias.map((dia, indice) => (
+                  <div className={`weather-google-day ${indice === 0 ? 'weather-google-day-today' : ''}`} key={dia.data}>
+                    <b>{indice === 0 ? 'Hoje' : new Date(`${dia.data}T12:00:00`).toLocaleDateString('pt-BR', { weekday: 'short' }).replace('.', '')}</b>
+                    <span>{iconeTempo(dia.codigo)}</span>
+                    <strong>{Math.round(dia.temperaturaMax)}° <small>{Math.round(dia.temperaturaMin)}°</small></strong>
+                    <em>☔ {Math.round(dia.probabilidade)}%</em>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+        </section>
        <div className="radar-calendar-card" ref={calendarioRef}>
          <div className="calendar-top"><div><span>CALENDÁRIO DE NOTIFICAÇÕES</span><h2>{mes.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}</h2></div><div className="month-buttons"><button type="button" aria-label="Mês anterior" onClick={() => setMes(new Date(mes.getFullYear(), mes.getMonth() - 1, 1))}>‹</button><button type="button" aria-label="Próximo mês" onClick={() => setMes(new Date(mes.getFullYear(), mes.getMonth() + 1, 1))}>›</button></div></div>
          <div className="weekdays">{['DOM', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SÁB'].map(d => <span key={d}>{d}</span>)}</div>

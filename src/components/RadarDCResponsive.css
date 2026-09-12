@@ -2,6 +2,161 @@
   filter: drop-shadow(0 2px 2px rgba(11, 71, 122, .34));
 }
 
+/* Ajustes responsivos do cartão de clima inspirado no Google Clima. */
+.radar-google-weather {
+  margin: 0 auto .7rem;
+  padding: .85rem;
+  border-radius: 17px;
+}
+
+.weather-google-header {
+  gap: .55rem;
+}
+
+.weather-google-header h2 {
+  font-size: 1.15rem;
+}
+
+.weather-google-header p {
+  font-size: .64rem;
+}
+
+.weather-google-header-actions {
+  gap: .35rem;
+}
+
+.radar-google-weather .radar-clock {
+  min-width: 82px;
+  padding: .28rem .38rem;
+}
+
+.radar-google-weather .radar-clock span {
+  font-size: .42rem;
+}
+
+.radar-google-weather .radar-clock strong {
+  font-size: .7rem;
+}
+
+.weather-google-menu {
+  font-size: 1.25rem;
+}
+
+.weather-google-current {
+  grid-template-columns: auto minmax(75px, 1fr);
+  gap: .45rem;
+  margin-top: .6rem;
+  padding: .72rem;
+}
+
+.weather-google-temperature > span {
+  font-size: .68rem;
+}
+
+.weather-google-temperature strong {
+  font-size: 3.45rem;
+}
+
+.weather-google-current-icon {
+  min-height: 78px;
+}
+
+.weather-google-sun {
+  width: 43px;
+  height: 43px;
+}
+
+.weather-google-cloud {
+  margin-top: 18px;
+  font-size: 2.4rem;
+}
+
+.weather-google-summary {
+  grid-column: 1 / -1;
+  padding-top: .35rem;
+  border-top: 1px solid rgba(120, 130, 140, .16);
+}
+
+.weather-google-summary strong {
+  font-size: 1rem;
+}
+
+.weather-google-summary span {
+  margin-top: .15rem;
+  font-size: .66rem;
+}
+
+.weather-google-metrics {
+  gap: .3rem .6rem;
+  padding-top: .55rem;
+  font-size: .61rem;
+}
+
+.weather-google-hours-heading,
+.weather-google-days-heading {
+  margin-top: .7rem;
+  font-size: .7rem;
+}
+
+.weather-google-hours-heading span {
+  font-size: .58rem;
+}
+
+.weather-google-hourly,
+.weather-google-days {
+  gap: .25rem;
+  overflow-x: auto;
+  padding-bottom: .18rem;
+  scrollbar-width: thin;
+}
+
+.weather-google-hour,
+.weather-google-day {
+  flex: 0 0 67px;
+}
+
+.weather-google-hour {
+  min-height: 94px;
+}
+
+.weather-google-frog-scene {
+  height: 67px;
+  margin-inline: -.1rem;
+}
+
+.weather-google-day {
+  min-height: 75px;
+}
+
+@media (min-width: 701px) {
+  .radar-google-weather {
+    margin: 0 auto .7rem;
+    padding: .85rem 1rem .75rem;
+  }
+
+  .weather-google-current {
+    grid-template-columns: auto minmax(100px, 1fr) minmax(200px, 1.4fr);
+  }
+
+  .weather-google-hour,
+  .weather-google-day {
+    flex-basis: auto;
+  }
+}
+
+/* Mantém o cartão novo acima das regras legadas do Radar definidas neste arquivo. */
+.radar-page .radar-google-weather {
+  margin: 0 auto .7rem;
+  padding: .85rem;
+}
+
+@media (min-width: 701px) {
+  .radar-page .radar-google-weather {
+    margin: 0 auto .7rem;
+    padding: .85rem 1rem .75rem;
+  }
+}
+
 .radar-tab-icon {
   width: 2rem;
   height: 2rem;

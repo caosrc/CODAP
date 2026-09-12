@@ -42,6 +42,7 @@ type ResumoFerramental = {
 type DiaPrevisao = { data: string; codigo: number; temperaturaMax: number; temperaturaMin: number; precipitacao: number; probabilidade: number; umidade: number; vento: number; rajada: number }
 type HoraPrevisao = { time: string; codigo: number; temperatura: number; probabilidade: number; precipitacao: number; vento: number }
 type TempoDC = { atual: { codigo: number; temperatura: number; chuva: number; vento: number; rajada: number; umidade: number }; horas: HoraPrevisao[]; dias: DiaPrevisao[] }
+type EstadoVisualTempo = 'normal' | 'quente' | 'frio' | 'chuva' | 'trovoada' | 'seco' | 'baixa-umidade'
 type DadosRadarCNL = {
   estacao: LeituraCNL
   estacoes: RadarEstacaoCNL[]
@@ -87,6 +88,29 @@ function iconeTempo(codigo: number, time?: string) {
   if (codigo >= 45) return '🌫️'
   if (codigo >= 2) return noturno ? '☁️' : '⛅'
   return noturno ? '🌙' : '☀️'
+}
+function estadosVisuaisTempo(tempo: TempoDC): EstadoVisualTempo[] {
+  const atual = tempo.atual
+  const hoje = tempo.dias[0]
+  const proximasHoras = tempo.horas.slice(0, 6)
+  const maiorProbabilidade = Math.max(
+    hoje?.probabilidade || 0,
+    ...proximasHoras.map(hora => hora.probabilidade || 0),
+  )
+  const haTrovoada = atual.codigo >= 95 || proximasHoras.some(hora => hora.codigo >= 95)
+  const haChuva = atual.codigo >= 51 || atual.chuva > 0.1 || maiorProbabilidade >= 60
+  const estaQuente = atual.temperatura >= 30 || (hoje && atual.temperatura - hoje.temperaturaMin >= 8)
+  const estaFrio = atual.temperatura <= 17 || (hoje && hoje.temperaturaMax - atual.temperatura >= 8)
+  const estaSeco = !haChuva && atual.temperatura >= 28 && atual.umidade <= 45
+  const umidadeBaixa = atual.umidade <= 45
+  const estados: EstadoVisualTempo[] = []
+  if (haTrovoada) estados.push('trovoada')
+  else if (haChuva) estados.push('chuva')
+  if (estaQuente) estados.push('quente')
+  if (estaFrio) estados.push('frio')
+  if (estaSeco) estados.push('seco')
+  if (umidadeBaixa) estados.push('baixa-umidade')
+  return estados.length > 0 ? estados : ['normal']
 }
 function dataTempo(data: string) { return new Date(data + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) }
 
@@ -795,6 +819,10 @@ export default function RadarDC() {
       rajada: tempo.dias.reduce((maior, dia) => dia.rajada > maior.rajada ? dia : maior),
     }
   }, [tempo])
+  const estadosClima = useMemo(
+    () => tempo ? estadosVisuaisTempo(tempo) : ['normal' as EstadoVisualTempo],
+    [tempo],
+  )
   const diasPrecipitacao = useMemo(() => {
     if (!dadosCNL) return []
     return [...new Set(dadosCNL.estacoes.flatMap(estacao => estacao.precipitacaoDiaria.map(dia => dia.data)))]
@@ -1111,16 +1139,26 @@ export default function RadarDC() {
                   </div>
                 ))}
               </div>
-              <div className="weather-google-frog-scene" aria-label="Sapinho observando a previsão do tempo">
+              <div
+                className={`weather-google-frog-scene ${estadosClima.map(estado => `weather-state-${estado}`).join(' ')}`}
+                aria-label={`Sapinho reagindo a ${estadosClima.map(estado => estado.replace('-', ' ')).join(', ')}`}
+              >
                 <span className="weather-google-sky-glow" />
                 <span className="weather-google-hill weather-google-hill-back" />
                 <span className="weather-google-hill weather-google-hill-front" />
                 <span className="weather-google-reed weather-google-reed-one" />
                 <span className="weather-google-reed weather-google-reed-two" />
+                <span className="weather-google-rain-drops" aria-hidden="true" />
+                <span className="weather-google-lightning" aria-hidden="true">ϟ</span>
+                <span className="weather-google-dry-dust" aria-hidden="true" />
+                <span className="weather-google-heat-wave" aria-hidden="true" />
+                <span className="weather-google-low-humidity" aria-hidden="true">~</span>
                 <span className="weather-google-frog">
                   <i className="weather-google-frog-eye weather-google-frog-eye-left" />
                   <i className="weather-google-frog-eye weather-google-frog-eye-right" />
                   <b className="weather-google-frog-mouth" />
+                  <i className="weather-google-frog-sweat" />
+                  <i className="weather-google-frog-scarf" />
                 </span>
                 <span className="weather-google-frog-sign">☁</span>
               </div>

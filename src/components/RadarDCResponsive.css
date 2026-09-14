@@ -3512,3 +3512,16 @@ html:-webkit-full-screen {
     min-height: 38px;
   }
 }
+
+/* O mapa meteorológico volta a ocupar a área vertical grande no uso normal. */
+@media (min-width: 701px) {
+  .radar-page:not(.radar-tv) .radar-live-map-card {
+    margin-top: 1rem;
+    padding-top: 1rem;
+  }
+
+  .radar-page:not(.radar-tv) .radar-live-map {
+    height: 720px;
+    min-height: 720px;
+  }
+}

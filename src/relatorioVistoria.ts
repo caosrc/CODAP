@@ -236,7 +236,7 @@ export async function gerarRelatorioVistoria(ocorrencia: Ocorrencia): Promise<Bl
   documentXml = substituirTextoDoParagrafo(
     documentXml,
     (texto) => texto.trimStart().startsWith('Foi promovida vistoria em'),
-    `Foi promovida vistoria em ${dataExtenso} pela equipe da Coordenadoria Municipal de Proteção e Defesa Civil do município de Ouro Branco, conforme solicitação supramencionada na ${enderecoFormatado}, coordenadas ${coordenadas}.`,
+    `Foi promovida vistoria em ${dataExtenso} pela equipe da Coordenadoria Municipal de Proteção e Defesa Civil do município de Conselheiro Lafaiete, conforme solicitação supramencionada na ${enderecoFormatado}, coordenadas ${coordenadas}.`,
   )
   documentXml = substituirTextoDoParagrafo(
     documentXml,
@@ -249,18 +249,15 @@ export async function gerarRelatorioVistoria(ocorrencia: Ocorrencia): Promise<Bl
     (texto) => texto.startsWith('Diante de todas as informações presentes'),
     textoConclusao,
   )
-  const nomeResponsavel = ocorrencia.tipo === 'Vistoria Ambiental'
-    ? 'Talita Oliveira de Araújo'
-    : 'Cristiane Caroline Campos Lopes'
   documentXml = substituirTextoDoParagrafo(
     documentXml,
     (texto) => texto.trim() === 'Nome',
-    nomeResponsavel,
+    'Nome',
   )
   documentXml = substituirTextoDoParagrafo(
     documentXml,
     (texto) => texto.trim() === 'Nome',
-    'Moisés Pinto dos Santos',
+    'Nome',
   )
 
   const substituicoes: Record<string, string> = {
@@ -282,9 +279,6 @@ export async function gerarRelatorioVistoria(ocorrencia: Ocorrencia): Promise<Bl
   }
 
   if (ocorrencia.tipo === 'Vistoria Ambiental') {
-    documentXml = documentXml
-      .split('Cristiane Caroline Campos Lopes').join('Talita Oliveira de Ara\u00FAjo')
-
     const paragrafoCargo = '<w:p><w:pPr><w:keepNext w:val="false" /><w:keepLines w:val="false" /><w:pageBreakBefore w:val="false" /><w:widowControl w:val="true" /><w:pBdr></w:pBdr><w:spacing w:after="0" /><w:ind /><w:jc w:val="center" /><w:rPr><w:rFonts w:hint="default" w:ascii="Arial" w:hAnsi="Arial" w:cs="Arial" /><w:sz w:val="20" /><w:szCs w:val="20" /></w:rPr></w:pPr><w:r><w:rPr><w:rFonts w:hint="default" w:ascii="Arial" w:hAnsi="Arial" w:cs="Arial" /><w:sz w:val="20" /><w:szCs w:val="20" /></w:rPr><w:t>Analista Ambiental</w:t></w:r></w:p>'
     documentXml = documentXml.replace(
       /<w:p\b[^>]*>(?:(?!<\/w:p>)[\s\S])*?Engenheiro\(a\) Civil - (?:(?!<\/w:p>)[\s\S])*?<\/w:p>/,
@@ -292,10 +286,17 @@ export async function gerarRelatorioVistoria(ocorrencia: Ocorrencia): Promise<Bl
     )
   } else {
     documentXml = documentXml
-      .split('Talita Oliveira de Ara\u00FAjo').join('Cristiane Caroline Campos Lopes')
-      .split('Talita Oliveira de Araújo').join('Cristiane Caroline Campos Lopes')
       .split('Analista Ambiental').join('Engenheira Civil - CODAP')
   }
+
+  // O modelo pode conter nomes de exemplo em trechos que não são
+  // identificados como parágrafos isolados. Eles nunca devem ser levados
+  // para o arquivo salvo.
+  documentXml = documentXml
+    .split('Cristiane Caroline Campos Lopes').join('Nome')
+    .split('Moisés Pinto dos Santos').join('Nome')
+    .split('Talita Oliveira de Ara\u00FAjo').join('Nome')
+    .split('Talita Oliveira de Araújo').join('Nome')
 
   documentXml = documentXml
     .replace(/[“”]/g, '')

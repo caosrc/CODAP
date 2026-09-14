@@ -2064,6 +2064,299 @@ html:-webkit-full-screen {
 }
 
 /*
+ * Composição final do modo TV.
+ * A referência usa o topo meteorológico apenas na área esquerda, deixando
+ * a coluna direita livre para os registros e o mapa. O layout continua
+ * responsivo fora do modo TV e não altera nenhuma fonte de dados.
+ */
+@media (min-width: 701px) {
+  body.radar-tv-active .radar-tv .radar-dashboard {
+    display: grid;
+    grid-template-columns: minmax(0, 1.16fr) minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+    align-items: stretch;
+    flex: 1 1 auto;
+    min-height: 0;
+    gap: clamp(.3rem, .55vw, .55rem);
+    padding: .35rem clamp(.45rem, 1.2vw, .85rem) calc(3rem + 1vh);
+    overflow: hidden;
+  }
+
+  body.radar-tv-active .radar-tv .radar-overview {
+    grid-column: 1 / -1;
+    grid-row: 1;
+    width: min(70%, 700px);
+    padding: 0;
+    gap: .35rem;
+  }
+
+  body.radar-tv-active .radar-tv .radar-layout {
+    display: contents;
+  }
+
+  body.radar-tv-active .radar-tv .radar-layout > .radar-note-card {
+    grid-column: 1;
+    grid-row: 2;
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+  }
+
+  body.radar-tv-active .radar-tv .radar-right-column {
+    grid-column: 2;
+    grid-row: 2;
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
+    align-content: stretch;
+    gap: clamp(.3rem, .55vw, .55rem);
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  body.radar-tv-active .radar-tv .radar-activities {
+    width: 100%;
+    height: auto;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  body.radar-tv-active .radar-tv .radar-live-map-card {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    height: auto;
+    margin: 0;
+    padding: .45rem;
+    overflow: hidden;
+  }
+
+  body.radar-tv-active .radar-tv .radar-live-map {
+    flex: 1 1 auto;
+    width: 100%;
+    height: min(720px, calc(100dvh - 330px));
+    min-height: 280px;
+  }
+
+  /* O cartão de clima passa a ser uma faixa: identidade à esquerda e
+     previsões em sequência à direita, como no painel de referência. */
+  body.radar-tv-active .radar-tv .radar-google-weather {
+    display: grid;
+    grid-template-columns: minmax(170px, 1.05fr) minmax(290px, 2.1fr);
+    grid-template-rows: auto auto auto 1fr;
+    column-gap: .45rem;
+    width: 100%;
+    height: 132px;
+    min-height: 0;
+    padding: .35rem .5rem;
+    overflow: hidden;
+  }
+
+  body.radar-tv-active .radar-tv .weather-google-header {
+    grid-column: 1;
+    grid-row: 1;
+    min-width: 0;
+    gap: .35rem;
+  }
+
+  body.radar-tv-active .radar-tv .weather-google-header h2 {
+    margin: .04rem 0 0;
+    font-size: .8rem;
+    line-height: 1.05;
+  }
+
+  body.radar-tv-active .radar-tv .weather-google-header p {
+    font-size: .46rem;
+  }
+
+  body.radar-tv-active .radar-tv .weather-google-header-actions {
+    gap: .2rem;
+  }
+
+  body.radar-tv-active .radar-tv .radar-clock {
+    min-width: 70px;
+    padding: .16rem .25rem;
+  }
+
+  body.radar-tv-active .radar-tv .radar-clock span {
+    font-size: .38rem;
+  }
+
+  body.radar-tv-active .radar-tv .radar-clock strong {
+    font-size: .6rem;
+  }
+
+  body.radar-tv-active .radar-tv .weather-google-menu {
+    display: none;
+  }
+
+  body.radar-tv-active .radar-tv .weather-google-current {
+    grid-column: 1;
+    grid-row: 2;
+    grid-template-columns: auto 40px minmax(0, 1fr);
+    gap: .3rem;
+    margin-top: .15rem;
+    padding: 0;
+    border: 0;
+    background: transparent;
+  }
+
+  body.radar-tv-active .radar-tv .weather-google-temperature > span {
+    font-size: .45rem;
+  }
+
+  body.radar-tv-active .radar-tv .weather-google-temperature strong {
+    font-size: 2rem;
+    line-height: .9;
+  }
+
+  body.radar-tv-active .radar-tv .weather-google-current-icon {
+    min-height: 38px;
+  }
+
+  body.radar-tv-active .radar-tv .weather-google-sun {
+    width: 25px;
+    height: 25px;
+  }
+
+  body.radar-tv-active .radar-tv .weather-google-cloud {
+    margin-top: 10px;
+    font-size: 1.25rem;
+  }
+
+  body.radar-tv-active .radar-tv .weather-google-summary strong {
+    font-size: .57rem;
+  }
+
+  body.radar-tv-active .radar-tv .weather-google-summary span {
+    margin-top: .08rem;
+    font-size: .4rem;
+  }
+
+  body.radar-tv-active .radar-tv .weather-google-metrics {
+    grid-column: 1;
+    grid-row: 3;
+    align-self: start;
+    gap: .18rem .35rem;
+    padding: .1rem 0 0;
+    font-size: .4rem;
+  }
+
+  body.radar-tv-active .radar-tv .weather-google-hours-heading {
+    grid-column: 2;
+    grid-row: 1;
+    align-self: end;
+    margin: 0;
+    font-size: .54rem;
+  }
+
+  body.radar-tv-active .radar-tv .weather-google-hours-heading span {
+    font-size: .4rem;
+  }
+
+  body.radar-tv-active .radar-tv .weather-google-hourly {
+    grid-column: 2;
+    grid-row: 2;
+    gap: .16rem;
+    min-width: 0;
+    margin-top: .12rem;
+    padding: 0;
+  }
+
+  body.radar-tv-active .radar-tv .weather-google-hour {
+    min-width: 0;
+    min-height: 42px;
+    padding: .14rem .06rem;
+    border-radius: 5px;
+  }
+
+  body.radar-tv-active .radar-tv .weather-google-hour > strong {
+    font-size: .4rem;
+  }
+
+  body.radar-tv-active .radar-tv .weather-google-hour-temperature {
+    font-size: .55rem;
+  }
+
+  body.radar-tv-active .radar-tv .weather-google-hour-icon {
+    min-height: 13px;
+    font-size: .7rem;
+  }
+
+  body.radar-tv-active .radar-tv .weather-google-hour small {
+    font-size: .36rem;
+  }
+
+  body.radar-tv-active .radar-tv .weather-google-frog-scene {
+    display: none;
+  }
+
+  body.radar-tv-active .radar-tv .weather-google-days-heading {
+    grid-column: 2;
+    grid-row: 3;
+    align-self: end;
+    margin: .08rem 0 0;
+    font-size: .52rem;
+  }
+
+  body.radar-tv-active .radar-tv .weather-google-days {
+    grid-column: 2;
+    grid-row: 4;
+    gap: .16rem;
+    min-width: 0;
+    margin-top: .1rem;
+    padding: 0;
+  }
+
+  body.radar-tv-active .radar-tv .weather-google-day {
+    min-width: 0;
+    min-height: 34px;
+    padding: .1rem .06rem;
+    border-radius: 5px;
+  }
+
+  body.radar-tv-active .radar-tv .weather-google-day > b {
+    font-size: .38rem;
+  }
+
+  body.radar-tv-active .radar-tv .weather-google-day > span {
+    font-size: .65rem;
+  }
+
+  body.radar-tv-active .radar-tv .weather-google-day strong {
+    font-size: .45rem;
+  }
+
+  body.radar-tv-active .radar-tv .weather-google-day strong small,
+  body.radar-tv-active .radar-tv .weather-google-day em {
+    font-size: .34rem;
+  }
+}
+
+@media (max-width: 700px) {
+  .radar-dashboard {
+    min-width: 0;
+  }
+
+  body.radar-tv-active .radar-tv .radar-dashboard {
+    display: block;
+    height: auto;
+    overflow: visible;
+    padding: 0 .6rem 3.5rem;
+  }
+
+  body.radar-tv-active .radar-tv .radar-layout {
+    display: grid;
+  }
+
+  body.radar-tv-active .radar-tv .radar-live-map {
+    height: 420px;
+    min-height: 420px;
+  }
+}
+
+/*
  * Composição final do Modo TV.
  * A tela cheia é um painel de leitura rápida: clima e calendário ficam
  * compactos no topo, enquanto gráficos, registros e mapa ocupam o restante.

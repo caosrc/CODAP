@@ -1086,7 +1086,8 @@ export default function RadarDC() {
            {tv ? '↙ Voltar ao app' : '⛶ Modo TV — Tela cheia'}
          </button>
        </div>
-       <div className="radar-overview">
+        <div className="radar-dashboard">
+        <div className="radar-overview">
         <section className="radar-weather radar-weather-compact radar-google-weather" aria-labelledby="radar-weather-title">
           <div className="weather-google-header">
             <div>
@@ -1412,7 +1413,8 @@ export default function RadarDC() {
           </div>
           <div><h3>⚠️ Ocorrências do dia</h3>{atividades.ocorrencias.length === 0 ? <div className="radar-empty">Nenhuma ocorrência registrada.</div> : atividades.ocorrencias.map(o => <button className="radar-activity" key={o.id} onClick={() => disparar('dc:abrir-ocorrencia', { id: o.id })}><b>{o.agente}</b><span>{o.hora} · {o.natureza || 'Natureza não informada'}</span><small>{o.endereco || 'Endereço não informado'}</small><em>abrir ›</em></button>)}</div>
         </div>
-        <RadarMapaTempoReal dadosCNL={dadosCNL} tv={tv} />
+         </section>
+         <RadarMapaTempoReal dadosCNL={dadosCNL} tv={tv} />
        {lembreteParaApagar && (
          <ModalSenha
            titulo={`Apagar lembrete de ${lembreteParaApagar.criadoPor}`}
@@ -1421,9 +1423,9 @@ export default function RadarDC() {
            onConfirmar={(senha) => { void remover(lembreteParaApagar, senha) }}
          />
        )}
-        </section>
         </div>
       </div>
+       </div>
       <div className="radar-ticker">
         <span>RADAR DC</span>
         <div className="radar-ticker-viewport">

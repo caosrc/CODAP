@@ -4,7 +4,7 @@ import './RadarDC.css'
 import './RadarDCResponsive.css'
 import 'leaflet/dist/leaflet.css'
 import { getAgenteLogado } from './Login'
-import { getSenhaAgente } from '../types'
+import { agentePodeGerenciarCriacao, getSenhaAgente } from '../types'
 import { wsOn, wsSend } from '../wsClient'
 import { supabase, supabaseDisponivel } from '../supabaseClient'
 import { AGENTES } from '../types'
@@ -532,6 +532,7 @@ export default function RadarDC() {
   const [marcandoCienteId, setMarcandoCienteId] = useState<string | null>(null)
   const [erroSalvamento, setErroSalvamento] = useState('')
   const [lembreteParaApagar, setLembreteParaApagar] = useState<RegistroRadar | null>(null)
+  const [registroEmEdicao, setRegistroEmEdicao] = useState<RegistroRadar | null>(null)
   const carregadoRef = useRef(false)
   const pendentesRef = useRef(new Set<string>())
   const ocorrenciasNotificadasRef = useRef(new Set<number>())
@@ -843,6 +844,65 @@ export default function RadarDC() {
       setErroSalvamento('Marque pelo menos um agente para receber este lembrete.')
       return
     }
+    if (registroEmEdicao) {
+      const registroAtualizado = {
+        texto: texto.trim(),
+        data,
+        hora: horaRegistro,
+        prioridade,
+        agentes_envolvidos: agentesParaRegistro,
+        concluido: registroEmEdicao.concluido,
+      }
+      setSalvando(true)
+      setErroSalvamento('')
+      try {
+        let row: Record<string, unknown>
+        if (supabaseDisponivel) {
+          const result = agentePodeGerenciarCriacao(registroEmEdicao.criadoPor, agente) && registroEmEdicao.criadoPor === 'J'
+            ? await supabase.from('radar_bilhetes').update(registroAtualizado).eq('id', registroEmEdicao.id).select().single()
+            : await supabase.from('radar_bilhetes').update(registroAtualizado).eq('id', registroEmEdicao.id).eq('criado_por', agente).select().single()
+          if (result.error || !result.data) throw new Error(result.error?.message || 'Não foi possível atualizar o registro.')
+          row = result.data as Record<string, unknown>
+        } else {
+          const res = await fetch(`/api/radar-bilhetes/${registroEmEdicao.id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ agente, ...registroAtualizado }),
+          })
+          if (!res.ok) {
+            const detalhe = await res.json().catch(() => null) as { error?: string } | null
+            throw new Error(detalhe?.error || 'Não foi possível atualizar o registro.')
+          }
+          row = await res.json() as Record<string, unknown>
+        }
+        const salvo: RegistroRadar = {
+          ...registroEmEdicao,
+          id: String(row.id),
+          texto: String(row.texto),
+          data: String(row.data),
+          hora: String(row.hora),
+          prioridade: (row.prioridade as Prioridade) || prioridade,
+          concluido: Boolean(row.concluido),
+          agentesEnvolvidos: Array.isArray(row.agentes_envolvidos) ? row.agentes_envolvidos.map(String) : agentesParaRegistro,
+          confirmacoesAgentes: lerConfirmacoes(row.confirmacoes_agentes),
+        }
+        setRegistros(prev => prev.map(item => item.id === salvo.id ? salvo : item))
+        setRegistroEmEdicao(null)
+        setTextoLembrete('')
+        setTextoNotificacao('')
+        setAgentesLembrete([])
+        setAgentesEnvolvidos([])
+        setHora(horaAgora())
+        setLembreteEditorAberto(false)
+        setEditorAberto(false)
+        if (supabaseDisponivel) wsSend({ tipo: 'radar_bilhetes_atualizados' })
+      } catch (error) {
+        setErroSalvamento(error instanceof Error ? error.message : 'Não foi possível atualizar o registro.')
+      } finally {
+        setSalvando(false)
+      }
+      return
+    }
     const novo: RegistroRadar = {
       id: crypto.randomUUID(), texto: texto.trim(), data, hora: horaRegistro,
       prioridade, concluido: false, criadoPor: agente, criadoEm: new Date().toISOString(), tipo,
@@ -931,7 +991,9 @@ export default function RadarDC() {
     setErroSalvamento('')
     try {
       if (supabaseDisponivel) {
-        const result = await supabase.from('radar_bilhetes').delete().eq('id', id).eq('criado_por', agente)
+        const result = agentePodeGerenciarCriacao(registro.criadoPor, agente) && registro.criadoPor === 'J'
+          ? await supabase.from('radar_bilhetes').delete().eq('id', id)
+          : await supabase.from('radar_bilhetes').delete().eq('id', id).eq('criado_por', agente)
         if (result.error) throw new Error(result.error.message)
       } else {
         const res = await fetch('/api/radar-bilhetes/' + id, {
@@ -949,6 +1011,24 @@ export default function RadarDC() {
       if (supabaseDisponivel) wsSend({ tipo: 'radar_bilhetes_atualizados' })
     } catch (error) {
       setErroSalvamento(error instanceof Error ? error.message : 'Não foi possível remover o registro.')
+    }
+  }
+
+  function iniciarEdicaoRegistro(registro: RegistroRadar) {
+    if (!agentePodeGerenciarCriacao(registro.criadoPor, agente)) return
+    setRegistroEmEdicao(registro)
+    setPrioridade(registro.prioridade)
+    setDataSelecionada(registro.data)
+    setHora(registro.hora)
+    if (registro.tipo === 'lembrete') {
+      setTextoLembrete(registro.texto)
+      setAgentesLembrete(registro.agentesEnvolvidos)
+      setLembreteEditorAberto(true)
+    } else {
+      setTextoNotificacao(registro.texto)
+      setAgentesEnvolvidos(registro.agentesEnvolvidos)
+      setEditorAberto(true)
+      requestAnimationFrame(() => calendarioRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }))
     }
   }
 
@@ -1193,10 +1273,10 @@ export default function RadarDC() {
        <div className="radar-calendar-card" ref={calendarioRef}>
          <div className="calendar-top"><div><span>CALENDÁRIO DE NOTIFICAÇÕES</span><h2>{mes.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}</h2></div><div className="month-buttons"><button type="button" aria-label="Mês anterior" onClick={() => setMes(new Date(mes.getFullYear(), mes.getMonth() - 1, 1))}>‹</button><button type="button" aria-label="Próximo mês" onClick={() => setMes(new Date(mes.getFullYear(), mes.getMonth() + 1, 1))}>›</button></div></div>
          <div className="weekdays">{['DOM', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SÁB'].map(d => <span key={d}>{d}</span>)}</div>
-         <div className="calendar-grid">{dias.map(d => { const key = dataLocalISO(d); const count = notificacoes.filter(n => n.data === key && !n.concluido).length; return <button type="button" key={key} aria-label={dataBonita(key)} className={`${d.getMonth() !== mes.getMonth() ? 'other-month ' : ''}${key === dataSelecionada ? 'selected ' : ''}${key === hoje() ? 'today' : ''}`} onClick={() => { setDataSelecionada(key); setEditorAberto(true) }}><span>{d.getDate()}</span>{count > 0 && <i>{count}</i>}</button> })}</div>
+         <div className="calendar-grid">{dias.map(d => { const key = dataLocalISO(d); const count = notificacoes.filter(n => n.data === key && !n.concluido).length; return <button type="button" key={key} aria-label={dataBonita(key)} className={`${d.getMonth() !== mes.getMonth() ? 'other-month ' : ''}${key === dataSelecionada ? 'selected ' : ''}${key === hoje() ? 'today' : ''}`} onClick={() => { setRegistroEmEdicao(null); setDataSelecionada(key); setEditorAberto(true) }}><span>{d.getDate()}</span>{count > 0 && <i>{count}</i>}</button> })}</div>
          <div className="calendar-legend"><span><i className="legend-red" /> notificações</span></div>
          {editorAberto && <form className="radar-calendar-editor" onSubmit={e => { e.preventDefault(); salvarRegistro('notificacao', textoNotificacao, dataSelecionada, hora) }}>
-           <strong>Notificar em {dataBonita(dataSelecionada)}</strong>
+           <strong>{registroEmEdicao ? 'Editar notificação' : `Notificar em ${dataBonita(dataSelecionada)}`}</strong>
            <div className="radar-date-notifications">
              <span className="radar-date-notifications-title">Notificações desta data</span>
              {notificacoesDaData.length === 0 ? (
@@ -1207,14 +1287,19 @@ export default function RadarDC() {
                    <b>{n.hora} · {n.prioridade}</b>
                    <span>{n.texto}</span>
                    <small>Por {n.criadoPor}</small>
-                   {n.criadoPor === agente && <small className="radar-confirmacoes-status">
+                   {agentePodeGerenciarCriacao(n.criadoPor, agente) && <small className="radar-confirmacoes-status">
                      {n.agentesEnvolvidos.map(nome => {
                        const confirmacao = n.confirmacoesAgentes.find(item => item.agente === nome)
                        return `${nome}: ${confirmacao ? confirmacao.confirmado ? 'vai ✅' : 'não vai ❌' : 'aguardando…'}`
                      }).join(' · ')}
                    </small>}
                  </div>
-                 {n.criadoPor === agente && <button type="button" onClick={() => remover(n)} aria-label={`Remover notificação: ${n.texto}`} title="Remover notificação">×</button>}
+                 {agentePodeGerenciarCriacao(n.criadoPor, agente) && (
+                   <div className="radar-record-actions">
+                     <button type="button" onClick={() => iniciarEdicaoRegistro(n)} aria-label={`Editar notificação: ${n.texto}`} title="Editar notificação">✏️</button>
+                     <button type="button" onClick={() => setLembreteParaApagar(n)} aria-label={`Remover notificação: ${n.texto}`} title="Remover notificação">×</button>
+                   </div>
+                 )}
                </div>
              ))}
            </div>
@@ -1235,7 +1320,8 @@ export default function RadarDC() {
                ))}
              </div>
            </fieldset>
-           <button className="radar-add" type="submit" disabled={!textoNotificacao.trim() || salvando}>{salvando ? 'Salvando...' : '+ Colocar no Radar DC'}</button>
+           <button className="radar-add" type="submit" disabled={!textoNotificacao.trim() || salvando}>{salvando ? 'Salvando...' : registroEmEdicao ? 'Salvar alterações' : '+ Colocar no Radar DC'}</button>
+           {registroEmEdicao && <button type="button" className="radar-cancel-edit" onClick={() => { setRegistroEmEdicao(null); setTextoNotificacao(''); setAgentesEnvolvidos([]); setEditorAberto(false) }}>Cancelar edição</button>}
            {erroSalvamento && <p className="radar-save-error" role="alert">{erroSalvamento}</p>}
          </form>}
        </div>
@@ -1276,8 +1362,11 @@ export default function RadarDC() {
                      {marcandoCienteId === l.id ? 'Salvando…' : 'Marcar Ciente'}
                    </button>
                  )}
-                 {l.criadoPor === agente && (
-                   <button onClick={() => setLembreteParaApagar(l)} title="Apagar meu lembrete" aria-label="Apagar meu lembrete">×</button>
+                 {agentePodeGerenciarCriacao(l.criadoPor, agente) && (
+                   <div className="radar-record-actions">
+                     <button type="button" onClick={() => iniciarEdicaoRegistro(l)} title="Editar lembrete" aria-label="Editar lembrete">✏️</button>
+                     <button type="button" onClick={() => setLembreteParaApagar(l)} title="Apagar lembrete" aria-label="Apagar lembrete">×</button>
+                   </div>
                  )}
               </div>
             ))}
@@ -1302,7 +1391,8 @@ export default function RadarDC() {
                   ))}
                 </div>
               </fieldset>
-              <button className="radar-add" onClick={() => salvarRegistro('lembrete', textoLembrete, hoje(), horaAgora())} disabled={!textoLembrete.trim() || agentesLembrete.length === 0 || salvando}>{salvando ? 'Salvando...' : '+ Salvar lembrete'}</button>
+              <button className="radar-add" onClick={() => salvarRegistro('lembrete', textoLembrete, registroEmEdicao?.data || hoje(), registroEmEdicao?.hora || horaAgora())} disabled={!textoLembrete.trim() || agentesLembrete.length === 0 || salvando}>{salvando ? 'Salvando...' : registroEmEdicao ? 'Salvar alterações' : '+ Salvar lembrete'}</button>
+              {registroEmEdicao && <button type="button" className="radar-cancel-edit" onClick={() => { setRegistroEmEdicao(null); setTextoLembrete(''); setAgentesLembrete([]); setLembreteEditorAberto(false) }}>Cancelar edição</button>}
               {erroSalvamento && <p className="radar-save-error" role="alert">{erroSalvamento}</p>}
             </div>
           ) : (

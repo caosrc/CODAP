@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import JSZip from 'jszip'
 import type { Ocorrencia, NivelRisco, StatusOc, VistoriaAdicional } from '../types'
 import { exportarPastaOcorrencia, nomePastaOcorrencia } from '../exportarPasta'
-import { NATUREZA_ICONE, NATUREZA_COR, TIPOS_OCORRENCIA, NATUREZAS, AGENTES, getSenhaAgente, normalizarNomeAgente } from '../types'
+import { NATUREZA_ICONE, NATUREZA_COR, TIPOS_OCORRENCIA, NATUREZAS, AGENTES, agentePodeGerenciarCriacao, getSenhaAgente, normalizarNomeAgente } from '../types'
 import { deletarOcorrencia, atualizarOcorrencia, buscarOcorrenciaCompleta } from '../api'
 import { geocodificarEndereco, updatePending } from '../offline'
 import { exportarOcorrenciaExcel } from '../exportExcel'
@@ -124,7 +124,7 @@ export default function DetalheOcorrencia({ ocorrencia: oc, onFechar, onDeletado
   const agenteLogado = getAgenteLogado()
   const responsavel = normalizarNomeAgente((o.responsavel_registro || '').trim())
   // Se a ocorrência não tem responsável registrado (legado), libera para todos.
-  const podeEditar = !responsavel || agenteLogado === responsavel
+  const podeEditar = !responsavel || agentePodeGerenciarCriacao(responsavel, agenteLogado)
   // Senha individual do agente logado (null = sem senha, acesso direto)
   const senhaAgenteLogado = getSenhaAgente(agenteLogado)
 

@@ -153,6 +153,9 @@
 .radar-mini-item b { flex: 0 0 auto; color: #3970a8; font-size: .68rem; }
 .radar-mini-item span { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .radar-mini-item button { border: 0; color: #879aae; background: transparent; font-size: 1.2rem; cursor: pointer; }
+.radar-record-actions { display: flex; flex: 0 0 auto; align-items: center; gap: .2rem; }
+.radar-record-actions button { margin: 0; }
+.radar-record-actions button:first-child { color: #8bdcf4; font-size: .9rem; }
 .radar-reminder-statuses {
   display: flex;
   flex: 0 1 auto;
@@ -275,6 +278,11 @@
 .radar-date-notification small { margin-top: .12rem; color: #91aec5; font-size: .62rem; }
 .radar-date-notification button { flex: 0 0 auto; width: 26px; height: 26px; border: 1px solid #557d98; border-radius: 7px; color: #ffd0cf; background: #6e3442; font-size: 1rem; line-height: 1; cursor: pointer; }
 .radar-date-notification button:hover { background: #a6444e; }
+.radar-date-notification .radar-record-actions { gap: .25rem; }
+.radar-date-notification .radar-record-actions button:first-child { border-color: #557d98; color: #8bdcf4; background: #1c526e; font-size: .82rem; }
+.radar-date-notification .radar-record-actions button:first-child:hover { background: #287896; }
+.radar-cancel-edit { display: block; width: 100%; margin-top: .4rem; border: 1px solid #557d98; border-radius: 7px; padding: .4rem .6rem; color: #8eabc2; background: transparent; font-size: .72rem; cursor: pointer; }
+.radar-cancel-edit:hover { color: #fff; background: #1d4e6d; }
 .radar-calendar-editor .radar-form-row { display: grid; grid-template-columns: 1fr 1fr; gap: .5rem; margin-top: .5rem; }
 .radar-calendar-editor label { display: block; color: #55708d; font-size: .7rem; font-weight: 800; }
 .radar-agentes-fieldset { margin: .65rem 0 0; padding: .55rem .6rem .6rem; border: 1px solid #dbe6f1; border-radius: 9px; }

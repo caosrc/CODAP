@@ -1651,10 +1651,27 @@ app.get('/api/atividades-dia', async (req, res) => {
 
 app.patch('/api/radar-bilhetes/:id', async (req, res) => {
   try {
-    const { agente, concluido } = req.body
+    const agente = typeof req.body?.agente === 'string' ? req.body.agente.trim() : ''
+    const concluido = typeof req.body?.concluido === 'boolean' ? req.body.concluido : null
+    const texto = typeof req.body?.texto === 'string' ? req.body.texto.trim() : null
+    const data = typeof req.body?.data === 'string' ? req.body.data.trim() : null
+    const hora = typeof req.body?.hora === 'string' ? req.body.hora.trim() : null
+    const prioridade = typeof req.body?.prioridade === 'string' ? req.body.prioridade.trim() : null
+    const agentesEnvolvidos = Array.isArray(req.body?.agentes_envolvidos)
+      ? req.body.agentes_envolvidos.map(String)
+      : null
     const result = await query(
-      `UPDATE radar_bilhetes SET concluido=$1 WHERE id=$2 AND criado_por=$3 RETURNING *`,
-      [Boolean(concluido), req.params.id, agente]
+      `UPDATE radar_bilhetes
+       SET texto=COALESCE($1, texto),
+           data=COALESCE($2, data),
+           hora=COALESCE($3, hora),
+           prioridade=COALESCE($4, prioridade),
+           concluido=COALESCE($5, concluido),
+           agentes_envolvidos=COALESCE($6::text[], agentes_envolvidos)
+       WHERE id=$7
+         AND (criado_por=$8 OR ($8='Arthur' AND criado_por='J'))
+       RETURNING *`,
+      [texto, data, hora, prioridade, concluido, agentesEnvolvidos, req.params.id, agente]
     )
     if (!result.rows[0]) return res.status(403).json({ error: 'Somente o agente que criou o bilhete pode alterá-lo' })
     broadcastParaTodos({ tipo: 'radar_bilhetes_atualizados' })
@@ -1673,12 +1690,18 @@ app.delete('/api/radar-bilhetes/:id', async (req, res) => {
     const criador = String(registro.rows[0].criado_por || '')
     const senhasAgentes = {
       A: '301067', B: '1234', C: '0620', D: '8228', E: '1210',
-      F: '1122', G: '1234', H: '1950', I: '2806', J: '3004',
+      F: '1122', G: '1234', H: '1950', I: '2806', J: '3004', Arthur: '1234',
     }
-    if (criador !== agente || senhasAgentes[criador] !== senha) {
-      return res.status(403).json({ error: 'Informe a senha do agente que criou o lembrete' })
+    const podeGerenciar = criador === agente || (agente === 'Arthur' && criador === 'J')
+    if (!podeGerenciar || senhasAgentes[agente] !== senha) {
+      return res.status(403).json({ error: 'Informe a senha do agente autorizado a gerenciar este registro' })
     }
-    const result = await query('DELETE FROM radar_bilhetes WHERE id=$1 AND criado_por=$2 RETURNING id', [req.params.id, agente])
+    const result = await query(
+      `DELETE FROM radar_bilhetes
+       WHERE id=$1 AND (criado_por=$2 OR ($2='Arthur' AND criado_por='J'))
+       RETURNING id`,
+      [req.params.id, agente],
+    )
     if (!result.rows[0]) return res.status(403).json({ error: 'Somente o agente que criou o bilhete pode apagá-lo' })
     broadcastParaTodos({ tipo: 'radar_bilhetes_atualizados' })
     res.json({ success: true })

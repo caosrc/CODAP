@@ -61,6 +61,14 @@ export function normalizarNomeAgente(nome: string): string {
   return AGENTES_LEGADOS_PARA_NOVOS[valor] ?? valor
 }
 
+/** Arthur também administra os registros que foram criados pelo agente legado J. */
+export function agentePodeGerenciarCriacao(criador: string | null | undefined, agente: string | null | undefined): boolean {
+  const nomeCriador = String(criador ?? '').trim()
+  const nomeAgente = normalizarNomeAgente(String(agente ?? '').trim())
+  return nomeCriador === nomeAgente
+    || (nomeAgente === 'Arthur' && nomeCriador === 'J')
+}
+
 export const AGENTE_SENHAS: Record<string, string> = {
   Alexandre: '1234',
   Arthur: '1234',

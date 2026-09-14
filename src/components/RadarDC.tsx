@@ -1112,13 +1112,6 @@ export default function RadarDC() {
                   <span className="weather-google-kicker">CLIMA</span>
                   <h2>Conselheiro Lafaiete</h2>
                   <p>Minas Gerais</p>
-                  <div className="weather-google-metrics" aria-label="Resumo das condições atuais">
-                    <span>🌧️ Chuva <b>{tempo.atual.chuva.toFixed(1)} mm</b></span>
-                    <span>☔ Prob. hoje <b>{tempo.dias[0]?.probabilidade ?? 0}%</b></span>
-                    <span>💨 Rajadas <b>{Math.round(tempo.atual.rajada)} km/h</b></span>
-                  </div>
-                </div>
-                <div className="weather-google-current-column">
                   <div className="weather-google-current">
                     <div className="weather-google-temperature">
                       <span>Agora</span>
@@ -1133,6 +1126,13 @@ export default function RadarDC() {
                       <span>Umidade {Math.round(tempo.atual.umidade)}% · vento {Math.round(tempo.atual.vento)} km/h</span>
                     </div>
                   </div>
+                  <div className="weather-google-metrics" aria-label="Resumo das condições atuais">
+                    <span>🌧️ Chuva <b>{tempo.atual.chuva.toFixed(1)} mm</b></span>
+                    <span>☔ Prob. hoje <b>{tempo.dias[0]?.probabilidade ?? 0}%</b></span>
+                    <span>💨 Rajadas <b>{Math.round(tempo.atual.rajada)} km/h</b></span>
+                  </div>
+                </div>
+                <div className="weather-google-current-column">
                   <div
                     className={`weather-google-frog-scene ${estadosClima.map(estado => `weather-state-${estado}`).join(' ')}`}
                     aria-label={`Sapinho reagindo a ${estadosClima.map(estado => estado.replace('-', ' ')).join(', ')}`}

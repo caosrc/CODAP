@@ -4389,3 +4389,118 @@ html:-webkit-full-screen {
     grid-template-columns: minmax(0, 6fr) minmax(220px, 1.1fr);
   }
 }
+
+/*
+ * Faixa superior — condição atual junto do local, quadro ilustrado ao lado
+ * e previsões ocupando o restante do cartão.
+ */
+@media (min-width: 701px) {
+  .radar-page:not(.radar-tv) .weather-google-body {
+    grid-template-columns: minmax(205px, 1.35fr) minmax(150px, 1.15fr) minmax(0, 4fr);
+    gap: .7rem;
+  }
+
+  .radar-page:not(.radar-tv) .weather-google-location {
+    display: grid;
+    grid-column: 1;
+    grid-template-columns: minmax(74px, .82fr) minmax(92px, 1fr);
+    grid-template-rows: auto auto 1fr;
+    column-gap: .45rem;
+    padding: .5rem 0 .2rem;
+  }
+
+  .radar-page:not(.radar-tv) .weather-google-location > .weather-google-kicker,
+  .radar-page:not(.radar-tv) .weather-google-location > h2,
+  .radar-page:not(.radar-tv) .weather-google-location > p {
+    grid-column: 1;
+  }
+
+  .radar-page:not(.radar-tv) .weather-google-location > .weather-google-kicker {
+    grid-row: 1;
+  }
+
+  .radar-page:not(.radar-tv) .weather-google-location > h2 {
+    grid-row: 2;
+  }
+
+  .radar-page:not(.radar-tv) .weather-google-location > p {
+    grid-row: 3;
+    align-self: start;
+  }
+
+  .radar-page:not(.radar-tv) .weather-google-location > .weather-google-current {
+    grid-column: 2;
+    grid-row: 1 / span 3;
+    grid-template-columns: minmax(0, 1fr) minmax(34px, .72fr);
+    align-self: center;
+    gap: .08rem;
+    margin: 0;
+    padding: 0;
+    overflow: visible;
+    border-radius: 0;
+    background: transparent;
+  }
+
+  .radar-page:not(.radar-tv) .weather-google-location > .weather-google-current .weather-google-temperature > span {
+    font-size: .54rem;
+  }
+
+  .radar-page:not(.radar-tv) .weather-google-location > .weather-google-current .weather-google-temperature strong {
+    font-size: clamp(2.15rem, 3.25vw, 3rem);
+  }
+
+  .radar-page:not(.radar-tv) .weather-google-location > .weather-google-current .weather-google-current-icon {
+    min-height: 48px;
+  }
+
+  .radar-page:not(.radar-tv) .weather-google-location > .weather-google-current .weather-google-sun {
+    width: 30px;
+    height: 30px;
+    transform: translate(-5px, -8px);
+  }
+
+  .radar-page:not(.radar-tv) .weather-google-location > .weather-google-current .weather-google-cloud {
+    margin: 12px 0 0 13px;
+    font-size: 1.55rem;
+  }
+
+  .radar-page:not(.radar-tv) .weather-google-location > .weather-google-current .weather-google-summary {
+    grid-column: 1 / -1;
+    padding: .08rem 0 0;
+  }
+
+  .radar-page:not(.radar-tv) .weather-google-location > .weather-google-current .weather-google-summary strong {
+    font-size: .59rem;
+  }
+
+  .radar-page:not(.radar-tv) .weather-google-location > .weather-google-current .weather-google-summary span {
+    display: none;
+  }
+
+  .radar-page:not(.radar-tv) .weather-google-location > .weather-google-metrics {
+    grid-column: 1 / -1;
+    grid-row: 4;
+    grid-template-columns: repeat(3, max-content);
+    gap: .2rem .45rem;
+    margin-top: .35rem;
+    padding: 0;
+    font-size: .5rem;
+  }
+
+  .radar-page:not(.radar-tv) .weather-google-current-column {
+    grid-column: 2;
+    display: block;
+    min-height: 0;
+  }
+
+  .radar-page:not(.radar-tv) .weather-google-frog-scene {
+    height: 100%;
+    min-height: 76px;
+    margin: 0;
+    border-radius: 9px;
+  }
+
+  .radar-page:not(.radar-tv) .weather-google-forecast-column {
+    grid-column: 3;
+  }
+}

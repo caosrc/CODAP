@@ -12,7 +12,7 @@ paths = [ "/__mockup/" ]
 localPort = 23636
 
 [services.development]
-run = "npm run dev"
+run = "npm install --no-package-lock --silent && npm run dev"
 
 [services.env]
 PORT = "23636"

@@ -5,3 +5,4 @@
 - [Radar de chuva](radar-chuva.md) — RainViewer fornece tiles observados; camadas GOES/RRQPE exigem processamento geoespacial separado.
 - [Ordem de callbacks React](ordem-callbacks-react.md) — callbacks com dependências devem ser declarados após as funções referenciadas para evitar acesso em TDZ durante a renderização.
 - [Cota CEMADEN](cota-cemaden.md) — para a estação Rio Bananeiras, a série hidrológica detalhada é a fonte confiável da cota; o catálogo pode retornar zero.
+- [Bootstrap do sandbox](sandbox-workflow-bootstrap.md) — serviços de artefatos precisam instalar suas dependências isoladas antes de iniciar o Vite.

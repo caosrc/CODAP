@@ -43,13 +43,15 @@ export interface Ocorrencia {
 }
 
 /** Agentes atualmente disponíveis no acesso e nas telas operacionais. */
-export const AGENTES = ['Alexandre', 'Arthur', 'Lucas']
+export const AGENTES = ['Alexandre', 'Arthur', 'Lucas', 'Junior', 'Rosane']
 
 /** Compatibilidade para sessões e escalas criadas antes da anonimização dos nomes. */
 export const AGENTES_LEGADOS_PARA_NOVOS: Record<string, string> = {
   A: 'Alexandre',
   B: 'Arthur',
   C: 'Lucas',
+  D: 'Junior',
+  E: 'Rosane',
   'Moisés': 'Alexandre',
   Valteir: 'Arthur',
 }
@@ -63,6 +65,8 @@ export const AGENTE_SENHAS: Record<string, string> = {
   Alexandre: '1234',
   Arthur: '1234',
   Lucas: '1234',
+  Junior: '1234',
+  Rosane: '1234',
   // Mantidos para sessões antigas que ainda carreguem a identificação A–J.
   A: '1234',
   B: '1234',

@@ -8,11 +8,13 @@ import type { Ocorrencia } from '../types'
 import './EscalaAgentes.css'
 
 // ── Constantes ────────────────────────────────────────────────────
-// Apenas os três agentes atualmente ativos participam da escala/banco de horas.
+// Agentes atualmente ativos que participam da escala/banco de horas.
 const AGENTES_ESCALA = [
   { nome: 'Alexandre', cor: '#0f766e', iniciais: 'AL' },
   { nome: 'Arthur', cor: '#2563eb', iniciais: 'AR' },
   { nome: 'Lucas', cor: '#16a34a', iniciais: 'L' },
+  { nome: 'Junior', cor: '#d97706', iniciais: 'JU' },
+  { nome: 'Rosane', cor: '#db2777', iniciais: 'RO' },
 ]
 
 // Todos os agentes ativos podem participar do sobreaviso.
@@ -831,6 +833,7 @@ interface BancoHorasAgenteProps {
   feriadosCustom: string[]
   onUpdateHoras: (data: string, horas: number) => void
   onUpdateJustificativa: (data: string, justificativa: string) => void
+  editavel?: boolean
   hideSobreaviso?: boolean
   hideTotalRow?: boolean
   ajusteBanco?: number
@@ -841,7 +844,7 @@ function fmtH(h: number): string {
   return h % 1 === 0 ? String(h) : h.toFixed(1)
 }
 
-function BancoHorasAgente({ agente, sobreavisoSemanal, horasTrabalhadasSobreaviso, justificativasSobreaviso, descontosFolgaBanco, folgas, percDomingoFeriado, percSobreaviso, percSabado, feriadosCustom, onUpdateHoras, onUpdateJustificativa, hideSobreaviso = false, hideTotalRow = false, ajusteBanco = 0, ocorrencias = [] }: BancoHorasAgenteProps) {
+function BancoHorasAgente({ agente, sobreavisoSemanal, horasTrabalhadasSobreaviso, justificativasSobreaviso, descontosFolgaBanco, folgas, percDomingoFeriado, percSobreaviso, percSabado, feriadosCustom, onUpdateHoras, onUpdateJustificativa, editavel = true, hideSobreaviso = false, hideTotalRow = false, ajusteBanco = 0, ocorrencias = [] }: BancoHorasAgenteProps) {
   const info = AGENTE_MAP[agente]
   const hoje = hojeStr()
   const horasAgente = horasTrabalhadasSobreaviso[agente] ?? {}
@@ -971,6 +974,11 @@ function BancoHorasAgente({ agente, sobreavisoSemanal, horasTrabalhadasSobreavis
           <span className="bh-agente-subtitulo">Banco de Horas</span>
         </div>
       </div>
+      {!editavel && (
+        <div className="bh-aviso-folga">
+          🔒 A escala e os lançamentos de horas são editados somente por Alexandre.
+        </div>
+      )}
 
       {estaDesobreaviso && (
         <div className="bh-aviso-ativo">
@@ -1071,6 +1079,7 @@ function BancoHorasAgente({ agente, sobreavisoSemanal, horasTrabalhadasSobreavis
                                   value={hInput === 0 ? '' : hInput}
                                   placeholder="0"
                                   className="bh-dia-input"
+                                   disabled={!editavel || foraDoPrazo}
                                   onChange={e => {
                                     const val = parseFloat(e.target.value) || 0
                                     onUpdateHoras(seg, Math.min(24, Math.max(0, val)))
@@ -1093,6 +1102,7 @@ function BancoHorasAgente({ agente, sobreavisoSemanal, horasTrabalhadasSobreavis
                                 rows={3}
                                 maxLength={500}
                                 disabled={foraDoPrazo}
+                                 readOnly={!editavel}
                                 onChange={e => onUpdateJustificativa(seg, e.target.value)}
                               />
                               {!(justificativasAgente[seg] ?? '').trim() && (
@@ -1214,11 +1224,12 @@ interface BancoHorasExtraSimplesProps {
   justificativasExtrasSimples: Record<string, Record<string, string>>
   onSalvarHora: (data: string, horas: number, justificativa?: string) => Promise<{ ok: boolean; mensagem?: string }>
   onSalvarJustificativa: (data: string, justificativa: string) => void
+  editavel?: boolean
   horasOcorrencias?: number
   ajusteBanco?: number
 }
 
-function BancoHorasExtraSimples({ agente, horasExtrasSimples, justificativasExtrasSimples, onSalvarHora, onSalvarJustificativa, horasOcorrencias = 0, ajusteBanco = 0 }: BancoHorasExtraSimplesProps) {
+function BancoHorasExtraSimples({ agente, horasExtrasSimples, justificativasExtrasSimples, onSalvarHora, onSalvarJustificativa, editavel = true, horasOcorrencias = 0, ajusteBanco = 0 }: BancoHorasExtraSimplesProps) {
   const info = AGENTE_MAP[agente]
   const horasAgente = horasExtrasSimples[agente] ?? {}
   const justifAgente = justificativasExtrasSimples[agente] ?? {}
@@ -1311,6 +1322,11 @@ function BancoHorasExtraSimples({ agente, horasExtrasSimples, justificativasExtr
           <span className="bh-agente-subtitulo">Banco de Horas Extras</span>
         </div>
       </div>
+      {!editavel && (
+        <div className="bh-aviso-folga">
+          🔒 A escala e os lançamentos de horas são editados somente por Alexandre.
+        </div>
+      )}
 
       <div className="bh-bloco">
         <div className="bh-bloco-header">
@@ -1319,7 +1335,7 @@ function BancoHorasExtraSimples({ agente, horasExtrasSimples, justificativasExtr
           <span className="bh-bloco-total">{fmtH(total)}h</span>
         </div>
 
-        <div className="escala-ferias-form" style={{ padding: '12px 14px' }}>
+        {editavel && <div className="escala-ferias-form" style={{ padding: '12px 14px' }}>
           <div className="escala-ferias-datas">
             <div className="escala-ferias-data-campo">
               <label>Data</label>
@@ -1365,7 +1381,7 @@ function BancoHorasExtraSimples({ agente, horasExtrasSimples, justificativasExtr
               {feedback.texto}
             </div>
           )}
-        </div>
+        </div>}
 
         {entradas.length === 0 ? (
           <p className="bh-card-vazio">Nenhuma hora extra registrada.</p>
@@ -1409,13 +1425,13 @@ function BancoHorasExtraSimples({ agente, horasExtrasSimples, justificativasExtr
                         <button
                           className="bh-extra-edit-btn"
                           onClick={() => { setEditandoData(data); setEditandoHoras(String(h)) }}
-                          disabled={salvando}
+                           disabled={!editavel || salvando}
                           title="Editar horas"
                         >✏️</button>
                         <button
                           className="escala-ferias-remover"
                           onClick={() => removerLinha(data)}
-                          disabled={salvando}
+                           disabled={!editavel || salvando}
                           title="Remover"
                         >✕</button>
                       </>
@@ -1424,7 +1440,7 @@ function BancoHorasExtraSimples({ agente, horasExtrasSimples, justificativasExtr
                   {justif && (
                     <div className="bh-domfer-justif">📝 {justif}</div>
                   )}
-                  {!justif && !estaEditando && (
+                   {!justif && !estaEditando && editavel && (
                     <div className="bh-domfer-justif-input-wrap">
                       <input
                         className="bh-domfer-justif-input"
@@ -3335,8 +3351,8 @@ export default function EscalaAgentes({ ocorrencias = [] }: EscalaAgentesProps) 
 
   const hoje = hojeComOffset(offsetDias)
   const agenteLogado = getAgenteLogado()
-  // Os três agentes ativos podem editar a escala e todos os seus painéis.
-  const isGestor = ['Alexandre', 'Arthur', 'Lucas'].includes(agenteLogado)
+  // Somente Alexandre pode alterar a escala e seus painéis.
+  const isGestor = agenteLogado === 'Alexandre'
   const isSobreaviso = AGENTES_SOBREAVISO.some(a => a.nome === agenteLogado)
   const isHorasExtras = AGENTES_SEM_SOBREAVISO.has(agenteLogado)
 
@@ -3441,11 +3457,11 @@ export default function EscalaAgentes({ ocorrencias = [] }: EscalaAgentesProps) 
   }
 
   const onDiaClick = useCallback((chave: string) => {
-    setModalDia(chave)
-  }, [])
+    if (isGestor) setModalDia(chave)
+  }, [isGestor])
 
   function salvarDia(agentesSobreaviso: string[], folgasDoDia: string[]) {
-    if (!modalDia) return
+    if (!isGestor || !modalDia) return
 
     const novoSobreaviso = { ...dados.sobreaviso }
     if (agentesSobreaviso.length === 0) delete novoSobreaviso[modalDia]
@@ -3462,30 +3478,35 @@ export default function EscalaAgentes({ ocorrencias = [] }: EscalaAgentesProps) 
   }
 
   function onFeriasChange(novasFerias: Ferias[]) {
+    if (!isGestor) return
     const novos = { ...dados, ferias: novasFerias }
     setDados(novos)
     salvarDados(novos)
   }
 
   function onAfastamentosChange(novosAfastamentos: Afastamento[]) {
+    if (!isGestor) return
     const novos = { ...dados, afastamentos: novosAfastamentos }
     setDados(novos)
     salvarDados(novos)
   }
 
   function onFeriadosCustomChange(novosFeriados: string[]) {
+    if (!isGestor) return
     const novos = { ...dados, feriadosCustom: novosFeriados }
     setDados(novos)
     salvarDados(novos)
   }
 
   function onRegrasChange(percDomFer: number, percSb: number, percSabado: number) {
+    if (!isGestor) return
     const novos = { ...dados, percDomingoFeriado: percDomFer, percSobreaviso: percSb, percSabado }
     setDados(novos)
     salvarDados(novos)
   }
 
   function atualizarHorasTrabalhadasSobreaviso(data: string, horas: number) {
+    if (!isGestor) return
     const agenteHoras = { ...(dados.horasTrabalhadasSobreaviso[agenteLogado] ?? {}) }
     const agenteJustifs = { ...(dados.justificativasSobreaviso?.[agenteLogado] ?? {}) }
     if (horas === 0) {
@@ -3511,6 +3532,7 @@ export default function EscalaAgentes({ ocorrencias = [] }: EscalaAgentesProps) 
   }
 
   function atualizarJustificativaSobreaviso(data: string, justificativa: string) {
+    if (!isGestor) return
     const agenteJustifs = { ...(dados.justificativasSobreaviso?.[agenteLogado] ?? {}) }
     const valor = justificativa.slice(0, 500)
     if (!valor.trim()) {
@@ -3530,6 +3552,7 @@ export default function EscalaAgentes({ ocorrencias = [] }: EscalaAgentesProps) 
   }
 
   async function removerAjusteBanco(agente: string, index: number) {
+    if (!isGestor) return
     const logsAgente = [...(dados.ajustesBancoLogs?.[agente] ?? [])]
     if (index < 0 || index >= logsAgente.length) return
     logsAgente.splice(index, 1)
@@ -3551,6 +3574,7 @@ export default function EscalaAgentes({ ocorrencias = [] }: EscalaAgentesProps) 
   }
 
   async function atualizarAjusteBanco(agente: string, delta: number, justificativa?: string) {
+    if (!isGestor) return
     const novosAjustes = { ...(dados.ajustesBanco ?? {}) }
     const ajusteAnterior = novosAjustes[agente] ?? 0
     const novoTotal = +(ajusteAnterior + delta).toFixed(2)
@@ -3573,6 +3597,7 @@ export default function EscalaAgentes({ ocorrencias = [] }: EscalaAgentesProps) 
   }
 
   async function salvarHoraExtraSimples(data: string, horas: number, justificativa?: string): Promise<{ ok: boolean; mensagem?: string }> {
+    if (!isGestor) return { ok: false, mensagem: 'Somente Alexandre pode editar a escala.' }
     const agenteHoras = { ...(dados.horasExtrasSimples[agenteLogado] ?? {}) }
     const agenteJustifs = { ...(dados.justificativasExtrasSimples?.[agenteLogado] ?? {}) }
     if (horas === 0) {
@@ -3605,6 +3630,7 @@ export default function EscalaAgentes({ ocorrencias = [] }: EscalaAgentesProps) 
   }
 
   function salvarJustificativaExtraSimples(data: string, justificativa: string) {
+    if (!isGestor) return
     const agenteJustifs = { ...(dados.justificativasExtrasSimples?.[agenteLogado] ?? {}) }
     const valor = justificativa.slice(0, 500)
     if (!valor.trim()) {
@@ -3760,6 +3786,7 @@ export default function EscalaAgentes({ ocorrencias = [] }: EscalaAgentesProps) 
           onUpdateHoras={atualizarHorasTrabalhadasSobreaviso}
           onUpdateJustificativa={atualizarJustificativaSobreaviso}
           ajusteBanco={dados.ajustesBanco?.[agenteLogado] ?? 0}
+          editavel={isGestor}
           ocorrencias={ocorrencias}
         />
       )}
@@ -3779,6 +3806,7 @@ export default function EscalaAgentes({ ocorrencias = [] }: EscalaAgentesProps) 
           feriadosCustom={dados.feriadosCustom}
           onUpdateHoras={atualizarHorasTrabalhadasSobreaviso}
           onUpdateJustificativa={atualizarJustificativaSobreaviso}
+           editavel={isGestor}
           hideSobreaviso={true}
           hideTotalRow={true}
           ajusteBanco={0}
@@ -3800,6 +3828,7 @@ export default function EscalaAgentes({ ocorrencias = [] }: EscalaAgentesProps) 
             justificativasExtrasSimples={dados.justificativasExtrasSimples ?? {}}
             onSalvarHora={salvarHoraExtraSimples}
             onSalvarJustificativa={salvarJustificativaExtraSimples}
+            editavel={isGestor}
             horasOcorrencias={horasOc}
             ajusteBanco={dados.ajustesBanco?.[agenteLogado] ?? 0}
           />
@@ -3849,7 +3878,7 @@ export default function EscalaAgentes({ ocorrencias = [] }: EscalaAgentesProps) 
       )}
 
       {/* Modal único do dia: Sobreaviso + Folga (legado, não aberto pelo fluxo atual) */}
-      {modalDia && (
+      {modalDia && isGestor && (
         <ModalDia
           data={modalDia}
           selecionados={dados.sobreaviso[modalDia] ?? []}

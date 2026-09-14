@@ -1767,6 +1767,303 @@ html:-webkit-full-screen {
 }
 
 /*
+ * Faixa meteorológica compacta do Radar DC.
+ * Mantém a hierarquia da referência: clima e previsão ocupam a maior área,
+ * enquanto o calendário fica visível como apoio operacional ao lado.
+ */
+@media (min-width: 701px) {
+  .radar-page:not(.radar-tv) .radar-overview {
+    grid-template-columns: minmax(0, 3.35fr) minmax(210px, 1fr);
+    gap: .45rem;
+    padding: 0 clamp(.65rem, 2vw, 1.75rem) .45rem;
+  }
+
+  .radar-page:not(.radar-tv) .radar-google-weather {
+    padding: .55rem .7rem .5rem;
+    border-radius: 14px;
+    box-shadow: 0 5px 16px rgba(2, 20, 40, .14);
+  }
+
+  .radar-page:not(.radar-tv) .weather-google-header {
+    align-items: center;
+    gap: .65rem;
+  }
+
+  .radar-page:not(.radar-tv) .weather-google-kicker {
+    font-size: .58rem;
+  }
+
+  .radar-page:not(.radar-tv) .weather-google-header h2 {
+    margin: .1rem 0 .04rem;
+    font-size: 1.05rem;
+  }
+
+  .radar-page:not(.radar-tv) .weather-google-header p {
+    font-size: .6rem;
+  }
+
+  .radar-page:not(.radar-tv) .weather-google-header-actions {
+    gap: .35rem;
+  }
+
+  .radar-page:not(.radar-tv) .radar-clock {
+    min-width: 92px;
+    padding: .28rem .45rem;
+    border-radius: 9px;
+  }
+
+  .radar-page:not(.radar-tv) .radar-clock span {
+    font-size: .46rem;
+  }
+
+  .radar-page:not(.radar-tv) .radar-clock strong {
+    font-size: .78rem;
+  }
+
+  .radar-page:not(.radar-tv) .weather-google-menu {
+    font-size: 1.15rem;
+  }
+
+  .radar-page:not(.radar-tv) .weather-google-current {
+    grid-template-columns: auto 74px minmax(110px, 1fr);
+    gap: .65rem;
+    margin-top: .52rem;
+    padding: .5rem .65rem;
+    border-radius: 11px;
+  }
+
+  .radar-page:not(.radar-tv) .weather-google-temperature > span {
+    font-size: .64rem;
+  }
+
+  .radar-page:not(.radar-tv) .weather-google-temperature strong {
+    font-size: clamp(2.55rem, 4vw, 3.55rem);
+  }
+
+  .radar-page:not(.radar-tv) .weather-google-current-icon {
+    min-height: 64px;
+  }
+
+  .radar-page:not(.radar-tv) .weather-google-sun {
+    width: 38px;
+    height: 38px;
+  }
+
+  .radar-page:not(.radar-tv) .weather-google-cloud {
+    margin-top: 15px;
+    font-size: 2.05rem;
+  }
+
+  .radar-page:not(.radar-tv) .weather-google-summary strong {
+    font-size: .9rem;
+  }
+
+  .radar-page:not(.radar-tv) .weather-google-summary span {
+    margin-top: .18rem;
+    font-size: .61rem;
+  }
+
+  .radar-page:not(.radar-tv) .weather-google-metrics {
+    gap: .25rem .65rem;
+    padding: .38rem .1rem .05rem;
+    font-size: .6rem;
+  }
+
+  .radar-page:not(.radar-tv) .weather-google-hours-heading,
+  .radar-page:not(.radar-tv) .weather-google-days-heading {
+    margin-top: .52rem;
+    font-size: .68rem;
+  }
+
+  .radar-page:not(.radar-tv) .weather-google-hours-heading span {
+    font-size: .57rem;
+  }
+
+  .radar-page:not(.radar-tv) .weather-google-hourly,
+  .radar-page:not(.radar-tv) .weather-google-days {
+    gap: .25rem;
+    margin-top: .28rem;
+  }
+
+  .radar-page:not(.radar-tv) .weather-google-hour {
+    min-height: 67px;
+    padding: .3rem .12rem .25rem;
+    border-radius: 8px;
+  }
+
+  .radar-page:not(.radar-tv) .weather-google-hour > strong {
+    font-size: .55rem;
+  }
+
+  .radar-page:not(.radar-tv) .weather-google-hour-temperature {
+    font-size: .72rem;
+  }
+
+  .radar-page:not(.radar-tv) .weather-google-hour-icon {
+    min-height: 20px;
+    font-size: 1rem;
+  }
+
+  .radar-page:not(.radar-tv) .weather-google-hour small {
+    font-size: .52rem;
+  }
+
+  .radar-page:not(.radar-tv) .weather-google-frog-scene {
+    display: none;
+  }
+
+  .radar-page:not(.radar-tv) .weather-google-days-heading {
+    margin-top: .5rem;
+  }
+
+  .radar-page:not(.radar-tv) .weather-google-day {
+    min-height: 62px;
+    padding: .28rem .12rem .32rem;
+    border-radius: 8px;
+  }
+
+  .radar-page:not(.radar-tv) .weather-google-day > b {
+    font-size: .55rem;
+  }
+
+  .radar-page:not(.radar-tv) .weather-google-day > span {
+    font-size: 1rem;
+  }
+
+  .radar-page:not(.radar-tv) .weather-google-day strong {
+    font-size: .62rem;
+  }
+
+  .radar-page:not(.radar-tv) .weather-google-day strong small {
+    font-size: .52rem;
+  }
+
+  .radar-page:not(.radar-tv) .weather-google-day em {
+    font-size: .48rem;
+  }
+
+  .radar-page:not(.radar-tv) .radar-overview .radar-calendar-card {
+    padding: .48rem .52rem;
+    border-radius: 12px;
+  }
+
+  .radar-page:not(.radar-tv) .radar-calendar-card .calendar-top > div > span {
+    font-size: .52rem;
+  }
+
+  .radar-page:not(.radar-tv) .radar-calendar-card h2 {
+    margin: .12rem 0 .25rem;
+    font-size: .84rem;
+  }
+
+  .radar-page:not(.radar-tv) .radar-calendar-card .month-buttons {
+    gap: .2rem;
+  }
+
+  .radar-page:not(.radar-tv) .radar-calendar-card .month-buttons button {
+    width: 24px;
+    height: 24px;
+    font-size: .95rem;
+  }
+
+  .radar-page:not(.radar-tv) .radar-calendar-card .weekdays {
+    margin-bottom: 3px;
+    font-size: .46rem;
+  }
+
+  .radar-page:not(.radar-tv) .radar-calendar-card .calendar-grid {
+    gap: 2px;
+  }
+
+  .radar-page:not(.radar-tv) .radar-calendar-card .calendar-grid button {
+    min-height: 25px;
+    border-radius: 5px;
+    font-size: .64rem;
+  }
+
+  .radar-page:not(.radar-tv) .radar-calendar-card .calendar-grid i {
+    top: 1px;
+    right: 1px;
+    padding: 1px 3px;
+    font-size: .42rem;
+  }
+
+  .radar-page:not(.radar-tv) .radar-calendar-card .calendar-legend {
+    margin-top: .35rem;
+    font-size: .52rem;
+  }
+}
+
+@media (max-width: 700px) {
+  .radar-page:not(.radar-tv) .radar-google-weather {
+    padding: .65rem;
+    border-radius: 13px;
+  }
+
+  .radar-page:not(.radar-tv) .weather-google-current {
+    grid-template-columns: auto 58px minmax(0, 1fr);
+    gap: .45rem;
+    padding: .55rem;
+  }
+
+  .radar-page:not(.radar-tv) .weather-google-temperature strong {
+    font-size: 2.8rem;
+  }
+
+  .radar-page:not(.radar-tv) .weather-google-current-icon {
+    min-height: 56px;
+  }
+
+  .radar-page:not(.radar-tv) .weather-google-sun {
+    width: 32px;
+    height: 32px;
+  }
+
+  .radar-page:not(.radar-tv) .weather-google-cloud {
+    margin-top: 13px;
+    font-size: 1.7rem;
+  }
+
+  .radar-page:not(.radar-tv) .weather-google-summary strong {
+    font-size: .82rem;
+  }
+
+  .radar-page:not(.radar-tv) .weather-google-summary span {
+    font-size: .57rem;
+  }
+
+  .radar-page:not(.radar-tv) .weather-google-metrics {
+    gap: .22rem .5rem;
+    padding-top: .4rem;
+    font-size: .57rem;
+  }
+
+  .radar-page:not(.radar-tv) .weather-google-hourly,
+  .radar-page:not(.radar-tv) .weather-google-days {
+    overflow-x: auto;
+    padding-bottom: .12rem;
+    scrollbar-width: thin;
+  }
+
+  .radar-page:not(.radar-tv) .weather-google-hour,
+  .radar-page:not(.radar-tv) .weather-google-day {
+    flex: 0 0 58px;
+  }
+
+  .radar-page:not(.radar-tv) .weather-google-hour {
+    min-height: 69px;
+  }
+
+  .radar-page:not(.radar-tv) .weather-google-day {
+    min-height: 64px;
+  }
+
+  .radar-page:not(.radar-tv) .weather-google-frog-scene {
+    display: none;
+  }
+}
+
+/*
  * Ajuste do painel TV conforme a referência:
  * calendário compacto no topo direito e gráfico do Rio Bananeiras
  * com área vertical suficiente para a leitura da curva/área de água.
@@ -2013,5 +2310,171 @@ html:-webkit-full-screen {
     width: calc(100% + .5rem);
     margin-right: -.25rem;
     margin-left: -.25rem;
+  }
+}
+
+/*
+ * O modo TV usa a mesma faixa meteorológica, mas com densidade própria para
+ * caber no quadro superior da tela cheia sem empurrar os registros para baixo.
+ */
+@media (min-width: 701px) {
+  body.radar-tv-active .radar-tv .radar-google-weather {
+    padding: .38rem .52rem .34rem;
+    border-radius: 10px;
+    box-shadow: 0 4px 12px rgba(2, 20, 40, .16);
+  }
+
+  body.radar-tv-active .radar-tv .weather-google-header {
+    align-items: center;
+    gap: .45rem;
+  }
+
+  body.radar-tv-active .radar-tv .weather-google-kicker {
+    font-size: .46rem;
+  }
+
+  body.radar-tv-active .radar-tv .weather-google-header h2 {
+    margin: .06rem 0 .02rem;
+    font-size: .82rem;
+  }
+
+  body.radar-tv-active .radar-tv .weather-google-header p {
+    font-size: .46rem;
+  }
+
+  body.radar-tv-active .radar-tv .weather-google-header-actions {
+    gap: .22rem;
+  }
+
+  body.radar-tv-active .radar-tv .radar-clock {
+    min-width: 74px;
+    padding: .2rem .3rem;
+    border-radius: 7px;
+  }
+
+  body.radar-tv-active .radar-tv .radar-clock span {
+    font-size: .38rem;
+  }
+
+  body.radar-tv-active .radar-tv .radar-clock strong {
+    font-size: .64rem;
+  }
+
+  body.radar-tv-active .radar-tv .weather-google-menu {
+    font-size: .9rem;
+  }
+
+  body.radar-tv-active .radar-tv .weather-google-current {
+    grid-template-columns: auto 58px minmax(0, 1fr);
+    gap: .38rem;
+    margin-top: .32rem;
+    padding: .3rem .42rem;
+    border-radius: 7px;
+  }
+
+  body.radar-tv-active .radar-tv .weather-google-temperature > span {
+    font-size: .45rem;
+  }
+
+  body.radar-tv-active .radar-tv .weather-google-temperature strong {
+    font-size: 2.45rem;
+  }
+
+  body.radar-tv-active .radar-tv .weather-google-current-icon {
+    min-height: 46px;
+  }
+
+  body.radar-tv-active .radar-tv .weather-google-sun {
+    width: 29px;
+    height: 29px;
+  }
+
+  body.radar-tv-active .radar-tv .weather-google-cloud {
+    margin-top: 11px;
+    font-size: 1.55rem;
+  }
+
+  body.radar-tv-active .radar-tv .weather-google-summary strong {
+    font-size: .68rem;
+  }
+
+  body.radar-tv-active .radar-tv .weather-google-summary span {
+    margin-top: .1rem;
+    font-size: .45rem;
+  }
+
+  body.radar-tv-active .radar-tv .weather-google-metrics {
+    gap: .16rem .42rem;
+    padding: .22rem .05rem .02rem;
+    font-size: .44rem;
+  }
+
+  body.radar-tv-active .radar-tv .weather-google-hours-heading,
+  body.radar-tv-active .radar-tv .weather-google-days-heading {
+    margin-top: .28rem;
+    font-size: .54rem;
+  }
+
+  body.radar-tv-active .radar-tv .weather-google-hours-heading span {
+    font-size: .43rem;
+  }
+
+  body.radar-tv-active .radar-tv .weather-google-hourly,
+  body.radar-tv-active .radar-tv .weather-google-days {
+    gap: .16rem;
+    margin-top: .16rem;
+  }
+
+  body.radar-tv-active .radar-tv .weather-google-hour {
+    min-height: 52px;
+    padding: .18rem .08rem .14rem;
+    border-radius: 5px;
+  }
+
+  body.radar-tv-active .radar-tv .weather-google-hour > strong {
+    font-size: .42rem;
+  }
+
+  body.radar-tv-active .radar-tv .weather-google-hour-temperature {
+    font-size: .58rem;
+  }
+
+  body.radar-tv-active .radar-tv .weather-google-hour-icon {
+    min-height: 14px;
+    font-size: .72rem;
+  }
+
+  body.radar-tv-active .radar-tv .weather-google-hour small {
+    font-size: .39rem;
+  }
+
+  body.radar-tv-active .radar-tv .weather-google-frog-scene {
+    display: none;
+  }
+
+  body.radar-tv-active .radar-tv .weather-google-day {
+    min-height: 48px;
+    padding: .18rem .08rem .2rem;
+    border-radius: 5px;
+  }
+
+  body.radar-tv-active .radar-tv .weather-google-day > b {
+    font-size: .42rem;
+  }
+
+  body.radar-tv-active .radar-tv .weather-google-day > span {
+    font-size: .78rem;
+  }
+
+  body.radar-tv-active .radar-tv .weather-google-day strong {
+    font-size: .48rem;
+  }
+
+  body.radar-tv-active .radar-tv .weather-google-day strong small {
+    font-size: .4rem;
+  }
+
+  body.radar-tv-active .radar-tv .weather-google-day em {
+    font-size: .37rem;
   }
 }

@@ -3818,3 +3818,94 @@ html:-webkit-full-screen {
     min-height: 720px;
   }
 }
+
+/*
+ * Ajustes finais do topo:
+ * - mais largura útil para o quadro de clima;
+ * - cartões horários e diários com a mesma altura;
+ * - calendário com espaço para a semana completa e os primeiros dias
+ *   do mês seguinte.
+ */
+@media (min-width: 701px) {
+  .radar-page:not(.radar-tv) .radar-overview {
+    grid-template-columns: minmax(0, 1.8fr) minmax(300px, 1fr);
+  }
+
+  .radar-page:not(.radar-tv) .weather-google-hour,
+  .radar-page:not(.radar-tv) .weather-google-day {
+    height: 72px;
+    min-height: 72px;
+  }
+
+  body.radar-tv-active .radar-tv .radar-overview {
+    width: min(78%, 820px);
+    grid-template-columns: minmax(0, 3fr) minmax(220px, 1.1fr);
+  }
+
+  body.radar-tv-active .radar-tv .radar-google-weather {
+    height: 148px;
+  }
+
+  body.radar-tv-active .radar-tv .weather-google-hour,
+  body.radar-tv-active .radar-tv .weather-google-day {
+    height: 57px;
+    min-height: 57px;
+  }
+
+  body.radar-tv-active .radar-tv .radar-calendar-card {
+    height: 148px;
+    min-height: 148px;
+    max-height: none;
+    padding: .35rem .4rem;
+    overflow: hidden;
+  }
+
+  body.radar-tv-active .radar-tv .radar-calendar-card .calendar-top > div > span {
+    font-size: .42rem;
+  }
+
+  body.radar-tv-active .radar-tv .radar-calendar-card h2 {
+    margin: .08rem 0 .18rem;
+    font-size: .76rem;
+  }
+
+  body.radar-tv-active .radar-tv .radar-calendar-card .month-buttons {
+    gap: .16rem;
+  }
+
+  body.radar-tv-active .radar-tv .radar-calendar-card .month-buttons button {
+    width: 20px;
+    height: 20px;
+    border-radius: 5px;
+    font-size: .78rem;
+  }
+
+  body.radar-tv-active .radar-tv .radar-calendar-card .weekdays {
+    margin-bottom: 2px;
+    font-size: .4rem;
+  }
+
+  body.radar-tv-active .radar-tv .radar-calendar-card .calendar-grid {
+    grid-auto-rows: 16px;
+    gap: 2px;
+  }
+
+  body.radar-tv-active .radar-tv .radar-calendar-card .calendar-grid button {
+    min-height: 16px;
+    height: 16px;
+    border-radius: 4px;
+    font-size: .5rem;
+  }
+
+  body.radar-tv-active .radar-tv .radar-calendar-card .calendar-grid i {
+    top: 0;
+    right: 1px;
+    padding: 0 2px;
+    font-size: .34rem;
+  }
+
+  body.radar-tv-active .radar-tv .radar-calendar-card .calendar-legend {
+    margin-top: .22rem;
+    font-size: .42rem;
+  }
+}

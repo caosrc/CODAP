@@ -1,3 +1,4 @@
+import { normalizarNomeAgente } from './types'
 import type { Ocorrencia } from './types'
 import type { CurralDados, CurralRegistro } from './components/Curral'
 import type { ProconRegistro } from './components/Procon'
@@ -73,8 +74,8 @@ function buildPayload(dados: Omit<Ocorrencia, 'id' | 'created_at'>) {
     hora_fim: dados.hora_fim ?? null,
     horas_total: dados.horas_total ?? null,
     horas_sobreaviso: dados.horas_sobreaviso ?? null,
-    agentes: Array.isArray(dados.agentes) ? dados.agentes : [],
-    responsavel_registro: dados.responsavel_registro ?? null,
+    agentes: Array.isArray(dados.agentes) ? dados.agentes.map(normalizarNomeAgente) : [],
+    responsavel_registro: dados.responsavel_registro ? normalizarNomeAgente(dados.responsavel_registro) : null,
     vistorias: Array.isArray(dados.vistorias) ? dados.vistorias : [],
     focos_incendio: Array.isArray((dados as any).focos_incendio) ? (dados as any).focos_incendio : null,
     poligono_area_queimada: Array.isArray((dados as any).poligono_area_queimada) ? (dados as any).poligono_area_queimada : null,
@@ -138,11 +139,19 @@ export async function listarOcorrencias(): Promise<Ocorrencia[]> {
             .order('created_at', { ascending: false })
             .limit(500)
           if (error2) throw new Error(error2.message)
-          return (data2 || []) as Ocorrencia[]
+      return (data2 || []).map((item) => ({
+        ...item,
+        agentes: Array.isArray(item.agentes) ? item.agentes.map(normalizarNomeAgente) : [],
+        responsavel_registro: item.responsavel_registro ? normalizarNomeAgente(item.responsavel_registro) : null,
+      })) as Ocorrencia[]
         }
         throw new Error(error.message)
       }
-      return (data || []) as Ocorrencia[]
+      return (data || []).map((item) => ({
+        ...item,
+        agentes: Array.isArray(item.agentes) ? item.agentes.map(normalizarNomeAgente) : [],
+        responsavel_registro: item.responsavel_registro ? normalizarNomeAgente(item.responsavel_registro) : null,
+      })) as Ocorrencia[]
     } catch (e) {
       if (isColumnMissingError(e)) {
         try {
@@ -151,7 +160,11 @@ export async function listarOcorrencias(): Promise<Ocorrencia[]> {
             .select(CAMPOS_LISTA_OCORRENCIA_BASE)
             .order('created_at', { ascending: false })
             .limit(500)
-          if (!error2) return (data2 || []) as Ocorrencia[]
+          if (!error2) return (data2 || []).map((item) => ({
+            ...item,
+            agentes: Array.isArray(item.agentes) ? item.agentes.map(normalizarNomeAgente) : [],
+            responsavel_registro: item.responsavel_registro ? normalizarNomeAgente(item.responsavel_registro) : null,
+          })) as Ocorrencia[]
         } catch { /* segue para Express */ }
       }
       console.warn('[api] listarOcorrencias Supabase falhou:', e)
@@ -163,7 +176,11 @@ export async function listarOcorrencias(): Promise<Ocorrencia[]> {
     const res = await fetch('/api/ocorrencias')
     if (respostaExpressValida(res)) {
       const data = await res.json()
-      return (data || []) as Ocorrencia[]
+      return (data || []).map((item) => ({
+        ...item,
+        agentes: Array.isArray(item.agentes) ? item.agentes.map(normalizarNomeAgente) : [],
+        responsavel_registro: item.responsavel_registro ? normalizarNomeAgente(item.responsavel_registro) : null,
+      })) as Ocorrencia[]
     }
   } catch { /* cai para cache offline */ }
 

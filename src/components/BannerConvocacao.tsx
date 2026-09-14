@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { getNomeAgenteGlobal } from '../gpsService'
 import { wsOn } from '../wsClient'
 import { supabase, supabaseDisponivel } from '../supabaseClient'
+import { normalizarNomeAgente } from '../types'
 
 interface ConfirmacaoAgente {
   agente: string
@@ -33,9 +34,11 @@ const TIPOS_CONFIG: Record<string, { label: string; emoji: string; cor: string }
 
 function nomeCorresponde(agLista: string, agLogado: string): boolean {
   if (!agLista || !agLogado) return false
-  if (agLista === agLogado) return true
-  const pL = agLista.trim().toLowerCase().split(' ')[0]
-  const pA = agLogado.trim().toLowerCase().split(' ')[0]
+  const nomeLista = normalizarNomeAgente(agLista)
+  const nomeLogado = normalizarNomeAgente(agLogado)
+  if (nomeLista === nomeLogado) return true
+  const pL = nomeLista.trim().toLowerCase().split(' ')[0]
+  const pA = nomeLogado.trim().toLowerCase().split(' ')[0]
   return pL === pA && pL.length > 2
 }
 
@@ -80,11 +83,11 @@ async function buscarPlanosComPendencia(agente: string): Promise<PlanoResumido[]
         dataInicio: (row.data_inicio as string) ?? '',
         horario: (row.horario as string) ?? '',
         horarioFim: (row.horario_fim as string) ?? '',
-        criadoPor: (row.criado_por as string) ?? '',
+        criadoPor: row.criado_por ? normalizarNomeAgente(String(row.criado_por)) : '',
         risco: (row.risco as string) ?? 'baixo',
         descricao: (row.descricao as string) ?? '',
         confirmacoes,
-        agentesDefesaCivil: agentes,
+        agentesDefesaCivil: agentes.map(normalizarNomeAgente),
       })
     }
     return pendentes

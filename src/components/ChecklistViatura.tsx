@@ -5,10 +5,10 @@ import { buscarFotosChecklists } from '../api'
 import ModalSenha from './ModalSenha'
 import { wsOn, wsSend } from '../wsClient'
 import { supabase, supabaseDisponivel } from '../supabaseClient'
-import { getSenhaAgente } from '../types'
+import { AGENTES, getSenhaAgente, normalizarNomeAgente } from '../types'
 import { getAgenteLogado } from './Login'
 
-const MOTORISTAS = ['A', 'C', 'D', 'B', 'I']
+const MOTORISTAS = AGENTES
 const CHECKLIST_LOCAL_KEY = 'checklists-pendentes-v1'
 
 function carregarChecklistsLocais(): ChecklistData[] {
@@ -138,6 +138,13 @@ function NivelCombustivelGauge({
 }
 
 type ChecklistData = ChecklistExportData
+
+function normalizarChecklist(c: ChecklistData): ChecklistData {
+  return {
+    ...c,
+    motorista: c.motorista ? normalizarNomeAgente(c.motorista) : c.motorista,
+  }
+}
 
 type Modo = 'lista' | 'form' | 'detalhe'
 
@@ -481,7 +488,7 @@ export default function ChecklistViatura({ abrirId }: { abrirId?: number | null 
           .eq('id', id)
           .single()
         if (error || !data) return null
-        return data as ChecklistData
+        return normalizarChecklist(data as ChecklistData)
       } catch { return null }
     }
     try {
@@ -503,7 +510,7 @@ export default function ChecklistViatura({ abrirId }: { abrirId?: number | null 
 
   async function carregar() {
     setCarregando(true)
-    const locais = carregarChecklistsLocais()
+    const locais = carregarChecklistsLocais().map(normalizarChecklist)
     if (supabaseDisponivel) {
       try {
         const { data } = await supabase
@@ -511,7 +518,7 @@ export default function ChecklistViatura({ abrirId }: { abrirId?: number | null 
           .select('id, data_checklist, km, placa, motorista, itens, observacoes, created_at')
           .order('created_at', { ascending: false })
           .limit(100)
-        const servidor = (Array.isArray(data) ? data : []) as ChecklistData[]
+        const servidor = (Array.isArray(data) ? data : []).map(item => normalizarChecklist(item as ChecklistData))
         setChecklists([...locais, ...servidor])
       } catch (e) {
         console.warn('[Checklist] erro ao carregar:', e)
@@ -524,7 +531,7 @@ export default function ChecklistViatura({ abrirId }: { abrirId?: number | null 
       const res = await fetch('/api/checklists')
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const data = await res.json()
-      const servidor = (Array.isArray(data) ? data : []) as ChecklistData[]
+      const servidor = (Array.isArray(data) ? data : []).map(item => normalizarChecklist(item as ChecklistData))
       setChecklists([...locais, ...servidor])
     } catch (e) {
       console.warn('[Checklist] erro ao carregar:', e)
@@ -565,7 +572,7 @@ export default function ChecklistViatura({ abrirId }: { abrirId?: number | null 
 
     // Fallback imediato: filtra dos checklists já carregados em memória
     const doEstado = checklists.filter(c => (c.data_checklist || '').startsWith(mes))
-    if (doEstado.length > 0) setChecklistsArquivo(doEstado)
+    if (doEstado.length > 0) setChecklistsArquivo(doEstado.map(normalizarChecklist))
 
     if (supabaseDisponivel) {
       try {
@@ -587,7 +594,7 @@ export default function ChecklistViatura({ abrirId }: { abrirId?: number | null 
           console.error('[Checklist] carregarArquivo Supabase error:', error.message)
           // mantém o fallback do estado se já havia dados
         } else {
-          setChecklistsArquivo((Array.isArray(data) ? data : doEstado) as ChecklistData[])
+          setChecklistsArquivo((Array.isArray(data) ? data : doEstado).map(item => normalizarChecklist(item as ChecklistData)))
         }
       } catch (e) {
         console.error('[Checklist] carregarArquivo exceção:', e)
@@ -599,7 +606,7 @@ export default function ChecklistViatura({ abrirId }: { abrirId?: number | null 
       const res = await fetch(`/api/checklists?mes=${mes}`)
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const data = await res.json()
-      setChecklistsArquivo((Array.isArray(data) ? data : []) as ChecklistData[])
+      setChecklistsArquivo((Array.isArray(data) ? data : []).map(item => normalizarChecklist(item as ChecklistData)))
     } catch { if (doEstado.length === 0) setChecklistsArquivo([]) }
     setCarregandoArquivo(false)
   }

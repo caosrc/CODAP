@@ -8,23 +8,15 @@ import type { Ocorrencia } from '../types'
 import './EscalaAgentes.css'
 
 // ── Constantes ────────────────────────────────────────────────────
-// Todos os agentes participam da escala/banco de horas.
+// Apenas os três agentes atualmente ativos participam da escala/banco de horas.
 const AGENTES_ESCALA = [
-  { nome: 'A', cor: '#0f766e', iniciais: 'A' },
-  { nome: 'B', cor: '#2563eb', iniciais: 'B' },
-  { nome: 'C', cor: '#16a34a', iniciais: 'C' },
-  { nome: 'D', cor: '#dc2626', iniciais: 'D' },
-  { nome: 'E', cor: '#9333ea', iniciais: 'E' },
-  { nome: 'F', cor: '#ea580c', iniciais: 'F' },
-  { nome: 'G', cor: '#0891b2', iniciais: 'G' },
-  { nome: 'H', cor: '#db2777', iniciais: 'H' },
-  { nome: 'I', cor: '#b45309', iniciais: 'I' },
-  { nome: 'J', cor: '#475569', iniciais: 'J' },
+  { nome: 'Alexandre', cor: '#0f766e', iniciais: 'AL' },
+  { nome: 'Arthur', cor: '#2563eb', iniciais: 'AR' },
+  { nome: 'Lucas', cor: '#16a34a', iniciais: 'L' },
 ]
 
-// Quem NÃO faz sobreaviso (mas registra horas extras 1:1, sem multiplicador)
-// J mantém a regra que era usada pelo último agente da lista anterior.
-const AGENTES_SEM_SOBREAVISO = new Set(['J'])
+// Todos os agentes ativos podem participar do sobreaviso.
+const AGENTES_SEM_SOBREAVISO = new Set<string>()
 
 // Quem pode ser escalado para sobreaviso = agentes operacionais
 const AGENTES_SOBREAVISO = AGENTES_ESCALA.filter(ag => !AGENTES_SEM_SOBREAVISO.has(ag.nome))
@@ -46,8 +38,7 @@ const HORAS_POR_DIA_SOBREAVISO = 4.62
 // Quantas horas cada folga marcada desconta do banco — varia por agente.
 // G e H mantêm a regra de 4h; J mantém a regra de 6h da configuração anterior.
 function horasPorFolga(agente: string): number {
-  if (agente === 'G' || agente === 'H') return 4
-  if (agente === 'J') return 6
+  void agente
   return 8
 }
 // Usado só em textos legados/genéricos quando não há agente em contexto
@@ -1937,7 +1928,7 @@ function ModalDetalhesBanco({
       {confirmandoRemocaoIdx !== null && (
         <ModalSenha
           titulo="Confirmar exclusão de ajuste"
-          senhaCorreta={getSenhaAgente('A') ?? '301067'}
+          senhaCorreta={getSenhaAgente('Alexandre') ?? '1234'}
           onConfirmar={() => {
             onRemoverAjuste?.(confirmandoRemocaoIdx)
             setConfirmandoRemocaoIdx(null)
@@ -3344,8 +3335,8 @@ export default function EscalaAgentes({ ocorrencias = [] }: EscalaAgentesProps) 
 
   const hoje = hojeComOffset(offsetDias)
   const agenteLogado = getAgenteLogado()
-  // A concentra as funções de gestão que antes pertenciam a Moisés, Talita e Cristiane.
-  const isGestor = agenteLogado === 'A'
+  // Os três agentes ativos podem editar a escala e todos os seus painéis.
+  const isGestor = ['Alexandre', 'Arthur', 'Lucas'].includes(agenteLogado)
   const isSobreaviso = AGENTES_SOBREAVISO.some(a => a.nome === agenteLogado)
   const isHorasExtras = AGENTES_SEM_SOBREAVISO.has(agenteLogado)
 
@@ -3417,20 +3408,20 @@ export default function EscalaAgentes({ ocorrencias = [] }: EscalaAgentesProps) 
     return off
   }, [])
 
-  // Reset único do banco do agente B (regra herdada do antigo Valteir).
+  // Reset único do banco do agente Arthur (regra herdada do antigo Valteir).
   useEffect(() => {
     if (valteirZeradoRef.current) return
     const FLAG = 'banco-valteir-zerado-2026-04'
     if (localStorage.getItem(FLAG)) { valteirZeradoRef.current = true; return }
     const calc = calcularBancoHoras(
-      'B', dados.sobreaviso, dados.horasTrabalhadasSobreaviso,
+      'Arthur', dados.sobreaviso, dados.horasTrabalhadasSobreaviso,
       dados.percDomingoFeriado, dados.percSobreaviso, dados.percSabado,
       dados.feriadosCustom, dados.descontosFolgaBanco, dados.folgas, hojeStr(),
     )
-    const ajusteAtual = dados.ajustesBanco?.['B'] ?? 0
+    const ajusteAtual = dados.ajustesBanco?.['Arthur'] ?? 0
     const totalAtual = calc + ajusteAtual
     if (totalAtual !== 0) {
-      const novosAjustes = { ...(dados.ajustesBanco ?? {}), B: -calc }
+      const novosAjustes = { ...(dados.ajustesBanco ?? {}), Arthur: -calc }
       const novos = { ...dados, ajustesBanco: novosAjustes }
       setDados(novos)
       salvarDados(novos)

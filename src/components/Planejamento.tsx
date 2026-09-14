@@ -3,7 +3,7 @@ import { MapContainer, TileLayer, Marker, Popup, useMapEvents, useMap, Circle } 
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { getAgenteLogado } from './Login'
-import { AGENTES, getSenhaAgente } from '../types'
+import { AGENTES, getSenhaAgente, normalizarNomeAgente } from '../types'
 import { wsOn, wsSend } from '../wsClient'
 import { ativarGps, desativarGps, subscribeGps, getEstadoGps, getDispositivoIdGlobal, getNomeAgenteGlobal } from '../gpsService'
 import { supabase, supabaseDisponivel } from '../supabaseClient'
@@ -232,7 +232,7 @@ function planoParaSB(p: Plano): Record<string, unknown> {
     data_inicio: p.dataInicio, data_fim: p.dataFim, horario: p.horario,
     horario_fim: p.horarioFim, publico_estimado: p.publicoEstimado,
     status: p.status, equipe: p.equipe,
-    agentes_defesa_civil: p.agentesDefesaCivil ?? [],
+    agentes_defesa_civil: (p.agentesDefesaCivil ?? []).map(normalizarNomeAgente),
     materiais: p.materiais, itens_mapa: p.itensMapa, pontos_extras: p.pontosExtras,
     lat: p.lat, lng: p.lng, observacoes: p.observacoes, risco: p.risco,
     criado_por: p.criadoPor, criado_em: p.criadoEm,
@@ -249,14 +249,16 @@ function sbParaPlano(row: Record<string, unknown>): Plano {
     publicoEstimado: (row.publico_estimado as string) ?? '',
     status: (row.status as StatusPlano) ?? 'planejado',
     equipe: (row.equipe as string[]) ?? [],
-    agentesDefesaCivil: (row.agentes_defesa_civil as string[]) ?? [],
+    agentesDefesaCivil: Array.isArray(row.agentes_defesa_civil)
+      ? (row.agentes_defesa_civil as string[]).map(normalizarNomeAgente)
+      : [],
     materiais: (row.materiais as MaterialPlano[]) ?? [],
     itensMapa: (row.itens_mapa as ItemMapa[]) ?? [],
     pontosExtras: (row.pontos_extras as PontoExtra[]) ?? [],
     lat: (row.lat as number) ?? null, lng: (row.lng as number) ?? null,
     observacoes: (row.observacoes as string) ?? '',
     risco: (row.risco as 'baixo' | 'medio' | 'alto') ?? 'baixo',
-    criadoPor: (row.criado_por as string) ?? '',
+    criadoPor: row.criado_por ? normalizarNomeAgente(String(row.criado_por)) : '',
     criadoEm: row.criado_em instanceof Date
       ? row.criado_em.toISOString()
       : ((row.criado_em as string) ?? new Date().toISOString()),
@@ -452,7 +454,15 @@ function carregarPlanos(): Plano[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (!raw) return []
-    return JSON.parse(raw) as Plano[]
+    return (JSON.parse(raw) as Plano[]).map(plano => ({
+      ...plano,
+      agentesDefesaCivil: (plano.agentesDefesaCivil ?? []).map(normalizarNomeAgente),
+      criadoPor: plano.criadoPor ? normalizarNomeAgente(plano.criadoPor) : '',
+      confirmacoes: (plano.confirmacoes ?? []).map(confirmacao => ({
+        ...confirmacao,
+        agente: normalizarNomeAgente(confirmacao.agente),
+      })),
+    }))
   } catch { return [] }
 }
 

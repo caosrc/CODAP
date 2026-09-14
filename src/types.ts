@@ -42,37 +42,38 @@ export interface Ocorrencia {
   _localId?: number
 }
 
-export const AGENTES = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J']
+/** Agentes atualmente disponíveis no acesso e nas telas operacionais. */
+export const AGENTES = ['Alexandre', 'Arthur', 'Lucas']
 
 /** Compatibilidade para sessões e escalas criadas antes da anonimização dos nomes. */
 export const AGENTES_LEGADOS_PARA_NOVOS: Record<string, string> = {
-  'Moisés': 'A',
-  Valteir: 'B',
-  Arthur: 'C',
-  Gustavo: 'D',
-  'Vânia': 'E',
-  'Graça': 'F',
-  Talita: 'G',
-  Cristiane: 'H',
-  Dyonathan: 'I',
-  'Sócrates': 'J',
+  A: 'Alexandre',
+  B: 'Arthur',
+  C: 'Lucas',
+  'Moisés': 'Alexandre',
+  Valteir: 'Arthur',
 }
 
 export function normalizarNomeAgente(nome: string): string {
-  return AGENTES_LEGADOS_PARA_NOVOS[nome] ?? nome
+  const valor = String(nome ?? '').trim()
+  return AGENTES_LEGADOS_PARA_NOVOS[valor] ?? valor
 }
 
 export const AGENTE_SENHAS: Record<string, string> = {
-  A: '301067',
+  Alexandre: '1234',
+  Arthur: '1234',
+  Lucas: '1234',
+  // Mantidos para sessões antigas que ainda carreguem a identificação A–J.
+  A: '1234',
   B: '1234',
-  C: '0620',
-  D: '8228',
-  E: '1210',
-  F: '1122',
+  C: '1234',
+  D: '1234',
+  E: '1234',
+  F: '1234',
   G: '1234',
-  H: '1950',
-  I: '2806',
-  J: '3004',
+  H: '1234',
+  I: '1234',
+  J: '1234',
 }
 
 export function getSenhaAgente(nome: string): string | null {

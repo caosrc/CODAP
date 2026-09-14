@@ -24,8 +24,8 @@ const LOGIN_KEY = 'defesacivil-logado'
 const AGENTE_SESSION_KEY = 'defesacivil-agente-sessao'
 const AGENTE_NOME_KEY = 'defesacivil-device-nome'
 const ORGAO_SESSION_KEY = 'defesacivil-orgao-sessao'
-const USUARIO_CORRETO = 'defesacivilob@gmail.com'
-const SENHA_CORRETA = 'dc-2026'
+const USUARIO_CORRETO = 'lafaiete'
+const SENHA_CORRETA = '1234'
 
 export type Orgao = 'defesa-civil' | 'curral' | 'procon'
 
@@ -273,12 +273,12 @@ export default function Login({ onLogin, apenasAgente = false }: Props) {
             <input
               ref={usuarioRef}
               className={`login-input${erro ? ' login-input-erro' : ''}`}
-              type="email"
-              inputMode="email"
+               type="text"
+               inputMode="text"
               autoComplete="username"
               autoCapitalize="none"
               autoCorrect="off"
-              placeholder="email@exemplo.com"
+               placeholder="Lafaiete"
               value={usuario}
               onChange={(e) => { setUsuario(e.target.value); setErro('') }}
             />

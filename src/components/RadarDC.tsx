@@ -1107,74 +1107,80 @@ export default function RadarDC() {
           {!tempo && !erroTempo && <p className="radar-weather-loading">Carregando previsão...</p>}
           {tempo && (
             <>
-              <div className="weather-google-current">
-                <div className="weather-google-temperature">
-                  <span>Agora</span>
-                  <strong>{Math.round(tempo.atual.temperatura)}°</strong>
-                </div>
-                <div className="weather-google-current-icon" aria-label={nomesTempo[tempo.atual.codigo] || 'Condição variável'}>
-                  <span className="weather-google-sun" />
-                  <span className="weather-google-cloud">{iconeTempo(tempo.atual.codigo)}</span>
-                </div>
-                <div className="weather-google-summary">
-                  <strong>{nomesTempo[tempo.atual.codigo] || 'Condição variável'}</strong>
-                  <span>Umidade {Math.round(tempo.atual.umidade)}% · vento {Math.round(tempo.atual.vento)} km/h</span>
-                </div>
-              </div>
-              <div className="weather-google-metrics" aria-label="Resumo das condições atuais">
-                <span>🌧️ Chuva <b>{tempo.atual.chuva.toFixed(1)} mm</b></span>
-                <span>☔ Prob. hoje <b>{tempo.dias[0]?.probabilidade ?? 0}%</b></span>
-                <span>💨 Rajadas <b>{Math.round(tempo.atual.rajada)} km/h</b></span>
-              </div>
-              <div className="weather-google-hours-heading">
-                <strong>Previsão por hora</strong>
-                <span>Próximas horas</span>
-              </div>
-              <div className="weather-google-hourly" aria-label="Previsão do tempo nas próximas horas">
-                {tempo.horas.slice(0, 7).map((hora, indice) => (
-                  <div className="weather-google-hour" key={hora.time} title={`${nomesTempo[hora.codigo] || 'Condição variável'} · ${hora.probabilidade}% de chuva`}>
-                    <strong>{indice === 0 ? 'Agora' : new Date(hora.time).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</strong>
-                    <span className="weather-google-hour-temperature">{Math.round(hora.temperatura)}°</span>
-                    <span className="weather-google-hour-icon">{iconeTempo(hora.codigo, hora.time)}</span>
-                    <small>{Math.round(hora.probabilidade)}%</small>
+              <div className="weather-google-body">
+                <div className="weather-google-current-column">
+                  <div className="weather-google-current">
+                    <div className="weather-google-temperature">
+                      <span>Agora</span>
+                      <strong>{Math.round(tempo.atual.temperatura)}°</strong>
+                    </div>
+                    <div className="weather-google-current-icon" aria-label={nomesTempo[tempo.atual.codigo] || 'Condição variável'}>
+                      <span className="weather-google-sun" />
+                      <span className="weather-google-cloud">{iconeTempo(tempo.atual.codigo)}</span>
+                    </div>
+                    <div className="weather-google-summary">
+                      <strong>{nomesTempo[tempo.atual.codigo] || 'Condição variável'}</strong>
+                      <span>Umidade {Math.round(tempo.atual.umidade)}% · vento {Math.round(tempo.atual.vento)} km/h</span>
+                    </div>
                   </div>
-                ))}
-              </div>
-              <div
-                className={`weather-google-frog-scene ${estadosClima.map(estado => `weather-state-${estado}`).join(' ')}`}
-                aria-label={`Sapinho reagindo a ${estadosClima.map(estado => estado.replace('-', ' ')).join(', ')}`}
-              >
-                <span className="weather-google-sky-glow" />
-                <span className="weather-google-hill weather-google-hill-back" />
-                <span className="weather-google-hill weather-google-hill-front" />
-                <span className="weather-google-reed weather-google-reed-one" />
-                <span className="weather-google-reed weather-google-reed-two" />
-                <span className="weather-google-rain-drops" aria-hidden="true" />
-                <span className="weather-google-lightning" aria-hidden="true">ϟ</span>
-                <span className="weather-google-dry-dust" aria-hidden="true" />
-                <span className="weather-google-heat-wave" aria-hidden="true" />
-                <span className="weather-google-low-humidity" aria-hidden="true">~</span>
-                <span className="weather-google-frog">
-                  <i className="weather-google-frog-eye weather-google-frog-eye-left" />
-                  <i className="weather-google-frog-eye weather-google-frog-eye-right" />
-                  <b className="weather-google-frog-mouth" />
-                  <i className="weather-google-frog-sweat" />
-                  <i className="weather-google-frog-scarf" />
-                </span>
-                <span className="weather-google-frog-sign">☁</span>
-              </div>
-              <div className="weather-google-days-heading">
-                <strong>Previsão para os próximos dias</strong>
-              </div>
-              <div className="weather-google-days" aria-label="Previsão do tempo para os próximos dias">
-                {tempo.dias.map((dia, indice) => (
-                  <div className={`weather-google-day ${indice === 0 ? 'weather-google-day-today' : ''}`} key={dia.data}>
-                    <b>{indice === 0 ? 'Hoje' : new Date(`${dia.data}T12:00:00`).toLocaleDateString('pt-BR', { weekday: 'short' }).replace('.', '')}</b>
-                    <span>{iconeTempo(dia.codigo)}</span>
-                    <strong>{Math.round(dia.temperaturaMax)}° <small>{Math.round(dia.temperaturaMin)}°</small></strong>
-                    <em>☔ {Math.round(dia.probabilidade)}%</em>
+                  <div className="weather-google-metrics" aria-label="Resumo das condições atuais">
+                    <span>🌧️ Chuva <b>{tempo.atual.chuva.toFixed(1)} mm</b></span>
+                    <span>☔ Prob. hoje <b>{tempo.dias[0]?.probabilidade ?? 0}%</b></span>
+                    <span>💨 Rajadas <b>{Math.round(tempo.atual.rajada)} km/h</b></span>
                   </div>
-                ))}
+                  <div
+                    className={`weather-google-frog-scene ${estadosClima.map(estado => `weather-state-${estado}`).join(' ')}`}
+                    aria-label={`Sapinho reagindo a ${estadosClima.map(estado => estado.replace('-', ' ')).join(', ')}`}
+                  >
+                    <span className="weather-google-sky-glow" />
+                    <span className="weather-google-hill weather-google-hill-back" />
+                    <span className="weather-google-hill weather-google-hill-front" />
+                    <span className="weather-google-reed weather-google-reed-one" />
+                    <span className="weather-google-reed weather-google-reed-two" />
+                    <span className="weather-google-rain-drops" aria-hidden="true" />
+                    <span className="weather-google-lightning" aria-hidden="true">ϟ</span>
+                    <span className="weather-google-dry-dust" aria-hidden="true" />
+                    <span className="weather-google-heat-wave" aria-hidden="true" />
+                    <span className="weather-google-low-humidity" aria-hidden="true">~</span>
+                    <span className="weather-google-frog">
+                      <i className="weather-google-frog-eye weather-google-frog-eye-left" />
+                      <i className="weather-google-frog-eye weather-google-frog-eye-right" />
+                      <b className="weather-google-frog-mouth" />
+                      <i className="weather-google-frog-sweat" />
+                      <i className="weather-google-frog-scarf" />
+                    </span>
+                    <span className="weather-google-frog-sign">☁</span>
+                  </div>
+                </div>
+                <div className="weather-google-forecast-column">
+                  <div className="weather-google-hours-heading">
+                    <strong>Previsão por hora</strong>
+                    <span>Próximas horas</span>
+                  </div>
+                  <div className="weather-google-hourly" aria-label="Previsão do tempo nas próximas horas">
+                    {tempo.horas.slice(0, 7).map((hora, indice) => (
+                      <div className="weather-google-hour" key={hora.time} title={`${nomesTempo[hora.codigo] || 'Condição variável'} · ${hora.probabilidade}% de chuva`}>
+                        <strong>{indice === 0 ? 'Agora' : new Date(hora.time).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</strong>
+                        <span className="weather-google-hour-temperature">{Math.round(hora.temperatura)}°</span>
+                        <span className="weather-google-hour-icon">{iconeTempo(hora.codigo, hora.time)}</span>
+                        <small>{Math.round(hora.probabilidade)}%</small>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="weather-google-days-heading">
+                    <strong>Previsão para os próximos dias</strong>
+                  </div>
+                  <div className="weather-google-days" aria-label="Previsão do tempo para os próximos dias">
+                    {tempo.dias.map((dia, indice) => (
+                      <div className={`weather-google-day ${indice === 0 ? 'weather-google-day-today' : ''}`} key={dia.data}>
+                        <b>{indice === 0 ? 'Hoje' : new Date(`${dia.data}T12:00:00`).toLocaleDateString('pt-BR', { weekday: 'short' }).replace('.', '')}</b>
+                        <span>{iconeTempo(dia.codigo)}</span>
+                        <strong>{Math.round(dia.temperaturaMax)}° <small>{Math.round(dia.temperaturaMin)}°</small></strong>
+                        <em>☔ {Math.round(dia.probabilidade)}%</em>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               </div>
             </>
           )}

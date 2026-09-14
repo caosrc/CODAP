@@ -1994,6 +1994,202 @@ html:-webkit-full-screen {
   }
 }
 
+/*
+ * Cartão superior alinhado ao painel de referência:
+ * condição atual + quadro do sapinho à esquerda, previsão horária no centro
+ * e próximos dias à direita. Em telas menores o fluxo volta a ser vertical.
+ */
+@media (min-width: 701px) {
+  .radar-page .weather-google-body {
+    display: grid;
+    grid-template-columns: minmax(150px, .72fr) minmax(0, 1.85fr);
+    align-items: stretch;
+    gap: .7rem;
+    min-width: 0;
+  }
+
+  .radar-page .weather-google-current-column,
+  .radar-page .weather-google-forecast-column {
+    min-width: 0;
+  }
+
+  .radar-page .weather-google-current-column {
+    display: flex;
+    min-height: 0;
+    flex-direction: column;
+  }
+
+  .radar-page .weather-google-current {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: .2rem;
+    min-height: 0;
+    margin-top: .8rem;
+    padding: .55rem .55rem .4rem;
+  }
+
+  .radar-page .weather-google-temperature > span {
+    font-size: .67rem;
+  }
+
+  .radar-page .weather-google-temperature strong {
+    font-size: clamp(2.8rem, 4.5vw, 4rem);
+  }
+
+  .radar-page .weather-google-current-icon {
+    min-height: 72px;
+  }
+
+  .radar-page .weather-google-sun {
+    width: 42px;
+    height: 42px;
+    transform: translate(-8px, -11px);
+  }
+
+  .radar-page .weather-google-cloud {
+    margin: 17px 0 0 18px;
+    font-size: 2.2rem;
+  }
+
+  .radar-page .weather-google-summary {
+    grid-column: 1 / -1;
+    padding: .15rem .05rem 0;
+  }
+
+  .radar-page .weather-google-summary strong {
+    font-size: .82rem;
+  }
+
+  .radar-page .weather-google-summary span {
+    margin-top: .15rem;
+    font-size: .58rem;
+    line-height: 1.25;
+  }
+
+  .radar-page .weather-google-metrics {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: .22rem;
+    padding: .42rem .1rem .08rem;
+    font-size: .59rem;
+  }
+
+  .radar-page .weather-google-frog-scene {
+    flex: 1 1 auto;
+    min-height: 82px;
+    height: auto;
+    margin: .45rem 0 0;
+    border-radius: 12px;
+  }
+
+  .radar-page .weather-google-frog {
+    transform: scale(.86);
+    transform-origin: bottom center;
+  }
+
+  .radar-page .weather-google-forecast-column {
+    display: grid;
+    grid-template-columns: minmax(0, 1.12fr) minmax(0, .88fr);
+    grid-template-rows: auto 1fr;
+    align-items: start;
+    gap: .25rem .55rem;
+  }
+
+  .radar-page .weather-google-hours-heading {
+    grid-column: 1;
+    grid-row: 1;
+    margin-top: .8rem;
+  }
+
+  .radar-page .weather-google-hourly {
+    grid-column: 1;
+    grid-row: 2;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: .22rem;
+    margin-top: .25rem;
+  }
+
+  .radar-page .weather-google-hour {
+    min-height: 91px;
+    padding: .36rem .08rem .3rem;
+    border-radius: 8px;
+  }
+
+  .radar-page .weather-google-hour > strong {
+    font-size: .52rem;
+  }
+
+  .radar-page .weather-google-hour-temperature {
+    font-size: .72rem;
+  }
+
+  .radar-page .weather-google-hour-icon {
+    min-height: 22px;
+    font-size: 1.15rem;
+  }
+
+  .radar-page .weather-google-hour small {
+    font-size: .5rem;
+  }
+
+  .radar-page .weather-google-days-heading {
+    grid-column: 2;
+    grid-row: 1;
+    margin-top: .8rem;
+  }
+
+  .radar-page .weather-google-days-heading strong {
+    font-size: .68rem;
+  }
+
+  .radar-page .weather-google-days {
+    grid-column: 2;
+    grid-row: 2;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: .22rem;
+    margin-top: .25rem;
+  }
+
+  .radar-page .weather-google-day {
+    min-height: 78px;
+    padding: .34rem .16rem .38rem;
+    border-radius: 8px;
+  }
+
+  .radar-page .weather-google-day > b {
+    font-size: .57rem;
+  }
+
+  .radar-page .weather-google-day > span {
+    font-size: 1rem;
+  }
+
+  .radar-page .weather-google-day strong {
+    font-size: .62rem;
+  }
+
+  .radar-page .weather-google-day strong small {
+    font-size: .53rem;
+  }
+
+  .radar-page .weather-google-day em {
+    font-size: .48rem;
+  }
+}
+
+@media (max-width: 700px) {
+  .radar-page .weather-google-body {
+    display: block;
+  }
+
+  .radar-page .weather-google-frog-scene {
+    margin-top: .5rem;
+  }
+
+  .radar-page .weather-google-forecast-column {
+    min-width: 0;
+  }
+}
+
 @media (max-width: 700px) {
   .radar-page:not(.radar-tv) .radar-google-weather {
     padding: .65rem;

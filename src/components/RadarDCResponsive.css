@@ -4070,7 +4070,7 @@ html:-webkit-full-screen {
  */
 @media (min-width: 701px) {
   .radar-page:not(.radar-tv) .radar-overview {
-    grid-template-columns: minmax(0, 1.8fr) minmax(300px, 1fr);
+    grid-template-columns: minmax(0, 3.15fr) minmax(300px, 1fr);
   }
 
   .radar-page:not(.radar-tv) .weather-google-hour,

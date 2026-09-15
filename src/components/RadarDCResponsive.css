@@ -5655,3 +5655,80 @@ html:-webkit-full-screen {
     font-size: .34rem;
   }
 }
+
+/* Ajuste final do resumo atual: preservar sol, condição e métricas
+   mesmo quando a faixa superior estiver na altura mínima do Modo TV. */
+@media (min-width: 701px) {
+  body.radar-tv-active .radar-tv .weather-google-body {
+    grid-template-columns: minmax(154px, 1.08fr) minmax(160px, 1.18fr) minmax(0, 3fr);
+    gap: .34rem;
+  }
+
+  body.radar-tv-active .radar-tv .weather-google-location {
+    overflow: hidden;
+  }
+
+  body.radar-tv-active .radar-tv .weather-google-location .weather-google-current {
+    grid-template-columns: minmax(44px, .78fr) 23px minmax(0, 1.15fr);
+    align-items: center;
+    gap: .1rem;
+    margin-top: .14rem;
+  }
+
+  body.radar-tv-active .radar-tv .weather-google-temperature strong {
+    font-size: clamp(1.85rem, 2.8vw, 2.45rem);
+    line-height: .88;
+  }
+
+  body.radar-tv-active .radar-tv .weather-google-current-icon {
+    display: block;
+    min-height: 23px;
+  }
+
+  body.radar-tv-active .radar-tv .weather-google-sun {
+    width: 18px;
+    height: 18px;
+  }
+
+  body.radar-tv-active .radar-tv .weather-google-cloud {
+    margin: 6px 0 0 7px;
+    font-size: .82rem;
+  }
+
+  body.radar-tv-active .radar-tv .weather-google-summary {
+    min-width: 0;
+    overflow: hidden;
+  }
+
+  body.radar-tv-active .radar-tv .weather-google-summary strong {
+    display: block;
+    overflow: hidden;
+    color: #3c4043;
+    font-size: clamp(.36rem, .43vw, .48rem);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  body.radar-tv-active .radar-tv .weather-google-summary span {
+    display: block;
+    margin-top: .05rem;
+    color: #5f6b72;
+    font-size: clamp(.34rem, .4vw, .46rem);
+    line-height: 1.1;
+  }
+
+  body.radar-tv-active .radar-tv .weather-google-location .weather-google-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: .06rem .22rem;
+    margin-top: .12rem;
+    font-size: clamp(.37rem, .42vw, .48rem);
+    line-height: 1.05;
+  }
+
+  body.radar-tv-active .radar-tv .weather-google-location .weather-google-metrics span {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}

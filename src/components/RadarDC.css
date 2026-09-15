@@ -808,6 +808,9 @@ body.radar-tv-active .radar-tv .radar-live-map { height: clamp(420px, 54vh, 640p
   overflow: hidden;
   border-radius: 0 0 18px 18px;
   background: linear-gradient(180deg, #f4f7f8 0%, #d9edf0 58%, #8dd4d6 59%, #49b8c1 100%);
+  background-position: center bottom;
+  background-repeat: no-repeat;
+  background-size: cover;
 }
 
 .weather-google-sky-glow {

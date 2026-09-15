@@ -43,6 +43,7 @@ type DiaPrevisao = { data: string; codigo: number; temperaturaMax: number; tempe
 type HoraPrevisao = { time: string; codigo: number; temperatura: number; probabilidade: number; precipitacao: number; vento: number }
 type TempoDC = { atual: { codigo: number; temperatura: number; chuva: number; vento: number; rajada: number; umidade: number }; horas: HoraPrevisao[]; dias: DiaPrevisao[] }
 type EstadoVisualTempo = 'normal' | 'quente' | 'frio' | 'chuva' | 'trovoada' | 'seco' | 'baixa-umidade'
+type CenaClima = 'nublado' | 'chuva-fraca' | 'ensolarado' | 'chuva-forte' | 'nuvem-e-sol' | 'raios'
 type DadosRadarCNL = {
   estacao: LeituraCNL
   estacoes: RadarEstacaoCNL[]
@@ -111,6 +112,23 @@ function estadosVisuaisTempo(tempo: TempoDC): EstadoVisualTempo[] {
   if (estaSeco) estados.push('seco')
   if (umidadeBaixa) estados.push('baixa-umidade')
   return estados.length > 0 ? estados : ['normal']
+}
+function cenaClimaTempo(tempo: TempoDC): { tipo: CenaClima; caminho: string; nome: string } {
+  const codigo = tempo.atual.codigo
+  if (codigo >= 95) return { tipo: 'raios', caminho: '/weather-scenes/raios.jpg', nome: 'COM RAIOS' }
+  if ([65, 75, 82].includes(codigo) || tempo.atual.chuva >= 4) {
+    return { tipo: 'chuva-forte', caminho: '/weather-scenes/chuva-forte.jpg', nome: 'CHUVA FORTE' }
+  }
+  if (codigo >= 51 || tempo.atual.chuva > 0.1) {
+    return { tipo: 'chuva-fraca', caminho: '/weather-scenes/chuva-fraca.jpg', nome: 'CHUVA FRACA' }
+  }
+  if (codigo === 3 || codigo === 45 || codigo === 48) {
+    return { tipo: 'nublado', caminho: '/weather-scenes/nublado.jpg', nome: 'NUBLADO' }
+  }
+  if (codigo === 2) {
+    return { tipo: 'nuvem-e-sol', caminho: '/weather-scenes/nuvem-e-sol.jpg', nome: 'COM NUVEM E SOL' }
+  }
+  return { tipo: 'ensolarado', caminho: '/weather-scenes/ensolarado.jpg', nome: 'ENSOLARADO' }
 }
 function dataTempo(data: string) { return new Date(data + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) }
 
@@ -824,6 +842,10 @@ export default function RadarDC() {
     () => tempo ? estadosVisuaisTempo(tempo) : ['normal' as EstadoVisualTempo],
     [tempo],
   )
+  const cenaClima = useMemo(
+    () => tempo ? cenaClimaTempo(tempo) : null,
+    [tempo],
+  )
   const diasPrecipitacao = useMemo(() => {
     if (!dadosCNL) return []
     return [...new Set(dadosCNL.estacoes.flatMap(estacao => estacao.precipitacaoDiaria.map(dia => dia.data)))]
@@ -1213,29 +1235,11 @@ export default function RadarDC() {
                   </div>
                 </div>
                 <div className="weather-google-current-column">
-                  <div
-                    className={`weather-google-frog-scene ${estadosClima.map(estado => `weather-state-${estado}`).join(' ')}`}
-                    aria-label={`Sapinho reagindo a ${estadosClima.map(estado => estado.replace('-', ' ')).join(', ')}`}
-                  >
-                    <span className="weather-google-sky-glow" />
-                    <span className="weather-google-hill weather-google-hill-back" />
-                    <span className="weather-google-hill weather-google-hill-front" />
-                    <span className="weather-google-reed weather-google-reed-one" />
-                    <span className="weather-google-reed weather-google-reed-two" />
-                    <span className="weather-google-rain-drops" aria-hidden="true" />
-                    <span className="weather-google-lightning" aria-hidden="true">ϟ</span>
-                    <span className="weather-google-dry-dust" aria-hidden="true" />
-                    <span className="weather-google-heat-wave" aria-hidden="true" />
-                    <span className="weather-google-low-humidity" aria-hidden="true">~</span>
-                    <span className="weather-google-frog">
-                      <i className="weather-google-frog-eye weather-google-frog-eye-left" />
-                      <i className="weather-google-frog-eye weather-google-frog-eye-right" />
-                      <b className="weather-google-frog-mouth" />
-                      <i className="weather-google-frog-sweat" />
-                      <i className="weather-google-frog-scarf" />
-                    </span>
-                    <span className="weather-google-frog-sign">☁</span>
-                  </div>
+                   <div
+                     className={`weather-google-frog-scene weather-scene-${cenaClima?.tipo ?? 'ensolarado'} ${estadosClima.map(estado => `weather-state-${estado}`).join(' ')}`}
+                     style={{ backgroundImage: `url(${cenaClima?.caminho ?? '/weather-scenes/ensolarado.jpg'})` }}
+                     aria-label={`Sapinho em cenário de ${cenaClima?.nome.toLowerCase() ?? 'ensolarado'}`}
+                   />
                 </div>
                 <div className="weather-google-forecast-column">
                   <div className="weather-google-hours-heading">

@@ -43,7 +43,7 @@ type DiaPrevisao = { data: string; codigo: number; temperaturaMax: number; tempe
 type HoraPrevisao = { time: string; codigo: number; temperatura: number; probabilidade: number; precipitacao: number; vento: number }
 type TempoDC = { atual: { codigo: number; temperatura: number; chuva: number; vento: number; rajada: number; umidade: number }; horas: HoraPrevisao[]; dias: DiaPrevisao[] }
 type EstadoVisualTempo = 'normal' | 'quente' | 'frio' | 'chuva' | 'trovoada' | 'seco' | 'baixa-umidade'
-type CenaClima = 'nublado' | 'chuva-fraca' | 'ensolarado' | 'chuva-forte' | 'nuvem-e-sol' | 'raios'
+type CenaClima = 'nublado' | 'chuva-fraca' | 'ensolarado' | 'chuva-forte' | 'nuvem-e-sol' | 'raios' | 'frio'
 type DadosRadarCNL = {
   estacao: LeituraCNL
   estacoes: RadarEstacaoCNL[]
@@ -123,6 +123,9 @@ function cenaClimaTempo(tempo: TempoDC): { tipo: CenaClima; caminho: string; nom
   }
   if ([65, 67, 75, 82].includes(codigo) || tempo.atual.chuva >= 4) {
     return { tipo: 'chuva-forte', caminho: '/weather-scenes/chuva-forte.jpg', nome: 'CHUVA FORTE' }
+  }
+  if (tempo.atual.temperatura <= 17) {
+    return { tipo: 'frio', caminho: '/weather-scenes/frio.jpg', nome: 'FRIO' }
   }
   if ([51, 53, 55, 56, 57, 61, 63, 66, 71, 73, 80, 81].includes(codigo) || tempo.atual.chuva > 0.1) {
     return { tipo: 'chuva-fraca', caminho: '/weather-scenes/chuva-fraca.jpg', nome: 'CHUVA FRACA' }
@@ -1243,7 +1246,7 @@ export default function RadarDC() {
                    <div
                      className={`weather-google-frog-scene weather-scene-${cenaClima?.tipo ?? 'ensolarado'} ${estadosClima.map(estado => `weather-state-${estado}`).join(' ')}`}
                      style={{ backgroundImage: `url(${cenaClima?.caminho ?? '/weather-scenes/ensolarado.jpg'})` }}
-                     aria-label={`Sapinho em cenário de ${cenaClima?.nome.toLowerCase() ?? 'ensolarado'}`}
+                     aria-label={`Sapinho em cenário ${cenaClima?.nome.toLowerCase() ?? 'ensolarado'}`}
                    />
                 </div>
                 <div className="weather-google-forecast-column">

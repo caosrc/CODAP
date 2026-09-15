@@ -556,6 +556,68 @@ function xmlEscape(value) {
     .replace(/'/g, '&apos;')
 }
 
+function textoDoParagrafo(paragrafo) {
+  return (paragrafo.match(/<w:t\b[^>]*>[\s\S]*?<\/w:t>/g) || [])
+    .map((trecho) => trecho.replace(/^<w:t\b[^>]*>|<\/w:t>$/g, ''))
+    .join('')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+}
+
+function atributosTexto(atributos) {
+  return atributos.replace(/\s+xml:space="[^"]*"/g, '')
+}
+
+function substituirTextoDoParagrafo(documentXml, localizar, novoTexto) {
+  let encontrado = false
+  return documentXml.replace(/<w:p\b[^>]*>[\s\S]*?<\/w:p>/g, (paragrafo) => {
+    if (encontrado || !localizar(textoDoParagrafo(paragrafo))) return paragrafo
+    const textos = paragrafo.match(/<w:t\b[^>]*>[\s\S]*?<\/w:t>/g) || []
+    if (!textos.length) return paragrafo
+    encontrado = true
+    let primeiro = true
+    return paragrafo.replace(/<w:t\b([^>]*)>[\s\S]*?<\/w:t>/g, (_trecho, atributos) => {
+      if (!primeiro) return ''
+      primeiro = false
+      return `<w:t${atributosTexto(atributos)} xml:space="preserve">${xmlEscape(novoTexto)}</w:t>`
+    })
+  })
+}
+
+const NOMES_COMPLETOS_ASSINATURA = {
+  Rosane: 'Rosane Felisbina Coelho',
+  Lucas: 'Lucas Hilário de Carvalho',
+  Junior: 'Junior Clayton Glauberto',
+}
+
+const NOME_COORDENADOR = 'Alexandre Dantte Barbosa'
+
+function normalizarAgenteRelatorio(nome) {
+  const valor = String(nome || '').trim()
+  return ({
+    A: 'Alexandre',
+    B: 'Arthur',
+    C: 'Lucas',
+    D: 'Junior',
+    E: 'Rosane',
+    'Moisés': 'Alexandre',
+    Valteir: 'Arthur',
+  })[valor] || valor
+}
+
+function nomesAssinaturaRelatorio(ocorrencia) {
+  const agente = normalizarAgenteRelatorio(ocorrencia.responsavel_registro)
+  return {
+    responsavel: agente === 'Alexandre'
+      ? ''
+      : NOMES_COMPLETOS_ASSINATURA[agente] || agente,
+    coordenador: NOME_COORDENADOR,
+  }
+}
+
 function formatarDataCurta(data = new Date()) {
   return data.toLocaleDateString('pt-BR')
 }
@@ -638,6 +700,7 @@ async function gerarRelatorioVistoria(ocorrencia) {
   const situacao = ocorrencia.situacao || ''
   const recomendacao = ocorrencia.recomendacao || ''
   const conclusao = ocorrencia.conclusao || ''
+  const assinaturas = nomesAssinaturaRelatorio(ocorrencia)
 
   const substituicoes = {
     '"data 1"': formatarDataCurta(hoje),
@@ -657,6 +720,17 @@ async function gerarRelatorioVistoria(ocorrencia) {
     documentXml = documentXml.split(alvo).join(valor)
   }
 
+  documentXml = substituirTextoDoParagrafo(
+    documentXml,
+    (texto) => texto.trim() === 'Nome',
+    assinaturas.responsavel,
+  )
+  documentXml = substituirTextoDoParagrafo(
+    documentXml,
+    (texto) => texto.trim() === 'Nome',
+    assinaturas.coordenador,
+  )
+
   if (ocorrencia.tipo === 'Vistoria Ambiental') {
     documentXml = documentXml
       .split('Cristiane Caroline Campos Lopes').join('Talita Oliveira de Ara\u00FAjo')
@@ -666,7 +740,12 @@ async function gerarRelatorioVistoria(ocorrencia) {
       paragrafoCargo
     )
   } else {
-    documentXml = documentXml
+    documentXml = substituirTextoDoParagrafo(
+      documentXml,
+      (texto) => texto.trimStart().startsWith('Engenheiro(a) Civil -')
+        || texto.trimStart().startsWith('Engenheira Civil -'),
+      'Agente - Coordenadoria Municipal de Proteção e Defesa Civil',
+    )
       .split('Talita Oliveira de Ara\u00FAjo').join('Cristiane Caroline Campos Lopes')
       .split('Talita Oliveira de Araújo').join('Cristiane Caroline Campos Lopes')
       .split('Analista Ambiental').join('Engenheira Civil - CODAP')

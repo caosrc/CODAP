@@ -308,7 +308,8 @@ export async function gerarRelatorioVistoria(ocorrencia: Ocorrencia): Promise<Bl
   } else {
     documentXml = substituirTextoDoParagrafo(
       documentXml,
-      (texto) => texto.trimStart().startsWith('Engenheiro(a) Civil -'),
+      (texto) => texto.trimStart().startsWith('Engenheiro(a) Civil -')
+        || texto.trimStart().startsWith('Engenheira Civil -'),
       'Agente - Coordenadoria Municipal de Proteção e Defesa Civil',
     ).split('Analista Ambiental').join('Engenheira Civil - CODAP')
   }

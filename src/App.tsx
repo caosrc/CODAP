@@ -71,6 +71,7 @@ const Planejamento = lazy(() => carregarChunkComRecuperacao(() => import('./comp
 const MonitoramentoCNL = lazy(() => carregarChunkComRecuperacao(() => import('./components/MonitoramentoCNL')))
 
 type Aba = 'lista' | 'mapa' | 'nova' | 'viatura' | 'escala' | 'materiais' | 'planejamento' | 'monitoramento'
+const ABAS_VALIDAS: Aba[] = ['lista', 'mapa', 'nova', 'viatura', 'escala', 'materiais', 'planejamento', 'monitoramento']
 const NOMES_ORGAOS = {
   'defesa-civil': 'Defesa Civil',
   curral: 'Curral',
@@ -282,6 +283,7 @@ export default function App() {
   const [logado, setLogado] = useState(estaLogado() && agenteEscolhido() && orgaoEscolhido())
   const [orgao, setOrgao] = useState(getOrgaoSelecionado)
   const [aba, setAba] = useState<Aba>('lista')
+  const abaAtualRef = useRef<Aba>('lista')
   const [ocorrencias, setOcorrencias] = useState<Ocorrencia[]>([])
   const [carregando, setCarregando] = useState(true)
   const [selecionada, setSelecionada] = useState<Ocorrencia | null>(null)
@@ -301,21 +303,57 @@ export default function App() {
   const [abrirChecklistId, setAbrirChecklistId] = useState<number | null>(null)
   const [registrosCurral, setRegistrosCurral] = useState<CurralRegistro[]>([])
 
+  const navegarParaAba = useCallback((proxima: Aba) => {
+    if (abaAtualRef.current === proxima) return
+    abaAtualRef.current = proxima
+    window.history.pushState(
+      { ...(window.history.state || {}), codapAba: proxima },
+      '',
+      `${window.location.pathname}${window.location.search}${window.location.hash}`,
+    )
+    setAba(proxima)
+  }, [])
+
+  useEffect(() => {
+    const estadoInicial = window.history.state as { codapAba?: unknown } | null
+    const abaInicial = ABAS_VALIDAS.includes(estadoInicial?.codapAba as Aba)
+      ? estadoInicial?.codapAba as Aba
+      : 'lista'
+    abaAtualRef.current = abaInicial
+    window.history.replaceState(
+      { ...(window.history.state || {}), codapAba: abaInicial },
+      '',
+      `${window.location.pathname}${window.location.search}${window.location.hash}`,
+    )
+    setAba(abaInicial)
+
+    const aoVoltarNoHistorico = (evento: PopStateEvent) => {
+      const estado = evento.state as { codapAba?: unknown } | null
+      if (!ABAS_VALIDAS.includes(estado?.codapAba as Aba)) return
+      const abaAnterior = estado.codapAba as Aba
+      abaAtualRef.current = abaAnterior
+      setSelecionada(null)
+      setAba(abaAnterior)
+    }
+    window.addEventListener('popstate', aoVoltarNoHistorico)
+    return () => window.removeEventListener('popstate', aoVoltarNoHistorico)
+  }, [])
+
   useEffect(() => {
     function abrirChecklist(e: Event) {
       const id = (e as CustomEvent<{ id: number }>).detail?.id
       if (typeof id !== 'number') return
       setAbrirChecklistId(id)
-      setAba('viatura')
+      navegarParaAba('viatura')
     }
     function abrirOcorrencia(e: Event) {
       const id = (e as CustomEvent<{ id: number }>).detail?.id
       if (typeof id !== 'number') return
       const encontrada = ocorrencias.find(o => o.id === id)
-      if (encontrada) { setSelecionada(encontrada); setAba('lista') }
+      if (encontrada) { setSelecionada(encontrada); navegarParaAba('lista') }
     }
     function abrirRadar() {
-      setAba('planejamento')
+      navegarParaAba('planejamento')
     }
     window.addEventListener('dc:abrir-checklist', abrirChecklist)
     window.addEventListener('dc:abrir-ocorrencia', abrirOcorrencia)
@@ -325,18 +363,18 @@ export default function App() {
       window.removeEventListener('dc:abrir-ocorrencia', abrirOcorrencia)
       window.removeEventListener('dc:abrir-radar', abrirRadar)
     }
-  }, [ocorrencias])
+  }, [ocorrencias, navegarParaAba])
 
   useEffect(() => {
     function aoSolicitarRota(e: Event) {
       const d = (e as CustomEvent<{ lat: number; lng: number }>).detail
       if (typeof d?.lat !== 'number' || typeof d?.lng !== 'number') return
       setDestinoSos({ lat: d.lat, lng: d.lng })
-      setAba('mapa')
+      navegarParaAba('mapa')
     }
     window.addEventListener(EVT_ROTA_RESGATE, aoSolicitarRota)
     return () => window.removeEventListener(EVT_ROTA_RESGATE, aoSolicitarRota)
-  }, [])
+  }, [navegarParaAba])
 
   const carregarCurral = useCallback(async () => {
     try {
@@ -941,9 +979,9 @@ export default function App() {
             if (ocOffline) showToast('📥 Salvo localmente. Será enviado ao reconectar.')
             await carregar()
             await atualizarPendingCount()
-            setAba('lista')
+            navegarParaAba('lista')
           }}
-          onVoltar={() => setAba('lista')}
+          onVoltar={() => navegarParaAba('lista')}
           isOnline={isOnline}
           orgao={orgaoAtual}
         />
@@ -1152,7 +1190,7 @@ export default function App() {
                     : `Nenhuma ocorrência em ${formatarItemData(filtroData)}.`}
                 </div>
                 {filtroData === hojeStr() && (
-                  <button className="btn-nova-vazia" onClick={() => setAba('nova')}>+ Registrar nova</button>
+                  <button className="btn-nova-vazia" onClick={() => navegarParaAba('nova')}>+ Registrar nova</button>
                 )}
               </div>
             ) : (
@@ -1215,7 +1253,7 @@ export default function App() {
                 destinoExterno={destinoSos ?? destinoCampo}
                 onDestinoExternoConsumido={() => { setDestinoSos(null); setDestinoCampo(null) }}
                 equipamentosCampo={equipamentosCampoMapa}
-                onVerDetalheCampo={(id) => { setAbrirCampoId(id); setAba('materiais') }}
+                onVerDetalheCampo={(id) => { setAbrirCampoId(id); navegarParaAba('materiais') }}
               />
             </Suspense>
           </ErrorBoundary>
@@ -1243,7 +1281,7 @@ export default function App() {
               <MateriaisEmprestimos
                 onIrParaMapa={(lat, lng, nome) => {
                   setDestinoCampo({ lat, lng, nome, soMostrar: true })
-                  setAba('mapa')
+                  navegarParaAba('mapa')
                 }}
                 abrirCampoId={abrirCampoId}
                 onAbrirCampoIdConsumido={() => setAbrirCampoId(null)}
@@ -1266,7 +1304,7 @@ export default function App() {
               <MonitoramentoCNL
                 onAbrirMapa={(lat, lng, nome) => {
                   setDestinoCampo({ lat, lng, nome, soMostrar: true })
-                  setAba('mapa')
+                  navegarParaAba('mapa')
                 }}
               />
             </Suspense>
@@ -1276,36 +1314,36 @@ export default function App() {
       </div>
 
       <nav className="bottom-nav">
-        <button className={`nav-btn ${aba === 'escala' ? 'ativo' : ''}`} onClick={() => setAba('escala')}>
+        <button className={`nav-btn ${aba === 'escala' ? 'ativo' : ''}`} onClick={() => navegarParaAba('escala')}>
           <span className="nav-emoji">👥</span>
           <span>Escala</span>
         </button>
-        <button className={`nav-btn ${aba === 'planejamento' ? 'ativo' : ''}`} onClick={() => setAba('planejamento')}>
+        <button className={`nav-btn ${aba === 'planejamento' ? 'ativo' : ''}`} onClick={() => navegarParaAba('planejamento')}>
           <span className="nav-emoji">📐</span>
           <span>Planejamento</span>
         </button>
         {orgaoAtual === 'defesa-civil' && (
-          <button className={`nav-btn nav-monitoramento ${aba === 'monitoramento' ? 'ativo' : ''}`} onClick={() => setAba('monitoramento')}>
+          <button className={`nav-btn nav-monitoramento ${aba === 'monitoramento' ? 'ativo' : ''}`} onClick={() => navegarParaAba('monitoramento')}>
             <span className="nav-emoji">🌊</span>
             <span>Monitoramento</span>
           </button>
         )}
-        <button className={`nav-btn ${aba === 'lista' ? 'ativo' : ''}`} onClick={() => setAba('lista')}>
+        <button className={`nav-btn ${aba === 'lista' ? 'ativo' : ''}`} onClick={() => navegarParaAba('lista')}>
           <span className="nav-emoji">📋</span>
           <span>Ocorrências</span>
         </button>
-        <button className="nav-btn nav-nova" onClick={() => setAba('nova')}>
+        <button className="nav-btn nav-nova" onClick={() => navegarParaAba('nova')}>
           <span className="nav-nova-icone">+</span>
         </button>
-        <button className={`nav-btn ${aba === 'mapa' ? 'ativo' : ''}`} onClick={() => setAba('mapa')}>
+        <button className={`nav-btn ${aba === 'mapa' ? 'ativo' : ''}`} onClick={() => navegarParaAba('mapa')}>
           <span className="nav-emoji">🗺️</span>
           <span>Mapa</span>
         </button>
-        <button className={`nav-btn ${aba === 'viatura' ? 'ativo' : ''}`} onClick={() => setAba('viatura')}>
+        <button className={`nav-btn ${aba === 'viatura' ? 'ativo' : ''}`} onClick={() => navegarParaAba('viatura')}>
           <span className="nav-emoji">🚗</span>
           <span>Viatura</span>
         </button>
-        <button className={`nav-btn ${aba === 'materiais' ? 'ativo' : ''}`} onClick={() => setAba('materiais')}>
+        <button className={`nav-btn ${aba === 'materiais' ? 'ativo' : ''}`} onClick={() => navegarParaAba('materiais')}>
           <span className="nav-emoji">📦</span>
           <span>Patrimônio</span>
         </button>

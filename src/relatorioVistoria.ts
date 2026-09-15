@@ -1,5 +1,6 @@
 import JSZip from 'jszip'
 import type { Ocorrencia } from './types'
+import { normalizarNomeAgente } from './types'
 
 // Versão explícita evita que o navegador reutilize um modelo DOCX antigo do cache.
 const TEMPLATE_URL = '/relatorio-vistoria-template.docx?v=modelo-1789057943437'
@@ -142,6 +143,25 @@ function formatarEnderecoRelatorio(endereco: string | null | undefined): string 
   return texto
 }
 
+const NOMES_COMPLETOS_ASSINATURA: Record<string, string> = {
+  Rosane: 'Rosane Felisbina Coelho',
+  Lucas: 'Lucas Hilário de Carvalho',
+  Junior: 'Junior Clayton Glauberto',
+}
+
+const NOME_COORDENADOR = 'Alexandre Dantte Barbosa'
+
+function nomesAssinatura(ocorrencia: Ocorrencia): { responsavel: string; coordenador: string } {
+  const agente = normalizarNomeAgente(ocorrencia.responsavel_registro || '')
+  return {
+    // Alexandre assina somente como coordenador, nunca na assinatura da equipe.
+    responsavel: agente === 'Alexandre'
+      ? ''
+      : NOMES_COMPLETOS_ASSINATURA[agente] || agente,
+    coordenador: NOME_COORDENADOR,
+  }
+}
+
 export function relatorioFileName(ocorrencia: Ocorrencia): string {
   const numero = limparNomeArquivo(ocorrencia.id, 'numero')
   const rua = limparNomeArquivo(nomeRua(ocorrencia.endereco), 'Nome_da_Rua')
@@ -206,6 +226,7 @@ export async function gerarRelatorioVistoria(ocorrencia: Ocorrencia): Promise<Bl
   const dataExtenso = formatarDataExtenso(hoje)
   const enderecoFormatado = formatarEnderecoRelatorio(ocorrencia.endereco)
   const coordenadas = formatarCoordenadas(ocorrencia.lat, ocorrencia.lng)
+  const assinaturas = nomesAssinatura(ocorrencia)
   const textoSituacao = situacao ? `Durante a vistoria, ${situacao}` : 'Durante a vistoria,'
   const textoConclusao = conclusao
     ? `Diante de todas as informações presentes nesse relatório conclui-se que ${conclusao.replace(/[.!?]+$/, '')}. Faz-se necessário que se atente às recomendações listadas nesse relatório para garantir o bem estar, segurança e a tranquilidade de todos.`
@@ -252,12 +273,12 @@ export async function gerarRelatorioVistoria(ocorrencia: Ocorrencia): Promise<Bl
   documentXml = substituirTextoDoParagrafo(
     documentXml,
     (texto) => texto.trim() === 'Nome',
-    'Nome',
+    assinaturas.responsavel,
   )
   documentXml = substituirTextoDoParagrafo(
     documentXml,
     (texto) => texto.trim() === 'Nome',
-    'Nome',
+    assinaturas.coordenador,
   )
 
   const substituicoes: Record<string, string> = {

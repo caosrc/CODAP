@@ -115,17 +115,22 @@ function estadosVisuaisTempo(tempo: TempoDC): EstadoVisualTempo[] {
 }
 function cenaClimaTempo(tempo: TempoDC): { tipo: CenaClima; caminho: string; nome: string } {
   const codigo = tempo.atual.codigo
-  if (codigo >= 95) return { tipo: 'raios', caminho: '/weather-scenes/raios.jpg', nome: 'COM RAIOS' }
-  if ([65, 75, 82].includes(codigo) || tempo.atual.chuva >= 4) {
+  // A cena grande do cartão acompanha a condição atual, não apenas a
+  // previsão do dia. Os códigos seguem a classificação WMO usada pelo
+  // Open-Meteo.
+  if ([95, 96, 99].includes(codigo)) {
+    return { tipo: 'raios', caminho: '/weather-scenes/raios.jpg', nome: 'COM RAIOS' }
+  }
+  if ([65, 67, 75, 82].includes(codigo) || tempo.atual.chuva >= 4) {
     return { tipo: 'chuva-forte', caminho: '/weather-scenes/chuva-forte.jpg', nome: 'CHUVA FORTE' }
   }
-  if (codigo >= 51 || tempo.atual.chuva > 0.1) {
+  if ([51, 53, 55, 56, 57, 61, 63, 66, 71, 73, 80, 81].includes(codigo) || tempo.atual.chuva > 0.1) {
     return { tipo: 'chuva-fraca', caminho: '/weather-scenes/chuva-fraca.jpg', nome: 'CHUVA FRACA' }
   }
-  if (codigo === 3 || codigo === 45 || codigo === 48) {
+  if ([3, 45, 48].includes(codigo)) {
     return { tipo: 'nublado', caminho: '/weather-scenes/nublado.jpg', nome: 'NUBLADO' }
   }
-  if (codigo === 2) {
+  if ([1, 2].includes(codigo)) {
     return { tipo: 'nuvem-e-sol', caminho: '/weather-scenes/nuvem-e-sol.jpg', nome: 'COM NUVEM E SOL' }
   }
   return { tipo: 'ensolarado', caminho: '/weather-scenes/ensolarado.jpg', nome: 'ENSOLARADO' }

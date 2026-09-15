@@ -1192,6 +1192,10 @@ export default function RadarDC() {
            <span className="radar-tv-launcher-label">RADAR DC</span>
            <span className="radar-tv-launcher-hint">Painel operacional</span>
          </div>
+          <div className="radar-tv-clock" aria-label="Hora atual">
+            <span>HORA ATUAL</span>
+            <strong>{horaAtual.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</strong>
+          </div>
          <button
            className="radar-tv-launcher-btn"
            type="button"

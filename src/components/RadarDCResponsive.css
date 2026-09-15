@@ -4504,3 +4504,15 @@ html:-webkit-full-screen {
     grid-column: 3;
   }
 }
+
+/*
+ * As ilustrações meteorológicas são faixas panorâmicas (1024x176).
+ * Preserve a proporção para que o cenário inteiro fique visível em todos
+ * os tamanhos de tela, em vez de cortar a imagem com background-size: cover.
+ */
+.radar-page .weather-google-frog-scene {
+  aspect-ratio: 1024 / 176;
+  height: auto;
+  min-height: 0;
+  background-size: 100% 100%;
+}

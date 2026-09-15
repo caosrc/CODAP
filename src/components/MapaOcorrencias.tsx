@@ -1828,27 +1828,15 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
           <button
             className={`mapa-camada-btn ${mostrarOcorrencias ? 'ativo' : ''}`}
             onClick={() => {
-              const proximoEstado = !mostrarOcorrencias
-              setMostrarOcorrencias(proximoEstado)
-              if (!proximoEstado) setSubmenuFiltroAberto(false)
+              if (!mostrarOcorrencias) setMostrarOcorrencias(true)
+              setSubmenuFiltroAberto(v => !v)
               setSelecionada(null)
             }}
             aria-pressed={mostrarOcorrencias}
-            title={mostrarOcorrencias ? 'Ocultar ocorrências do mapa' : 'Mostrar ocorrências no mapa'}
-          >
-            📋 Ocorrências
-          </button>
-          <button
-            className={`mapa-camada-btn mapa-ocorr-filtro-btn ${submenuFiltroAberto ? 'ativo' : ''}`}
-            onClick={() => {
-              if (!mostrarOcorrencias) setMostrarOcorrencias(true)
-              setSubmenuFiltroAberto(v => !v)
-            }}
             aria-expanded={submenuFiltroAberto}
-            aria-label="Filtrar ocorrências por natureza"
-            title="Filtrar ocorrências por natureza"
+            title="Mostrar ocorrências e abrir filtro por natureza"
           >
-            ⚙️
+            📋 Ocorrências {submenuFiltroAberto && '▾'}
           </button>
 
           {submenuFiltroAberto && (

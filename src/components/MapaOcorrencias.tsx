@@ -1824,16 +1824,31 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
         >
           🚧 Material{equipamentosCampo.filter(c => c.status === 'ativo').length > 0 ? ` (${equipamentosCampo.filter(c => c.status === 'ativo').length})` : ''}
         </button>
-        <div className="mapa-ocorr-wrap">
+        <div className={`mapa-ocorr-wrap ${submenuFiltroAberto ? 'filtro-aberto' : ''}`}>
           <button
             className={`mapa-camada-btn ${mostrarOcorrencias ? 'ativo' : ''}`}
             onClick={() => {
-              if (!mostrarOcorrencias) setMostrarOcorrencias(true)
-              setSubmenuFiltroAberto(v => !v)
+              const proximoEstado = !mostrarOcorrencias
+              setMostrarOcorrencias(proximoEstado)
+              if (!proximoEstado) setSubmenuFiltroAberto(false)
               setSelecionada(null)
             }}
+            aria-pressed={mostrarOcorrencias}
+            title={mostrarOcorrencias ? 'Ocultar ocorrências do mapa' : 'Mostrar ocorrências no mapa'}
           >
-            📋 Ocorrências {mostrarOcorrencias && `▾`}
+            📋 Ocorrências
+          </button>
+          <button
+            className={`mapa-camada-btn mapa-ocorr-filtro-btn ${submenuFiltroAberto ? 'ativo' : ''}`}
+            onClick={() => {
+              if (!mostrarOcorrencias) setMostrarOcorrencias(true)
+              setSubmenuFiltroAberto(v => !v)
+            }}
+            aria-expanded={submenuFiltroAberto}
+            aria-label="Filtrar ocorrências por natureza"
+            title="Filtrar ocorrências por natureza"
+          >
+            ⚙️
           </button>
 
           {submenuFiltroAberto && (

@@ -284,6 +284,8 @@ export default function App() {
   const [orgao, setOrgao] = useState(getOrgaoSelecionado)
   const [aba, setAba] = useState<Aba>('lista')
   const abaAtualRef = useRef<Aba>('lista')
+  const [materiaisResetSignal, setMateriaisResetSignal] = useState(0)
+  const materiaisNoMenuRef = useRef(true)
   const [ocorrencias, setOcorrencias] = useState<Ocorrencia[]>([])
   const [carregando, setCarregando] = useState(true)
   const [selecionada, setSelecionada] = useState<Ocorrencia | null>(null)
@@ -302,17 +304,24 @@ export default function App() {
   const [abrirCampoId, setAbrirCampoId] = useState<number | null>(null)
   const [abrirChecklistId, setAbrirChecklistId] = useState<number | null>(null)
   const [registrosCurral, setRegistrosCurral] = useState<CurralRegistro[]>([])
+  const selecionadaRef = useRef<Ocorrencia | null>(null)
 
   const navegarParaAba = useCallback((proxima: Aba) => {
     if (abaAtualRef.current === proxima) return
     abaAtualRef.current = proxima
-    window.history.pushState(
+    // As abas são estados internos do app, não páginas independentes.
+    // Substituir a entrada evita que o Voltar do celular refaça cada clique.
+    window.history.replaceState(
       { ...(window.history.state || {}), codapAba: proxima },
       '',
       `${window.location.pathname}${window.location.search}${window.location.hash}`,
     )
     setAba(proxima)
   }, [])
+
+  useEffect(() => {
+    selecionadaRef.current = selecionada
+  }, [selecionada])
 
   useEffect(() => {
     const estadoInicial = window.history.state as { codapAba?: unknown } | null
@@ -328,12 +337,46 @@ export default function App() {
     setAba(abaInicial)
 
     const aoVoltarNoHistorico = (evento: PopStateEvent) => {
-      const estado = evento.state as { codapAba?: unknown } | null
-      if (!ABAS_VALIDAS.includes(estado?.codapAba as Aba)) return
-      const abaAnterior = estado.codapAba as Aba
-      abaAtualRef.current = abaAnterior
-      setSelecionada(null)
-      setAba(abaAnterior)
+      const abaAtual = abaAtualRef.current
+      const restaurarEntradaAtual = () => {
+        window.history.pushState(
+          { ...(window.history.state || {}), codapAba: abaAtual },
+          '',
+          `${window.location.pathname}${window.location.search}${window.location.hash}`,
+        )
+      }
+
+      // Detalhes e submenus são estados da tela atual. O primeiro Voltar
+      // fecha/resetará esse estado sem navegar por cada interação anterior.
+      if (selecionadaRef.current) {
+        restaurarEntradaAtual()
+        selecionadaRef.current = null
+        setSelecionada(null)
+        return
+      }
+
+      if (abaAtual === 'materiais' && !materiaisNoMenuRef.current) {
+        restaurarEntradaAtual()
+        materiaisNoMenuRef.current = true
+        setMateriaisResetSignal((sinal) => sinal + 1)
+        return
+      }
+
+      // Fora do menu principal, um único Voltar leva à aba principal.
+      if (abaAtual !== 'lista') {
+        window.history.pushState(
+          { ...(window.history.state || {}), codapAba: 'lista' },
+          '',
+          `${window.location.pathname}${window.location.search}${window.location.hash}`,
+        )
+        abaAtualRef.current = 'lista'
+        setSelecionada(null)
+        setAba('lista')
+        return
+      }
+
+      // Na tela principal, o próximo Voltar pode sair normalmente do app.
+      if (ABAS_VALIDAS.includes((evento.state as { codapAba?: unknown } | null)?.codapAba as Aba)) return
     }
     window.addEventListener('popstate', aoVoltarNoHistorico)
     return () => window.removeEventListener('popstate', aoVoltarNoHistorico)
@@ -1285,6 +1328,8 @@ export default function App() {
                 }}
                 abrirCampoId={abrirCampoId}
                 onAbrirCampoIdConsumido={() => setAbrirCampoId(null)}
+                resetSignal={materiaisResetSignal}
+                onMenuPrincipalChange={(noMenu) => { materiaisNoMenuRef.current = noMenu }}
               />
             </Suspense>
           </ErrorBoundary>

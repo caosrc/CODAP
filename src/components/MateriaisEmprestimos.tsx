@@ -172,9 +172,17 @@ interface MateriaisProps {
   onIrParaMapa?: (lat: number, lng: number, nome?: string) => void
   abrirCampoId?: number | null
   onAbrirCampoIdConsumido?: () => void
+  resetSignal?: number
+  onMenuPrincipalChange?: (noMenu: boolean) => void
 }
 
-export default function MateriaisEmprestimos({ onIrParaMapa, abrirCampoId, onAbrirCampoIdConsumido }: MateriaisProps = {}) {
+export default function MateriaisEmprestimos({
+  onIrParaMapa,
+  abrirCampoId,
+  onAbrirCampoIdConsumido,
+  resetSignal = 0,
+  onMenuPrincipalChange,
+}: MateriaisProps = {}) {
   const [modo, setModo] = useState<Modo>('inicial')
   const [carregando, setCarregando] = useState(true)
   const [materiais, setMateriais] = useState<Material[]>([])
@@ -193,6 +201,21 @@ export default function MateriaisEmprestimos({ onIrParaMapa, abrirCampoId, onAbr
   const [notificacoesPrazo, setNotificacoesPrazo] = useState<Emprestimo[]>([])
   const [tipoOperacao, setTipoOperacao] = useState<'emprestimo' | 'manutencao'>('emprestimo')
   const [exportandoCatalogo, setExportandoCatalogo] = useState(false)
+
+  useEffect(() => {
+    onMenuPrincipalChange?.(modo === 'inicial')
+  }, [modo, onMenuPrincipalChange])
+
+  useEffect(() => {
+    if (resetSignal === 0) return
+    setModo('inicial')
+    setMaterialSelecionado(null)
+    setEmprestimoSelecionado(null)
+    setCampoSelecionado(null)
+    setMostrarImport(false)
+    setBusca('')
+    setFiltroStatus('todos')
+  }, [resetSignal])
 
   function showToast(msg: string) {
     setToast(msg)

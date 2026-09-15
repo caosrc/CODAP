@@ -160,6 +160,7 @@ export default function DetalheOcorrencia({ ocorrencia: oc, onFechar, onDeletado
   const [eNatureza, setENatureza] = useState(o.natureza)
   const [eSubnatureza, setESubnatureza] = useState(o.subnatureza ?? '')
   const [eChuva, setEChuva] = useState(o.chuva != null ? String(o.chuva) : '')
+  const [eMetragemLona, setEMetragemLona] = useState(o.metragem_lona != null ? String(o.metragem_lona) : '')
   const [eNivel, setENivel] = useState<NivelRisco>(o.nivel_risco)
   const [eStatus, setEStatus] = useState<StatusOc>(o.status_oc)
   const [eDataOcorrencia, setEDataOcorrencia] = useState(o.data_ocorrencia ?? '')
@@ -187,6 +188,7 @@ export default function DetalheOcorrencia({ ocorrencia: oc, onFechar, onDeletado
   const precisaSubnatureza = eNatureza === 'Queda de Estrutura' || eNatureza === 'Apreensão e Captura de Animal'
   const labelSubnatureza = eNatureza === 'Queda de Estrutura' ? 'Qual é a estrutura?' : 'Qual é o animal?'
   const precisaPrecipitacaoEdicao = eNatureza === 'Inundação' || eNatureza === 'Alagamento'
+  const precisaMetragemLonaEdicao = eNatureza === 'Entrega de Lona'
   const icone = NATUREZA_ICONE[o.natureza] ?? '📋'
   const cor = NATUREZA_COR[o.natureza] ?? '#1a4b8c'
   const dataFormatada = o.created_at ? new Date(o.created_at).toLocaleString('pt-BR') : ''
@@ -198,6 +200,7 @@ export default function DetalheOcorrencia({ ocorrencia: oc, onFechar, onDeletado
     setENatureza(o.natureza)
     setESubnatureza(o.subnatureza ?? '')
     setEChuva(o.chuva != null ? String(o.chuva) : '')
+    setEMetragemLona(o.metragem_lona != null ? String(o.metragem_lona) : '')
     setENivel(o.nivel_risco)
     setEStatus(o.status_oc)
     setEDataOcorrencia(o.data_ocorrencia ?? '')
@@ -273,6 +276,10 @@ export default function DetalheOcorrencia({ ocorrencia: oc, onFechar, onDeletado
     const tipoFinal = eTipo === 'Outro' ? (eTipoOutro.trim() || 'Outro') : eTipo
     if (!tipoFinal) { setErroEdit('Selecione o tipo.'); return }
     if (!eNatureza) { setErroEdit('Selecione a natureza.'); return }
+    if (precisaMetragemLonaEdicao && (!eMetragemLona.trim() || Number(eMetragemLona) < 0)) {
+      setErroEdit('Informe a quantidade de metros de lona.')
+      return
+    }
 
     let finalLat: number | null
     let finalLng: number | null
@@ -308,6 +315,7 @@ export default function DetalheOcorrencia({ ocorrencia: oc, onFechar, onDeletado
         created_at: eCreatedAt ? new Date(eCreatedAt).toISOString() : o.created_at,
         subnatureza: precisaSubnatureza ? eSubnatureza || null : null,
         chuva: precisaPrecipitacaoEdicao && eChuva !== '' ? Number(eChuva) : null,
+        metragem_lona: precisaMetragemLonaEdicao && eMetragemLona !== '' ? Number(eMetragemLona) : null,
         nivel_risco: eNivel,
         status_oc: eStatus,
         data_ocorrencia: eDataOcorrencia || null,
@@ -583,6 +591,9 @@ export default function DetalheOcorrencia({ ocorrencia: oc, onFechar, onDeletado
                 {o.subnatureza && <InfoRow icone="↳" label="Detalhe" valor={o.subnatureza} />}
                 {o.chuva != null && (
                   <InfoRow icone="🌧️" label="Precipitação de chuva" valor={`${Number(o.chuva).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} mm`} />
+                )}
+                {o.metragem_lona != null && (
+                  <InfoRow icone="🟦" label="Quantidade de metros de lona" valor={`${Number(o.metragem_lona).toLocaleString('pt-BR', { maximumFractionDigits: 2 })} m`} />
                 )}
 
                 {o.data_ocorrencia && (
@@ -863,6 +874,22 @@ export default function DetalheOcorrencia({ ocorrencia: oc, onFechar, onDeletado
                       placeholder="Informe o volume de chuva"
                       value={eChuva}
                       onChange={(e) => setEChuva(e.target.value)}
+                    />
+                  </div>
+                )}
+
+                {precisaMetragemLonaEdicao && (
+                  <div className="campo campo-edit campo-sub">
+                    <label className="campo-label campo-label-sub">↳ Quantidade de metros de lona</label>
+                    <input
+                      className="campo-input"
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      inputMode="decimal"
+                      placeholder="Informe a metragem em metros"
+                      value={eMetragemLona}
+                      onChange={(e) => setEMetragemLona(e.target.value)}
                     />
                   </div>
                 )}

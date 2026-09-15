@@ -68,6 +68,7 @@ export default function NovaOcorrencia({ onSalvo, onVoltar, isOnline, orgao = 'd
   const [natureza, setNatureza] = useState(naturezaPadrao)
   const [subnatureza, setSubnatureza] = useState('')
   const [chuva, setChuva] = useState('')
+  const [metragemLona, setMetragemLona] = useState('')
   const [nivelRisco, setNivelRisco] = useState<NivelRisco>('baixo')
   const [statusOc, setStatusOc] = useState<StatusOc>('ativo')
   const [dataOcorrencia, setDataOcorrencia] = useState(hoje)
@@ -125,6 +126,7 @@ export default function NovaOcorrencia({ onSalvo, onVoltar, isOnline, orgao = 'd
       else if (orgao !== 'defesa-civil') setNatureza(naturezaPadrao)
       if (d.subnatureza) setSubnatureza(d.subnatureza)
       if (d.chuva != null) setChuva(String(d.chuva))
+      if (d.metragemLona != null) setMetragemLona(String(d.metragemLona))
       if (d.nivelRisco) setNivelRisco(d.nivelRisco)
       if (d.statusOc) setStatusOc(d.statusOc)
       if (d.dataOcorrencia) setDataOcorrencia(d.dataOcorrencia)
@@ -156,7 +158,7 @@ export default function NovaOcorrencia({ onSalvo, onVoltar, isOnline, orgao = 'd
   useEffect(() => {
     const timer = setTimeout(() => {
       const draft = {
-        tipo, tipoOutro, natureza, subnatureza, chuva, nivelRisco, statusOc,
+        tipo, tipoOutro, natureza, subnatureza, chuva, metragemLona, nivelRisco, statusOc,
         dataOcorrencia, horaInicio, horaFim,
         rua, numero, bairro, lat, lng,
         proprietario, situacao, recomendacao, conclusao,
@@ -173,7 +175,7 @@ export default function NovaOcorrencia({ onSalvo, onVoltar, isOnline, orgao = 'd
       }
     }, 800)
     return () => clearTimeout(timer)
-  }, [tipo, tipoOutro, natureza, subnatureza, chuva, nivelRisco, statusOc,
+  }, [tipo, tipoOutro, natureza, subnatureza, chuva, metragemLona, nivelRisco, statusOc,
       dataOcorrencia, horaInicio, horaFim,
       rua, numero, bairro, lat, lng,
       proprietario, situacao, recomendacao, conclusao,
@@ -182,7 +184,7 @@ export default function NovaOcorrencia({ onSalvo, onVoltar, isOnline, orgao = 'd
   const descartarRascunho = useCallback(() => {
     localStorage.removeItem(RASCUNHO_KEY)
     setTipo(ehCurral ? 'Diligência' : ehProcon ? 'Fiscalização' : '')
-    setTipoOutro(''); setNatureza(naturezaPadrao); setSubnatureza(''); setChuva('')
+    setTipoOutro(''); setNatureza(naturezaPadrao); setSubnatureza(''); setChuva(''); setMetragemLona('')
     setNivelRisco('baixo'); setStatusOc('ativo')
     setDataOcorrencia(hoje); setHoraInicio(''); setHoraFim('')
     setRua(''); setNumero(''); setBairro('')
@@ -212,6 +214,7 @@ export default function NovaOcorrencia({ onSalvo, onVoltar, isOnline, orgao = 'd
   const labelSubnatureza = natureza === 'Queda de Estrutura' ? 'Qual é a estrutura?' : 'Qual é o animal?'
   const ehIncendio = natureza === 'Incêndio em Área Urbana' || natureza === 'Incêndio em Área Rural'
   const precisaPrecipitacao = natureza === 'Inundação' || natureza === 'Alagamento'
+  const precisaMetragemLona = natureza === 'Entrega de Lona'
 
   function obterGps() {
     if (!navigator.geolocation) { setErro('Geolocalização não disponível.'); return }
@@ -357,6 +360,10 @@ export default function NovaOcorrencia({ onSalvo, onVoltar, isOnline, orgao = 'd
       setErro(`Informe: ${labelSubnatureza}`)
       return
     }
+    if (precisaMetragemLona && (!metragemLona.trim() || Number(metragemLona) < 0)) {
+      setErro('Informe a quantidade de metros de lona.')
+      return
+    }
     const enderecoEspecializado = ehProcon
       ? [rua, numero, bairro, proconCampos.complemento, proconCampos.municipio, proconCampos.uf, proconCampos.cep].filter(Boolean).join(', ')
       : ehCurral
@@ -408,6 +415,7 @@ export default function NovaOcorrencia({ onSalvo, onVoltar, isOnline, orgao = 'd
       natureza,
       subnatureza: precisaSubnatureza ? subnatureza : null,
       chuva: precisaPrecipitacao && chuva !== '' ? Number(chuva) : null,
+      metragem_lona: precisaMetragemLona && metragemLona !== '' ? Number(metragemLona) : null,
       nivel_risco: nivelRisco,
       status_oc: statusOc,
       data_ocorrencia: dataOcorrencia || null,
@@ -577,6 +585,22 @@ export default function NovaOcorrencia({ onSalvo, onVoltar, isOnline, orgao = 'd
                 placeholder="Informe o volume de chuva"
                 value={chuva}
                 onChange={(e) => setChuva(e.target.value)}
+              />
+            </div>
+          )}
+
+          {precisaMetragemLona && (
+            <div className="campo campo-animado campo-sub">
+              <label className="campo-label campo-label-sub">↳ Quantidade de metros de lona</label>
+              <input
+                className="campo-input"
+                type="number"
+                min="0"
+                step="0.01"
+                inputMode="decimal"
+                placeholder="Informe a metragem em metros"
+                value={metragemLona}
+                onChange={(e) => setMetragemLona(e.target.value)}
               />
             </div>
           )}

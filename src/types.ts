@@ -37,6 +37,7 @@ export interface Ocorrencia {
   focos_incendio?: { lat: number; lng: number }[] | null
   poligono_area_queimada?: { lat: number; lng: number }[] | null
   chuva?: number | null
+  metragem_lona?: number | null
   origem?: 'curral'
   _offline?: boolean
   _localId?: number
@@ -112,6 +113,7 @@ export const NATUREZAS = [
   'Corte/poda árvores',
   'Colisão veículo/residência',
   'Alagamento',
+  'Entrega de Lona',
 ]
 
 export const NATUREZA_ICONE: Record<string, string> = {
@@ -123,6 +125,7 @@ export const NATUREZA_ICONE: Record<string, string> = {
   'Incêndio em Área Urbana': '🔥',
   'Incêndio em Área Rural': '🔥',
   'Alagamento': '💧',
+  'Entrega de Lona': '🟦',
   'Inundação': '🌊',
   'Queda de Estrutura': '🏚️',
   'Deslizamento de Massa/Rocha': '⛰️',

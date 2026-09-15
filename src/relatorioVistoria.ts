@@ -306,8 +306,11 @@ export async function gerarRelatorioVistoria(ocorrencia: Ocorrencia): Promise<Bl
       paragrafoCargo
     )
   } else {
-    documentXml = documentXml
-      .split('Analista Ambiental').join('Engenheira Civil - CODAP')
+    documentXml = substituirTextoDoParagrafo(
+      documentXml,
+      (texto) => texto.trimStart().startsWith('Engenheiro(a) Civil -'),
+      'Agente - Coordenadoria Municipal de Proteção e Defesa Civil',
+    ).split('Analista Ambiental').join('Engenheira Civil - CODAP')
   }
 
   // O modelo pode conter nomes de exemplo em trechos que não são

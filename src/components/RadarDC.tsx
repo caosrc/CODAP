@@ -43,7 +43,7 @@ type DiaPrevisao = { data: string; codigo: number; temperaturaMax: number; tempe
 type HoraPrevisao = { time: string; codigo: number; temperatura: number; probabilidade: number; precipitacao: number; vento: number }
 type TempoDC = { atual: { codigo: number; temperatura: number; chuva: number; vento: number; rajada: number; umidade: number }; horas: HoraPrevisao[]; dias: DiaPrevisao[] }
 type EstadoVisualTempo = 'normal' | 'quente' | 'frio' | 'chuva' | 'trovoada' | 'seco' | 'baixa-umidade'
-type CenaClima = 'nublado' | 'chuva-fraca' | 'ensolarado' | 'chuva-forte' | 'nuvem-e-sol' | 'raios' | 'frio'
+type CenaClima = 'nublado' | 'chuva-fraca' | 'ensolarado' | 'chuva-forte' | 'nuvem-e-sol' | 'raios' | 'frio' | 'chuva-frio'
 type DadosRadarCNL = {
   estacao: LeituraCNL
   estacoes: RadarEstacaoCNL[]
@@ -115,11 +115,16 @@ function estadosVisuaisTempo(tempo: TempoDC): EstadoVisualTempo[] {
 }
 function cenaClimaTempo(tempo: TempoDC): { tipo: CenaClima; caminho: string; nome: string } {
   const codigo = tempo.atual.codigo
+  const estaChovendo = [51, 53, 55, 56, 57, 61, 63, 65, 66, 67, 71, 73, 75, 80, 81, 82].includes(codigo)
+    || tempo.atual.chuva > 0.1
   // A cena grande do cartão acompanha a condição atual, não apenas a
   // previsão do dia. Os códigos seguem a classificação WMO usada pelo
   // Open-Meteo.
   if ([95, 96, 99].includes(codigo)) {
     return { tipo: 'raios', caminho: '/weather-scenes/raios.jpg', nome: 'COM RAIOS' }
+  }
+  if (estaChovendo && tempo.atual.temperatura <= 17) {
+    return { tipo: 'chuva-frio', caminho: '/weather-scenes/chuva-frio.jpg', nome: 'CHUVA E FRIO' }
   }
   if ([65, 67, 75, 82].includes(codigo) || tempo.atual.chuva >= 4) {
     return { tipo: 'chuva-forte', caminho: '/weather-scenes/chuva-forte.jpg', nome: 'CHUVA FORTE' }
@@ -127,7 +132,7 @@ function cenaClimaTempo(tempo: TempoDC): { tipo: CenaClima; caminho: string; nom
   if (tempo.atual.temperatura <= 17) {
     return { tipo: 'frio', caminho: '/weather-scenes/frio.jpg', nome: 'FRIO' }
   }
-  if ([51, 53, 55, 56, 57, 61, 63, 66, 71, 73, 80, 81].includes(codigo) || tempo.atual.chuva > 0.1) {
+  if (estaChovendo) {
     return { tipo: 'chuva-fraca', caminho: '/weather-scenes/chuva-fraca.jpg', nome: 'CHUVA FRACA' }
   }
   if ([3, 45, 48].includes(codigo)) {

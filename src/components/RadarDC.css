@@ -464,7 +464,17 @@
 .radar-ticker-group > b, .radar-ticker-empty { display: block; font-size: 1.05rem; font-weight: 800; white-space: nowrap; }
 @keyframes radar-scroll { to { transform: translateX(-50%); } }
 
-.radar-tv { position: fixed; inset: 0; z-index: 100; overflow: auto; color: #e9f5ff; background: #071c34; }
+.radar-tv {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  min-width: 0;
+  height: 100dvh;
+  overflow: hidden;
+  color: #e9f5ff;
+  background: #071c34;
+}
 .radar-tv .radar-header { padding: 2.5vh 4vw; }
 .radar-tv .radar-layout { max-width: 1500px; margin: auto; padding: 3vh 4vw; }
 .radar-tv .radar-note-card, .radar-tv .radar-calendar-card, .radar-tv .radar-activities { border-color: #235073; color: #e9f5ff; background: #102d4b; }

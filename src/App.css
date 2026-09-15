@@ -1445,16 +1445,16 @@ input, select, textarea { font-family: inherit; }
   .mapa-camadas {
     top: 54px;
     width: calc(100vw - 16px);
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 0.08rem;
-    padding: 0.16rem;
+    display: flex;
+    gap: 0.02rem;
+    padding: 0.12rem;
     overflow: visible;
   }
   .mapa-camadas > .mapa-camada-btn,
   .mapa-camadas > .mapa-chuva-wrap,
   .mapa-camadas > .mapa-ocorr-wrap,
   .mapa-camadas > .mapa-incendios-wrap {
+    flex: 1 1 0;
     min-width: 0;
   }
   .mapa-camadas .mapa-camada-btn {
@@ -1462,8 +1462,8 @@ input, select, textarea { font-family: inherit; }
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
-    padding: 0.25rem 0.16rem;
-    font-size: 0.59rem;
+    padding: 0.22rem 0.1rem;
+    font-size: 0.55rem;
     letter-spacing: -0.01em;
   }
   .mapa-camadas .mapa-chuva-wrap,

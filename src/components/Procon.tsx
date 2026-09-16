@@ -1,6 +1,7 @@
 import { useMemo, useRef, useState } from 'react'
 import type { ChangeEvent, FormEvent } from 'react'
 import './Procon.css'
+import { converterParaWebp } from '../utils'
 
 export type ProconEtapa = 'formulario' | 'revisao' | 'sucesso'
 export type ProconSimNao = 'sim' | 'nao' | 'nao_informado'
@@ -340,15 +341,18 @@ export default function Procon({
     if (!arquivos.length) return
     Promise.all(arquivos.map((arquivo) => new Promise<ProconFoto>((resolve, reject) => {
       const leitor = new FileReader()
-      leitor.onload = () => resolve({
-        id: `${Date.now()}-${arquivo.name}-${Math.random().toString(16).slice(2)}`,
-        nome: arquivo.name,
-        dataUrl: String(leitor.result),
-        capturadaEm: agoraLocal(),
-        latitude: dados.localizacao.latitude,
-        longitude: dados.localizacao.longitude,
-        descricao: '',
-      })
+      leitor.onload = async () => {
+        const dataUrl = await converterParaWebp(String(leitor.result), 1600, 1600, 0.82)
+        resolve({
+          id: `${Date.now()}-${arquivo.name}-${Math.random().toString(16).slice(2)}`,
+          nome: arquivo.name.replace(/\.[^.]+$/, '.webp'),
+          dataUrl,
+          capturadaEm: agoraLocal(),
+          latitude: dados.localizacao.latitude,
+          longitude: dados.localizacao.longitude,
+          descricao: '',
+        })
+      }
       leitor.onerror = () => reject(new Error('Falha ao ler foto'))
       leitor.readAsDataURL(arquivo)
     }))).then((novasFotos) => {

@@ -1,6 +1,7 @@
 import JSZip from 'jszip'
 import type { Ocorrencia } from './types'
 import { normalizarNomeAgente } from './types'
+import { converterParaJpeg } from './utils'
 
 // Versão explícita evita que o navegador reutilize um modelo DOCX antigo do cache.
 const TEMPLATE_URL = '/relatorio-vistoria-template.docx?v=modelo-1789057943437'
@@ -179,8 +180,9 @@ interface ImagemDataUrl {
   bytes: Uint8Array
 }
 
-function parseDataUrl(dataUrl: string): ImagemDataUrl | null {
-  const match = String(dataUrl || '').match(/^data:(image\/(?:png|jpeg|jpg));base64,(.+)$/)
+async function parseDataUrl(dataUrl: string): Promise<ImagemDataUrl | null> {
+  const normalizada = await converterParaJpeg(String(dataUrl || ''))
+  const match = normalizada.match(/^data:(image\/(?:png|jpeg|jpg));base64,(.+)$/)
   if (!match) return null
   const mime = match[1] === 'image/jpg' ? 'image/jpeg' : match[1]
   const extension = mime === 'image/png' ? 'png' : 'jpeg'
@@ -374,9 +376,9 @@ export async function gerarRelatorioVistoria(ocorrencia: Ocorrencia): Promise<Bl
   }
 
   // Fotos 1-6: usar slots do template
-  fotos.slice(0, 6).forEach((foto, index) => {
-    const imagem = parseDataUrl(foto)
-    if (!imagem) return
+  for (const [index, foto] of fotos.slice(0, 6).entries()) {
+    const imagem = await parseDataUrl(foto)
+    if (!imagem) continue
     const numero = index + 1
     const rId = adicionarImagem(imagem, numero)
     const desc = descricoes[index] ?? ''
@@ -388,16 +390,16 @@ export async function gerarRelatorioVistoria(ocorrencia: Ocorrencia): Promise<Bl
         : captionPara
       return `${imageDrawingXml(rId, numero)}${captionComDesc}`
     })
-  })
+  }
 
   // Fotos 7+: gerar novas linhas na tabela de fotos
   const fotosExtra = fotos.slice(6)
   if (fotosExtra.length > 0) {
     const extraRows: string[] = []
     for (let i = 0; i < fotosExtra.length; i += 2) {
-      const buildCell = (fotoDataUrl: string | undefined, numero: number, width: number): string => {
+      const buildCell = async (fotoDataUrl: string | undefined, numero: number, width: number): Promise<string> => {
         if (!fotoDataUrl) return cellFotoXml(`<w:p><w:pPr><w:jc w:val="center"/></w:pPr></w:p>`, width)
-        const imagem = parseDataUrl(fotoDataUrl)
+        const imagem = await parseDataUrl(fotoDataUrl)
         if (!imagem) return cellFotoXml(`<w:p><w:pPr><w:jc w:val="center"/></w:pPr></w:p>`, width)
         const rId = adicionarImagem(imagem, numero)
         const desc = descricoes[numero - 1] ?? ''
@@ -405,8 +407,8 @@ export async function gerarRelatorioVistoria(ocorrencia: Ocorrencia): Promise<Bl
       }
       const numero1 = 7 + i
       const numero2 = 8 + i
-      const cell1 = buildCell(fotosExtra[i], numero1, 4960)
-      const cell2 = buildCell(fotosExtra[i + 1], numero2, 4961)
+       const cell1 = await buildCell(fotosExtra[i], numero1, 4960)
+       const cell2 = await buildCell(fotosExtra[i + 1], numero2, 4961)
       extraRows.push(`<w:tr><w:trPr><w:trHeight w:val="6052"/></w:trPr>${cell1}${cell2}</w:tr>`)
     }
     const lastFigureIdx = documentXml.lastIndexOf('SEQ Figura')

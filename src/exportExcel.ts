@@ -1,6 +1,6 @@
 import type { CellValue as ExcelCellValue, Workbook as ExcelWorkbook } from 'exceljs'
 import type { Ocorrencia } from './types'
-import { parseDateLocal } from './utils'
+import { converterParaJpeg, parseDateLocal } from './utils'
 
 export interface ChecklistExportData {
   id: number
@@ -55,6 +55,7 @@ async function normalizarFoto(foto: string): Promise<{ base64: string; ext: 'jpe
     if (!fetched) return null
     dataUrl = fetched
   }
+  dataUrl = await converterParaJpeg(dataUrl)
   const base64 = dataUrl.includes(',') ? dataUrl.split(',')[1] : dataUrl
   const ext: 'png' | 'jpeg' = dataUrl.startsWith('data:image/png') ? 'png' : 'jpeg'
   return { base64, ext }

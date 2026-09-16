@@ -84,7 +84,8 @@ function comprimirFoto(dataUrl: string): Promise<string> {
         return
       }
       contexto.drawImage(imagem, 0, 0, canvas.width, canvas.height)
-      resolve(canvas.toDataURL('image/jpeg', 0.72))
+      const webp = canvas.toDataURL('image/webp', 0.82)
+      resolve(webp.startsWith('data:image/webp') ? webp : dataUrl)
     }
     imagem.onerror = () => resolve(dataUrl)
     imagem.src = dataUrl

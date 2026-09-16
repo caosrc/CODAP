@@ -132,9 +132,80 @@ export async function adicionarMarcaDagua(
         })
       }
 
-      const result = canvas.toDataURL('image/jpeg', qualidade)
+      const webp = canvas.toDataURL('image/webp', qualidade)
+      const result = webp.startsWith('data:image/webp')
+        ? webp
+        : canvas.toDataURL('image/jpeg', qualidade)
       canvas.width = 0; canvas.height = 0
       resolve(result)
+    }
+    img.onerror = () => resolve(dataUrl)
+    img.src = dataUrl
+  })
+}
+
+/**
+ * Redimensiona uma imagem para armazenamento e codifica novas fotos em WebP.
+ * Imagens antigas ou navegadores sem suporte a WebP continuam funcionando.
+ */
+export function converterParaWebp(
+  dataUrl: string,
+  maxW = 1280,
+  maxH = 1280,
+  qualidade = 0.82,
+): Promise<string> {
+  if (!dataUrl || !dataUrl.startsWith('data:')) return Promise.resolve(dataUrl)
+  return new Promise((resolve) => {
+    const img = new Image()
+    img.onload = () => {
+      let width = img.width
+      let height = img.height
+      const escala = Math.min(1, maxW / width, maxH / height)
+      if (escala < 1) {
+        width = Math.max(1, Math.round(width * escala))
+        height = Math.max(1, Math.round(height * escala))
+      }
+      try {
+        const canvas = document.createElement('canvas')
+        canvas.width = width
+        canvas.height = height
+        const ctx = canvas.getContext('2d')
+        if (!ctx) { resolve(dataUrl); return }
+        ctx.drawImage(img, 0, 0, width, height)
+        const webp = canvas.toDataURL('image/webp', qualidade)
+        canvas.width = 0
+        canvas.height = 0
+        resolve(webp.startsWith('data:image/webp') ? webp : dataUrl)
+      } catch {
+        resolve(dataUrl)
+      }
+    }
+    img.onerror = () => resolve(dataUrl)
+    img.src = dataUrl
+  })
+}
+
+// Formatos de documentos como DOCX/ExcelJS não aceitam WebP em todos os
+// leitores. A conversão acontece apenas na exportação; o Supabase mantém WebP.
+export function converterParaJpeg(dataUrl: string, qualidade = 0.88): Promise<string> {
+  if (!dataUrl || !dataUrl.startsWith('data:image/webp')) return Promise.resolve(dataUrl)
+  return new Promise((resolve) => {
+    const img = new Image()
+    img.onload = () => {
+      try {
+        const canvas = document.createElement('canvas')
+        canvas.width = img.width
+        canvas.height = img.height
+        const ctx = canvas.getContext('2d')
+        if (!ctx) { resolve(dataUrl); return }
+        ctx.drawImage(img, 0, 0)
+        const jpeg = canvas.toDataURL('image/jpeg', qualidade)
+        canvas.width = 0
+        canvas.height = 0
+        resolve(jpeg)
+      } catch {
+        resolve(dataUrl)
+      }
     }
     img.onerror = () => resolve(dataUrl)
     img.src = dataUrl
@@ -148,7 +219,7 @@ export async function salvarFotoNoDispositivo(dataUrl: string, prefixo = 'Defesa
     const agora = new Date()
     const pad = (n: number) => String(n).padStart(2, '0')
     const ts = `${agora.getFullYear()}${pad(agora.getMonth() + 1)}${pad(agora.getDate())}-${pad(agora.getHours())}${pad(agora.getMinutes())}${pad(agora.getSeconds())}`
-    const nomeArquivo = `${prefixo}-${ts}.jpg`
+    const nomeArquivo = `${prefixo}-${ts}.webp`
     const res = await fetch(dataUrl)
     const blob = await res.blob()
     const blobUrl = URL.createObjectURL(blob)

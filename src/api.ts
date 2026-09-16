@@ -7,9 +7,10 @@ import { supabase, supabaseDisponivel } from './supabaseClient'
 import { wsSend } from './wsClient'
 
 // Redimensiona e recomprime um base64 para no máximo maxW pixels de largura
-// e qualidade JPEG bem reduzida para manter as fotos leves no banco.
-async function comprimirFoto(dataUrl: string, maxW = 800, qualidade = 0.45): Promise<string> {
+// em WebP para manter as fotos leves no banco sem perder tanta qualidade.
+async function comprimirFoto(dataUrl: string, maxW = 1280, qualidade = 0.78): Promise<string> {
   if (!dataUrl || !dataUrl.startsWith('data:')) return dataUrl
+  if (dataUrl.startsWith('data:image/webp')) return dataUrl
   return new Promise((resolve) => {
     const img = new Image()
     img.onload = () => {
@@ -25,7 +26,8 @@ async function comprimirFoto(dataUrl: string, maxW = 800, qualidade = 0.45): Pro
         const ctx = canvas.getContext('2d')
         if (!ctx) { resolve(dataUrl); return }
         ctx.drawImage(img, 0, 0, width, height)
-        resolve(canvas.toDataURL('image/jpeg', qualidade))
+        const webp = canvas.toDataURL('image/webp', qualidade)
+        resolve(webp.startsWith('data:image/webp') ? webp : dataUrl)
       } catch {
         resolve(dataUrl)
       }

@@ -675,10 +675,10 @@ function getRelatorioTemplatePath() {
 }
 
 function parseDataUrl(dataUrl) {
-  const match = String(dataUrl || '').match(/^data:(image\/(?:png|jpeg|jpg));base64,(.+)$/)
+  const match = String(dataUrl || '').match(/^data:(image\/(?:png|jpeg|jpg|webp));base64,(.+)$/)
   if (!match) return null
   const mime = match[1] === 'image/jpg' ? 'image/jpeg' : match[1]
-  const extension = mime === 'image/png' ? 'png' : 'jpeg'
+  const extension = mime === 'image/png' ? 'png' : mime === 'image/webp' ? 'webp' : 'jpeg'
   return { mime, extension, buffer: Buffer.from(match[2], 'base64') }
 }
 

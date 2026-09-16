@@ -145,7 +145,8 @@ function redimensionarImagem(dataUrl: string, maxW: number, maxH: number, qualid
       const canvas = document.createElement('canvas')
       canvas.width = w; canvas.height = h
       canvas.getContext('2d')!.drawImage(img, 0, 0, w, h)
-      resolve(canvas.toDataURL('image/jpeg', qualidade))
+      const webp = canvas.toDataURL('image/webp', qualidade)
+      resolve(webp.startsWith('data:image/webp') ? webp : dataUrl)
     }
     img.src = dataUrl
   })

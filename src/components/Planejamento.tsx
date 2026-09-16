@@ -2822,8 +2822,8 @@ function DetalheP({
     }
   }
 
-  // Comprime uma foto base64 para no máximo maxW pixels de largura antes de salvar no banco.
-  // Padrão: 800px / 70% qualidade → ~80-150 KB por foto (leve para Supabase e rápido no campo).
+  // Comprime uma foto base64 em WebP antes de salvar no banco.
+  // O WebP mantém boa qualidade visual com menos bytes que o JPEG.
   async function comprimirFotoEvento(dataUrl: string, maxW = 800, qualidade = 0.70): Promise<string> {
     if (!dataUrl || !dataUrl.startsWith('data:')) return dataUrl
     return new Promise(resolve => {
@@ -2837,7 +2837,8 @@ function DetalheP({
           const ctx = canvas.getContext('2d')
           if (!ctx) { resolve(dataUrl); return }
           ctx.drawImage(img, 0, 0, width, height)
-          resolve(canvas.toDataURL('image/jpeg', qualidade))
+          const webp = canvas.toDataURL('image/webp', qualidade)
+          resolve(webp.startsWith('data:image/webp') ? webp : dataUrl)
         } catch { resolve(dataUrl) }
       }
       img.onerror = () => resolve(dataUrl)

@@ -106,6 +106,8 @@ const CAMPOS_LISTA_OCORRENCIA =
 
 // Fallback sem colunas que podem não existir em Supabase mais antigo
 const CAMPOS_LISTA_OCORRENCIA_BASE =
+  'id,tipo,natureza,subnatureza,nivel_risco,status_oc,lat,lng,endereco,proprietario,telefone_proprietario,situacao,recomendacao,conclusao,data_ocorrencia,agentes,responsavel_registro,focos_incendio,poligono_area_queimada,created_at'
+const CAMPOS_LISTA_OCORRENCIA_LEGADO =
   'id,tipo,natureza,subnatureza,nivel_risco,status_oc,lat,lng,endereco,proprietario,situacao,recomendacao,conclusao,data_ocorrencia,agentes,responsavel_registro,focos_incendio,poligono_area_queimada,created_at'
 
 function isColumnMissingError(e: unknown): boolean {
@@ -142,6 +144,19 @@ export async function listarOcorrencias(): Promise<Ocorrencia[]> {
             .select(CAMPOS_LISTA_OCORRENCIA_BASE)
             .order('created_at', { ascending: false })
             .limit(500)
+          if (error2 && isColumnMissingError(error2)) {
+            const { data: dataLegado, error: errorLegado } = await supabase
+              .from('ocorrencias')
+              .select(CAMPOS_LISTA_OCORRENCIA_LEGADO)
+              .order('created_at', { ascending: false })
+              .limit(500)
+            if (errorLegado) throw new Error(errorLegado.message)
+            return (dataLegado || []).map((item) => ({
+              ...item,
+              agentes: Array.isArray(item.agentes) ? item.agentes.map(normalizarNomeAgente) : [],
+              responsavel_registro: item.responsavel_registro ? normalizarNomeAgente(item.responsavel_registro) : null,
+            })) as Ocorrencia[]
+          }
           if (error2) throw new Error(error2.message)
       return (data2 || []).map((item) => ({
         ...item,
@@ -165,10 +180,22 @@ export async function listarOcorrencias(): Promise<Ocorrencia[]> {
             .order('created_at', { ascending: false })
             .limit(500)
           if (!error2) return (data2 || []).map((item) => ({
-            ...item,
-            agentes: Array.isArray(item.agentes) ? item.agentes.map(normalizarNomeAgente) : [],
-            responsavel_registro: item.responsavel_registro ? normalizarNomeAgente(item.responsavel_registro) : null,
-          })) as Ocorrencia[]
+              ...item,
+              agentes: Array.isArray(item.agentes) ? item.agentes.map(normalizarNomeAgente) : [],
+              responsavel_registro: item.responsavel_registro ? normalizarNomeAgente(item.responsavel_registro) : null,
+            })) as Ocorrencia[]
+          if (isColumnMissingError(error2)) {
+            const { data: dataLegado, error: errorLegado } = await supabase
+              .from('ocorrencias')
+              .select(CAMPOS_LISTA_OCORRENCIA_LEGADO)
+              .order('created_at', { ascending: false })
+              .limit(500)
+            if (!errorLegado) return (dataLegado || []).map((item) => ({
+                ...item,
+                agentes: Array.isArray(item.agentes) ? item.agentes.map(normalizarNomeAgente) : [],
+                responsavel_registro: item.responsavel_registro ? normalizarNomeAgente(item.responsavel_registro) : null,
+              })) as Ocorrencia[]
+          }
         } catch { /* segue para Express */ }
       }
       console.warn('[api] listarOcorrencias Supabase falhou:', e)
@@ -239,11 +266,11 @@ export async function enviarOcorrenciaServidor(
       if (error && isColumnMissingError(error)) {
         console.warn('[api] Supabase insert: coluna ausente, tentando schema base.', error.message)
         const {
-            hora_inicio: _hi, hora_fim: _hf, horas_total: _ht, horas_sobreaviso: _hs, telefone_proprietario: _telefoneProprietario,
+            hora_inicio: _hi, hora_fim: _hf, horas_total: _ht, horas_sobreaviso: _hs,
            focos_incendio: _fi, poligono_area_queimada: _paq, descricoes_fotos: _df, chuva: _chuva, metragem_lona: _metragemLona,
           ...payloadBase
         } = payload as Record<string, unknown>
-         void _hi; void _hf; void _ht; void _hs; void _telefoneProprietario; void _fi; void _paq; void _df; void _chuva; void _metragemLona
+         void _hi; void _hf; void _ht; void _hs; void _fi; void _paq; void _df; void _chuva; void _metragemLona
         const r2 = await supabase.from('ocorrencias').insert(payloadBase).select().single()
         data = r2.data
         error = r2.error
@@ -335,8 +362,8 @@ export async function atualizarOcorrencia(
       .single()
     if (error && isColumnMissingError(error)) {
       // Colunas ausentes no Supabase — tenta sem elas
-      const { hora_inicio: _hi, hora_fim: _hf, horas_total: _ht, horas_sobreaviso: _hs, telefone_proprietario: _telefoneProprietario, poligono_area_queimada: _paq, descricoes_fotos: _df, chuva: _chuva, metragem_lona: _metragemLona, ...payloadBase } = payload as Record<string, unknown>
-      void _hi; void _hf; void _ht; void _hs; void _telefoneProprietario; void _paq; void _df; void _chuva; void _metragemLona
+      const { hora_inicio: _hi, hora_fim: _hf, horas_total: _ht, horas_sobreaviso: _hs, poligono_area_queimada: _paq, descricoes_fotos: _df, chuva: _chuva, metragem_lona: _metragemLona, ...payloadBase } = payload as Record<string, unknown>
+      void _hi; void _hf; void _ht; void _hs; void _paq; void _df; void _chuva; void _metragemLona
       const r2 = await supabase.from('ocorrencias').update(payloadBase).eq('id', id).select().single()
       data = r2.data
       error = r2.error

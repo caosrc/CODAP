@@ -48,3 +48,10 @@ description: Stack técnica, configuração do ambiente Replit, e decisões de b
 **Why:** O ambiente pode servir leituras e gravações do Radar por armazenamentos diferentes conforme as variáveis disponíveis; escolher um único banco pode retornar sucesso sem atualizar a fila exibida aos agentes.
 
 **How to apply:** Ao alterar mutações ou notificações do Radar, preserve a coerência entre criação, confirmação, polling, WebSocket e push nos dois caminhos de persistência.
+
+## Migrações Supabase
+- O schema Supabase compartilhado pode ficar atrás das migrações versionadas; em setembro de 2026 faltavam colunas de horário e telefone em `ocorrencias`.
+
+**Why:** O frontend recebeu erro 400 ao consultar colunas novas antes de o SQL de migração ser executado no projeto Supabase.
+
+**How to apply:** Ao adicionar uma coluna usada por uma funcionalidade, inclua a migração SQL e mantenha um fallback de leitura que não descarte silenciosamente o dado quando a coluna já existir.

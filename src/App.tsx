@@ -336,47 +336,25 @@ export default function App() {
     )
     setAba(abaInicial)
 
-    const aoVoltarNoHistorico = (evento: PopStateEvent) => {
+    const aoVoltarNoHistorico = () => {
       const abaAtual = abaAtualRef.current
-      const restaurarEntradaAtual = () => {
-        window.history.pushState(
-          { ...(window.history.state || {}), codapAba: abaAtual },
-          '',
-          `${window.location.pathname}${window.location.search}${window.location.hash}`,
-        )
-      }
-
-      // Detalhes e submenus são estados da tela atual. O primeiro Voltar
-      // fecha/resetará esse estado sem navegar por cada interação anterior.
-      if (selecionadaRef.current) {
-        restaurarEntradaAtual()
-        selecionadaRef.current = null
-        setSelecionada(null)
-        return
-      }
-
-      if (abaAtual === 'materiais' && !materiaisNoMenuRef.current) {
-        restaurarEntradaAtual()
+      // Cada aba é uma tela interna do app. Ao pressionar Voltar, substituímos
+      // a entrada antiga por "lista" em vez de deixar o navegador reabrir as
+      // telas visitadas anteriormente.
+      if (abaAtual !== 'lista' || selecionadaRef.current || !materiaisNoMenuRef.current) {
         materiaisNoMenuRef.current = true
+        selecionadaRef.current = null
         setMateriaisResetSignal((sinal) => sinal + 1)
-        return
-      }
-
-      // Fora do menu principal, um único Voltar leva à aba principal.
-      if (abaAtual !== 'lista') {
-        window.history.pushState(
-          { ...(window.history.state || {}), codapAba: 'lista' },
-          '',
-          `${window.location.pathname}${window.location.search}${window.location.hash}`,
-        )
-        abaAtualRef.current = 'lista'
         setSelecionada(null)
+        abaAtualRef.current = 'lista'
         setAba('lista')
-        return
       }
 
-      // Na tela principal, o próximo Voltar pode sair normalmente do app.
-      if (ABAS_VALIDAS.includes((evento.state as { codapAba?: unknown } | null)?.codapAba as Aba)) return
+      window.history.replaceState(
+        { ...(window.history.state || {}), codapAba: 'lista' },
+        '',
+        `${window.location.pathname}${window.location.search}${window.location.hash}`,
+      )
     }
     window.addEventListener('popstate', aoVoltarNoHistorico)
     return () => window.removeEventListener('popstate', aoVoltarNoHistorico)

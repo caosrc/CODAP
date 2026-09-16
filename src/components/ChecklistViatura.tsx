@@ -85,6 +85,7 @@ interface Itens {
   segDocumentos: OpcSN; segExtintor: OpcSN; segLimpadores: OpcSN; segMacaco: OpcSN
   segPainel: OpcSN; segRetrovisorInterno: OpcSN; segRetrovisorDireito: OpcSN
   segRetrovisorEsquerdo: OpcSN; segTravas: OpcSN; segTriangulo: OpcSN
+  emerIluminacaoGiroflex: OpcSN; emerMultimidia: OpcSN; emerSirene: OpcSN; emerStrobo: OpcSN
   motAcelerador: OpcSN; motAguaLimpador: OpcSN; motAguaRadiador: OpcSN
   motEmbreagem: OpcSN; motFreio: OpcSN; motFreioMao: OpcSN
   motOleoFreio: OpcSN; motOleoMoto: OpcSN; motTanquePartida: OpcSN
@@ -103,6 +104,7 @@ function itensIniciais(): Itens {
     segExtintor: '', segLimpadores: '', segMacaco: '', segPainel: '',
     segRetrovisorInterno: '', segRetrovisorDireito: '', segRetrovisorEsquerdo: '',
     segTravas: '', segTriangulo: '',
+    emerIluminacaoGiroflex: '', emerMultimidia: '', emerSirene: '', emerStrobo: '',
     motAcelerador: '', motAguaLimpador: '', motAguaRadiador: '', motEmbreagem: '',
     motFreio: '', motFreioMao: '', motOleoFreio: '', motOleoMoto: '', motTanquePartida: '',
     nivelCombustivel: '',
@@ -187,6 +189,10 @@ const ITENS_PDF: [keyof Itens, string, 'bmr' | 'sn'][] = [
   ['segRetrovisorEsquerdo', 'Retrovisor Esq.', 'sn'],
   ['segTravas', 'Travas', 'sn'],
   ['segTriangulo', 'Triângulo', 'sn'],
+  ['emerIluminacaoGiroflex', 'Iluminação Giroflex', 'sn'],
+  ['emerMultimidia', 'Multimídia', 'sn'],
+  ['emerSirene', 'Sirene', 'sn'],
+  ['emerStrobo', 'Strobo', 'sn'],
   ['motAcelerador', 'Acelerador', 'sn'],
   ['motAguaLimpador', 'Água Limpador', 'sn'],
   ['motAguaRadiador', 'Água Radiador', 'sn'],
@@ -425,8 +431,8 @@ export default function ChecklistViatura({ abrirId }: { abrirId?: number | null 
   const mesAtual = hoje.substring(0, 7)
   const [data, setData] = useState(hoje)
   const [km, setKm] = useState('')
-  const [placa, setPlaca] = useState('')
-  const [editandoPlaca, setEditandoPlaca] = useState(true)
+  const [placa, setPlaca] = useState('RUA4A46')
+  const [editandoPlaca, setEditandoPlaca] = useState(false)
   const [motorista, setMotorista] = useState('')
   const [motoristaOutro, setMotoristaOutro] = useState(false)
   const [fotosAvarias, setFotosAvarias] = useState<string[]>([])
@@ -666,7 +672,7 @@ export default function ChecklistViatura({ abrirId }: { abrirId?: number | null 
   }, [modo])
 
   function resetForm() {
-    setData(hoje); setKm(''); setPlaca(''); setEditandoPlaca(true)
+    setData(hoje); setKm(''); setPlaca('RUA4A46'); setEditandoPlaca(false)
     setMotorista(''); setMotoristaOutro(false)
     setFotosAvarias([]); setFotoFrontal(null); setFotoTraseira(null)
     setFotoDireita(null); setFotoEsquerda(null)
@@ -750,6 +756,7 @@ export default function ChecklistViatura({ abrirId }: { abrirId?: number | null 
       { titulo: 'Conservação', opcoes: ['bom', 'medio', 'ruim'], labels: ['Bom', 'Médio', 'Ruim'], campos: ITENS_PDF.filter(([, , tipo]) => tipo === 'bmr') },
       { titulo: 'Luzes Traseiras e Dianteiras', opcoes: ['sim', 'nao', 'na'], labels: ['Sim', 'Não', 'N/A'], campos: ITENS_PDF.filter(([campo]) => String(campo).startsWith('ltz') || String(campo).startsWith('ldz')) },
       { titulo: 'Segurança', opcoes: ['sim', 'nao', 'na'], labels: ['Sim', 'Não', 'N/A'], campos: ITENS_PDF.filter(([campo]) => String(campo).startsWith('seg')) },
+      { titulo: 'Emergência', opcoes: ['sim', 'nao', 'na'], labels: ['Sim', 'Não', 'N/A'], campos: ITENS_PDF.filter(([campo]) => String(campo).startsWith('emer')) },
       { titulo: 'Motor', opcoes: ['sim', 'nao', 'na'], labels: ['Sim', 'Não', 'N/A'], campos: ITENS_PDF.filter(([campo]) => String(campo).startsWith('mot')) },
     ]
     const tabelasItens = gruposPdf.map((grupo) => `
@@ -1128,6 +1135,16 @@ export default function ChecklistViatura({ abrirId }: { abrirId?: number | null 
               </div>
             </div>
 
+            {/* ── Emergência ── */}
+            <div className="ck-table-wrap ck-emergencia" style={{ marginTop: '0.75rem' }}>
+              <div className="ck-section-title" style={{ marginBottom: 0, borderRadius: 0 }}>EMERGÊNCIA</div>
+              <CkHeader cols={['Sim', 'Não', 'N/A']} />
+              <CkRow label="Iluminação Giroflex" campo="emerIluminacaoGiroflex" itens={itens} onChange={setItem} opcoes={OPT_SN} />
+              <CkRow label="Multimídia" campo="emerMultimidia" itens={itens} onChange={setItem} opcoes={OPT_SN} />
+              <CkRow label="Sirene" campo="emerSirene" itens={itens} onChange={setItem} opcoes={OPT_SN} />
+              <CkRow label="Strobo" campo="emerStrobo" itens={itens} onChange={setItem} opcoes={OPT_SN} />
+            </div>
+
             {/* ── Observações ── */}
             <div className="campo" style={{ marginTop: '0.75rem' }}>
               <label className="campo-label">📝 Observações</label>
@@ -1331,6 +1348,19 @@ export default function ChecklistViatura({ abrirId }: { abrirId?: number | null 
                   })}
                 </div>
               </div>
+            </div>
+
+            <div className="ck-table-wrap ck-emergencia" style={{ marginTop: '0.75rem' }}>
+              <div className="ck-section-title" style={{ marginBottom: 0, borderRadius: 0 }}>EMERGÊNCIA</div>
+              <CkHeader cols={['S', 'N', 'N/A']} />
+              {([
+                ['emerIluminacaoGiroflex', 'Iluminação Giroflex'],
+                ['emerMultimidia', 'Multimídia'],
+                ['emerSirene', 'Sirene'],
+                ['emerStrobo', 'Strobo'],
+              ] as [keyof Itens, string][]).map(([k, label]) => (
+                <CkRowRO key={k} label={label} valor={it[k] as string} opcoes={OPT_SN} />
+              ))}
             </div>
 
             {c.observacoes && (

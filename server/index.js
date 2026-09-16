@@ -722,7 +722,10 @@ async function gerarRelatorioVistoria(ocorrencia) {
 
   documentXml = substituirTextoDoParagrafo(
     documentXml,
-    (texto) => texto.trim() === 'Nome',
+    (texto) => {
+      const nome = texto.trim()
+      return nome === 'Nome' || nome === '“Nome completo do agente”' || nome === '"Nome completo do agente"'
+    },
     assinaturas.responsavel,
   )
   documentXml = substituirTextoDoParagrafo(
@@ -752,7 +755,7 @@ async function gerarRelatorioVistoria(ocorrencia) {
   }
 
   documentXml = documentXml
-    .replace(/[""]/g, '')
+    .replace(/[“”]/g, '')
     .replace(/,\s*Zona Rural de Olaria/g, '')
     .replace(/\s+Zona Rural de Olaria,\s*coordenadas/g, ' coordenadas')
     .replace(/\s*descreva a conclus.o\.?/gi, '')

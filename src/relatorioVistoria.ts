@@ -274,7 +274,10 @@ export async function gerarRelatorioVistoria(ocorrencia: Ocorrencia): Promise<Bl
   )
   documentXml = substituirTextoDoParagrafo(
     documentXml,
-    (texto) => texto.trim() === 'Nome',
+    (texto) => {
+      const nome = texto.trim()
+      return nome === 'Nome' || nome === '“Nome completo do agente”' || nome === '"Nome completo do agente"'
+    },
     assinaturas.responsavel,
   )
   documentXml = substituirTextoDoParagrafo(

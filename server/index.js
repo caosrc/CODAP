@@ -819,6 +819,7 @@ async function initDb() {
       lng DOUBLE PRECISION,
       endereco TEXT,
       proprietario TEXT,
+      telefone_proprietario TEXT,
       situacao TEXT,
       recomendacao TEXT,
       conclusao TEXT,
@@ -838,6 +839,7 @@ async function initDb() {
   await query(`ALTER TABLE ocorrencias ADD COLUMN IF NOT EXISTS hora_fim VARCHAR(5)`)
   await query(`ALTER TABLE ocorrencias ADD COLUMN IF NOT EXISTS horas_total NUMERIC(5,2)`)
   await query(`ALTER TABLE ocorrencias ADD COLUMN IF NOT EXISTS horas_sobreaviso NUMERIC(5,2)`)
+  await query(`ALTER TABLE ocorrencias ADD COLUMN IF NOT EXISTS telefone_proprietario TEXT`)
 
   await query(`
     CREATE TABLE IF NOT EXISTS escala_estado (
@@ -1148,7 +1150,7 @@ app.get('/api/ocorrencias', async (req, res) => {
     // Exclui fotos e vistorias (base64 pesado) da listagem — carregados sob demanda ao abrir
     const result = await query(
       `SELECT id, tipo, natureza, subnatureza, nivel_risco, status_oc,
-              lat, lng, endereco, proprietario, situacao, recomendacao, conclusao,
+               lat, lng, endereco, proprietario, telefone_proprietario, situacao, recomendacao, conclusao,
               data_ocorrencia, hora_inicio, hora_fim, horas_total, horas_sobreaviso,
               agentes, responsavel_registro, focos_incendio, poligono_area_queimada, chuva,
               created_at
@@ -1162,11 +1164,11 @@ app.get('/api/ocorrencias', async (req, res) => {
 })
 
 app.post('/api/ocorrencias', async (req, res) => {
-  const { tipo, natureza, subnatureza, nivel_risco, status_oc, fotos, descricoes_fotos, lat, lng, endereco, proprietario, situacao, recomendacao, conclusao, data_ocorrencia, agentes, responsavel_registro, vistorias, focos_incendio, poligono_area_queimada, chuva } = req.body
+  const { tipo, natureza, subnatureza, nivel_risco, status_oc, fotos, descricoes_fotos, lat, lng, endereco, proprietario, telefone_proprietario, situacao, recomendacao, conclusao, data_ocorrencia, agentes, responsavel_registro, vistorias, focos_incendio, poligono_area_queimada, chuva } = req.body
   try {
     const result = await query(
-      `INSERT INTO ocorrencias (tipo, natureza, subnatureza, nivel_risco, status_oc, fotos, descricoes_fotos, lat, lng, endereco, proprietario, situacao, recomendacao, conclusao, data_ocorrencia, agentes, responsavel_registro, vistorias, focos_incendio, poligono_area_queimada, chuva)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21) RETURNING *`,
+      `INSERT INTO ocorrencias (tipo, natureza, subnatureza, nivel_risco, status_oc, fotos, descricoes_fotos, lat, lng, endereco, proprietario, situacao, recomendacao, conclusao, data_ocorrencia, agentes, responsavel_registro, vistorias, focos_incendio, poligono_area_queimada, chuva, telefone_proprietario)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22) RETURNING *`,
       [tipo, natureza, subnatureza || null, nivel_risco, status_oc || 'ativo',
        JSON.stringify(Array.isArray(fotos) ? fotos : []),
        JSON.stringify(Array.isArray(descricoes_fotos) ? descricoes_fotos : []),
@@ -1178,7 +1180,8 @@ app.post('/api/ocorrencias', async (req, res) => {
        JSON.stringify(Array.isArray(vistorias) ? vistorias : []),
        Array.isArray(focos_incendio) && focos_incendio.length ? JSON.stringify(focos_incendio) : null,
        Array.isArray(poligono_area_queimada) && poligono_area_queimada.length ? JSON.stringify(poligono_area_queimada) : null,
-       chuva != null && chuva !== '' ? Number(chuva) : null]
+       chuva != null && chuva !== '' ? Number(chuva) : null,
+       telefone_proprietario || null]
     )
     broadcastOcorrenciasAtualizadas()
     res.status(201).json(result.rows[0])
@@ -1201,7 +1204,7 @@ app.get('/api/ocorrencias/:id', async (req, res) => {
 app.put('/api/ocorrencias/:id', async (req, res) => {
   const id = parseInt(req.params.id, 10)
   if (isNaN(id)) return res.status(400).json({ error: 'ID inválido' })
-  const { tipo, natureza, subnatureza, nivel_risco, status_oc, fotos, descricoes_fotos, lat, lng, endereco, proprietario, situacao, recomendacao, conclusao, data_ocorrencia, hora_inicio, hora_fim, horas_total, horas_sobreaviso, agentes, vistorias, focos_incendio, poligono_area_queimada, chuva, created_at } = req.body
+  const { tipo, natureza, subnatureza, nivel_risco, status_oc, fotos, descricoes_fotos, lat, lng, endereco, proprietario, telefone_proprietario, situacao, recomendacao, conclusao, data_ocorrencia, hora_inicio, hora_fim, horas_total, horas_sobreaviso, agentes, vistorias, focos_incendio, poligono_area_queimada, chuva, created_at } = req.body
   console.log(`PUT /api/ocorrencias/${id} — tipo=${tipo} natureza=${natureza}`)
   try {
     const result = await query(
@@ -1210,8 +1213,8 @@ app.put('/api/ocorrencias/:id', async (req, res) => {
        conclusao=$14, data_ocorrencia=$15, hora_inicio=$16, hora_fim=$17,
        horas_total=$18, horas_sobreaviso=$19,
        agentes=$20, vistorias=$21, focos_incendio=$22,
-       poligono_area_queimada=$23, chuva=$24, created_at=COALESCE($25, created_at)
-       WHERE id=$26 RETURNING *`,
+       poligono_area_queimada=$23, chuva=$24, telefone_proprietario=$25, created_at=COALESCE($26, created_at)
+       WHERE id=$27 RETURNING *`,
       [tipo, natureza, subnatureza || null, nivel_risco, status_oc,
        JSON.stringify(Array.isArray(fotos) ? fotos : []),
        JSON.stringify(Array.isArray(descricoes_fotos) ? descricoes_fotos : []),
@@ -1228,7 +1231,8 @@ app.put('/api/ocorrencias/:id', async (req, res) => {
        Array.isArray(focos_incendio) && focos_incendio.length ? JSON.stringify(focos_incendio) : null,
        Array.isArray(poligono_area_queimada) && poligono_area_queimada.length ? JSON.stringify(poligono_area_queimada) : null,
         chuva != null && chuva !== '' ? Number(chuva) : null,
-        created_at || null,
+         telefone_proprietario || null,
+         created_at || null,
        id]
     )
     if (!result.rows[0]) return res.status(404).json({ error: 'Ocorrência não encontrada' })

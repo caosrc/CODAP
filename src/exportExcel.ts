@@ -274,6 +274,7 @@ export async function exportarOcorrenciaExcel(o: Ocorrencia): Promise<void> {
   row++
   secao('RESPONSÁVEL')
   linha('Proprietário / Morador', o.proprietario)
+  linha('DDD e telefone', o.telefone_proprietario)
 
   row++
   secao('SITUAÇÃO')
@@ -757,10 +758,10 @@ async function exportarOcorrenciasSemFotos(
   const cabecalhos = [
     'ID', 'Data Ocorrência', 'Registrado em', 'Tipo', 'Natureza', 'Detalhe',
     'Nível de Risco', 'Status', 'Endereço', 'Latitude', 'Longitude',
-    'Proprietário', 'Situação', 'Recomendação', 'Conclusão',
+    'Proprietário', 'DDD e telefone', 'Situação', 'Recomendação', 'Conclusão',
     'Vistorias Adicionais (qtd)', 'Última Vistoria', 'Observações das Vistorias',
   ]
-  ws.columns = [6, 16, 20, 24, 28, 22, 16, 14, 36, 14, 14, 28, 44, 44, 44, 18, 18, 60]
+  ws.columns = [6, 16, 20, 24, 28, 22, 16, 14, 36, 14, 14, 28, 22, 44, 44, 44, 18, 18, 60]
     .map(width => ({ width }))
 
   const titulo = ws.getCell('A1')
@@ -805,7 +806,7 @@ async function exportarOcorrenciasSemFotos(
       textoExcel(o.tipo), textoExcel(o.natureza), textoExcel(o.subnatureza),
       textoExcel(nivelLabel(o.nivel_risco)), textoExcel(statusLabel(o.status_oc)),
       textoExcel(o.endereco), textoExcel(o.lat), textoExcel(o.lng),
-      textoExcel(o.proprietario), textoExcel(o.situacao), textoExcel(o.recomendacao),
+      textoExcel(o.proprietario), textoExcel(o.telefone_proprietario), textoExcel(o.situacao), textoExcel(o.recomendacao),
       textoExcel(o.conclusao), vistorias.length, ultimaVistoria, observacoes,
     ].forEach((valor, column) => { row.getCell(column + 1).value = valor as ExcelCellValue })
     row.height = 18

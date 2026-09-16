@@ -83,6 +83,7 @@ export default function NovaOcorrencia({ onSalvo, onVoltar, isOnline, orgao = 'd
   const [bairro, setBairro] = useState('')
   const endereco = [rua, numero, bairro].filter(Boolean).join(', ')
   const [proprietario, setProprietario] = useState('')
+  const [telefoneProprietario, setTelefoneProprietario] = useState('')
   const [situacao, setSituacao] = useState('')
   const [recomendacao, setRecomendacao] = useState('')
   const [conclusao, setConclusao] = useState('')
@@ -138,6 +139,7 @@ export default function NovaOcorrencia({ onSalvo, onVoltar, isOnline, orgao = 'd
       if (d.lat != null) setLat(d.lat)
       if (d.lng != null) setLng(d.lng)
       if (d.proprietario) setProprietario(d.proprietario)
+      if (d.telefoneProprietario) setTelefoneProprietario(d.telefoneProprietario)
       if (d.situacao) setSituacao(d.situacao)
       if (d.recomendacao) setRecomendacao(d.recomendacao)
       if (d.conclusao) setConclusao(d.conclusao)
@@ -161,7 +163,7 @@ export default function NovaOcorrencia({ onSalvo, onVoltar, isOnline, orgao = 'd
         tipo, tipoOutro, natureza, subnatureza, chuva, metragemLona, nivelRisco, statusOc,
         dataOcorrencia, horaInicio, horaFim,
         rua, numero, bairro, lat, lng,
-        proprietario, situacao, recomendacao, conclusao,
+        proprietario, telefoneProprietario, situacao, recomendacao, conclusao,
         agentes, focosIncendio, fotos, poligonoArea,
         curralCampos, proconCampos, orgao,
       }
@@ -178,7 +180,7 @@ export default function NovaOcorrencia({ onSalvo, onVoltar, isOnline, orgao = 'd
   }, [tipo, tipoOutro, natureza, subnatureza, chuva, metragemLona, nivelRisco, statusOc,
       dataOcorrencia, horaInicio, horaFim,
       rua, numero, bairro, lat, lng,
-      proprietario, situacao, recomendacao, conclusao,
+      proprietario, telefoneProprietario, situacao, recomendacao, conclusao,
       agentes, focosIncendio, fotos, poligonoArea, curralCampos, proconCampos, orgao])
 
   const descartarRascunho = useCallback(() => {
@@ -189,7 +191,7 @@ export default function NovaOcorrencia({ onSalvo, onVoltar, isOnline, orgao = 'd
     setDataOcorrencia(hoje); setHoraInicio(''); setHoraFim('')
     setRua(''); setNumero(''); setBairro('')
     setLat(null); setLng(null)
-    setProprietario(''); setSituacao(''); setRecomendacao(''); setConclusao('')
+    setProprietario(''); setTelefoneProprietario(''); setSituacao(''); setRecomendacao(''); setConclusao('')
     const agenteLogado = getAgenteLogado()
     setAgentes(agenteLogado ? [agenteLogado] : [])
     setFotos([])
@@ -428,6 +430,7 @@ export default function NovaOcorrencia({ onSalvo, onVoltar, isOnline, orgao = 'd
       lng: finalLng,
       endereco: enderecoFinal || null,
       proprietario: proprietarioFinal || null,
+      telefone_proprietario: telefoneProprietario.trim() || null,
       situacao: situacaoFinal || null,
       recomendacao: recomendacao || null,
       conclusao: conclusao || null,
@@ -890,6 +893,16 @@ export default function NovaOcorrencia({ onSalvo, onVoltar, isOnline, orgao = 'd
               placeholder="Nome completo"
               value={proprietario}
               onChange={(e) => setProprietario(e.target.value)}
+            />
+            <label className="campo-label campo-label-sub">↳ DDD e telefone</label>
+            <input
+              className="campo-input"
+              type="tel"
+              inputMode="tel"
+              maxLength={20}
+              placeholder="(31) 99999-9999"
+              value={telefoneProprietario}
+              onChange={(e) => setTelefoneProprietario(e.target.value)}
             />
           </div>
 

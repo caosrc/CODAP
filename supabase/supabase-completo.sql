@@ -7,7 +7,7 @@ CREATE TABLE IF NOT EXISTS public.ocorrencias (
   tipo TEXT, natureza TEXT, subnatureza TEXT, nivel_risco TEXT,
   status_oc TEXT DEFAULT 'ativo', fotos JSONB DEFAULT '[]'::jsonb,
   lat DOUBLE PRECISION, lng DOUBLE PRECISION, endereco TEXT,
-  proprietario TEXT, situacao TEXT, recomendacao TEXT, conclusao TEXT,
+  proprietario TEXT, telefone_proprietario TEXT, situacao TEXT, recomendacao TEXT, conclusao TEXT,
   data_ocorrencia TEXT, hora_inicio TEXT, hora_fim TEXT,
   horas_total NUMERIC(5,2), horas_sobreaviso NUMERIC(5,2),
   agentes JSONB DEFAULT '[]'::jsonb,
@@ -16,6 +16,9 @@ CREATE TABLE IF NOT EXISTS public.ocorrencias (
   focos_incendio JSONB, poligono_area_queimada JSONB, chuva NUMERIC,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+ALTER TABLE public.ocorrencias
+  ADD COLUMN IF NOT EXISTS telefone_proprietario TEXT;
 
 CREATE TABLE IF NOT EXISTS public.escala_estado (
   id INTEGER PRIMARY KEY,

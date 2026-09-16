@@ -68,6 +68,7 @@ function buildPayload(dados: Omit<Ocorrencia, 'id' | 'created_at'>) {
     lng: dados.lng ?? null,
     endereco: dados.endereco ?? null,
     proprietario: dados.proprietario ?? null,
+    telefone_proprietario: dados.telefone_proprietario ?? null,
     situacao: dados.situacao ?? null,
     recomendacao: dados.recomendacao ?? null,
     conclusao: dados.conclusao ?? null,
@@ -101,7 +102,7 @@ export class ApiError extends Error {
 
 // Campos leves para listagem/mapa — exclui fotos e vistorias (base64 pesado)
 const CAMPOS_LISTA_OCORRENCIA =
-  'id,tipo,natureza,subnatureza,nivel_risco,status_oc,lat,lng,endereco,proprietario,situacao,recomendacao,conclusao,data_ocorrencia,hora_inicio,hora_fim,horas_total,horas_sobreaviso,agentes,responsavel_registro,focos_incendio,poligono_area_queimada,chuva,metragem_lona,created_at'
+  'id,tipo,natureza,subnatureza,nivel_risco,status_oc,lat,lng,endereco,proprietario,telefone_proprietario,situacao,recomendacao,conclusao,data_ocorrencia,hora_inicio,hora_fim,horas_total,horas_sobreaviso,agentes,responsavel_registro,focos_incendio,poligono_area_queimada,chuva,metragem_lona,created_at'
 
 // Fallback sem colunas que podem não existir em Supabase mais antigo
 const CAMPOS_LISTA_OCORRENCIA_BASE =
@@ -238,11 +239,11 @@ export async function enviarOcorrenciaServidor(
       if (error && isColumnMissingError(error)) {
         console.warn('[api] Supabase insert: coluna ausente, tentando schema base.', error.message)
         const {
-           hora_inicio: _hi, hora_fim: _hf, horas_total: _ht, horas_sobreaviso: _hs,
+            hora_inicio: _hi, hora_fim: _hf, horas_total: _ht, horas_sobreaviso: _hs, telefone_proprietario: _telefoneProprietario,
            focos_incendio: _fi, poligono_area_queimada: _paq, descricoes_fotos: _df, chuva: _chuva, metragem_lona: _metragemLona,
           ...payloadBase
         } = payload as Record<string, unknown>
-         void _hi; void _hf; void _ht; void _hs; void _fi; void _paq; void _df; void _chuva; void _metragemLona
+         void _hi; void _hf; void _ht; void _hs; void _telefoneProprietario; void _fi; void _paq; void _df; void _chuva; void _metragemLona
         const r2 = await supabase.from('ocorrencias').insert(payloadBase).select().single()
         data = r2.data
         error = r2.error
@@ -334,8 +335,8 @@ export async function atualizarOcorrencia(
       .single()
     if (error && isColumnMissingError(error)) {
       // Colunas ausentes no Supabase — tenta sem elas
-      const { hora_inicio: _hi, hora_fim: _hf, horas_total: _ht, horas_sobreaviso: _hs, poligono_area_queimada: _paq, descricoes_fotos: _df, chuva: _chuva, metragem_lona: _metragemLona, ...payloadBase } = payload as Record<string, unknown>
-      void _hi; void _hf; void _ht; void _hs; void _paq; void _df; void _chuva; void _metragemLona
+      const { hora_inicio: _hi, hora_fim: _hf, horas_total: _ht, horas_sobreaviso: _hs, telefone_proprietario: _telefoneProprietario, poligono_area_queimada: _paq, descricoes_fotos: _df, chuva: _chuva, metragem_lona: _metragemLona, ...payloadBase } = payload as Record<string, unknown>
+      void _hi; void _hf; void _ht; void _hs; void _telefoneProprietario; void _paq; void _df; void _chuva; void _metragemLona
       const r2 = await supabase.from('ocorrencias').update(payloadBase).eq('id', id).select().single()
       data = r2.data
       error = r2.error

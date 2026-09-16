@@ -10,6 +10,7 @@ ALTER TABLE ocorrencias ADD COLUMN IF NOT EXISTS hora_fim VARCHAR(5);
 ALTER TABLE ocorrencias ADD COLUMN IF NOT EXISTS horas_total NUMERIC(5,2);
 ALTER TABLE ocorrencias ADD COLUMN IF NOT EXISTS horas_sobreaviso NUMERIC(5,2);
 ALTER TABLE ocorrencias ADD COLUMN IF NOT EXISTS descricoes_fotos JSONB DEFAULT '[]';
+ALTER TABLE ocorrencias ADD COLUMN IF NOT EXISTS telefone_proprietario TEXT;
 
 -- ── materiais ────────────────────────────────────────────────────────────────
 ALTER TABLE materiais ADD COLUMN IF NOT EXISTS foto TEXT;

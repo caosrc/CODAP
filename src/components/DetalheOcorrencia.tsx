@@ -179,6 +179,7 @@ export default function DetalheOcorrencia({ ocorrencia: oc, onFechar, onDeletado
   const [eLatDms, setELatDms] = useState<DmsEdicao>(decimalParaPartesGms(o.lat, 'N', 'S'))
   const [eLngDms, setELngDms] = useState<DmsEdicao>(decimalParaPartesGms(o.lng, 'L', 'O'))
   const [eProprietario, setEProprietario] = useState(o.proprietario ?? '')
+  const [eTelefoneProprietario, setETelefoneProprietario] = useState(o.telefone_proprietario ?? '')
   const [eSituacao, setESituacao] = useState(o.situacao ?? '')
   const [eRecomendacao, setERecomendacao] = useState(o.recomendacao ?? '')
   const [eConclusao, setEConclusao] = useState(o.conclusao ?? '')
@@ -214,6 +215,7 @@ export default function DetalheOcorrencia({ ocorrencia: oc, onFechar, onDeletado
     setELatDms(decimalParaPartesGms(o.lat, 'N', 'S'))
     setELngDms(decimalParaPartesGms(o.lng, 'L', 'O'))
     setEProprietario(o.proprietario ?? '')
+    setETelefoneProprietario(o.telefone_proprietario ?? '')
     setESituacao(o.situacao ?? '')
     setERecomendacao(o.recomendacao ?? '')
     setEConclusao(o.conclusao ?? '')
@@ -329,6 +331,7 @@ export default function DetalheOcorrencia({ ocorrencia: oc, onFechar, onDeletado
         lng: finalLng,
         endereco: eEndereco || null,
         proprietario: eProprietario || null,
+        telefone_proprietario: eTelefoneProprietario.trim() || null,
         situacao: eSituacao || null,
         recomendacao: eRecomendacao || null,
         conclusao: eConclusao || null,
@@ -669,6 +672,7 @@ export default function DetalheOcorrencia({ ocorrencia: oc, onFechar, onDeletado
                 })()}
 
                 {o.proprietario && <InfoRow icone="👤" label="Proprietário / Morador" valor={o.proprietario} />}
+                {o.telefone_proprietario && <InfoRow icone="📞" label="Telefone do Proprietário / Morador" valor={o.telefone_proprietario} />}
                 {o.situacao && <InfoRow icone="📝" label="Situação" valor={o.situacao} />}
                 {o.recomendacao && <InfoRow icone="💡" label="Recomendação" valor={o.recomendacao} />}
                 {o.conclusao && <InfoRow icone="✅" label="Conclusão" valor={o.conclusao} />}
@@ -1099,6 +1103,16 @@ export default function DetalheOcorrencia({ ocorrencia: oc, onFechar, onDeletado
                     placeholder="Nome completo"
                     value={eProprietario}
                     onChange={(e) => setEProprietario(e.target.value)}
+                  />
+                  <label className="campo-label campo-label-sub">↳ DDD e telefone</label>
+                  <input
+                    className="campo-input"
+                    type="tel"
+                    inputMode="tel"
+                    maxLength={20}
+                    placeholder="(31) 99999-9999"
+                    value={eTelefoneProprietario}
+                    onChange={(e) => setETelefoneProprietario(e.target.value)}
                   />
                 </div>
 

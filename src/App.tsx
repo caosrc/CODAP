@@ -309,9 +309,12 @@ export default function App() {
   const navegarParaAba = useCallback((proxima: Aba) => {
     if (abaAtualRef.current === proxima) return
     abaAtualRef.current = proxima
-    // As abas são estados internos do app, não páginas independentes.
-    // Substituir a entrada evita que o Voltar do celular refaça cada clique.
-    window.history.replaceState(
+    // A lista é a tela-raiz: trocar de menu cria uma entrada para que
+    // o primeiro Voltar retorne às ocorrências e o segundo saia do app.
+    const mudarHistorico = proxima === 'lista'
+      ? window.history.replaceState.bind(window.history)
+      : window.history.pushState.bind(window.history)
+    mudarHistorico(
       { ...(window.history.state || {}), codapAba: proxima },
       '',
       `${window.location.pathname}${window.location.search}${window.location.hash}`,
@@ -346,6 +349,10 @@ export default function App() {
         selecionadaRef.current = null
         setMateriaisResetSignal((sinal) => sinal + 1)
         setSelecionada(null)
+        setAbrirChecklistId(null)
+        setAbrirCampoId(null)
+        setDestinoSos(null)
+        setDestinoCampo(null)
         abaAtualRef.current = 'lista'
         setAba('lista')
       }

@@ -419,6 +419,7 @@ export default function ChecklistViatura({ abrirId }: { abrirId?: number | null 
   const [checklists, setChecklists] = useState<ChecklistData[]>([])
   const [carregando, setCarregando] = useState(true)
   const [selecionado, setSelecionado] = useState<ChecklistData | null>(null)
+  const [fotoAmpliada, setFotoAmpliada] = useState<{ src: string; label: string } | null>(null)
 
   const [mesesArquivo, setMesesArquivo] = useState<string[]>([])
   const [mesSelecionado, setMesSelecionado] = useState<string | null>(null)
@@ -448,6 +449,20 @@ export default function ChecklistViatura({ abrirId }: { abrirId?: number | null 
   const [pedindoSenhaDeletar, setPedindoSenhaDeletar] = useState<number | null>(null)
   const agenteLogadoCk = getAgenteLogado()
   const senhaAgenteCk = getSenhaAgente(agenteLogadoCk)
+
+  useEffect(() => {
+    if (!fotoAmpliada) return
+    const fecharComEsc = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setFotoAmpliada(null)
+    }
+    document.addEventListener('keydown', fecharComEsc)
+    const overflowAnterior = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.removeEventListener('keydown', fecharComEsc)
+      document.body.style.overflow = overflowAnterior
+    }
+  }, [fotoAmpliada])
 
   function solicitarDeletar(id: number) {
     if (senhaAgenteCk) {
@@ -1250,7 +1265,20 @@ export default function ChecklistViatura({ abrirId }: { abrirId?: number | null 
               ? <div className="carregando" style={{ padding: '1rem', textAlign: 'center' }}>⏳ Carregando fotos...</div>
               : <div className="ck-fotos-4col">
                   {fotos4.map(({ label, foto, icone }) => (
-                    <div key={label} className="ck-foto-slot" style={{ cursor: 'default' }}>
+                    <div
+                      key={label}
+                      className="ck-foto-slot"
+                      style={{ cursor: foto ? 'zoom-in' : 'default' }}
+                      onClick={() => foto && setFotoAmpliada({ src: foto, label })}
+                      role={foto ? 'button' : undefined}
+                      tabIndex={foto ? 0 : undefined}
+                      onKeyDown={event => {
+                        if (foto && (event.key === 'Enter' || event.key === ' ')) {
+                          event.preventDefault()
+                          setFotoAmpliada({ src: foto, label })
+                        }
+                      }}
+                    >
                       {foto
                         ? <><img src={foto} alt={label} className="ck-foto-img" /><span className="ck-foto-nome">{label}</span></>
                         : <div className="ck-foto-empty">{icone}<span className="ck-foto-label">{label}</span></div>}
@@ -1264,7 +1292,17 @@ export default function ChecklistViatura({ abrirId }: { abrirId?: number | null 
                 <div className="ck-section-title">FOTOS DE AVARIA ({c.fotos_avarias.length})</div>
                 <div className="ck-avaria-slot" style={{ cursor: 'default' }}>
                   <div className="ck-avaria-grid">
-                    {c.fotos_avarias.map((f, i) => <img key={i} src={f} alt="" className="foto-thumb" />)}
+                    {c.fotos_avarias.map((f, i) => (
+                      <button
+                        key={i}
+                        type="button"
+                        className="ck-avaria-thumb"
+                        onClick={() => setFotoAmpliada({ src: f, label: `Avaria ${i + 1}` })}
+                        aria-label={`Ampliar foto de avaria ${i + 1}`}
+                      >
+                        <img src={f} alt={`Avaria ${i + 1}`} />
+                      </button>
+                    ))}
                   </div>
                 </div>
               </>
@@ -1383,6 +1421,28 @@ export default function ChecklistViatura({ abrirId }: { abrirId?: number | null 
           </div>
         </div>
       </div>
+      {fotoAmpliada && (
+        <div
+          className="ck-foto-lightbox"
+          role="dialog"
+          aria-modal="true"
+          aria-label={`Foto ampliada: ${fotoAmpliada.label}`}
+          onClick={() => setFotoAmpliada(null)}
+        >
+          <button
+            type="button"
+            className="ck-foto-lightbox-fechar"
+            onClick={() => setFotoAmpliada(null)}
+            aria-label="Fechar foto ampliada"
+          >
+            ✕
+          </button>
+          <div className="ck-foto-lightbox-conteudo" onClick={event => event.stopPropagation()}>
+            <img src={fotoAmpliada.src} alt={fotoAmpliada.label} className="ck-foto-lightbox-img" />
+            <span>{fotoAmpliada.label}</span>
+          </div>
+        </div>
+      )}
       {pedindoSenhaDeletar !== null && senhaAgenteCk && (
         <ModalSenha
           titulo="Excluir Checklist"

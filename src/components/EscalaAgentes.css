@@ -673,9 +673,12 @@
 }
 
 .escala-legenda-item {
-  display: flex;
+  display: grid;
+  grid-template-columns: 11px minmax(0, 1fr) auto;
+  grid-template-rows: auto auto;
   align-items: center;
-  gap: 0.35rem;
+  column-gap: 0.35rem;
+  row-gap: 0.08rem;
 }
 
 .escala-legenda-cor {
@@ -683,9 +686,12 @@
   height: 11px;
   border-radius: 50%;
   flex-shrink: 0;
+  grid-row: 1 / span 2;
 }
 
 .escala-legenda-nome {
+  grid-column: 2;
+  grid-row: 1;
   font-size: 0.76rem;
   color: #374151;
   font-weight: 500;
@@ -695,10 +701,17 @@
 }
 
 .escala-legenda-horario {
+  grid-column: 2;
+  grid-row: 2;
   font-size: 0.66rem;
   color: #6b7280;
   white-space: nowrap;
-  margin-left: auto;
+}
+
+.escala-legenda-edit-icone {
+  grid-column: 3;
+  grid-row: 1 / span 2;
+  margin-left: 2px;
 }
 
 .escala-legenda-ferias-bloco {

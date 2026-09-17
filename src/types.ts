@@ -72,9 +72,9 @@ export function agentePodeGerenciarCriacao(criador: string | null | undefined, a
 }
 
 export const AGENTE_SENHAS: Record<string, string> = {
-  Alexandre: '1234',
+  Alexandre: '4668',
   Arthur: '1234',
-  Lucas: '1234',
+  Lucas: '0356',
   Junior: '1234',
   Rosane: '1234',
   // Mantidos para sessões antigas que ainda carreguem a identificação A–J.

@@ -374,57 +374,54 @@ export async function gerarRelatorioVistoria(ocorrencia: Ocorrencia): Promise<Bl
     return `<w:p><w:pPr><w:pStyle w:val="2024"/><w:pBdr></w:pBdr><w:spacing/><w:ind/><w:jc w:val="center"/><w:rPr><w:highlight w:val="none"/></w:rPr></w:pPr><w:r><w:t xml:space="preserve">Figura </w:t></w:r><w:r><w:fldChar w:fldCharType="begin"/><w:instrText xml:space="preserve"> SEQ Figura \\* Arabic </w:instrText><w:fldChar w:fldCharType="separate"/></w:r><w:r><w:t xml:space="preserve">${numero} </w:t></w:r><w:r><w:fldChar w:fldCharType="end"/></w:r><w:r><w:t xml:space="preserve">- </w:t></w:r>${descRun}</w:p>`
   }
 
-  function cellFotoXml(content: string, width: number): string {
-    return `<w:tc><w:tcPr><w:tcBorders><w:top w:val="none" w:color="000000" w:sz="4" w:space="0"/><w:left w:val="none" w:color="000000" w:sz="4" w:space="0"/><w:bottom w:val="none" w:color="000000" w:sz="4" w:space="0"/><w:right w:val="none" w:color="000000" w:sz="4" w:space="0"/></w:tcBorders><w:tcW w:w="${width}" w:type="dxa"/><w:textDirection w:val="lrTb"/><w:noWrap w:val="false"/></w:tcPr>${content}</w:tc>`
+  function cellFotoXml(content: string, width: number, gridSpan = 1): string {
+    const span = gridSpan > 1 ? `<w:gridSpan w:val="${gridSpan}"/>` : ''
+    return `<w:tc><w:tcPr><w:tcBorders><w:top w:val="none" w:color="000000" w:sz="4" w:space="0"/><w:left w:val="none" w:color="000000" w:sz="4" w:space="0"/><w:bottom w:val="none" w:color="000000" w:sz="4" w:space="0"/><w:right w:val="none" w:color="000000" w:sz="4" w:space="0"/></w:tcBorders>${span}<w:tcW w:w="${width}" w:type="dxa"/><w:textDirection w:val="lrTb"/><w:noWrap w:val="false"/></w:tcPr>${content}</w:tc>`
   }
 
-  // Fotos 1-6: usar slots do template
-  for (const [index, foto] of fotos.slice(0, 6).entries()) {
+  const imagensFotos: Array<{ imagem: ImagemDataUrl; numero: number; descricao: string }> = []
+  for (const foto of fotos) {
     const imagem = await parseDataUrl(foto)
     if (!imagem) continue
-    const numero = index + 1
-    const rId = adicionarImagem(imagem, numero)
-    const desc = descricoes[index] ?? ''
-
-    const captionRegex = new RegExp(`(<w:p\\b(?:(?!<\\/w:p>)[\\s\\S])*?SEQ Figura(?:(?!<\\/w:p>)[\\s\\S])*?<w:t[^>]*>\\s*${numero}\\s*<\\/w:t>(?:(?!<\\/w:p>)[\\s\\S])*?<\\/w:p>)`)
-    documentXml = documentXml.replace(captionRegex, (_match, captionPara: string) => {
-      const captionComDesc = desc
-        ? captionPara.replace(/<\/w:p>$/, `<w:r><w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial" w:cs="Arial"/><w:sz w:val="22"/><w:szCs w:val="22"/></w:rPr><w:t xml:space="preserve">${xmlEscape(desc)}</w:t></w:r></w:p>`)
-        : captionPara
-      return `${imageDrawingXml(rId, numero)}${captionComDesc}`
+    imagensFotos.push({
+      imagem,
+      numero: imagensFotos.length + 1,
+      descricao: descricoes[imagensFotos.length] ?? '',
     })
   }
 
-  // Fotos 7+: gerar novas linhas na tabela de fotos
-  const fotosExtra = fotos.slice(6)
-  if (fotosExtra.length > 0) {
-    const extraRows: string[] = []
-    for (let i = 0; i < fotosExtra.length; i += 2) {
-      const buildCell = async (fotoDataUrl: string | undefined, numero: number, width: number): Promise<string> => {
-        if (!fotoDataUrl) return cellFotoXml(`<w:p><w:pPr><w:jc w:val="center"/></w:pPr></w:p>`, width)
-        const imagem = await parseDataUrl(fotoDataUrl)
-        if (!imagem) return cellFotoXml(`<w:p><w:pPr><w:jc w:val="center"/></w:pPr></w:p>`, width)
-        const rId = adicionarImagem(imagem, numero)
-        const desc = descricoes[numero - 1] ?? ''
-        return cellFotoXml(`${imageDrawingXml(rId, numero)}${captionFiguraXml(numero, desc)}`, width)
-      }
-      const numero1 = 7 + i
-      const numero2 = 8 + i
-       const cell1 = await buildCell(fotosExtra[i], numero1, 4960)
-       const cell2 = await buildCell(fotosExtra[i + 1], numero2, 4961)
-      extraRows.push(`<w:tr><w:trPr><w:trHeight w:val="6052"/></w:trPr>${cell1}${cell2}</w:tr>`)
-    }
-    const lastFigureIdx = documentXml.lastIndexOf('SEQ Figura')
-    const insertAfter = documentXml.indexOf('</w:tr>', lastFigureIdx) + 7
-    documentXml = documentXml.slice(0, insertAfter) + extraRows.join('') + documentXml.slice(insertAfter)
-  }
+  const tabelaFotosRegex = /<w:tbl\b[\s\S]*?SEQ Figura[\s\S]*?<\/w:tbl>/
+  const tabelaFotos = documentXml.match(tabelaFotosRegex)?.[0]
+  if (tabelaFotos) {
+    if (imagensFotos.length === 0) {
+      documentXml = documentXml.replace(tabelaFotos, '')
+    } else {
+      const tabelaCabecalho = tabelaFotos.match(/^[\s\S]*?<w:tblGrid>[\s\S]*?<\/w:tblGrid>/)?.[0]
+      if (!tabelaCabecalho) throw new Error('Modelo de relatório inválido (tabela de fotos sem grade).')
 
-  // Remove linhas do template com slots de foto não preenchidos
-  // (linhas que ainda têm "SEQ Figura" mas não têm nenhuma imagem inserida)
-  documentXml = documentXml.replace(/<w:tr\b[\s\S]*?<\/w:tr>/g, (row) => {
-    if (row.includes('SEQ Figura') && !row.includes('<w:drawing>')) return ''
-    return row
-  })
+      const linhasFotos: string[] = []
+      for (let i = 0; i < imagensFotos.length; i += 2) {
+        const primeira = imagensFotos[i]
+        const primeiraRid = adicionarImagem(primeira.imagem, primeira.numero)
+        const primeiraCelula = cellFotoXml(
+          `${imageDrawingXml(primeiraRid, primeira.numero)}${captionFiguraXml(primeira.numero, primeira.descricao)}`,
+          imagensFotos[i + 1] ? 4960 : 9921,
+          imagensFotos[i + 1] ? 1 : 2,
+        )
+        let celulas = primeiraCelula
+        if (imagensFotos[i + 1]) {
+          const segunda = imagensFotos[i + 1]
+          const segundaRid = adicionarImagem(segunda.imagem, segunda.numero)
+          celulas += cellFotoXml(
+            `${imageDrawingXml(segundaRid, segunda.numero)}${captionFiguraXml(segunda.numero, segunda.descricao)}`,
+            4961,
+          )
+        }
+        linhasFotos.push(`<w:tr><w:trPr><w:trHeight w:val="6052"/></w:trPr>${celulas}</w:tr>`)
+      }
+      documentXml = documentXml.replace(tabelaFotos, `${tabelaCabecalho}${linhasFotos.join('')}</w:tbl>`)
+    }
+  }
 
   documentXml = documentXml.replace(/<w:tc>([\s\S]*?)<\/w:tc>/g, (match, content: string) => {
     if (!content.includes('<w:drawing>')) return match

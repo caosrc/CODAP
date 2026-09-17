@@ -688,6 +688,13 @@ function imageDrawingXml(rId, index) {
   return `<w:p><w:pPr><w:spacing w:before="0" w:after="0"/><w:jc w:val="center"/></w:pPr><w:r><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0"><wp:extent cx="${cx}" cy="${cy}"/><wp:effectExtent l="0" t="0" r="0" b="0"/><wp:docPr id="${200 + index}" name="Foto ${index}"/><wp:cNvGraphicFramePr><a:graphicFrameLocks noChangeAspect="0"/></wp:cNvGraphicFramePr><a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:nvPicPr><pic:cNvPr id="${300 + index}" name="Foto ${index}"/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip r:embed="${rId}"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill><pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${cx}" cy="${cy}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r></w:p>`
 }
 
+function captionFiguraXml(numero, descricao) {
+  const descRun = descricao
+    ? `<w:r><w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial" w:cs="Arial"/><w:sz w:val="22"/><w:szCs w:val="22"/></w:rPr><w:t xml:space="preserve">${xmlEscape(descricao)}</w:t></w:r>`
+    : ''
+  return `<w:p><w:pPr><w:pStyle w:val="2024"/><w:pBdr></w:pBdr><w:spacing/><w:ind/><w:jc w:val="center"/><w:rPr><w:highlight w:val="none"/></w:rPr></w:pPr><w:r><w:t xml:space="preserve">Figura </w:t></w:r><w:r><w:fldChar w:fldCharType="begin"/><w:instrText xml:space="preserve"> SEQ Figura \\* Arabic </w:instrText><w:fldChar w:fldCharType="separate"/></w:r><w:r><w:t xml:space="preserve">${numero} </w:t></w:r><w:r><w:fldChar w:fldCharType="end"/></w:r><w:r><w:t xml:space="preserve">- </w:t></w:r>${descRun}</w:p>`
+}
+
 async function gerarRelatorioVistoria(ocorrencia) {
   const template = readFileSync(getRelatorioTemplatePath())
   const zip = await JSZip.loadAsync(template)
@@ -766,27 +773,73 @@ async function gerarRelatorioVistoria(ocorrencia) {
   const ids = [...relsXml.matchAll(/Id="rId(\d+)"/g)].map((match) => Number(match[1]))
   let proximoId = Math.max(0, ...ids) + 1
 
-  const fotos = Array.isArray(ocorrencia.fotos) ? ocorrencia.fotos.slice(0, 6) : []
-  fotos.forEach((foto, index) => {
+  const fotos = Array.isArray(ocorrencia.fotos) ? ocorrencia.fotos : []
+  const descricoes = Array.isArray(ocorrencia.descricoes_fotos) ? ocorrencia.descricoes_fotos : []
+  const imagensFotos = []
+  fotos.forEach((foto) => {
     const imagem = parseDataUrl(foto)
     if (!imagem) return
-    const numero = index + 1
-    const rId = `rId${proximoId++}`
-    const target = `media/relatorio_foto_${numero}.${imagem.extension}`
-    zip.file(`word/${target}`, imagem.buffer)
-    relsXml = relsXml.replace(
-      '</Relationships>',
-      `<Relationship Id="${rId}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="${target}" /></Relationships>`
-    )
-    if (!contentTypesXml.includes(`Extension="${imagem.extension}"`)) {
-      contentTypesXml = contentTypesXml.replace(
-        '</Types>',
-        `<Default Extension="${imagem.extension}" ContentType="${imagem.mime}"/></Types>`
-      )
-    }
-    const captionRegex = new RegExp(`(<w:p\\b(?:(?!<\\/w:p>)[\\s\\S])*?SEQ Figura(?:(?!<\\/w:p>)[\\s\\S])*?<w:t[^>]*>\\s*${numero}\\s*<\\/w:t>(?:(?!<\\/w:p>)[\\s\\S])*?<\\/w:p>)`)
-    documentXml = documentXml.replace(captionRegex, `${imageDrawingXml(rId, numero)}$1`)
+    imagensFotos.push({ imagem, numero: imagensFotos.length + 1, descricao: descricoes[imagensFotos.length] || '' })
   })
+
+  function cellFotoXml(content, width, gridSpan = 1) {
+    const span = gridSpan > 1 ? `<w:gridSpan w:val="${gridSpan}"/>` : ''
+    return `<w:tc><w:tcPr><w:tcBorders><w:top w:val="none" w:color="000000" w:sz="4" w:space="0"/><w:left w:val="none" w:color="000000" w:sz="4" w:space="0"/><w:bottom w:val="none" w:color="000000" w:sz="4" w:space="0"/><w:right w:val="none" w:color="000000" w:sz="4" w:space="0"/></w:tcBorders>${span}<w:tcW w:w="${width}" w:type="dxa"/><w:textDirection w:val="lrTb"/><w:noWrap w:val="false"/></w:tcPr>${content}</w:tc>`
+  }
+
+  const tabelaFotosRegex = /<w:tbl\b[\s\S]*?SEQ Figura[\s\S]*?<\/w:tbl>/
+  const tabelaFotos = documentXml.match(tabelaFotosRegex)?.[0]
+  if (tabelaFotos && imagensFotos.length === 0) {
+    documentXml = documentXml.replace(tabelaFotos, '')
+  } else if (tabelaFotos) {
+    const tabelaCabecalho = tabelaFotos.match(/^[\s\S]*?<w:tblGrid>[\s\S]*?<\/w:tblGrid>/)?.[0]
+    if (!tabelaCabecalho) throw new Error('Modelo de relatório inválido (tabela de fotos sem grade).')
+    const linhasFotos = []
+    for (let i = 0; i < imagensFotos.length; i += 2) {
+      const primeira = imagensFotos[i]
+      const primeiraRid = `rId${proximoId++}`
+      const primeiroTarget = `media/relatorio_foto_${primeira.numero}.${primeira.imagem.extension}`
+      zip.file(`word/${primeiroTarget}`, primeira.imagem.buffer)
+      relsXml = relsXml.replace(
+        '</Relationships>',
+        `<Relationship Id="${primeiraRid}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="${primeiroTarget}" /></Relationships>`
+      )
+      if (!contentTypesXml.includes(`Extension="${primeira.imagem.extension}"`)) {
+        contentTypesXml = contentTypesXml.replace(
+          '</Types>',
+          `<Default Extension="${primeira.imagem.extension}" ContentType="${primeira.imagem.mime}"/></Types>`
+        )
+      }
+      const primeiraCelula = cellFotoXml(
+        `${imageDrawingXml(primeiraRid, primeira.numero)}${captionFiguraXml(primeira.numero, primeira.descricao)}`,
+        imagensFotos[i + 1] ? 4960 : 9921,
+        imagensFotos[i + 1] ? 1 : 2,
+      )
+      let celulas = primeiraCelula
+      if (imagensFotos[i + 1]) {
+        const segunda = imagensFotos[i + 1]
+        const segundaRid = `rId${proximoId++}`
+        const segundoTarget = `media/relatorio_foto_${segunda.numero}.${segunda.imagem.extension}`
+        zip.file(`word/${segundoTarget}`, segunda.imagem.buffer)
+        relsXml = relsXml.replace(
+          '</Relationships>',
+          `<Relationship Id="${segundaRid}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="${segundoTarget}" /></Relationships>`
+        )
+        if (!contentTypesXml.includes(`Extension="${segunda.imagem.extension}"`)) {
+          contentTypesXml = contentTypesXml.replace(
+            '</Types>',
+            `<Default Extension="${segunda.imagem.extension}" ContentType="${segunda.imagem.mime}"/></Types>`
+          )
+        }
+        celulas += cellFotoXml(
+          `${imageDrawingXml(segundaRid, segunda.numero)}${captionFiguraXml(segunda.numero, segunda.descricao)}`,
+          4961,
+        )
+      }
+      linhasFotos.push(`<w:tr><w:trPr><w:trHeight w:val="6052"/></w:trPr>${celulas}</w:tr>`)
+    }
+    documentXml = documentXml.replace(tabelaFotos, `${tabelaCabecalho}${linhasFotos.join('')}</w:tbl>`)
+  }
 
   documentXml = documentXml.replace(/<w:tc>([\s\S]*?)<\/w:tc>/g, (match, content) => {
     if (!content.includes('<w:drawing>')) return match

@@ -2627,6 +2627,9 @@ function Legenda({ ferias, afastamentos, mes, ano, editavel = false, onAgenteCli
         Legenda
         {editavel && <span className="escala-legenda-dica"> — toque num agente para escalar os dias dele</span>}
       </span>
+      <p className="escala-legenda-regra">
+        Jornada normal · ocorrências fora deste horário entram automaticamente no banco de horas.
+      </p>
       <div className="escala-legenda-lista">
         {ativos.map(ag =>
           editavel ? (
@@ -2639,12 +2642,18 @@ function Legenda({ ferias, afastamentos, mes, ano, editavel = false, onAgenteCli
             >
               <span className="escala-legenda-cor" style={{ background: ag.cor }} />
               <span className="escala-legenda-nome">{ag.nome}</span>
+              <span className="escala-legenda-horario">
+                {obterJornadaAgente(ag.nome).inicio}–{obterJornadaAgente(ag.nome).fim}
+              </span>
               <span className="escala-legenda-edit-icone">✏️</span>
             </button>
           ) : (
             <div key={ag.nome} className="escala-legenda-item">
               <span className="escala-legenda-cor" style={{ background: ag.cor }} />
               <span className="escala-legenda-nome">{ag.nome}</span>
+              <span className="escala-legenda-horario">
+                {obterJornadaAgente(ag.nome).inicio}–{obterJornadaAgente(ag.nome).fim}
+              </span>
             </div>
           )
         )}

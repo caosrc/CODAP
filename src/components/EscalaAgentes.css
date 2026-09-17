@@ -687,6 +687,12 @@
   text-overflow: ellipsis;
 }
 
+.escala-legenda-horario {
+  font-size: 0.66rem;
+  color: #6b7280;
+  white-space: nowrap;
+}
+
 .escala-legenda-ferias-bloco {
   border-top: 1px solid #f0f4f8;
   margin-top: 0.55rem;

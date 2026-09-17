@@ -39,12 +39,95 @@ function ehSabadoComumUtils(chave: string, feriadosCustom: string[] = []): boole
   return new Date(y, m - 1, d).getDay() === 6
 }
 
+export interface JornadaAgente {
+  inicio: string
+  fim: string
+}
+
+// Jornada normal em dias que não são domingo ou feriado.
+// Arthur não foi alterado nesta regra e mantém a jornada comercial anterior.
+export const JORNADAS_AGENTES: Record<string, JornadaAgente> = {
+  Alexandre: { inicio: '08:00', fim: '16:00' },
+  Rosane: { inicio: '08:00', fim: '16:00' },
+  Lucas: { inicio: '07:00', fim: '13:00' },
+  Junior: { inicio: '13:00', fim: '18:00' },
+  Arthur: { inicio: '07:00', fim: '17:00' },
+}
+
+const JORNADA_PADRAO: JornadaAgente = { inicio: '07:00', fim: '17:00' }
+
+export function obterJornadaAgente(nome: string | null | undefined): JornadaAgente {
+  return JORNADAS_AGENTES[String(nome ?? '').trim()] ?? JORNADA_PADRAO
+}
+
+function minutosHora(hora: string): number | null {
+  const [h, m] = String(hora || '').split(':').map(Number)
+  if (!Number.isInteger(h) || !Number.isInteger(m) || h < 0 || h > 23 || m < 0 || m > 59) return null
+  return h * 60 + m
+}
+
+function adicionarDias(chave: string, dias: number): string {
+  const [y, m, d] = chave.split('-').map(Number)
+  const dt = new Date(y, m - 1, d)
+  dt.setDate(dt.getDate() + dias)
+  return chaveDataDt(dt)
+}
+
+/**
+ * Calcula as horas de uma ocorrência que ficaram fora da jornada normal
+ * de um agente. Domingos e feriados continuam contando integralmente, como
+ * na regra anterior do banco de horas.
+ */
+export function calcularHorasForaJornada(
+  dataStr: string,
+  horaInicio: string,
+  horaFim: string,
+  jornada: JornadaAgente,
+  feriadosCustom: string[] = [],
+): number {
+  const inicio = minutosHora(horaInicio)
+  const fimInformado = minutosHora(horaFim)
+  const jornadaInicio = minutosHora(jornada.inicio)
+  const jornadaFim = minutosHora(jornada.fim)
+  if (!dataStr || inicio == null || fimInformado == null || jornadaInicio == null || jornadaFim == null) return 0
+
+  let fim = fimInformado
+  if (fim === inicio) return 0
+  if (fim <= inicio) fim += 24 * 60
+
+  let extrasMin = 0
+  const diasAbrangidos = Math.ceil((fim - inicio) / (24 * 60))
+  for (let deslocamento = 0; deslocamento <= diasAbrangidos; deslocamento++) {
+    const inicioDia = deslocamento * 24 * 60
+    const segmentoInicio = Math.max(inicio, inicioDia)
+    const segmentoFim = Math.min(fim, inicioDia + 24 * 60)
+    if (segmentoFim <= segmentoInicio) continue
+
+    const chaveDia = adicionarDias(dataStr, deslocamento)
+    if (ehDomingoOuFeriado(chaveDia, feriadosCustom)) {
+      extrasMin += segmentoFim - segmentoInicio
+      continue
+    }
+
+    let janelaInicio = inicioDia + jornadaInicio
+    let janelaFim = inicioDia + jornadaFim
+    if (janelaFim <= janelaInicio) janelaFim += 24 * 60
+    const dentroDaJornada = Math.max(
+      0,
+      Math.min(segmentoFim, janelaFim) - Math.max(segmentoInicio, janelaInicio),
+    )
+    extrasMin += (segmentoFim - segmentoInicio) - dentroDaJornada
+  }
+
+  return Math.round((extrasMin / 60) * 100) / 100
+}
+
 /**
  * Calcula as horas que devem entrar no banco de horas de uma ocorrência.
  *
  * Regra:
  * - Domingo ou feriado: TODAS as horas da ocorrência contam (×1,5 aplicado na Escala).
- * - Demais dias (seg–sáb): somente as horas dentro do sobreaviso (17h–7h) contam.
+ * - Demais dias: somente as horas fora da jornada normal do agente contam.
  * Nenhum multiplicador é aplicado aqui — apenas a quantidade de horas qualificadas.
  */
 export function calcularHorasOcorrenciaBanco(
@@ -52,12 +135,16 @@ export function calcularHorasOcorrenciaBanco(
   horaInicio: string,
   horaFim: string,
   feriadosCustom: string[] = [],
+  agente?: string | null,
 ): number {
   if (!dataStr || !horaInicio || !horaFim) return 0
-  if (ehDomingoOuFeriado(dataStr, feriadosCustom)) {
-    return calcularHorasTotal(horaInicio, horaFim)
-  }
-  return calcularHorasSobreaviso(dataStr, horaInicio, horaFim, feriadosCustom)
+  return calcularHorasForaJornada(
+    dataStr,
+    horaInicio,
+    horaFim,
+    obterJornadaAgente(agente),
+    feriadosCustom,
+  )
 }
 
 /**

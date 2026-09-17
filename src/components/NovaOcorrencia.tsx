@@ -395,10 +395,18 @@ export default function NovaOcorrencia({ onSalvo, onVoltar, isOnline, orgao = 'd
 
     const horasTotalBruto = (horaInicio && horaFim) ? calcularHorasTotal(horaInicio, horaFim) : null
     const horasTotal = horasTotalBruto  // horas brutas, sem multiplicador
-    // Horas que entram no banco: dom/feriado = todas as horas; seg–sáb = sobreaviso 17h–7h (sem mult)
-    const horasBanco = (horaInicio && horaFim && dataOcorrencia)
-      ? calcularHorasOcorrenciaBanco(dataOcorrencia, horaInicio, horaFim, feriadosCustom)
-      : null
+    // O banco é calculado por agente; o campo legado guarda o maior valor para
+    // manter compatibilidade com ocorrências que ainda usam um total único.
+    const horasBancoAgentes = agentes.map((agente) => (
+      horaInicio && horaFim && dataOcorrencia
+        ? calcularHorasOcorrenciaBanco(dataOcorrencia, horaInicio, horaFim, feriadosCustom, agente)
+        : 0
+    ))
+    const horasBanco = horasBancoAgentes.length > 0
+      ? Math.max(...horasBancoAgentes)
+      : (horaInicio && horaFim && dataOcorrencia
+        ? calcularHorasOcorrenciaBanco(dataOcorrencia, horaInicio, horaFim, feriadosCustom)
+        : null)
     const detalhesOrgao = nomesCamposOrgao(orgao, curralCampos, proconCampos)
     const situacaoFinal = [situacao.trim(), detalhesOrgao].filter(Boolean).join('\n\n')
     const enderecoFinal = ehProcon
@@ -685,20 +693,25 @@ export default function NovaOcorrencia({ onSalvo, onVoltar, isOnline, orgao = 'd
             </div>
             {horaInicio && horaFim && (() => {
               const totalBruto = calcularHorasTotal(horaInicio, horaFim)
-              const bancoBruto = calcularHorasOcorrenciaBanco(dataOcorrencia, horaInicio, horaFim, feriadosCustom)
+              const extrasPorAgente = agentes
+                .map((agente) => ({
+                  agente,
+                  horas: calcularHorasOcorrenciaBanco(dataOcorrencia, horaInicio, horaFim, feriadosCustom, agente),
+                }))
+                .filter(({ horas }) => horas > 0)
               return (
                 <div className="horario-resumo">
                   <span className="horario-total">
                     ⏱ Total: <strong>{formatarHoras(totalBruto)}</strong>
                   </span>
-                  {bancoBruto > 0
-                    ? <span className="horario-sobreaviso">🌙 Hora extra — {formatarHoras(bancoBruto)} no banco</span>
-                    : <span className="horario-sem-sobreaviso">☀️ Sem horas no banco (horário comercial, seg–sex)</span>
+                  {extrasPorAgente.length > 0
+                    ? <span className="horario-sobreaviso">🌙 Hora extra — {extrasPorAgente.map(({ agente, horas }) => `${agente}: ${formatarHoras(horas)}`).join(' · ')} no banco</span>
+                    : <span className="horario-sem-sobreaviso">☀️ Sem horas fora da jornada no banco</span>
                   }
                 </div>
               )
             })()}
-            <div className="geo-dica">💡 Dom/feriado: todas as horas ×2 · Seg–Sáb 17h–7h ×1,5 · Risco alto: ×2</div>
+            <div className="geo-dica">💡 Fora da jornada individual entra no banco · Dom/feriado: todas as horas · Risco alto: ×2</div>
           </div>
 
           {/* 6 - Fotos */}

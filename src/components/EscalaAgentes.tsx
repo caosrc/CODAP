@@ -4,6 +4,7 @@ import ModalSenha from './ModalSenha'
 import { wsOn, wsSend } from '../wsClient'
 import { supabase, supabaseDisponivel } from '../supabaseClient'
 import { getSenhaAgente, normalizarNomeAgente } from '../types'
+import { calcularHorasOcorrenciaBanco, obterJornadaAgente } from '../horasUtils'
 import type { Ocorrencia } from '../types'
 import './EscalaAgentes.css'
 
@@ -743,7 +744,7 @@ interface HoraOcorrenciaItem {
   horasBruto: number
   multiplicador: number
   horasComMult: number
-  motivo: 'noturno'
+  motivo: 'fora_jornada'
 }
 
 function ehHorarioNoturno(horaInicio: string | null): boolean {
@@ -789,14 +790,21 @@ function computarHorasOcorrencias(
     if (!oc.data_ocorrencia) continue
     if (!oc.agentes.includes(agente)) continue
 
-    const ehDomFer = ehFeriadoOuDomingo(oc.data_ocorrencia, feriadosCustom)
-    // Domingo/feriado: todas as horas contam; seg–sáb: somente sobreaviso (17h–7h)
-    const horas = ehDomFer
-      ? (oc.horas_total ?? oc.horas_sobreaviso ?? 0)
+    // Recalcula com a jornada individual. O valor salvo é usado apenas como
+    // fallback para ocorrências antigas que ainda não têm horário preenchido.
+    const horas = oc.hora_inicio && oc.hora_fim
+      ? calcularHorasOcorrenciaBanco(
+        oc.data_ocorrencia,
+        oc.hora_inicio,
+        oc.hora_fim,
+        feriadosCustom,
+        agente,
+      )
       : (oc.horas_sobreaviso ?? 0)
     if (horas <= 0) continue
 
     const data = oc.data_ocorrencia
+    const ehDomFer = ehFeriadoOuDomingo(data, feriadosCustom)
     // Domingo/feriado OU ferido (risco alto) → ×2 (percDomFer); demais → ×1,5 (percSobreaviso)
     const ehFerido = oc.nivel_risco === 'alto'
     const multiplicador = (ehDomFer || ehFerido)
@@ -812,7 +820,7 @@ function computarHorasOcorrencias(
       horasBruto: horas,
       multiplicador,
       horasComMult: +(horas * multiplicador).toFixed(2),
-      motivo: 'noturno',
+      motivo: 'fora_jornada',
     })
   }
   const total = +(itens.reduce((acc, item) => acc + item.horasComMult, 0)).toFixed(2)

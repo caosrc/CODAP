@@ -260,7 +260,7 @@ function BannerInstalar() {
   return (
     <div className="pwa-banner">
       <div className="pwa-banner-icone">
-        <span className="pwa-banner-icone-texto">C</span>
+        <img src="/icon-192.png" alt="Defesa Civil Conselheiro Lafaiete" />
       </div>
       <div className="pwa-banner-texto">
         <strong>Instale o app</strong>

@@ -41,10 +41,22 @@ input, select, textarea { font-family: inherit; }
   position: sticky;
   top: 0;
 }
+.pwa-banner-icone {
+  width: 38px;
+  height: 38px;
+  flex: 0 0 38px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: 9px;
+  background: #fff;
+}
 .pwa-banner-icone img {
   width: 38px;
   height: 38px;
-  border-radius: 8px;
+  display: block;
+  object-fit: contain;
   flex-shrink: 0;
 }
 .pwa-banner-icone-texto {

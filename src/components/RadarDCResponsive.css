@@ -5884,3 +5884,61 @@ html:-webkit-full-screen {
     padding: .2rem .28rem;
   }
 }
+
+/* Modo TV — leitura ampliada dos registros operacionais.
+ * Estas regras ficam no fim para garantir boa leitura à distância na tela cheia.
+ */
+@media (min-width: 701px) {
+  body.radar-tv-active .radar-tv .radar-activities .card-label {
+    font-size: clamp(.68rem, .82vw, .9rem);
+  }
+
+  body.radar-tv-active .radar-tv .radar-activities .radar-list-heading h2 {
+    font-size: clamp(.98rem, 1.18vw, 1.3rem);
+    line-height: 1.15;
+  }
+
+  body.radar-tv-active .radar-tv .radar-activities .radar-list-heading > strong {
+    font-size: clamp(.68rem, .78vw, .86rem);
+  }
+
+  body.radar-tv-active .radar-tv .radar-activities .radar-activity-columns h3 {
+    font-size: clamp(.72rem, .86vw, .98rem);
+  }
+
+  body.radar-tv-active .radar-tv .radar-activities .radar-activity {
+    margin: .18rem 0;
+    padding: .4rem .45rem;
+    font-size: clamp(.68rem, .8vw, .92rem);
+    line-height: 1.25;
+  }
+
+  body.radar-tv-active .radar-tv .radar-activities .radar-activity b {
+    font-size: clamp(.74rem, .88vw, 1rem);
+  }
+
+  body.radar-tv-active .radar-tv .radar-activities .radar-activity span,
+  body.radar-tv-active .radar-tv .radar-activities .radar-activity small {
+    font-size: clamp(.64rem, .74vw, .84rem);
+  }
+
+  body.radar-tv-active .radar-tv .radar-activities .radar-foto-carregada,
+  body.radar-tv-active .radar-tv .radar-activities .radar-activity em {
+    font-size: clamp(.62rem, .7vw, .8rem);
+  }
+
+  body.radar-tv-active .radar-tv .radar-activities .radar-empty,
+  body.radar-tv-active .radar-tv .radar-activities .radar-ferramental-cabecalho {
+    font-size: clamp(.68rem, .8vw, .9rem);
+  }
+
+  body.radar-tv-active .radar-tv .radar-activities .radar-ferramental-itens span {
+    font-size: clamp(.62rem, .72vw, .82rem);
+  }
+
+  body.radar-tv-active .radar-tv .radar-activities .radar-ferramental-quantidade,
+  body.radar-tv-active .radar-tv .radar-activities .radar-ferramental-alerta {
+    font-size: clamp(.62rem, .72vw, .82rem);
+    line-height: 1.25;
+  }
+}

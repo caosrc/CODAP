@@ -3954,7 +3954,16 @@ app.get('/api/limite-conselheiro-lafaiete', async (_req, res) => {
 // ── Serve frontend build ─────────────────────────────────────────────────────
 const distPath = join(__dirname, '..', 'dist')
 if (existsSync(distPath)) {
-  app.use('/assets', express.static(join(distPath, 'assets'), { maxAge: '1y', immutable: true }))
+  const assetsPath = join(distPath, 'assets')
+  // Uma aba aberta antes de um novo build pode continuar referenciando o hash
+  // anterior do chunk pesado do ExcelJS. Servir o chunk atual evita que a
+  // exportação quebre até a aba receber o novo bundle.
+  app.get(/^\/assets\/exceljs\.min-[^/]+\.js$/, (_req, res, next) => {
+    const excelChunk = readdirSync(assetsPath).find(nome => /^exceljs\.min-.+\.js$/.test(nome))
+    if (!excelChunk) return next()
+    res.type('application/javascript').sendFile(join(assetsPath, excelChunk))
+  })
+  app.use('/assets', express.static(assetsPath, { maxAge: '1y', immutable: true }))
   app.use(express.static(distPath, {
     setHeaders(res, filePath) {
       if (filePath.endsWith('sw.js') || filePath.endsWith('index.html')) {

@@ -760,15 +760,15 @@ function referenciaPlanilha(nome: string): string {
 }
 
 function cacheCategoriasXml(categorias: string[]): string {
-  return `<c:strCache><c:ptCount val="${categorias.length}">${categorias
+  return `<c:strCache><c:ptCount val="${categorias.length}"/>${categorias
     .map((categoria, index) => `<c:pt idx="${index}"><c:v>${xmlEscapar(categoria)}</c:v></c:pt>`)
     .join('')}</c:strCache>`
 }
 
 function cacheNumerosXml(valores: number[]): string {
-  return `<c:numCache><c:formatCode>0</c:formatCode><c:ptCount val="${valores.length}">${valores
+  return `<c:numCache><c:formatCode>0</c:formatCode><c:ptCount val="${valores.length}"/>${valores
     .map((valor, index) => `<c:pt idx="${index}"><c:v>${valor}</c:v></c:pt>`)
-    .join('')}</c:ptCount></c:numCache>`
+    .join('')}</c:numCache>`
 }
 
 function criarGraficoBarrasXml(
@@ -944,6 +944,19 @@ async function exportarOcorrenciasSemFotos(
     onProgresso?.(index + 1, ocorrencias.length)
   })
 
+  // Tabela estruturada: permite filtrar, editar e incluir novas linhas sem
+  // perder a organização da base usada pelos relatórios.
+  ws.addTable({
+    name: 'TabelaOcorrencias',
+    ref: `A2:U${Math.max(2, ocorrencias.length + 2)}`,
+    headerRow: true,
+    style: { theme: 'TableStyleMedium2', showRowStripes: true },
+    columns: cabecalhos.map(name => ({ name, filterButton: true })),
+    rows: ocorrencias.map((_, index) => (
+      Array.from({ length: cabecalhos.length }, (_, column) => ws.getCell(index + 3, column + 1).value)
+    )),
+  })
+
   // Dashboard editável: os números são fórmulas para recalcular quando o
   // usuário filtrar/editar a aba Ocorrências no Excel.
   const dash = wb.addWorksheet('📊 Dashboard')
@@ -1058,6 +1071,7 @@ async function exportarOcorrenciasSemFotos(
   graficos.getCell('A2').font = { italic: true, color: { argb: '64748b' } }
 
   const preencherTabelaGrafico = (
+    nomeTabela: string,
     titulo: string,
     colunaCategoria: string,
     colunaQuantidade: string,
@@ -1065,16 +1079,16 @@ async function exportarOcorrenciasSemFotos(
     itens: string[],
     origemColuna: string,
   ) => {
-    const tituloCell = graficos.getCell(3, inicioColuna)
-    tituloCell.value = titulo
-    tituloCell.font = { bold: true, color: { argb: BRANCO } }
-    tituloCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: '0f766e' } }
-    graficos.getCell(3, inicioColuna + 1).value = 'Quantidade'
-    graficos.getCell(3, inicioColuna + 1).font = { bold: true, color: { argb: BRANCO } }
-    graficos.getCell(3, inicioColuna + 1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: '0f766e' } }
+    graficos.addTable({
+      name: nomeTabela,
+      ref: `${colunaCategoria}3`,
+      headerRow: true,
+      style: { theme: 'TableStyleMedium4', showRowStripes: true },
+      columns: [{ name: titulo, filterButton: true }, { name: 'Quantidade', filterButton: false }],
+      rows: itens.map(item => [item, 0]),
+    })
     itens.forEach((item, index) => {
       const row = index + 4
-      graficos.getCell(`${colunaCategoria}${row}`).value = item
       graficos.getCell(`${colunaQuantidade}${row}`).value = {
         formula: `COUNTIF('Ocorrências'!$${origemColuna}:$${origemColuna},${colunaCategoria}${row})`,
         result: ocorrencias.filter(o => (
@@ -1083,8 +1097,8 @@ async function exportarOcorrenciasSemFotos(
       } as any
     })
   }
-  preencherTabelaGrafico('Bairro', 'K', 'L', 11, bairros, 'T')
-  preencherTabelaGrafico('Natureza', 'N', 'O', 14, naturezas, 'E')
+  preencherTabelaGrafico('TabelaBairros', 'Bairro', 'K', 'L', 11, bairros, 'T')
+  preencherTabelaGrafico('TabelaNaturezas', 'Natureza', 'N', 'O', 14, naturezas, 'E')
   graficos.views = [{ state: 'frozen', ySplit: 3 }]
 
   const buffer = await wb.xlsx.writeBuffer()

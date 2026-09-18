@@ -18,7 +18,7 @@
  *  - LIMPAR_CACHE_MAPA               → apaga todos os tiles cacheados
  */
 
-const VERSION = 'v17-2026-09-defesa-civil-lafaiete'
+const VERSION = 'v18-2026-09-excel-export'
 const APP_CACHE = `defesacivil-app-${VERSION}`
 const TILES_CACHE = 'defesacivil-tiles-osm'
 const ASSETS_CACHE = `defesacivil-assets-${VERSION}`

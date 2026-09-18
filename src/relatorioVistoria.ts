@@ -229,6 +229,7 @@ export async function gerarRelatorioVistoria(ocorrencia: Ocorrencia): Promise<Bl
   const enderecoFormatado = formatarEnderecoRelatorio(ocorrencia.endereco)
   const coordenadas = formatarCoordenadas(ocorrencia.lat, ocorrencia.lng)
   const assinaturas = nomesAssinatura(ocorrencia)
+  const ehAlexandre = normalizarNomeAgente(ocorrencia.responsavel_registro || '') === 'Alexandre'
   const textoSituacao = situacao ? `Durante a vistoria, ${situacao}` : 'Durante a vistoria,'
   const textoConclusao = conclusao
     ? `Diante de todas as informações presentes nesse relatório conclui-se que ${conclusao.replace(/[.!?]+$/, '')}. Faz-se necessário que se atente às recomendações listadas nesse relatório para garantir o bem estar, segurança e a tranquilidade de todos.`
@@ -315,7 +316,7 @@ export async function gerarRelatorioVistoria(ocorrencia: Ocorrencia): Promise<Bl
       documentXml,
       (texto) => texto.trimStart().startsWith('Engenheiro(a) Civil -')
         || texto.trimStart().startsWith('Engenheira Civil -'),
-      'Agente - Coordenadoria Municipal de Proteção e Defesa Civil',
+      ehAlexandre ? '' : 'Agente - Coordenadoria Municipal de Proteção e Defesa Civil',
     ).split('Analista Ambiental').join('Engenheira Civil - CODAP')
   }
 

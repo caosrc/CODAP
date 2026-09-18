@@ -7,3 +7,4 @@
 - [Cota CEMADEN](cota-cemaden.md) — para a estação Rio Bananeiras, a série hidrológica detalhada é a fonte confiável da cota; o catálogo pode retornar zero.
 - [Bootstrap do sandbox](sandbox-workflow-bootstrap.md) — serviços de artefatos precisam instalar suas dependências isoladas antes de iniciar o Vite.
 - [Fotos WebP](fotos-webp.md) — novas fotos são armazenadas em WebP; exportações que exigem compatibilidade convertem temporariamente para JPEG.
+- [Gráficos nativos em Excel](excel-charts-ooXml.md) — ExcelJS exige tabelas auxiliares e OOXML/JSZip para gráficos editáveis, não imagens PNG.

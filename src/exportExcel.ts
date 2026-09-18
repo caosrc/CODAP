@@ -198,6 +198,7 @@ export async function exportarOcorrenciaExcel(o: Ocorrencia): Promise<void> {
   const wb = new ExcelJS.Workbook()
   wb.creator = 'CODAP - Conselheiro Lafaiete'
   wb.created = new Date()
+  wb.calcProperties = { calcMode: 'auto', fullCalcOnLoad: true, forceFullCalc: true }
 
   const ws = wb.addWorksheet('Ocorrência', {
     pageSetup: { orientation: 'landscape', fitToPage: true },
@@ -745,6 +746,129 @@ function criarImagemDashboard(
   return canvas.toDataURL('image/png').split(',')[1] ?? null
 }
 
+function xmlEscapar(valor: string): string {
+  return valor
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;')
+}
+
+function referenciaPlanilha(nome: string): string {
+  return `'${nome.replace(/'/g, "''")}'`
+}
+
+function cacheCategoriasXml(categorias: string[]): string {
+  return `<c:strCache><c:ptCount val="${categorias.length}">${categorias
+    .map((categoria, index) => `<c:pt idx="${index}"><c:v>${xmlEscapar(categoria)}</c:v></c:pt>`)
+    .join('')}</c:strCache>`
+}
+
+function cacheNumerosXml(valores: number[]): string {
+  return `<c:numCache><c:formatCode>0</c:formatCode><c:ptCount val="${valores.length}">${valores
+    .map((valor, index) => `<c:pt idx="${index}"><c:v>${valor}</c:v></c:pt>`)
+    .join('')}</c:ptCount></c:numCache>`
+}
+
+function criarGraficoBarrasXml(
+  titulo: string,
+  categorias: string[],
+  valores: number[],
+  colunaCategorias: string,
+  colunaValores: string,
+  ultimaLinha: number,
+  cor: string,
+): string {
+  const sheet = referenciaPlanilha('📈 Gráficos')
+  const categoriasRef = `${sheet}!$${colunaCategorias}$4:$${colunaCategorias}$${ultimaLinha}`
+  const valoresRef = `${sheet}!$${colunaValores}$4:$${colunaValores}$${ultimaLinha}`
+
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+  <c:date1904 val="0"/><c:lang val="pt-BR"/><c:roundedCorners val="0"/>
+  <c:chart>
+    <c:title><c:tx><c:rich><a:bodyPr/><a:lstStyle/><a:p><a:r><a:rPr lang="pt-BR" sz="1400"/><a:t>${xmlEscapar(titulo)}</a:t></a:r></a:p></c:rich></c:tx><c:layout/><c:overlay val="0"/></c:title>
+    <c:plotArea><c:layout/>
+      <c:barChart>
+        <c:barDir val="bar"/><c:grouping val="clustered"/><c:varyColors val="0"/>
+        <c:ser><c:idx val="0"/><c:order val="0"/><c:tx><c:v>Quantidade</c:v></c:tx>
+          <c:spPr><a:solidFill><a:srgbClr val="${cor}"/></a:solidFill><a:ln><a:solidFill><a:srgbClr val="${cor}"/></a:solidFill></a:ln></c:spPr>
+          <c:invertIfNegative val="0"/>
+          <c:cat><c:strRef><c:f>${categoriasRef}</c:f>${cacheCategoriasXml(categorias)}</c:strRef></c:cat>
+          <c:val><c:numRef><c:f>${valoresRef}</c:f>${cacheNumerosXml(valores)}</c:numRef></c:val>
+          <c:dLbls><c:showLegendKey val="0"/><c:showVal val="1"/><c:showCatName val="0"/><c:showSerName val="0"/><c:showPercent val="0"/></c:dLbls>
+        </c:ser>
+        <c:gapWidth val="35"/><c:overlap val="0"/><c:axId val="-201"/><c:axId val="202"/>
+      </c:barChart>
+      <c:catAx><c:axId val="-201"/><c:scaling><c:orientation val="max"/></c:scaling><c:delete val="0"/><c:axPos val="l"/><c:majorTickMark val="none"/><c:minorTickMark val="none"/><c:tickLblPos val="nextTo"/><c:crossAx val="202"/><c:crosses val="autoZero"/><c:crossBetween val="midCat"/></c:catAx>
+      <c:valAx><c:axId val="202"/><c:scaling><c:orientation val="min"/></c:scaling><c:delete val="0"/><c:axPos val="b"/><c:majorGridlines/><c:majorTickMark val="none"/><c:minorTickMark val="none"/><c:tickLblPos val="nextTo"/><c:numFmt formatCode="0" sourceLinked="1"/><c:crossAx val="-201"/><c:crosses val="autoZero"/><c:crossBetween val="midCat"/></c:valAx>
+    </c:plotArea>
+    <c:plotVisOnly val="1"/><c:dispBlanksAs val="zero"/><c:showDLblsOverMax val="0"/>
+  </c:chart>
+</c:chartSpace>`
+}
+
+function proximoNumeroArquivo(zip: any, padrao: RegExp): number {
+  const usados = Object.keys(zip.files)
+    .map(nome => nome.match(padrao))
+    .filter(Boolean)
+    .map(match => Number(match?.[1]))
+    .filter(Number.isFinite)
+  return Math.max(0, ...usados) + 1
+}
+
+async function adicionarGraficosNativosAoXlsx(
+  buffer: ArrayBuffer | Uint8Array,
+  categoriasBairro: string[],
+  valoresBairro: number[],
+  categoriasNatureza: string[],
+  valoresNatureza: number[],
+): Promise<Uint8Array> {
+  const { default: JSZip } = await import('jszip')
+  const zip = await JSZip.loadAsync(buffer)
+  const drawingNumber = proximoNumeroArquivo(zip, /^xl\/drawings\/drawing(\d+)\.xml$/)
+  const chartNumber = proximoNumeroArquivo(zip, /^xl\/charts\/chart(\d+)\.xml$/)
+  const sheetNumber = Object.keys(zip.files)
+    .map(nome => nome.match(/^xl\/worksheets\/sheet(\d+)\.xml$/))
+    .filter(Boolean)
+    .map(match => Number(match?.[1]))
+    .filter(Number.isFinite)
+    .sort((a, b) => b - a)[0]
+  if (!sheetNumber) throw new Error('Não foi possível localizar a aba de gráficos no Excel.')
+
+  const sheetPath = `xl/worksheets/sheet${sheetNumber}.xml`
+  const sheetRelsPath = `xl/worksheets/_rels/sheet${sheetNumber}.xml.rels`
+  const sheetXml = await zip.file(sheetPath)?.async('string')
+  const contentTypesPath = '[Content_Types].xml'
+  const contentTypesXml = await zip.file(contentTypesPath)?.async('string')
+  if (!sheetXml || !contentTypesXml) throw new Error('O arquivo Excel foi gerado sem os metadados esperados.')
+
+  const drawingXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <xdr:twoCellAnchor editAs="oneCell"><xdr:from><xdr:col>0</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>3</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:from><xdr:to><xdr:col>8</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>27</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:to><xdr:graphicFrame macro=""><xdr:nvGraphicFramePr><xdr:cNvPr id="2" name="Gráfico de bairros"/><xdr:cNvGraphicFramePr/></xdr:nvGraphicFramePr><xdr:xfrm/><a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/chart"><c:chart r:id="rId1"/></a:graphicData></a:graphic></xdr:graphicFrame><xdr:clientData/></xdr:twoCellAnchor>
+  <xdr:twoCellAnchor editAs="oneCell"><xdr:from><xdr:col>0</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>29</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:from><xdr:to><xdr:col>8</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>53</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:to><xdr:graphicFrame macro=""><xdr:nvGraphicFramePr><xdr:cNvPr id="3" name="Gráfico de naturezas"/><xdr:cNvGraphicFramePr/></xdr:nvGraphicFramePr><xdr:xfrm/><a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/chart"><c:chart r:id="rId2"/></a:graphicData></a:graphic></xdr:graphicFrame><xdr:clientData/></xdr:twoCellAnchor>
+</xdr:wsDr>`
+  const drawingRelsXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/chart" Target="../charts/chart${chartNumber}.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/chart" Target="../charts/chart${chartNumber + 1}.xml"/></Relationships>`
+  const sheetRelsXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing" Target="../drawings/drawing${drawingNumber}.xml"/></Relationships>`
+  const contentTypesAdicionais = [
+    `<Override PartName="/xl/drawings/drawing${drawingNumber}.xml" ContentType="application/vnd.openxmlformats-officedocument.drawingml.drawing+xml"/>`,
+    `<Override PartName="/xl/charts/chart${chartNumber}.xml" ContentType="application/vnd.openxmlformats-officedocument.drawingml.chart+xml"/>`,
+    `<Override PartName="/xl/charts/chart${chartNumber + 1}.xml" ContentType="application/vnd.openxmlformats-officedocument.drawingml.chart+xml"/>`,
+  ].join('')
+
+  zip.file(sheetPath, sheetXml.replace('</worksheet>', '<drawing xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" r:id="rId1"/></worksheet>'))
+  zip.file(sheetRelsPath, sheetRelsXml)
+  zip.file(`xl/drawings/drawing${drawingNumber}.xml`, drawingXml)
+  zip.file(`xl/drawings/_rels/drawing${drawingNumber}.xml.rels`, drawingRelsXml)
+  zip.file(`xl/charts/chart${chartNumber}.xml`, criarGraficoBarrasXml('Quantidade de ocorrências por bairro', categoriasBairro, valoresBairro, 'K', 'L', categoriasBairro.length + 3, '2563EB'))
+  zip.file(`xl/charts/chart${chartNumber + 1}.xml`, criarGraficoBarrasXml('Natureza das ocorrências', categoriasNatureza, valoresNatureza, 'N', 'O', categoriasNatureza.length + 3, '3B82F6'))
+  zip.file(contentTypesPath, contentTypesXml.replace('</Types>', `${contentTypesAdicionais}</Types>`))
+  return zip.generateAsync({ type: 'uint8array' })
+}
+
 async function exportarOcorrenciasSemFotos(
   ocorrencias: Ocorrencia[],
   onProgresso?: (atual: number, total: number) => void,
@@ -753,6 +877,7 @@ async function exportarOcorrenciasSemFotos(
   const wb = new ExcelJS.Workbook()
   wb.creator = 'CODAP - Conselheiro Lafaiete'
   wb.created = new Date()
+  wb.calcProperties = { calcMode: 'auto', fullCalcOnLoad: true, forceFullCalc: true }
 
   const ws = wb.addWorksheet('Ocorrências')
   const cabecalhos = [
@@ -760,8 +885,9 @@ async function exportarOcorrenciasSemFotos(
     'Nível de Risco', 'Status', 'Endereço', 'Latitude', 'Longitude',
     'Proprietário', 'DDD e telefone', 'Situação', 'Recomendação', 'Conclusão',
     'Vistorias Adicionais (qtd)', 'Última Vistoria', 'Observações das Vistorias',
+    'Bairro (editável)', 'Rua (editável)',
   ]
-  ws.columns = [6, 16, 20, 24, 28, 22, 16, 14, 36, 14, 14, 28, 22, 44, 44, 44, 18, 18, 60]
+  ws.columns = [6, 16, 20, 24, 28, 22, 16, 14, 36, 14, 14, 28, 22, 44, 44, 44, 18, 18, 60, 24, 30]
     .map(width => ({ width }))
 
   const titulo = ws.getCell('A1')
@@ -807,7 +933,8 @@ async function exportarOcorrenciasSemFotos(
       textoExcel(nivelLabel(o.nivel_risco)), textoExcel(statusLabel(o.status_oc)),
       textoExcel(o.endereco), textoExcel(o.lat), textoExcel(o.lng),
       textoExcel(o.proprietario), textoExcel(o.telefone_proprietario), textoExcel(o.situacao), textoExcel(o.recomendacao),
-      textoExcel(o.conclusao), vistorias.length, ultimaVistoria, observacoes,
+       textoExcel(o.conclusao), vistorias.length, ultimaVistoria, observacoes,
+       extrairBairroExcel(o.endereco), extrairRuaExcel(o.endereco),
     ].forEach((valor, column) => { row.getCell(column + 1).value = valor as ExcelCellValue })
     row.height = 18
     row.eachCell({ includeEmpty: true }, cell => {
@@ -911,44 +1038,64 @@ async function exportarOcorrenciasSemFotos(
     dash.getCell(`H${row}`).value = { formula: `IFERROR(REPT("█",ROUND(G${row}/MAX($A$5,1)*24,0)),"")`, result: '█'.repeat(Math.min(24, Math.round(qtd / Math.max(ocorrencias.length, 1) * 24))) } as any
     dash.getCell(`H${row}`).font = { bold: true, color: { argb: '2563EB' } }
   })
-  const riscoGrafico = [
-    { label: 'Alto', quantidade: porNivel[0].quantidade, cor: 'dc2626' },
-    { label: 'Médio', quantidade: porNivel[1].quantidade, cor: 'f59e0b' },
-    { label: 'Baixo', quantidade: porNivel[2].quantidade, cor: '16a34a' },
-  ]
-  const statusGrafico = [
-    { label: 'Ativos', quantidade: porStatus[0].quantidade, cor: 'ef4444' },
-    { label: 'Resolvidos', quantidade: porStatus[1].quantidade, cor: '10b981' },
-  ]
-  const diasGrafico: { label: string; quantidade: number }[] = []
-  for (let i = 13; i >= 0; i--) {
-    const data = new Date()
-    data.setHours(0, 0, 0, 0)
-    data.setDate(data.getDate() - i)
-    const iso = data.toISOString().slice(0, 10)
-    diasGrafico.push({
-      label: String(data.getDate()).padStart(2, '0'),
-      quantidade: ocorrencias.filter(o => o.created_at?.slice(0, 10) === iso).length,
-    })
-  }
-  const imagemDashboard = criarImagemDashboard(
-    riscoGrafico,
-    statusGrafico,
-    tipos.map((tipo, index) => ({
-      label: tipo,
-      quantidade: ocorrencias.filter(o => (o.tipo || 'Não informado') === tipo).length,
-      cor: ['2563eb', '0f766e', '7c3aed', 'dc2626', 'd97706'][index % 5],
-    })),
-    diasGrafico,
-  )
-  if (imagemDashboard) {
-    const imageId = wb.addImage({ base64: imagemDashboard, extension: 'png' })
-    dash.addImage(imageId, { tl: { col: 9, row: 0 }, ext: { width: 550, height: 450 } })
-  }
   dash.views = [{ state: 'frozen', ySplit: 5 }]
 
+  // Gráficos nativos do Excel: as fórmulas da tabela auxiliar recalculam
+  // quando o usuário edita a aba Ocorrências, sem transformar o gráfico em PNG.
+  const bairros = [...new Set(ocorrencias.map(o => extrairBairroExcel(o.endereco)))]
+    .sort((a, b) => a.localeCompare(b, 'pt-BR'))
+  const naturezas = [...new Set(ocorrencias.map(o => o.natureza || 'Não informado'))]
+    .sort((a, b) => a.localeCompare(b, 'pt-BR'))
+  const graficos = wb.addWorksheet('📈 Gráficos')
+  graficos.columns = [32, 16, 4, 42, 16, 4, 18, 18, 18, 18, 28, 16, 4, 42, 16].map(width => ({ width }))
+  graficos.mergeCells('A1:I1')
+  graficos.getCell('A1').value = '📈 GRÁFICOS DINÂMICOS DE OCORRÊNCIAS'
+  graficos.getCell('A1').font = { bold: true, size: 16, color: { argb: BRANCO } }
+  graficos.getCell('A1').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: AZUL } }
+  graficos.getCell('A1').alignment = { horizontal: 'center' }
+  graficos.mergeCells('A2:I2')
+  graficos.getCell('A2').value = 'Edite a aba Ocorrências e pressione F9 para recalcular. Os gráficos são objetos editáveis do Excel.'
+  graficos.getCell('A2').font = { italic: true, color: { argb: '64748b' } }
+
+  const preencherTabelaGrafico = (
+    titulo: string,
+    colunaCategoria: string,
+    colunaQuantidade: string,
+    inicioColuna: number,
+    itens: string[],
+    origemColuna: string,
+  ) => {
+    const tituloCell = graficos.getCell(3, inicioColuna)
+    tituloCell.value = titulo
+    tituloCell.font = { bold: true, color: { argb: BRANCO } }
+    tituloCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: '0f766e' } }
+    graficos.getCell(3, inicioColuna + 1).value = 'Quantidade'
+    graficos.getCell(3, inicioColuna + 1).font = { bold: true, color: { argb: BRANCO } }
+    graficos.getCell(3, inicioColuna + 1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: '0f766e' } }
+    itens.forEach((item, index) => {
+      const row = index + 4
+      graficos.getCell(`${colunaCategoria}${row}`).value = item
+      graficos.getCell(`${colunaQuantidade}${row}`).value = {
+        formula: `COUNTIF('Ocorrências'!$${origemColuna}:$${origemColuna},${colunaCategoria}${row})`,
+        result: ocorrencias.filter(o => (
+          origemColuna === 'T' ? extrairBairroExcel(o.endereco) : (o.natureza || 'Não informado')
+        ) === item).length,
+      } as any
+    })
+  }
+  preencherTabelaGrafico('Bairro', 'K', 'L', 11, bairros, 'T')
+  preencherTabelaGrafico('Natureza', 'N', 'O', 14, naturezas, 'E')
+  graficos.views = [{ state: 'frozen', ySplit: 3 }]
+
   const buffer = await wb.xlsx.writeBuffer()
-  const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+  const bufferComGraficos = await adicionarGraficosNativosAoXlsx(
+    buffer,
+    bairros,
+    bairros.map(bairro => ocorrencias.filter(o => extrairBairroExcel(o.endereco) === bairro).length),
+    naturezas,
+    naturezas.map(natureza => ocorrencias.filter(o => (o.natureza || 'Não informado') === natureza).length),
+  )
+  const blob = new Blob([bufferComGraficos], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
   const url = URL.createObjectURL(blob)
   const link = document.createElement('a')
   link.href = url

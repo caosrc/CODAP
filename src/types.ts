@@ -76,7 +76,7 @@ export const AGENTE_SENHAS: Record<string, string> = {
   Arthur: '1234',
   Lucas: '0356',
   Junior: '1234',
-  Rosane: '1234',
+  Rosane: '1969',
   // Mantidos para sessões antigas que ainda carreguem a identificação A–J.
   A: '1234',
   B: '1234',

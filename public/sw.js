@@ -18,11 +18,12 @@
  *  - LIMPAR_CACHE_MAPA               → apaga todos os tiles cacheados
  */
 
-const VERSION = 'v16-2026-09-defesa-civil-lafaiete'
+const VERSION = 'v17-2026-09-defesa-civil-lafaiete'
 const APP_CACHE = `defesacivil-app-${VERSION}`
 const TILES_CACHE = 'defesacivil-tiles-osm'
 const ASSETS_CACHE = `defesacivil-assets-${VERSION}`
-const MALHA_CACHE = 'defesacivil-malha-viaria'
+// v2 descarta a malha antiga, que foi baixada usando um centro incorreto.
+const MALHA_CACHE = 'defesacivil-malha-viaria-v2'
 
 // Recursos essenciais para abrir o app offline (app shell)
 const APP_SHELL = [
@@ -438,8 +439,9 @@ async function cachearMapaConselheiroLafaiete(zooms, raioKm, source) {
 
   notificar('iniciando')
 
-  // Baixa em lotes para não sobrecarregar nem o navegador nem o servidor de tiles
-  const lote = 16
+  // Baixa em lotes maiores para concluir mais rápido, sem abrir uma requisição
+  // para cada tile ao mesmo tempo. Tiles já salvos nunca são baixados de novo.
+  const lote = 32
   for (let i = 0; i < tiles.length; i += lote) {
     const slice = tiles.slice(i, i + lote)
     await Promise.all(
@@ -447,7 +449,7 @@ async function cachearMapaConselheiroLafaiete(zooms, raioKm, source) {
         try {
           const existente = await cache.match(url)
           if (existente) { concluido++; return }
-          const resp = await fetch(url, { mode: 'cors' })
+          const resp = await fetch(url, { mode: 'cors', cache: 'no-store' })
           if (resp && resp.ok) {
             await cache.put(url, resp.clone())
             concluido++
@@ -469,8 +471,10 @@ async function cachearMapaConselheiroLafaiete(zooms, raioKm, source) {
 // Baixa todas as ruas/estradas dentro do raio configurado e armazena
 // como Response no cache para o app indexar e usar offline.
 async function baixarMalhaViaria(raioM, source) {
-  const lat = -20.5195
-  const lng = -43.6983
+  // Centro de Conselheiro Lafaiete. As coordenadas antigas apontavam para
+  // outra região e deixavam a busca offline sem as ruas do mapa.
+  const lat = -20.6604
+  const lng = -43.7863
 
   function notificar(status, extra = {}) {
     if (source) source.postMessage({ tipo: 'PROGRESSO_MALHA', status, ...extra })

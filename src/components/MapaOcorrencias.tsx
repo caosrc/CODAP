@@ -6,6 +6,7 @@ import type { Ocorrencia } from '../types'
 import { NATUREZA_ICONE, NATUREZA_COR, NATUREZAS, normalizarNomeAgente } from '../types'
 import {
   baixarMapaOffline,
+  solicitarArmazenamentoPersistente,
   obterInfoCacheMapa,
   limparCacheMapa,
   baixarMalhaViariaOffline,
@@ -725,6 +726,7 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
 
   // Mapa offline — inicializa tiles do localStorage para mostrar status imediatamente
   const [statusOffline, setStatusOffline] = useState<StatusOffline>('idle')
+  const [estaOnline, setEstaOnline] = useState(() => navigator.onLine)
   const [progressoMapa, setProgressoMapa] = useState<ProgressoMapa | null>(null)
   const [tilesCacheados, setTilesCacheados] = useState<number>(() => {
     try { return parseInt(localStorage.getItem('dc_tiles_count') || '0') || 0 } catch { return 0 }
@@ -740,6 +742,17 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
   })
   const [statusMalha, setStatusMalha] = useState<'idle' | 'baixando' | 'concluido' | 'erro'>('idle')
   const [progressoMalha, setProgressoMalha] = useState<ProgressoMalha | null>(null)
+
+  useEffect(() => {
+    const ficouOnline = () => setEstaOnline(true)
+    const ficouOffline = () => setEstaOnline(false)
+    window.addEventListener('online', ficouOnline)
+    window.addEventListener('offline', ficouOffline)
+    return () => {
+      window.removeEventListener('online', ficouOnline)
+      window.removeEventListener('offline', ficouOffline)
+    }
+  }, [])
 
   // Mantém ref sempre atualizada com o nome atual
   useEffect(() => { nomeLocalRef.current = nomeLocal }, [nomeLocal])
@@ -760,14 +773,24 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
 
   // Verifica tiles: ao mudar statusOffline e também quando o SW ficar pronto
   useEffect(() => {
-    obterInfoCacheMapa().then(setTilesCacheados).catch(() => {})
+    obterInfoCacheMapa()
+      .then((total) => {
+        setTilesCacheados(total)
+        if (total > 0) setStatusOffline('concluido')
+      })
+      .catch(() => {})
   }, [statusOffline])
 
   // Verifica ao montar — aguarda SW controller disponível para leitura correta
   useEffect(() => {
     if (!('serviceWorker' in navigator)) return
     const verificar = () => {
-      obterInfoCacheMapa().then(n => { if (n > 0) setTilesCacheados(n) }).catch(() => {})
+      obterInfoCacheMapa().then(n => {
+        if (n > 0) {
+          setTilesCacheados(n)
+          setStatusOffline('concluido')
+        }
+      }).catch(() => {})
       obterInfoMalhaViaria().then(info => {
         if (info.baixada) setMalhaInfo(info)
       }).catch(() => {})
@@ -988,6 +1011,8 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
     setStatusOffline('baixando')
     setProgressoMapa(null)
     try {
+      // Evita que o navegador descarte os tiles sob pressão de armazenamento.
+      await solicitarArmazenamentoPersistente()
       // Tiles num raio de 10 km do centro de Conselheiro Lafaiete.
       await baixarMapaOffline((p) => {
         setProgressoMapa(p)
@@ -1305,6 +1330,7 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
             subdomains={['a', 'b', 'c']}
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
             maxZoom={MAX_ZOOM_MAPA_PADRAO}
+            maxNativeZoom={estaOnline ? MAX_ZOOM_MAPA_PADRAO : 16}
             keepBuffer={2}
             updateWhenZooming={false}
             updateWhenIdle={true}
@@ -1928,12 +1954,12 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
           )}
         </div>
 
-        {!navigator.onLine && !malhaInfo.baixada && (
+        {!estaOnline && !malhaInfo.baixada && (
           <div className="mapa-busca-aviso">
             📵 Sem internet e sem mapa de ruas salvo. Conecte ou baixe o mapa offline.
           </div>
         )}
-        {!navigator.onLine && malhaInfo.baixada && (
+        {!estaOnline && malhaInfo.baixada && (
           <div className="mapa-busca-aviso" style={{ background: '#dcfce7', borderColor: '#86efac', color: '#166534' }}>
             📵 Sem internet — buscando nas ruas salvas offline.
           </div>
@@ -2100,9 +2126,9 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
               <button
                 className="mapa-offline-btn-acao"
                 onClick={iniciarDownloadMapa}
-                disabled={!navigator.onLine}
+                disabled={!estaOnline}
               >
-                {navigator.onLine
+                {estaOnline
                   ? tilesCacheados > 0 ? '🔄 Atualizar mapa offline' : '📥 Salvar mapa de Conselheiro Lafaiete'
                   : '📵 Sem conexão para baixar'}
               </button>
@@ -2159,10 +2185,10 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
               <button
                 className="mapa-offline-btn-acao"
                 onClick={iniciarDownloadMalha}
-                disabled={!navigator.onLine}
+                disabled={!estaOnline}
                 style={{ marginTop: 6 }}
               >
-                {navigator.onLine
+                {estaOnline
                   ? malhaInfo.baixada ? '🔄 Atualizar ruas offline' : '📥 Baixar ruas e endereços'
                   : '📵 Sem conexão para baixar'}
               </button>

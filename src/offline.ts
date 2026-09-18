@@ -281,6 +281,35 @@ export type ProgressoMapa = {
   status: 'iniciando' | 'andamento' | 'concluido' | 'erro'
 }
 
+async function obterServiceWorkerAtivo(): Promise<ServiceWorker> {
+  if (!('serviceWorker' in navigator)) {
+    throw new Error('Service Worker não disponível')
+  }
+
+  if (navigator.serviceWorker.controller) return navigator.serviceWorker.controller
+
+  try {
+    const registro = await navigator.serviceWorker.ready
+    const worker = navigator.serviceWorker.controller || registro.active
+    if (worker) return worker
+  } catch {
+    // O erro abaixo dá uma mensagem única para a interface.
+  }
+
+  throw new Error('Service Worker ainda não está pronto')
+}
+
+/** Solicita ao navegador que preserve os caches offline contra limpeza automática. */
+export async function solicitarArmazenamentoPersistente(): Promise<boolean> {
+  if (!navigator.storage?.persist) return false
+  try {
+    if (await navigator.storage.persisted()) return true
+    return await navigator.storage.persist()
+  } catch {
+    return false
+  }
+}
+
 // Envia mensagem ao SW para pré-cachear tiles de Conselheiro Lafaiete
 // Chama onProgresso com atualizações até status === 'concluido'.
 // Por padrão cobre raio de 10 km e zooms 11..17 (cidade + entorno imediato).
@@ -289,15 +318,12 @@ export function baixarMapaOffline(
   zooms = [11, 12, 13, 14, 15, 16],
   raioKm = 10
 ): Promise<void> {
-  return new Promise((resolve, reject) => {
-    if (!('serviceWorker' in navigator) || !navigator.serviceWorker.controller) {
-      reject(new Error('Service Worker não disponível'))
-      return
-    }
-
-    const handler = (event: MessageEvent) => {
-      const msg = event.data
-      if (msg?.tipo === 'PROGRESSO_MAPA') {
+  return (async () => {
+    const worker = await obterServiceWorkerAtivo()
+    await new Promise<void>((resolve, reject) => {
+      const handler = (event: MessageEvent) => {
+        const msg = event.data
+        if (msg?.tipo !== 'PROGRESSO_MAPA') return
         onProgresso({
           total: msg.total,
           concluido: msg.concluido,
@@ -307,17 +333,20 @@ export function baixarMapaOffline(
         if (msg.status === 'concluido') {
           navigator.serviceWorker.removeEventListener('message', handler)
           resolve()
+        } else if (msg.status === 'erro') {
+          navigator.serviceWorker.removeEventListener('message', handler)
+          reject(new Error('Falha ao salvar os tiles do mapa'))
         }
       }
-    }
 
-    navigator.serviceWorker.addEventListener('message', handler)
-    navigator.serviceWorker.controller.postMessage({
-      tipo: 'CACHEAR_MAPA_CONSELHEIRO_LAFAIETE',
-      zooms,
-      raioKm,
+      navigator.serviceWorker.addEventListener('message', handler)
+      worker.postMessage({
+        tipo: 'CACHEAR_MAPA_CONSELHEIRO_LAFAIETE',
+        zooms,
+        raioKm,
+      })
     })
-  })
+  })()
 }
 
 // ── Malha viária (Overpass) — para autocomplete + rota offline ────
@@ -331,14 +360,12 @@ export function baixarMalhaViariaOffline(
   onProgresso: (p: ProgressoMalha) => void,
   raioM = 10000
 ): Promise<void> {
-  return new Promise((resolve, reject) => {
-    if (!('serviceWorker' in navigator) || !navigator.serviceWorker.controller) {
-      reject(new Error('Service Worker não disponível'))
-      return
-    }
-    const handler = (event: MessageEvent) => {
-      const msg = event.data
-      if (msg?.tipo === 'PROGRESSO_MALHA') {
+  return (async () => {
+    const worker = await obterServiceWorkerAtivo()
+    await new Promise<void>((resolve, reject) => {
+      const handler = (event: MessageEvent) => {
+        const msg = event.data
+        if (msg?.tipo !== 'PROGRESSO_MALHA') return
         onProgresso({
           status: msg.status,
           bytes: msg.bytes,
@@ -352,67 +379,76 @@ export function baixarMalhaViariaOffline(
           reject(new Error(msg.mensagem || 'Falha ao baixar malha viária'))
         }
       }
-    }
-    navigator.serviceWorker.addEventListener('message', handler)
-    navigator.serviceWorker.controller.postMessage({
-      tipo: 'BAIXAR_MALHA_VIARIA',
-      raioM,
+      navigator.serviceWorker.addEventListener('message', handler)
+      worker.postMessage({
+        tipo: 'BAIXAR_MALHA_VIARIA',
+        raioM,
+      })
     })
-  })
+  })()
 }
 
 export function obterInfoMalhaViaria(): Promise<{ baixada: boolean; bytes: number }> {
-  return new Promise((resolve) => {
-    if (!('serviceWorker' in navigator) || !navigator.serviceWorker.controller) {
-      resolve({ baixada: false, bytes: 0 })
-      return
+  return (async () => {
+    let worker: ServiceWorker
+    try {
+      worker = await obterServiceWorkerAtivo()
+    } catch {
+      return { baixada: false, bytes: 0 }
     }
-    const handler = (event: MessageEvent) => {
-      if (event.data?.tipo === 'INFO_MALHA_VIARIA_RESP') {
+    return new Promise((resolve) => {
+      const handler = (event: MessageEvent) => {
+        if (event.data?.tipo !== 'INFO_MALHA_VIARIA_RESP') return
         navigator.serviceWorker.removeEventListener('message', handler)
         resolve({
           baixada: !!event.data.baixada,
           bytes: Number(event.data.bytes) || 0,
         })
       }
-    }
-    navigator.serviceWorker.addEventListener('message', handler)
-    navigator.serviceWorker.controller.postMessage({ tipo: 'INFO_MALHA_VIARIA' })
-  })
+      navigator.serviceWorker.addEventListener('message', handler)
+      worker.postMessage({ tipo: 'INFO_MALHA_VIARIA' })
+    })
+  })()
 }
 
 // Consulta quantos tiles estão no cache
 export function obterInfoCacheMapa(): Promise<number> {
-  return new Promise((resolve) => {
-    if (!('serviceWorker' in navigator) || !navigator.serviceWorker.controller) {
-      resolve(0)
-      return
+  return (async () => {
+    let worker: ServiceWorker
+    try {
+      worker = await obterServiceWorkerAtivo()
+    } catch {
+      return 0
     }
-    const handler = (event: MessageEvent) => {
-      if (event.data?.tipo === 'INFO_CACHE_MAPA_RESP') {
+    return new Promise<number>((resolve) => {
+      const handler = (event: MessageEvent) => {
+        if (event.data?.tipo !== 'INFO_CACHE_MAPA_RESP') return
         navigator.serviceWorker.removeEventListener('message', handler)
-        resolve(event.data.totalTiles ?? 0)
+        resolve(Number(event.data.totalTiles) || 0)
       }
-    }
-    navigator.serviceWorker.addEventListener('message', handler)
-    navigator.serviceWorker.controller.postMessage({ tipo: 'INFO_CACHE_MAPA' })
-  })
+      navigator.serviceWorker.addEventListener('message', handler)
+      worker.postMessage({ tipo: 'INFO_CACHE_MAPA' })
+    })
+  })()
 }
 
 // Limpa o cache de tiles
 export function limparCacheMapa(): Promise<void> {
-  return new Promise((resolve) => {
-    if (!('serviceWorker' in navigator) || !navigator.serviceWorker.controller) {
-      resolve()
+  return (async () => {
+    let worker: ServiceWorker
+    try {
+      worker = await obterServiceWorkerAtivo()
+    } catch {
       return
     }
-    const handler = (event: MessageEvent) => {
-      if (event.data?.tipo === 'CACHE_MAPA_LIMPO') {
+    await new Promise<void>((resolve) => {
+      const handler = (event: MessageEvent) => {
+        if (event.data?.tipo !== 'CACHE_MAPA_LIMPO') return
         navigator.serviceWorker.removeEventListener('message', handler)
         resolve()
       }
-    }
-    navigator.serviceWorker.addEventListener('message', handler)
-    navigator.serviceWorker.controller.postMessage({ tipo: 'LIMPAR_CACHE_MAPA' })
-  })
+      navigator.serviceWorker.addEventListener('message', handler)
+      worker.postMessage({ tipo: 'LIMPAR_CACHE_MAPA' })
+    })
+  })()
 }

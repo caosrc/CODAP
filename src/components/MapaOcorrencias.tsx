@@ -505,18 +505,6 @@ function BoundsTracker({ onChange }: { onChange: (b: L.LatLngBounds) => void }) 
   return null
 }
 
-// Remove temporariamente os marcadores durante o gesto para o mapa continuar
-// fluido no celular; eles retornam assim que o arraste/zoom termina.
-function MapMovementTracker({ onChange }: { onChange: (movendo: boolean) => void }) {
-  useMapEvents({
-    movestart: () => onChange(true),
-    zoomstart: () => onChange(true),
-    moveend: () => onChange(false),
-    zoomend: () => onChange(false),
-  })
-  return null
-}
-
 // ── Tipos ───────────────────────────────────────────────────────
 interface EquipamentoCampoMapa {
   id: number
@@ -615,7 +603,6 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
   const [submenuFiltroAberto, setSubmenuFiltroAberto] = useState(false)
   const [naturezasOcultas, setNaturezasOcultas] = useState<Set<string>>(new Set())
   const [mapaBounds, setMapaBounds] = useState<L.LatLngBounds | null>(null)
-  const [mapaEmMovimento, setMapaEmMovimento] = useState(false)
 
   // Busca de endereço + rota (estilo Google Maps)
   const [enderecoBusca, setEnderecoBusca] = useState('')
@@ -1462,7 +1449,6 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
 
         <MapClickHandler onMapClick={() => setSelecionada(null)} />
         <BoundsTracker onChange={setMapaBounds} />
-        <MapMovementTracker onChange={setMapaEmMovimento} />
 
         {/* Trilha GPS local */}
         {trilha.length >= 2 && (
@@ -1570,7 +1556,7 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
         {destino && <FocoDestino destino={destino} rota={rota} />}
 
         {/* Ocorrências — ícones individuais, viewport culling ativo */}
-        {mostrarOcorrencias && !mapaEmMovimento && ocorrenciasVisiveis.map(o => {
+        {mostrarOcorrencias && ocorrenciasVisiveis.map(o => {
           const temGps = !!(o.lat && o.lng)
           const pos: [number, number] = temGps ? [o.lat!, o.lng!] : coordsSemGps(o.id)
           return (

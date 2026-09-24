@@ -7,6 +7,9 @@ const CNL_ESTACAO_CHUVA_CENTRO_ID = 3121
 const CNL_ESTACAO_CHUVA_CENTRO_CODIGO = '311830401H'
 const ESTACOES_CHUVA_IDS = new Set([4146, 4144, 3121, 6622, 4145, 4143, 4142])
 const COTAS_PADRAO = { atencao: 2.55, alerta: 3.4, transbordamento: 4.25 }
+let monitoramentoCnlCache = null
+let monitoramentoCnlCacheTs = 0
+const MONITORAMENTO_CNL_CACHE_MAX_STALE_MS = 15 * 60 * 1000
 
 const json = (statusCode, body) => ({
   statusCode,
@@ -26,7 +29,7 @@ async function buscarCotas() {
   const supabase = configurarSupabase()
   if (!supabase) return { cotas: COTAS_PADRAO, configuradas: false }
   try {
-    const response = await fetch(`${supabase.endpoint}?id=eq.1&select=atencao,alerta,transbordamento`, { headers: supabase.headers, signal: AbortSignal.timeout(8000) })
+    const response = await fetch(`${supabase.endpoint}?id=eq.1&select=atencao,alerta,transbordamento`, { headers: supabase.headers, signal: AbortSignal.timeout(2500) })
     if (!response.ok) return { cotas: COTAS_PADRAO, configuradas: false }
     const row = (await response.json())?.[0]
     const cotas = { atencao: number(row?.atencao), alerta: number(row?.alerta), transbordamento: number(row?.transbordamento) }
@@ -101,18 +104,29 @@ function normalizar(item, payload) {
 export const handler = async () => {
   try {
     const [catalogoResponse, nivelResponse, cotasSalvas] = await Promise.all([
-      fetch(CATALOGO, { signal: AbortSignal.timeout(15000) }),
-      fetch(NIVEL, { signal: AbortSignal.timeout(15000) }),
+      fetch(CATALOGO, { signal: AbortSignal.timeout(6000) }),
+      fetch(NIVEL, { signal: AbortSignal.timeout(6000) }).catch(() => null),
       buscarCotas(),
     ])
-    if (!catalogoResponse.ok || !nivelResponse.ok) throw new Error('CEMADEN indisponível')
-    const [catalogo, medidas] = await Promise.all([catalogoResponse.json(), nivelResponse.json()])
+    if (!catalogoResponse.ok) throw new Error(`Catálogo CEMADEN: ${catalogoResponse.status}`)
+    const catalogo = await catalogoResponse.json()
+    let medidas = []
+    let avisoNivel = ''
+    if (nivelResponse?.ok) {
+      try {
+        medidas = await nivelResponse.json()
+      } catch {
+        avisoNivel = 'A série hidrológica está indisponível; a leitura do catálogo foi mantida como referência.'
+      }
+    } else {
+      avisoNivel = 'A série hidrológica está indisponível; a leitura do catálogo foi mantida como referência.'
+    }
     const principalRaw = Array.isArray(catalogo) ? catalogo.find(row => Number(row?.idestacao) === CNL_ID) : null
     if (!principalRaw) throw new Error('Estação Rio Bananeiras não encontrada')
     const estacoesCatalogo = catalogo.filter(row => ESTACOES_CHUVA_IDS.has(Number(row?.idestacao)))
     const chuva = await Promise.allSettled(estacoesCatalogo.map(async item => {
       const id = Number(item.idestacao)
-      const response = await fetch(`${RECURSOS}/horario/${id}/96`, { signal: AbortSignal.timeout(15000) })
+      const response = await fetch(`${RECURSOS}/horario/${id}/96`, { signal: AbortSignal.timeout(2500) })
       if (!response.ok) throw new Error(`estação ${id} respondeu ${response.status}`)
       return { id, payload: await response.json() }
     }))
@@ -152,7 +166,7 @@ export const handler = async () => {
       status: String(estacaoHorario.status || 'UNKNOWN'),
       cotas: cotasSalvas.configuradas ? cotasSalvas.cotas : cotasOficiais,
     }
-    return json(200, {
+    const dados = {
       sucesso: true,
       estacao,
       estacoes,
@@ -164,8 +178,20 @@ export const handler = async () => {
       cotasConfiguradas: cotasSalvas.configuradas,
       atualizadoEm: new Date().toISOString(),
       fonte: FONTE,
-    })
+      aviso: avisoNivel,
+    }
+    monitoramentoCnlCache = dados
+    monitoramentoCnlCacheTs = Date.now()
+    return json(200, dados)
   } catch (error) {
+    if (monitoramentoCnlCache && Date.now() - monitoramentoCnlCacheTs <= MONITORAMENTO_CNL_CACHE_MAX_STALE_MS) {
+      return json(200, {
+        ...monitoramentoCnlCache,
+        cache: true,
+        erroAtualizacao: true,
+        aviso: 'O CEMADEN não respondeu nesta atualização. Exibindo a última consulta válida; uma nova tentativa será feita em breve.',
+      })
+    }
     return json(503, { sucesso: false, erro: 'Não foi possível consultar o monitoramento do CEMADEN.', detalhe: error?.message })
   }
 }

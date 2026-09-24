@@ -3674,21 +3674,35 @@ app.get('/api/monitoramento-cnl', async (_req, res) => {
       fetch(`${CNL_RECURSOS_URL}/horario/${CNL_ESTACAO_ID}/23`, {
         signal: controlador.signal,
         headers: { 'User-Agent': 'CODAP/1.0 (Conselheiro Lafaiete, MG)' },
-      }),
+      }).catch(() => null),
       fetch(CNL_NIVEL_URL, {
         signal: controlador.signal,
         headers: { 'User-Agent': 'CODAP/1.0 (Conselheiro Lafaiete, MG)' },
-      }),
+      }).catch(() => null),
     ])
-    if (!catalogoResposta.ok || !horarioResposta.ok || !nivelResposta.ok) {
-      throw new Error(`CEMADEN respondeu catálogo ${catalogoResposta.status}, série ${horarioResposta.status} e nível ${nivelResposta.status}`)
+    if (!catalogoResposta.ok) throw new Error(`CEMADEN respondeu catálogo ${catalogoResposta.status}`)
+    const catalogo = await catalogoResposta.json()
+    let horario = {}
+    let medidasNivel = []
+    let avisoSerie = ''
+    if (horarioResposta?.ok) {
+      try {
+        horario = await horarioResposta.json()
+      } catch {
+        avisoSerie = 'Série horária de chuva indisponível nesta atualização.'
+      }
+    } else {
+      avisoSerie = 'Série horária de chuva indisponível nesta atualização.'
     }
-
-    const [catalogo, horario, medidasNivel] = await Promise.all([
-      catalogoResposta.json(),
-      horarioResposta.json(),
-      nivelResposta.json(),
-    ])
+    if (nivelResposta?.ok) {
+      try {
+        medidasNivel = await nivelResposta.json()
+      } catch {
+        avisoSerie = [avisoSerie, 'Série hidrológica indisponível; usando a leitura mais recente do catálogo.'].filter(Boolean).join(' ')
+      }
+    } else {
+      avisoSerie = [avisoSerie, 'Série hidrológica indisponível; usando a leitura mais recente do catálogo.'].filter(Boolean).join(' ')
+    }
     const estacaoCatalogo = Array.isArray(catalogo)
       ? catalogo.find((item) => Number(item?.idestacao) === CNL_ESTACAO_ID)
       : null
@@ -3818,6 +3832,7 @@ app.get('/api/monitoramento-cnl', async (_req, res) => {
       serieChuvaCentro,
       aviso: [
         'Nível calculado pelo recurso oficial MedidaResource do CEMADEN: offset - valor.',
+        avisoSerie,
         falhasChuva.length ? `Precipitação diária indisponível para ${falhasChuva.length} estação(ões) neste ciclo.` : '',
       ].filter(Boolean).join(' '),
     }

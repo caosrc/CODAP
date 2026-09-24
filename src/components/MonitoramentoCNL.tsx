@@ -87,6 +87,25 @@ type ControleAlertaSonoro = {
 const INTERVALO_ATUALIZACAO = 5 * 60 * 1000
 const FUSO_HORARIO = 'America/Sao_Paulo'
 const DURACAO_ALERTA_SONORO_MS = 5000
+const CHAVE_CACHE_MONITORAMENTO = 'monitoramento-cnl-cache-v1'
+
+function lerCacheMonitoramento(): DadosCNL | null {
+  try {
+    const bruto = window.localStorage.getItem(CHAVE_CACHE_MONITORAMENTO)
+    if (!bruto) return null
+    const dados = JSON.parse(bruto) as DadosCNL
+    if (
+      dados?.sucesso !== true ||
+      !dados.estacao ||
+      !Array.isArray(dados.estacoes) ||
+      !Array.isArray(dados.serie) ||
+      !Array.isArray(dados.serieNivel)
+    ) return null
+    return dados
+  } catch {
+    return null
+  }
+}
 
 function formatarMm(valor: number | null | undefined): string {
   return valor == null || !Number.isFinite(valor) ? '—' : `${valor.toLocaleString('pt-BR', { maximumFractionDigits: 2 })} mm`
@@ -453,8 +472,23 @@ export default function MonitoramentoCNL({ onAbrirMapa }: Props) {
       if (!resposta.ok || !corpo.sucesso) throw new Error(corpo.erro || 'O CEMADEN não retornou dados.')
       setDados(corpo)
       setErro('')
+      try {
+        window.localStorage.setItem(CHAVE_CACHE_MONITORAMENTO, JSON.stringify(corpo))
+      } catch {
+        // O cache local é opcional; a consulta ao vivo continua funcionando sem espaço de armazenamento.
+      }
     } catch (falha) {
       setErro(falha instanceof Error ? falha.message : 'Não foi possível consultar o CEMADEN.')
+      const cache = lerCacheMonitoramento()
+      setDados((anterior) => {
+        const ultimoValido = anterior || cache
+        return ultimoValido
+          ? {
+              ...ultimoValido,
+              aviso: 'Não foi possível atualizar os dados do CEMADEN. Exibindo a última consulta válida; uma nova tentativa será feita em breve.',
+            }
+          : null
+      })
     } finally {
       setCarregando(false)
       setAtualizando(false)

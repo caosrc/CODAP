@@ -3,8 +3,8 @@ function resposta(statusCode, body) {
 }
 
 function configurarSupabase() {
-  const url = String(process.env.VITE_SUPABASE_URL || '').replace(/\/$/, '')
-  const key = String(process.env.VITE_SUPABASE_ANON_KEY || '')
+  const url = String(process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || '').replace(/\/$/, '')
+  const key = String(process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || '')
   if (!url || !key) throw new Error('Supabase não configurado')
   return { endpoint: `${url}/rest/v1/monitoramento_cnl_cotas`, headers: { apikey: key, Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' } }
 }

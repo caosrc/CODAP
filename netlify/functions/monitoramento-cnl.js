@@ -19,8 +19,8 @@ const json = (statusCode, body) => ({
 const number = value => value == null || value === '-' || value === '' ? null : (Number.isFinite(Number(value)) ? Number(value) : null)
 
 function configurarSupabase() {
-  const url = String(process.env.VITE_SUPABASE_URL || '').replace(/\/$/, '')
-  const key = String(process.env.VITE_SUPABASE_ANON_KEY || '')
+  const url = String(process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || '').replace(/\/$/, '')
+  const key = String(process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || '')
   if (!url || !key) return null
   return { endpoint: `${url}/rest/v1/monitoramento_cnl_cotas`, headers: { apikey: key, Authorization: `Bearer ${key}` } }
 }

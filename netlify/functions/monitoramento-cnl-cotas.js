@@ -51,7 +51,9 @@ export const handler = async event => {
       console.error('[Monitoramento CNL] Falha ao salvar cotas:', error?.message || error)
       return resposta(500, {
         sucesso: false,
-        erro: 'Não foi possível salvar as cotas. Verifique a configuração e as permissões da tabela monitoramento_cnl_cotas no Supabase.',
+        erro: error instanceof Error && error.message
+          ? `Não foi possível salvar as cotas: ${error.message}`
+          : 'Não foi possível salvar as cotas. Verifique a configuração e as permissões da tabela monitoramento_cnl_cotas no Supabase.',
       })
     }
     return resposta(200, { sucesso: true, cotas: null, aviso: error?.message })

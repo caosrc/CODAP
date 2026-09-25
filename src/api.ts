@@ -6,19 +6,21 @@ import { savePending, getCachedOcorrencias } from './offline'
 import { supabase, supabaseDisponivel } from './supabaseClient'
 import { wsSend } from './wsClient'
 
-// Redimensiona e recomprime um base64 para no máximo maxW pixels de largura
-// em WebP para manter as fotos leves no banco sem perder tanta qualidade.
-async function comprimirFoto(dataUrl: string, maxW = 1280, qualidade = 0.78): Promise<string> {
-  if (!dataUrl || !dataUrl.startsWith('data:')) return dataUrl
-  if (dataUrl.startsWith('data:image/webp')) return dataUrl
+const LIMITE_FOTOS_OCORRENCIA_BYTES = 4 * 1024 * 1024
+
+// Redimensiona e recomprime imagens, inclusive WebP já existente. Isso evita
+// que um lote de fotos codificadas em base64 transforme o UPDATE JSONB em uma
+// única instrução grande o bastante para exceder o statement_timeout.
+async function comprimirFoto(dataUrl: string, maxDimensao = 1280, qualidade = 0.62): Promise<string> {
+  if (!dataUrl || !dataUrl.startsWith('data:image/')) return dataUrl
   return new Promise((resolve) => {
     const img = new Image()
     img.onload = () => {
       let { width, height } = img
-      if (width > maxW) {
-        height = Math.round((height * maxW) / width)
-        width = maxW
-      }
+      if (!width || !height) { resolve(dataUrl); return }
+      const escala = Math.min(1, maxDimensao / width, maxDimensao / height)
+      width = Math.max(1, Math.round(width * escala))
+      height = Math.max(1, Math.round(height * escala))
       try {
         const canvas = document.createElement('canvas')
         canvas.width = width
@@ -27,7 +29,12 @@ async function comprimirFoto(dataUrl: string, maxW = 1280, qualidade = 0.78): Pr
         if (!ctx) { resolve(dataUrl); return }
         ctx.drawImage(img, 0, 0, width, height)
         const webp = canvas.toDataURL('image/webp', qualidade)
-        resolve(webp.startsWith('data:image/webp') ? webp : dataUrl)
+        const result = webp.startsWith('data:image/webp')
+          ? webp
+          : canvas.toDataURL('image/jpeg', qualidade)
+        canvas.width = 0
+        canvas.height = 0
+        resolve(result)
       } catch {
         resolve(dataUrl)
       }
@@ -39,11 +46,35 @@ async function comprimirFoto(dataUrl: string, maxW = 1280, qualidade = 0.78): Pr
 
 async function comprimirFotos(fotos: unknown[]): Promise<string[]> {
   if (!Array.isArray(fotos) || fotos.length === 0) return []
-  const result: string[] = []
-  for (const f of fotos) {
-    result.push(typeof f === 'string' ? await comprimirFoto(f) : '')
+  const configuracoes = [
+    { dimensao: 1280, qualidade: 0.62 },
+    { dimensao: 960, qualidade: 0.54 },
+    { dimensao: 768, qualidade: 0.46 },
+    { dimensao: 640, qualidade: 0.38 },
+  ]
+  let result: string[] = []
+  let tamanhoBytes = 0
+
+  for (const config of configuracoes) {
+    result = []
+    for (const foto of fotos) {
+      result.push(typeof foto === 'string'
+        ? await comprimirFoto(foto, config.dimensao, config.qualidade)
+        : '')
+    }
+    tamanhoBytes = result.reduce((total, foto) => {
+      const base64 = foto.match(/^data:[^,]*;base64,(.*)$/s)?.[1]
+      if (!base64) return total + foto.length
+      const padding = base64.endsWith('==') ? 2 : base64.endsWith('=') ? 1 : 0
+      return total + Math.max(0, Math.floor(base64.length * 3 / 4) - padding)
+    }, 0)
+    if (tamanhoBytes <= LIMITE_FOTOS_OCORRENCIA_BYTES) return result
   }
-  return result
+
+  const tamanhoMb = (tamanhoBytes / (1024 * 1024)).toFixed(1)
+  throw new Error(
+    `As fotos ainda ocupam ${tamanhoMb} MB após a compressão. Reduza o número de fotos ou selecione imagens menores (limite total: 4 MB).`
+  )
 }
 
 function localOffline(dados: Omit<Ocorrencia, 'id' | 'created_at'>, localId: number): Ocorrencia {
@@ -345,38 +376,42 @@ export async function atualizarOcorrencia(
   const { id: _i, _offline: _o, _localId: _l, ...payloadRaw } = dados as Record<string, unknown>
   void _i; void _o; void _l
 
-  // payload começa como payloadRaw; pode ser substituído com fotos comprimidas no bloco Supabase
-  let payload: Record<string, unknown> = payloadRaw
+  // Só inclui fotos no UPDATE quando a chamada realmente as altera. Isso evita
+  // apagar fotos em atualizações parciais, como adicionar uma vistoria.
+  let payload: Record<string, unknown> = { ...payloadRaw }
 
   // Supabase direto quando disponível (Netlify)
   if (supabaseDisponivel) {
-    // Comprime fotos antes de enviar para evitar payload > 10 MB no Supabase
-    const fotosComprimidas = await comprimirFotos(Array.isArray(payloadRaw.fotos) ? payloadRaw.fotos as unknown[] : [])
-    payload = { ...payloadRaw, fotos: fotosComprimidas }
+    if (Array.isArray(payloadRaw.fotos)) {
+      payload.fotos = await comprimirFotos(payloadRaw.fotos)
+    }
 
+    let payloadSalvo = payload
     let { data, error } = await supabase
       .from('ocorrencias')
       .update(payload)
       .eq('id', id)
-      .select()
+      .select('id')
       .single()
     if (error && isColumnMissingError(error)) {
       // Colunas ausentes no Supabase — tenta sem elas
       const { hora_inicio: _hi, hora_fim: _hf, horas_total: _ht, horas_sobreaviso: _hs, poligono_area_queimada: _paq, descricoes_fotos: _df, chuva: _chuva, metragem_lona: _metragemLona, ...payloadBase } = payload as Record<string, unknown>
       void _hi; void _hf; void _ht; void _hs; void _paq; void _df; void _chuva; void _metragemLona
-      const r2 = await supabase.from('ocorrencias').update(payloadBase).eq('id', id).select().single()
+      const r2 = await supabase.from('ocorrencias').update(payloadBase).eq('id', id).select('id').single()
       data = r2.data
       error = r2.error
+      payloadSalvo = payloadBase
     }
     if (error) throw new Error(error.message)
     if (!data) throw new Error('Ocorrência não encontrada')
     wsSend({ tipo: 'ocorrencias_atualizadas' })
-    return data as Ocorrencia
+    return { ...payloadSalvo, ...data } as Ocorrencia
   }
 
   // Express (Replit) — comprime fotos antes de enviar
-  const fotosExpressAtualizadas = await comprimirFotos(Array.isArray(payloadRaw.fotos) ? payloadRaw.fotos as unknown[] : [])
-  payload = { ...payloadRaw, fotos: fotosExpressAtualizadas }
+  if (Array.isArray(payloadRaw.fotos)) {
+    payload.fotos = await comprimirFotos(payloadRaw.fotos)
+  }
 
   try {
     const res = await fetch(`/api/ocorrencias/${id}`, {
@@ -391,7 +426,7 @@ export async function atualizarOcorrencia(
       }
       const data = await res.json()
       if (!data) throw new Error('Ocorrência não encontrada')
-      return data as Ocorrencia
+      return { ...payload, ...data } as Ocorrencia
     }
   } catch (e) {
     if (e instanceof Error && e.message) throw e

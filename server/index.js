@@ -1257,37 +1257,46 @@ app.get('/api/ocorrencias/:id', async (req, res) => {
 app.put('/api/ocorrencias/:id', async (req, res) => {
   const id = parseInt(req.params.id, 10)
   if (isNaN(id)) return res.status(400).json({ error: 'ID inválido' })
-  const { tipo, natureza, subnatureza, nivel_risco, status_oc, fotos, descricoes_fotos, lat, lng, endereco, proprietario, telefone_proprietario, situacao, recomendacao, conclusao, data_ocorrencia, hora_inicio, hora_fim, horas_total, horas_sobreaviso, agentes, vistorias, focos_incendio, poligono_area_queimada, chuva, created_at } = req.body
-  console.log(`PUT /api/ocorrencias/${id} — tipo=${tipo} natureza=${natureza}`)
+  const camposAtualizaveis = {
+    tipo: { coluna: 'tipo', converter: valor => valor ?? null },
+    natureza: { coluna: 'natureza', converter: valor => valor ?? null },
+    subnatureza: { coluna: 'subnatureza', converter: valor => valor || null },
+    nivel_risco: { coluna: 'nivel_risco', converter: valor => valor ?? null },
+    status_oc: { coluna: 'status_oc', converter: valor => valor ?? null },
+    fotos: { coluna: 'fotos', converter: valor => JSON.stringify(Array.isArray(valor) ? valor : []) },
+    descricoes_fotos: { coluna: 'descricoes_fotos', converter: valor => JSON.stringify(Array.isArray(valor) ? valor : []) },
+    lat: { coluna: 'lat', converter: valor => valor != null && valor !== '' ? valor : null },
+    lng: { coluna: 'lng', converter: valor => valor != null && valor !== '' ? valor : null },
+    endereco: { coluna: 'endereco', converter: valor => valor || null },
+    proprietario: { coluna: 'proprietario', converter: valor => valor || null },
+    situacao: { coluna: 'situacao', converter: valor => valor || null },
+    recomendacao: { coluna: 'recomendacao', converter: valor => valor || null },
+    conclusao: { coluna: 'conclusao', converter: valor => valor || null },
+    data_ocorrencia: { coluna: 'data_ocorrencia', converter: valor => valor || null },
+    hora_inicio: { coluna: 'hora_inicio', converter: valor => valor || null },
+    hora_fim: { coluna: 'hora_fim', converter: valor => valor || null },
+    horas_total: { coluna: 'horas_total', converter: valor => valor ?? null },
+    horas_sobreaviso: { coluna: 'horas_sobreaviso', converter: valor => valor ?? null },
+    agentes: { coluna: 'agentes', converter: valor => JSON.stringify(Array.isArray(valor) ? valor : []) },
+    vistorias: { coluna: 'vistorias', converter: valor => JSON.stringify(Array.isArray(valor) ? valor : []) },
+    focos_incendio: { coluna: 'focos_incendio', converter: valor => Array.isArray(valor) && valor.length ? JSON.stringify(valor) : null },
+    poligono_area_queimada: { coluna: 'poligono_area_queimada', converter: valor => Array.isArray(valor) && valor.length ? JSON.stringify(valor) : null },
+    chuva: { coluna: 'chuva', converter: valor => valor != null && valor !== '' ? Number(valor) : null },
+    telefone_proprietario: { coluna: 'telefone_proprietario', converter: valor => valor || null },
+    created_at: { coluna: 'created_at', converter: valor => valor || null, manterSeNulo: true },
+  }
+  const campos = Object.entries(camposAtualizaveis)
+    .filter(([nome]) => Object.hasOwn(req.body, nome))
+  console.log(`PUT /api/ocorrencias/${id} — tipo=${req.body.tipo} natureza=${req.body.natureza}`)
   try {
-    const result = await query(
-      `UPDATE ocorrencias SET tipo=$1, natureza=$2, subnatureza=$3, nivel_risco=$4, status_oc=$5,
-       fotos=$6, descricoes_fotos=$7, lat=$8, lng=$9, endereco=$10, proprietario=$11, situacao=$12, recomendacao=$13,
-       conclusao=$14, data_ocorrencia=$15, hora_inicio=$16, hora_fim=$17,
-       horas_total=$18, horas_sobreaviso=$19,
-       agentes=$20, vistorias=$21, focos_incendio=$22,
-       poligono_area_queimada=$23, chuva=$24, telefone_proprietario=$25, created_at=COALESCE($26, created_at)
-       WHERE id=$27 RETURNING *`,
-      [tipo, natureza, subnatureza || null, nivel_risco, status_oc,
-       JSON.stringify(Array.isArray(fotos) ? fotos : []),
-       JSON.stringify(Array.isArray(descricoes_fotos) ? descricoes_fotos : []),
-       lat != null && lat !== '' ? lat : null,
-       lng != null && lng !== '' ? lng : null,
-       endereco || null, proprietario || null,
-       situacao || null, recomendacao || null, conclusao || null,
-       data_ocorrencia || null,
-       hora_inicio || null, hora_fim || null,
-       horas_total != null ? horas_total : null,
-       horas_sobreaviso != null ? horas_sobreaviso : null,
-       JSON.stringify(Array.isArray(agentes) ? agentes : []),
-       JSON.stringify(Array.isArray(vistorias) ? vistorias : []),
-       Array.isArray(focos_incendio) && focos_incendio.length ? JSON.stringify(focos_incendio) : null,
-       Array.isArray(poligono_area_queimada) && poligono_area_queimada.length ? JSON.stringify(poligono_area_queimada) : null,
-        chuva != null && chuva !== '' ? Number(chuva) : null,
-         telefone_proprietario || null,
-         created_at || null,
-       id]
-    )
+    const result = campos.length
+      ? await query(
+          `UPDATE ocorrencias SET ${campos.map(([nome, config], i) =>
+            `${config.coluna}=${config.manterSeNulo ? `COALESCE($${i + 1}, ${config.coluna})` : `$${i + 1}`}`
+          ).join(', ')} WHERE id=$${campos.length + 1} RETURNING id`,
+          [...campos.map(([nome, config]) => config.converter(req.body[nome])), id]
+        )
+      : await query('SELECT id FROM ocorrencias WHERE id=$1', [id])
     if (!result.rows[0]) return res.status(404).json({ error: 'Ocorrência não encontrada' })
     console.log(`PUT /api/ocorrencias/${id} — salvo com sucesso`)
     broadcastOcorrenciasAtualizadas()

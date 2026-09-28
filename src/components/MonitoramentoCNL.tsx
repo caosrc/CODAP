@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import './MonitoramentoCNL.css'
+import { supabase, supabaseDisponivel } from '../supabaseClient'
 
 export type EstacaoCNL = {
   id: number
@@ -42,6 +43,32 @@ type CotasCNL = {
   atencao: number | null
   alerta: number | null
   transbordamento: number | null
+}
+
+const COTAS_CNL_ID = 1
+
+function normalizarCotasCNL(valor: Partial<CotasCNL> | null | undefined): CotasCNL | null {
+  const cotas = {
+    atencao: Number(valor?.atencao),
+    alerta: Number(valor?.alerta),
+    transbordamento: Number(valor?.transbordamento),
+  }
+  return Object.values(cotas).every((numero) => Number.isFinite(numero) && numero >= 0 && numero <= 100)
+    && cotas.atencao < cotas.alerta
+    && cotas.alerta < cotas.transbordamento
+    ? cotas
+    : null
+}
+
+async function buscarCotasSupabase(): Promise<CotasCNL | null> {
+  if (!supabaseDisponivel) return null
+  const { data, error } = await supabase
+    .from('monitoramento_cnl_cotas')
+    .select('atencao, alerta, transbordamento')
+    .eq('id', COTAS_CNL_ID)
+    .maybeSingle()
+  if (error) throw error
+  return normalizarCotasCNL(data)
 }
 
 export type PontoSerie = {
@@ -470,10 +497,25 @@ export default function MonitoramentoCNL({ onAbrirMapa }: Props) {
       const resposta = await fetch('/api/monitoramento-cnl', { cache: 'no-store' })
       const corpo = await resposta.json() as DadosCNL & { erro?: string }
       if (!resposta.ok || !corpo.sucesso) throw new Error(corpo.erro || 'O CEMADEN não retornou dados.')
-      setDados(corpo)
+      let dadosCarregados = corpo
+      if (supabaseDisponivel) {
+        try {
+          const cotasSupabase = await buscarCotasSupabase()
+          if (cotasSupabase) {
+            dadosCarregados = {
+              ...corpo,
+              cotasConfiguradas: true,
+              estacao: { ...corpo.estacao, cotas: cotasSupabase },
+            }
+          }
+        } catch (falhaSupabase) {
+          console.warn('[Monitoramento CNL] Não foi possível ler as cotas do Supabase:', falhaSupabase)
+        }
+      }
+      setDados(dadosCarregados)
       setErro('')
       try {
-        window.localStorage.setItem(CHAVE_CACHE_MONITORAMENTO, JSON.stringify(corpo))
+        window.localStorage.setItem(CHAVE_CACHE_MONITORAMENTO, JSON.stringify(dadosCarregados))
       } catch {
         // O cache local é opcional; a consulta ao vivo continua funcionando sem espaço de armazenamento.
       }
@@ -540,17 +582,30 @@ export default function MonitoramentoCNL({ onAbrirMapa }: Props) {
     setSalvandoCotas(true)
     setErroCotas('')
     try {
-      const resposta = await fetch('/api/monitoramento-cnl/cotas', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(valores),
-      })
-      const corpo = await resposta.json() as { sucesso?: boolean; cotas?: CotasCNL; erro?: string }
-      if (!resposta.ok || !corpo.sucesso || !corpo.cotas) throw new Error(corpo.erro || 'Não foi possível salvar as cotas.')
+      let cotasSalvas: CotasCNL | null = null
+      if (supabaseDisponivel) {
+        const { data, error } = await supabase
+          .from('monitoramento_cnl_cotas')
+          .upsert({ id: COTAS_CNL_ID, ...valores, updated_at: new Date().toISOString() }, { onConflict: 'id' })
+          .select('atencao, alerta, transbordamento')
+          .single()
+        if (error) throw new Error(`Não foi possível salvar as cotas no Supabase: ${error.message}`)
+        cotasSalvas = normalizarCotasCNL(data)
+      } else {
+        const resposta = await fetch('/api/monitoramento-cnl/cotas', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(valores),
+        })
+        const corpo = await resposta.json() as { sucesso?: boolean; cotas?: CotasCNL; erro?: string }
+        if (!resposta.ok || !corpo.sucesso || !corpo.cotas) throw new Error(corpo.erro || 'Não foi possível salvar as cotas.')
+        cotasSalvas = corpo.cotas
+      }
+      if (!cotasSalvas) throw new Error('O Supabase não retornou as cotas gravadas.')
       setDados((anterior) => anterior ? {
         ...anterior,
         cotasConfiguradas: true,
-        estacao: { ...anterior.estacao, cotas: corpo.cotas! },
+        estacao: { ...anterior.estacao, cotas: cotasSalvas! },
       } : anterior)
       setEditandoCotas(false)
       setCotasSalvas('Cotas salvas para todos os agentes do monitoramento.')

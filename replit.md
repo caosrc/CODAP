@@ -8,6 +8,10 @@
 
 Required env vars (all set in Replit shared env / secrets):
 - `DATABASE_URL` — Replit PostgreSQL (auto-provisioned; do not set manually)
+- `VITE_USE_SUPABASE` — `true` para usar o banco Supabase no frontend
+- `VITE_SUPABASE_URL` — URL pública do projeto Supabase
+- `VITE_SUPABASE_ANON_KEY` — chave pública anon do projeto Supabase
+- `SUPABASE_URL` e `SUPABASE_ANON_KEY` — mesmos valores para rotas/serviços server-side
 - `VAPID_PUBLIC_KEY` — VAPID public key (shared env var, already set)
 - `VAPID_PRIVATE_KEY` — VAPID private key (**secret** — needed for push notifications)
 - `VAPID_SUBJECT` — mailto: contact for VAPID (already set)
@@ -31,9 +35,9 @@ Required env vars (all set in Replit shared env / secrets):
 
 ## Where things live
 - `server/index.js` — Express API + WebSocket server + DB init (`initDb`)
-- `src/api.ts` — CRUD for ocorrências (Express primary, Supabase disabled)
+- `src/api.ts` — CRUD for ocorrências (Supabase quando configurado; Express como fallback)
 - `src/matApi.ts` — CRUD for materiais/emprestimos/campo (Express primary)
-- `src/supabaseClient.ts` — client desativado nesta cópia; `supabaseDisponivel=false`
+- `src/supabaseClient.ts` — cliente Supabase ativado quando as variáveis `VITE_*` estão presentes
 - `src/wsClient.ts` — WebSocket client (connects to /ws)
 - `src/pushNotifications.ts` — Web Push subscription via Express `/api/push-subscriptions`
 - `src/components/` — React components per feature

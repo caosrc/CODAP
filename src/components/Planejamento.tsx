@@ -120,6 +120,7 @@ const ORGAOS_EMPENHO: { categoria: string; emoji: string; orgaos: { emoji: strin
 import './Planejamento.css'
 
 const PlanoEmergencia = lazy(() => import('./PlanoEmergencia'))
+const MonitoramentoCNL = lazy(() => import('./MonitoramentoCNL'))
 
 // Corrige ícones do Leaflet com Vite
 delete (L.Icon.Default.prototype as Record<string, unknown>)._getIconUrl
@@ -131,7 +132,7 @@ L.Icon.Default.mergeOptions({
 
 // ── Tipos ──────────────────────────────────────────────────────────────
 type TipoPlano = 'evento' | 'operacao' | 'simulado' | 'emergencia'
-type SubAbaPlanejamento = TipoPlano | 'radar'
+type SubAbaPlanejamento = TipoPlano | 'radar' | 'monitoramento'
 type StatusPlano = 'planejado' | 'em_curso' | 'concluido' | 'cancelado'
 
 interface MaterialPlano {
@@ -4202,7 +4203,11 @@ function ListaPlanos({
 }
 
 // ── Componente principal ────────────────────────────────────────────────
-export default function Planejamento() {
+type PlanejamentoProps = {
+  onAbrirMapa?: (latitude: number, longitude: number, nome: string) => void
+}
+
+export default function Planejamento({ onAbrirMapa }: PlanejamentoProps) {
   const [subAba, setSubAba] = useState<SubAbaPlanejamento>('radar')
   const [planos, setPlanos] = useState<Plano[]>(() => carregarPlanos())
   const [criando, setCriando] = useState(false)
@@ -4387,6 +4392,13 @@ export default function Planejamento() {
           <img className="radar-tab-icon" src="/defesa-civil-logo.png" alt="" />
           Radar DC
         </button>
+        <button
+          className={`plan-subtab ${subAba === 'monitoramento' ? 'ativo' : ''}`}
+          onClick={() => setSubAba('monitoramento')}
+        >
+          <span className="st-emoji">🌊</span>
+          Monitoramento
+        </button>
         {(['evento', 'operacao', 'simulado', 'emergencia'] as TipoPlano[]).map(t => {
           const c = TIPOS_CONFIG[t]
           const total = t !== 'emergencia' ? totalPorTipo(t) : 0
@@ -4420,6 +4432,12 @@ export default function Planejamento() {
         <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
            <RadarDC />
         </div>
+      ) : subAba === 'monitoramento' ? (
+        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
+          <Suspense fallback={<div style={{ padding: '2rem', textAlign: 'center' }}>Carregando...</div>}>
+            <MonitoramentoCNL onAbrirMapa={onAbrirMapa} />
+          </Suspense>
+        </div>
       ) : subAba === 'emergencia' ? (
         <div style={{ flex: 1, overflowY: 'auto' }}>
           <Suspense fallback={<div style={{ padding: '2rem', textAlign: 'center' }}>Carregando...</div>}>
@@ -4451,7 +4469,7 @@ export default function Planejamento() {
         </>
       )}
 
-      {subAba !== 'emergencia' && criando && (
+      {subAba !== 'emergencia' && subAba !== 'monitoramento' && criando && (
         <FormularioPlano
           tipo={subAba}
           onSalvar={salvarPlano}
@@ -4459,7 +4477,7 @@ export default function Planejamento() {
         />
       )}
 
-      {subAba !== 'emergencia' && aberto && (
+      {subAba !== 'emergencia' && subAba !== 'monitoramento' && aberto && (
         <DetalheP
           plano={aberto}
           onVoltar={() => setAberto(null)}

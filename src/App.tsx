@@ -1323,7 +1323,12 @@ export default function App() {
         {aba === 'planejamento' && (
           <ErrorBoundary>
             <Suspense fallback={<LazyFallback />}>
-              <Planejamento />
+              <Planejamento
+                onAbrirMapa={(lat, lng, nome) => {
+                  setDestinoCampo({ lat, lng, nome, soMostrar: true })
+                  navegarParaAba('mapa')
+                }}
+              />
             </Suspense>
           </ErrorBoundary>
         )}
@@ -1352,12 +1357,6 @@ export default function App() {
           <span className="nav-emoji">📐</span>
           <span>Planejamento</span>
         </button>
-        {orgaoAtual === 'defesa-civil' && (
-          <button className={`nav-btn nav-monitoramento ${aba === 'monitoramento' ? 'ativo' : ''}`} onClick={() => navegarParaAba('monitoramento')}>
-            <span className="nav-emoji">🌊</span>
-            <span>Monitoramento</span>
-          </button>
-        )}
         <button className={`nav-btn ${aba === 'lista' ? 'ativo' : ''}`} onClick={() => navegarParaAba('lista')}>
           <span className="nav-emoji">📋</span>
           <span>Ocorrências</span>

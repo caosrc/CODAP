@@ -20,10 +20,11 @@
 }
 .plan-subtab {
   flex: 1;
-  padding: 0.7rem 0.3rem;
+  min-width: 0;
+  padding: 0.55rem 0.2rem;
   border: none;
   background: none;
-  font-size: 0.78rem;
+  font-size: 0.72rem;
   font-weight: 600;
   color: #6b7280;
   display: flex;
@@ -34,7 +35,7 @@
   margin-bottom: -2px;
   transition: all 0.15s;
 }
-.plan-subtab .st-emoji { font-size: 1.3rem; line-height: 1; }
+.plan-subtab .st-emoji { font-size: 1.15rem; line-height: 1; }
 .plan-subtab.ativo {
   color: #1a4b8c;
   border-bottom-color: #1a4b8c;

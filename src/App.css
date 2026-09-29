@@ -1231,6 +1231,190 @@ input, select, textarea { font-family: inherit; }
   padding: 0.2rem 0.4rem;
   cursor: pointer;
 }
+.mapa-tempo-marker {
+  background: transparent;
+  border: 0;
+}
+.mapa-tempo-marker-balao {
+  position: relative;
+  display: grid;
+  grid-template-columns: 20px 1fr;
+  align-items: center;
+  width: 86px;
+  min-height: 50px;
+  padding: 5px 6px;
+  border: 2px solid var(--tempo-cor, #0369a1);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.96);
+  color: #0f172a;
+  box-shadow: 0 3px 10px rgba(15, 23, 42, 0.28);
+  font-family: inherit;
+}
+.mapa-tempo-marker-icone {
+  grid-row: span 2;
+  font-size: 1rem;
+}
+.mapa-tempo-marker-balao strong {
+  color: var(--tempo-cor, #0369a1);
+  font-size: 0.86rem;
+  line-height: 1;
+}
+.mapa-tempo-marker-balao small {
+  overflow: hidden;
+  color: #475569;
+  font-size: 0.48rem;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mapa-tempo-marker-ponta {
+  width: 10px;
+  height: 10px;
+  margin: -2px auto 0;
+  border-right: 2px solid var(--tempo-cor, #0369a1);
+  border-bottom: 2px solid var(--tempo-cor, #0369a1);
+  background: white;
+  transform: rotate(45deg);
+}
+.mapa-tempo-popup {
+  min-width: 170px;
+  display: grid;
+  gap: 3px;
+  font-family: inherit;
+  font-size: 0.78rem;
+}
+.mapa-tempo-popup-temperatura {
+  color: #0369a1;
+  font-size: 1.45rem;
+  font-weight: 800;
+}
+.mapa-tempo-popup small {
+  margin-top: 4px;
+  color: #64748b;
+}
+.mapa-tempo-painel {
+  padding: 0.5rem;
+  border-bottom: 1px solid #e5e7eb;
+  background: linear-gradient(180deg, #f0f9ff, #ffffff);
+}
+.mapa-tempo-painel-atual {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+.mapa-tempo-painel-icone {
+  font-size: 1.35rem;
+}
+.mapa-tempo-painel-atual strong,
+.mapa-tempo-painel-atual span {
+  display: block;
+}
+.mapa-tempo-painel-atual strong {
+  color: #0f172a;
+  font-size: 0.92rem;
+}
+.mapa-tempo-painel-atual span {
+  color: #475569;
+  font-size: 0.55rem;
+}
+.mapa-tempo-painel-metricas {
+  display: grid;
+  gap: 0.15rem;
+  margin-left: auto;
+  color: #475569;
+  font-size: 0.55rem;
+  text-align: right;
+}
+.mapa-tempo-painel-estado {
+  display: flex;
+  align-items: baseline;
+  gap: 0.3rem;
+  margin-top: 0.35rem;
+  font-size: 0.58rem;
+}
+.mapa-tempo-painel-estado span {
+  color: #64748b;
+}
+.mapa-tempo-painel-previsao {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 0.18rem;
+  margin-top: 0.45rem;
+}
+.mapa-tempo-painel-previsao span {
+  display: grid;
+  justify-items: center;
+  gap: 0.12rem;
+  padding: 0.2rem 0.05rem;
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.85);
+  color: #475569;
+  font-size: 0.43rem;
+}
+.mapa-tempo-painel-previsao strong {
+  font-size: 0.8rem;
+}
+.mapa-tempo-painel-previsao small {
+  font-size: 0.42rem;
+}
+.mapa-tempo-alertas {
+  display: grid;
+  gap: 0.25rem;
+  padding: 0.45rem 0.5rem;
+  border-bottom: 1px solid #e5e7eb;
+  background: #fff;
+}
+.mapa-tempo-alertas-titulo {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.4rem;
+}
+.mapa-tempo-alertas-titulo strong {
+  color: #334155;
+  font-size: 0.6rem;
+}
+.mapa-tempo-alertas-titulo span {
+  color: #64748b;
+  font-size: 0.48rem;
+}
+.mapa-tempo-alerta {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.4rem;
+  padding: 0.3rem 0.35rem;
+  border-left: 3px solid #f59e0b;
+  border-radius: 4px;
+  background: #fffbeb;
+  color: #92400e;
+  font-size: 0.5rem;
+  text-decoration: none;
+}
+.mapa-tempo-alerta b {
+  font-size: 0.55rem;
+}
+.mapa-tempo-alerta span {
+  color: #a16207;
+  white-space: nowrap;
+}
+.mapa-tempo-alerta--vermelho {
+  border-left-color: #dc2626;
+  background: #fef2f2;
+  color: #991b1b;
+}
+.mapa-tempo-alerta--informativo {
+  border-left-color: #0284c7;
+  background: #f0f9ff;
+  color: #075985;
+}
+.mapa-tempo-sem-alerta,
+.mapa-tempo-alerta-erro {
+  color: #64748b;
+  font-size: 0.54rem;
+}
+.mapa-tempo-alerta-erro {
+  color: #b91c1c;
+}
 .mapa-chuva-fontes {
   display: flex;
   align-items: center;

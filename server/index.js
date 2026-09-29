@@ -3407,6 +3407,101 @@ app.get('/api/tempo', async (_req, res) => {
   }
 })
 
+// ── Alertas meteorológicos do INMET para Conselheiro Lafaiete ───────────────
+// O INMET publica os avisos ativos em formato JSON. Mantemos a consulta no
+// servidor para evitar CORS e para não expor uma chamada externa em cada mapa.
+let alertasInmetCache = null
+let alertasInmetCacheTs = 0
+const ALERTAS_INMET_TTL_MS = 10 * 60 * 1000
+const CODIGO_IBGE_CONSELHEIRO_LAFAIETE = '3118304'
+
+function tituloAlertaInmet(alerta) {
+  const codigo = Number(alerta?.id_condicao_severa)
+  if (codigo === 45) return 'Onda de calor'
+  if (codigo === 38) return 'Tempestade'
+  if ([23, 24, 25, 26, 27].includes(codigo)) return 'Chuva intensa'
+  return 'Aviso meteorológico'
+}
+
+function nivelAlertaInmet(alerta) {
+  const codigo = Number(alerta?.id_condicao_severa)
+  if (codigo === 45) return 'vermelho'
+  if ([38, 23, 24, 25, 26, 27].includes(codigo)) return 'amarelo'
+  return 'informativo'
+}
+
+app.get('/api/alertas-tempo', async (_req, res) => {
+  try {
+    const agora = Date.now()
+    if (alertasInmetCache && agora - alertasInmetCacheTs < ALERTAS_INMET_TTL_MS) {
+      return res.json({ ...alertasInmetCache, cache: true })
+    }
+
+    const resposta = await fetch('https://apiprevmet3.inmet.gov.br/avisos/ativos', {
+      headers: {
+        Accept: 'application/json',
+        'User-Agent': 'CODAP/1.0 (Conselheiro Lafaiete, MG)',
+      },
+      signal: AbortSignal.timeout(10000),
+    })
+    if (!resposta.ok) throw new Error(`INMET: ${resposta.status}`)
+
+    const payload = await resposta.json()
+    const itens = Object.values(payload || {}).flat().filter(Boolean)
+    const encontrados = itens
+      .filter(item => {
+        const municipios = String(item?.municipios || '')
+        return municipios.includes(CODIGO_IBGE_CONSELHEIRO_LAFAIETE)
+          || /Conselheiro Lafaiete/i.test(municipios)
+      })
+      .map(item => ({
+        id: Number(item.id ?? item.id_aviso),
+        codigo: String(item.codigo || ''),
+        titulo: tituloAlertaInmet(item),
+        nivel: nivelAlertaInmet(item),
+        condicao: Number(item.id_condicao_severa) || null,
+        inicio: item.data_inicio && item.hora_inicio
+          ? `${String(item.data_inicio).slice(0, 10)}T${item.hora_inicio}:00-03:00`
+          : item.data_inicio || null,
+        fim: item.data_fim && item.hora_fim
+          ? `${String(item.data_fim).slice(0, 10)}T${item.hora_fim}:00-03:00`
+          : item.data_fim || null,
+        horaInicio: item.hora_inicio || null,
+        horaFim: item.hora_fim || null,
+        municipios: String(item.municipios || ''),
+        fonte: 'INMET',
+        url: item.id ? `https://avisos.inmet.gov.br/${item.id}` : 'https://avisos.inmet.gov.br/',
+      }))
+      .filter(item => Number.isFinite(item.id))
+      .filter((item, indice, lista) => lista.findIndex(outro =>
+        outro.id === item.id
+        && outro.condicao === item.condicao
+        && outro.inicio === item.inicio
+        && outro.fim === item.fim,
+      ) === indice)
+
+    alertasInmetCache = {
+      local: 'Conselheiro Lafaiete - MG',
+      atualizadoEm: new Date().toISOString(),
+      alertas: encontrados,
+      fonte: 'INMET',
+    }
+    alertasInmetCacheTs = agora
+    return res.json(alertasInmetCache)
+  } catch (erro) {
+    console.error('Erro ao buscar alertas do INMET:', erro?.message || erro)
+    if (alertasInmetCache) {
+      return res.json({ ...alertasInmetCache, cache: true, erroAtualizacao: true })
+    }
+    return res.status(503).json({
+      local: 'Conselheiro Lafaiete - MG',
+      alertas: [],
+      erro: 'Alertas do INMET indisponíveis',
+      fonte: 'INMET',
+    })
+  }
+})
+
 // ── Monitoramento CNL / CEMADEN ────────────────────────────────────────────
 // A página pública do CEMADEN usa dois serviços: um catálogo com os
 // acumulados mais recentes e o MapaInterativoWS para a série horária.

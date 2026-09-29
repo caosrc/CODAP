@@ -52,6 +52,45 @@ interface EstacaoCemadenMapa {
   precipitacaoDataHora: string
 }
 
+interface TempoMapa {
+  atualizadoEm?: string
+  atual?: {
+    time?: string
+    temperatura?: number | null
+    umidade?: number | null
+    precipitacao?: number | null
+    chuva?: number | null
+    codigoTempo?: number | null
+    vento?: number | null
+    rajada?: number | null
+  } | null
+  horas?: Array<{
+    time: string
+    temperatura?: number | null
+    umidade?: number | null
+    precipitacao?: number | null
+    probabilidadeChuva?: number | null
+    codigoTempo?: number | null
+    vento?: number | null
+    rajada?: number | null
+  }>
+  fonte?: string
+  cache?: boolean
+  erroAtualizacao?: boolean
+}
+
+interface AlertaTempoMapa {
+  id: number
+  titulo: string
+  nivel: 'vermelho' | 'amarelo' | 'informativo' | string
+  inicio?: string | null
+  fim?: string | null
+  horaInicio?: string | null
+  horaFim?: string | null
+  fonte?: string
+  url?: string
+}
+
 // Serviço público NOAA/NNVL com imagens infravermelhas diárias do GOES.
 // A variável de ambiente continua disponível para substituir a fonte padrão.
 const GOES_CLOUD_TILE_URL = String(
@@ -84,6 +123,90 @@ function valorChuvaFormatado(valor: number | null): string {
 function valorChuvaMarcadorFormatado(valor: number | null): string {
   const valorSeguro = valor != null && Number.isFinite(valor) ? valor : 0
   return `${valorSeguro.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} mm`
+}
+
+function codigoTempoMapa(codigo: number | null | undefined): string {
+  const valor = Number(codigo)
+  if (valor >= 95) return 'Trovoada'
+  if (valor >= 80) return 'Pancadas de chuva'
+  if (valor >= 61) return 'Chuva'
+  if (valor >= 51) return 'Garoa'
+  if (valor >= 45) return 'Neblina'
+  if (valor === 3) return 'Nublado'
+  if (valor === 2) return 'Parcialmente nublado'
+  if (valor === 1) return 'Predominantemente limpo'
+  return 'Céu limpo'
+}
+
+function iconeTempoMapa(codigo: number | null | undefined): string {
+  const valor = Number(codigo)
+  if (valor >= 95) return '⛈️'
+  if (valor >= 80) return '🌦️'
+  if (valor >= 51) return '🌧️'
+  if (valor >= 45) return '🌫️'
+  if (valor >= 2) return '⛅'
+  return '☀️'
+}
+
+function estadoTempoMapa(tempo: TempoMapa | null): {
+  nome: string
+  cor: string
+  detalhe: string
+} {
+  const atual = tempo?.atual
+  const horas = tempo?.horas?.slice(0, 6) || []
+  const temperatura = Number(atual?.temperatura)
+  const umidade = Number(atual?.umidade)
+  const temTrovoada = Number(atual?.codigoTempo) >= 95
+    || horas.some(hora => Number(hora.codigoTempo) >= 95)
+  const probabilidadeChuva = Math.max(
+    ...horas.map(hora => Number(hora.probabilidadeChuva) || 0),
+    0,
+  )
+  const temChuva = Number(atual?.chuva) > 0.1
+    || Number(atual?.precipitacao) > 0.1
+    || Number(atual?.codigoTempo) >= 51
+    || probabilidadeChuva >= 60
+
+  if (temTrovoada) return { nome: 'Trovoada', cor: '#7c3aed', detalhe: 'Risco de raios na previsão' }
+  if (temperatura >= 30) return { nome: 'Calor', cor: '#dc2626', detalhe: 'Temperatura elevada' }
+  if (temperatura <= 17) return { nome: 'Frio', cor: '#2563eb', detalhe: 'Temperatura baixa' }
+  if (!temChuva && temperatura >= 28 && umidade <= 45) {
+    return { nome: 'Tempo seco', cor: '#d97706', detalhe: 'Calor com umidade baixa' }
+  }
+  if (temChuva) return { nome: 'Chuva', cor: '#0369a1', detalhe: 'Chuva ou pancadas previstas' }
+  if (umidade <= 45) return { nome: 'Umidade baixa', cor: '#b45309', detalhe: 'Atenção à baixa umidade' }
+  return { nome: 'Condição normal', cor: '#15803d', detalhe: 'Sem condição crítica detectada' }
+}
+
+function criarIconeTempoMapa(tempo: TempoMapa) {
+  const atual = tempo.atual
+  const estado = estadoTempoMapa(tempo)
+  const temperatura = Number.isFinite(Number(atual?.temperatura))
+    ? `${Math.round(Number(atual?.temperatura))}°`
+    : '—'
+  return L.divIcon({
+    className: 'mapa-tempo-marker',
+    html: `
+      <div class="mapa-tempo-marker-balao" style="--tempo-cor:${estado.cor}">
+        <span class="mapa-tempo-marker-icone">${iconeTempoMapa(atual?.codigoTempo)}</span>
+        <strong>${temperatura}</strong>
+        <small>${estado.nome}</small>
+      </div>
+      <div class="mapa-tempo-marker-ponta" style="--tempo-cor:${estado.cor}"></div>
+    `,
+    iconSize: [86, 64],
+    iconAnchor: [43, 64],
+    popupAnchor: [0, -64],
+  })
+}
+
+function dataHoraTempoMapa(valor?: string | null): string {
+  if (!valor) return '—'
+  const data = new Date(valor)
+  return Number.isNaN(data.getTime())
+    ? '—'
+    : data.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
 }
 
 function distanciaMetros(lat1: number, lng1: number, lat2: number, lng2: number): number {
@@ -598,6 +721,13 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
   const [cemadenAtualizadoEm, setCemadenAtualizadoEm] = useState<string | null>(null)
   const [cemadenCarregando, setCemadenCarregando] = useState(false)
   const [cemadenErro, setCemadenErro] = useState<string | null>(null)
+  const [tempoMapa, setTempoMapa] = useState<TempoMapa | null>(null)
+  const [tempoMapaCarregando, setTempoMapaCarregando] = useState(false)
+  const [tempoMapaErro, setTempoMapaErro] = useState<string | null>(null)
+  const [alertasTempoMapa, setAlertasTempoMapa] = useState<AlertaTempoMapa[]>([])
+  const [alertasTempoCarregando, setAlertasTempoCarregando] = useState(false)
+  const [alertasTempoErro, setAlertasTempoErro] = useState<string | null>(null)
+  const [mostrarTermometroMapa, setMostrarTermometroMapa] = useState(true)
   const [mostrarOcorrencias, setMostrarOcorrencias] = useState(false)
   const [mostrarMateriais, setMostrarMateriais] = useState(false)
   const [painelMaterialAberto, setPainelMaterialAberto] = useState(false)
@@ -723,6 +853,46 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
       document.removeEventListener('visibilitychange', atualizarAoVoltar)
     }
   }, [mostrarIntensidadeCemaden, painelChuvaAberto, buscarCemadenMapa])
+
+  const buscarTempoMapa = useCallback(async () => {
+    setTempoMapaCarregando(true)
+    setTempoMapaErro(null)
+    try {
+      const resposta = await fetch(`/api/tempo?_ts=${Date.now()}`, { cache: 'no-store' })
+      const dados = await resposta.json().catch(() => ({}))
+      if (!resposta.ok || !dados?.atual) throw new Error('Previsão indisponível')
+      setTempoMapa(dados)
+    } catch (erro) {
+      setTempoMapaErro(erro instanceof Error ? erro.message : 'Previsão indisponível')
+    } finally {
+      setTempoMapaCarregando(false)
+    }
+  }, [])
+
+  const buscarAlertasTempoMapa = useCallback(async () => {
+    setAlertasTempoCarregando(true)
+    setAlertasTempoErro(null)
+    try {
+      const resposta = await fetch(`/api/alertas-tempo?_ts=${Date.now()}`, { cache: 'no-store' })
+      const dados = await resposta.json().catch(() => ({}))
+      if (!resposta.ok) throw new Error(typeof dados?.erro === 'string' ? dados.erro : 'Alertas indisponíveis')
+      setAlertasTempoMapa(Array.isArray(dados?.alertas) ? dados.alertas : [])
+    } catch (erro) {
+      setAlertasTempoErro(erro instanceof Error ? erro.message : 'Alertas indisponíveis')
+    } finally {
+      setAlertasTempoCarregando(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    buscarTempoMapa()
+    buscarAlertasTempoMapa()
+    const intervalo = setInterval(() => {
+      buscarTempoMapa()
+      buscarAlertasTempoMapa()
+    }, 10 * 60 * 1000)
+    return () => clearInterval(intervalo)
+  }, [buscarTempoMapa, buscarAlertasTempoMapa])
 
   // Mapa offline — inicializa tiles do localStorage para mostrar status imediatamente
   const [statusOffline, setStatusOffline] = useState<StatusOffline>('idle')
@@ -1347,6 +1517,28 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
             updateWhenIdle={true}
           />
         )}
+        {mostrarTermometroMapa && tempoMapa?.atual && (
+          <Marker
+            position={CONSELHEIRO_LAFAIETE}
+            icon={criarIconeTempoMapa(tempoMapa)}
+          >
+            <Popup>
+              <div className="mapa-tempo-popup">
+                <strong>🌡️ Conselheiro Lafaiete</strong>
+                <div className="mapa-tempo-popup-temperatura">
+                  {Number.isFinite(Number(tempoMapa.atual.temperatura))
+                    ? `${Math.round(Number(tempoMapa.atual.temperatura))} °C`
+                    : 'Temperatura indisponível'}
+                </div>
+                <div>{codigoTempoMapa(tempoMapa.atual.codigoTempo)}</div>
+                <div>Umidade: {tempoMapa.atual.umidade ?? '—'}%</div>
+                <div>Vento: {tempoMapa.atual.vento ?? '—'} km/h</div>
+                <div>Rajada: {tempoMapa.atual.rajada ?? '—'} km/h</div>
+                <small>Fonte: {tempoMapa.fonte || 'Open-Meteo'}</small>
+              </div>
+            </Popup>
+          </Marker>
+        )}
         {mostrarNuvensGoes && templateTilesHttpsValido(GOES_CLOUD_TILE_URL) && (
           <Pane name="nuvensGoesPane" style={{ zIndex: 410 }}>
             <TileLayer
@@ -1672,6 +1864,14 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
         >
           🛰️ Satélite
         </button>
+        <button
+          className={`mapa-camada-btn ${mostrarTermometroMapa ? 'ativo' : ''}`}
+          onClick={() => setMostrarTermometroMapa(v => !v)}
+          aria-pressed={mostrarTermometroMapa}
+          title="Mostrar ou ocultar a temperatura atual da cidade"
+        >
+          🌡️ Tempo
+        </button>
         <div className="mapa-chuva-wrap">
           <button
             className={`mapa-camada-btn mapa-chuva-btn ${mostrarChuva ? 'ativo' : ''}`}
@@ -1696,6 +1896,66 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
                   onClick={() => setPainelChuvaAberto(false)}
                   aria-label="Fechar painel de chuva"
                 >✕</button>
+              </div>
+              {tempoMapa && (
+                <div className="mapa-tempo-painel">
+                  <div className="mapa-tempo-painel-atual">
+                    <span className="mapa-tempo-painel-icone">
+                      {iconeTempoMapa(tempoMapa.atual?.codigoTempo)}
+                    </span>
+                    <div>
+                      <strong>
+                        {Number.isFinite(Number(tempoMapa.atual?.temperatura))
+                          ? `${Math.round(Number(tempoMapa.atual?.temperatura))} °C`
+                          : '—'}
+                      </strong>
+                      <span>{codigoTempoMapa(tempoMapa.atual?.codigoTempo)}</span>
+                    </div>
+                    <div className="mapa-tempo-painel-metricas">
+                      <span>💧 {tempoMapa.atual?.umidade ?? '—'}%</span>
+                      <span>💨 {tempoMapa.atual?.vento ?? '—'} km/h</span>
+                    </div>
+                  </div>
+                  <div className="mapa-tempo-painel-estado" style={{ color: estadoTempoMapa(tempoMapa).cor }}>
+                    <b>{estadoTempoMapa(tempoMapa).nome}</b>
+                    <span>{estadoTempoMapa(tempoMapa).detalhe}</span>
+                  </div>
+                  <div className="mapa-tempo-painel-previsao">
+                    {(tempoMapa.horas || []).slice(0, 6).map(hora => (
+                      <span key={hora.time}>
+                        <b>{dataHoraTempoMapa(hora.time)}</b>
+                        <strong>{iconeTempoMapa(hora.codigoTempo)}</strong>
+                        <small>{Math.round(Number(hora.temperatura) || 0)}° · {Math.round(Number(hora.probabilidadeChuva) || 0)}%</small>
+                      </span>
+                    ))}
+                  </div>
+                  {tempoMapaErro && <div className="mapa-chuva-status mapa-chuva-status--erro">{tempoMapaErro}</div>}
+                </div>
+              )}
+              <div className="mapa-tempo-alertas">
+                <div className="mapa-tempo-alertas-titulo">
+                  <strong>⚠️ Alertas e condições</strong>
+                  <span>
+                    {alertasTempoCarregando ? 'consultando INMET…' : `${alertasTempoMapa.length} aviso(s) do INMET`}
+                  </span>
+                </div>
+                {alertasTempoMapa.length > 0 ? alertasTempoMapa.slice(0, 3).map(alerta => (
+                  <a
+                    key={alerta.id}
+                    href={alerta.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className={`mapa-tempo-alerta mapa-tempo-alerta--${alerta.nivel}`}
+                  >
+                    <b>{alerta.titulo}</b>
+                    <span>{alerta.inicio ? `Início: ${dataHoraTempoMapa(alerta.inicio)}` : 'Aviso vigente'}</span>
+                  </a>
+                )) : (
+                  <span className="mapa-tempo-sem-alerta">
+                    Nenhum aviso oficial do INMET encontrado para o município.
+                  </span>
+                )}
+                {alertasTempoErro && <span className="mapa-tempo-alerta-erro">{alertasTempoErro}</span>}
               </div>
               <div className="mapa-chuva-fontes">
                 <button

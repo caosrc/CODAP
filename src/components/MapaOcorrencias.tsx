@@ -106,6 +106,21 @@ interface PrevisaoRaiosMapa {
     codigoMaisGrave?: number
     risco?: string
   }>
+  pontos?: Array<{
+    id: string
+    nome: string
+    latitude: number
+    longitude: number
+    primeiraTrovoada: string
+    modelosComTrovoada: number
+    codigoMaisGrave: number
+    intensidade: string
+    intensidadeNivel: number
+    probabilidadeChuva: number
+    precipitacao: number
+    chuva: number
+    risco: string
+  }>
   proximaTrovoada?: string | null
   riscoAtual?: string
   fonte?: string
@@ -126,18 +141,8 @@ interface AlertaTempoMapa {
   url?: string
 }
 
-// Serviço público NOAA/NNVL com imagens infravermelhas diárias do GOES.
-// A variável de ambiente continua disponível para substituir a fonte padrão.
-const GOES_CLOUD_TILE_URL = String(
-  import.meta.env.VITE_GOES_CLOUD_TILES_URL
-    || 'https://gis.nnvl.noaa.gov/arcgis/rest/services/GOES/GOES_current/ImageServer/tile/{z}/{y}/{x}',
-).trim()
 const ESTIMATIVA_CEMADEN_RAIO_METROS = 10_000
 const CEMADEN_ESTACOES_ESPERADAS = new Set([4146, 4144, 3121, 6622, 4145, 4143, 4142])
-
-function templateTilesHttpsValido(url: string): boolean {
-  return /^https:\/\//i.test(url) && ['{z}', '{x}', '{y}'].every(token => url.includes(token))
-}
 
 function intensidadeCemaden(valor: number): { cor: string; alpha: number } {
   if (!Number.isFinite(valor) || valor <= 0) return { cor: '#38bdf8', alpha: 0 }
@@ -249,14 +254,14 @@ function corRiscoRaiosMapa(risco?: string): string {
   return '#15803d'
 }
 
-function criarIconeRaiosMapa(raios: PrevisaoRaiosMapa) {
-  const risco = raios.atual?.risco || raios.riscoAtual
-  const cor = corRiscoRaiosMapa(risco)
+function criarIconeRaiosMapa(ponto: NonNullable<PrevisaoRaiosMapa['pontos']>[number]) {
+  const cor = corRiscoRaiosMapa(ponto.risco)
+  const simbolos = '⚡'.repeat(Math.max(1, Math.min(3, ponto.intensidadeNivel)))
   return L.divIcon({
     className: 'mapa-raios-marker',
     html: `
       <div class="mapa-raios-marker-balao" style="--raios-cor:${cor}">
-        <span>⚡</span><strong>${nomeRiscoRaiosMapa(risco)}</strong>
+        <span>${simbolos}</span><strong>${ponto.modelosComTrovoada}/3</strong>
       </div>
     `,
     iconSize: [104, 30],
@@ -766,6 +771,24 @@ function LimiteZoomCamada({ camada }: { camada: CamadaMapa }) {
   return null
 }
 
+function RaiosMapaBounds({
+  pontos,
+  token,
+}: {
+  pontos: NonNullable<PrevisaoRaiosMapa['pontos']>
+  token: number
+}) {
+  const map = useMap()
+
+  useEffect(() => {
+    if (token <= 0 || pontos.length === 0) return
+    const bounds = L.latLngBounds(pontos.map(ponto => [ponto.latitude, ponto.longitude] as [number, number]))
+    map.fitBounds(bounds, { padding: [28, 28], maxZoom: 8, animate: true })
+  }, [map, pontos, token])
+
+  return null
+}
+
 // ── Componente principal ────────────────────────────────────────
 export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExterno, onDestinoExternoConsumido, equipamentosCampo = [], onVerDetalheCampo }: Props) {
   const [selecionada, setSelecionada] = useState<Ocorrencia | null>(null)
@@ -776,9 +799,7 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
   const [radarChuva, setRadarChuva] = useState<DadosRadarChuva | null>(null)
   const [radarChuvaCarregando, setRadarChuvaCarregando] = useState(false)
   const [radarChuvaErro, setRadarChuvaErro] = useState<string | null>(null)
-  const [mostrarNuvensGoes, setMostrarNuvensGoes] = useState(false)
   const [mostrarIntensidadeCemaden, setMostrarIntensidadeCemaden] = useState(false)
-  const [opacidadeNuvensGoes, setOpacidadeNuvensGoes] = useState(0.5)
   const [opacidadeRadar, setOpacidadeRadar] = useState(0.72)
   const [opacidadeCemaden, setOpacidadeCemaden] = useState(0.52)
   const [estacoesCemaden, setEstacoesCemaden] = useState<EstacaoCemadenMapa[]>([])
@@ -792,6 +813,7 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
   const [previsaoRaiosCarregando, setPrevisaoRaiosCarregando] = useState(false)
   const [previsaoRaiosErro, setPrevisaoRaiosErro] = useState<string | null>(null)
   const [mostrarPrevisaoRaios, setMostrarPrevisaoRaios] = useState(true)
+  const [enquadrarRaiosMapa, setEnquadrarRaiosMapa] = useState(0)
   const [alertasTempoMapa, setAlertasTempoMapa] = useState<AlertaTempoMapa[]>([])
   const [alertasTempoCarregando, setAlertasTempoCarregando] = useState(false)
   const [alertasTempoErro, setAlertasTempoErro] = useState<string | null>(null)
@@ -1625,46 +1647,30 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
             </Popup>
           </Marker>
         )}
-        {mostrarChuva && mostrarPrevisaoRaios && previsaoRaiosMapa?.atual && (
+        {mostrarChuva && mostrarPrevisaoRaios && (previsaoRaiosMapa?.pontos || []).map(ponto => (
           <Marker
-            position={CONSELHEIRO_LAFAIETE}
-            icon={criarIconeRaiosMapa(previsaoRaiosMapa)}
+            key={`raios-${ponto.id}`}
+            position={[ponto.latitude, ponto.longitude]}
+            icon={criarIconeRaiosMapa(ponto)}
             zIndexOffset={700}
           >
             <Popup>
               <div className="mapa-raios-popup">
-                <strong>⚡ Previsão de raios e trovoadas</strong>
-                <b style={{ color: corRiscoRaiosMapa(previsaoRaiosMapa.atual.risco) }}>
-                  Risco {nomeRiscoRaiosMapa(previsaoRaiosMapa.atual.risco)}
+                <strong>⚡ {ponto.nome}</strong>
+                <b style={{ color: corRiscoRaiosMapa(ponto.risco) }}>
+                  {ponto.intensidade} · {ponto.modelosComTrovoada}/3 modelos
                 </b>
-                <span>
-                  {previsaoRaiosMapa.atual.modelosComTrovoada || 0}/3 modelos indicam trovoada neste horário
-                </span>
-                <small>
-                  Próxima indicação: {previsaoRaiosMapa.proximaTrovoada
-                    ? dataHoraTempoMapa(previsaoRaiosMapa.proximaTrovoada)
-                    : 'nenhuma nas próximas 36 horas'}
-                </small>
-                <small>Fonte: Open-Meteo · previsão numérica</small>
+                <span>Previsão a partir de {dataHoraTempoMapa(ponto.primeiraTrovoada)}</span>
+                <span>Chuva prevista: {ponto.probabilidadeChuva}% · até {ponto.precipitacao.toLocaleString('pt-BR', { maximumFractionDigits: 1 })} mm</span>
+                <small>Open‑Meteo · previsão numérica</small>
               </div>
             </Popup>
           </Marker>
-        )}
-        {mostrarNuvensGoes && templateTilesHttpsValido(GOES_CLOUD_TILE_URL) && (
-          <Pane name="nuvensGoesPane" style={{ zIndex: 410 }}>
-            <TileLayer
-              key={`nuvens-goes-${GOES_CLOUD_TILE_URL}`}
-              url={GOES_CLOUD_TILE_URL}
-              opacity={opacidadeNuvensGoes}
-              attribution='Imagens de nuvens &copy; <a href="https://gis.nnvl.noaa.gov/arcgis/rest/services/GOES/GOES_current/ImageServer" target="_blank" rel="noreferrer">NOAA / GOES</a>'
-              maxNativeZoom={8}
-              maxZoom={19}
-              tileSize={256}
-              updateWhenZooming={false}
-              updateWhenIdle={true}
-            />
-          </Pane>
-        )}
+        ))}
+        <RaiosMapaBounds
+          pontos={previsaoRaiosMapa?.pontos || []}
+          token={enquadrarRaiosMapa}
+        />
         {mostrarChuva && radarChuva && (
           <Pane name="radarRainViewerPane" style={{ zIndex: 420 }}>
             <TileLayer
@@ -2039,15 +2045,24 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
                 <div className="mapa-raios-painel-header">
                   <div>
                     <strong>⚡ Previsão de raios e trovoadas</strong>
-                    <span>Consenso dos modelos para Conselheiro Lafaiete</span>
+                    <span>Locais com previsão de trovoada em Minas Gerais</span>
                   </div>
-                  <button
-                    className={`mapa-chuva-fonte-btn ${mostrarPrevisaoRaios ? 'ativo' : ''}`}
-                    onClick={() => setMostrarPrevisaoRaios(v => !v)}
-                    aria-pressed={mostrarPrevisaoRaios}
-                  >
-                    {mostrarPrevisaoRaios ? 'No mapa' : 'No painel'}
-                  </button>
+                  <div className="mapa-raios-painel-acoes">
+                    <button
+                      className={`mapa-chuva-fonte-btn ${mostrarPrevisaoRaios ? 'ativo' : ''}`}
+                      onClick={() => setMostrarPrevisaoRaios(v => !v)}
+                      aria-pressed={mostrarPrevisaoRaios}
+                    >
+                      {mostrarPrevisaoRaios ? 'Raios' : 'Painel'}
+                    </button>
+                    <button
+                      className="mapa-chuva-fonte-btn"
+                      onClick={() => setEnquadrarRaiosMapa(v => v + 1)}
+                      disabled={!previsaoRaiosMapa?.pontos?.length}
+                    >
+                      Ver MG
+                    </button>
+                  </div>
                 </div>
                 {previsaoRaiosMapa?.atual ? (
                   <>
@@ -2079,6 +2094,11 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
                         </div>
                       ))}
                     </div>
+                    <div className="mapa-raios-pontos-resumo">
+                      {previsaoRaiosMapa.pontos?.length
+                        ? `${previsaoRaiosMapa.pontos.length} local(is) com trovoada prevista nas próximas 36 horas`
+                        : 'Nenhum local com trovoada prevista nas próximas 36 horas'}
+                    </div>
                     <div className="mapa-raios-horarios">
                       {(previsaoRaiosMapa.consenso || []).slice(0, 6).map(hora => (
                         <span key={hora.time} className={hora.modelosComTrovoada ? 'tem-raios' : ''}>
@@ -2091,6 +2111,7 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
                     <p className="mapa-raios-nota">
                       Atualização automática a cada 10 min. Esta é uma previsão de trovoadas:
                       o Open‑Meteo não detecta a posição de descargas elétricas já ocorridas.
+                      Cada símbolo representa a previsão para a localidade consultada, não a posição exata de um raio.
                     </p>
                   </>
                 ) : (
@@ -2126,24 +2147,6 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
               </div>
               <div className="mapa-chuva-fontes">
                 <button
-                  className={`mapa-chuva-fonte-btn ${mostrarNuvensGoes ? 'ativo' : ''}`}
-                  onClick={() => setMostrarNuvensGoes(v => !v)}
-                  aria-pressed={mostrarNuvensGoes}
-                  disabled={!templateTilesHttpsValido(GOES_CLOUD_TILE_URL)}
-                  title={templateTilesHttpsValido(GOES_CLOUD_TILE_URL)
-                    ? 'Mostrar imagens de nuvens GOES'
-                    : 'Configure VITE_GOES_CLOUD_TILES_URL com um template HTTPS de tiles'}
-                >
-                  ☁️ Nuvens GOES
-                </button>
-                <span>
-                  {templateTilesHttpsValido(GOES_CLOUD_TILE_URL)
-                    ? 'Imagem de nuvens · independente da chuva'
-                    : 'Fonte de tiles GOES não configurada'}
-                </span>
-              </div>
-              <div className="mapa-chuva-fontes">
-                <button
                   className={`mapa-chuva-fonte-btn ${mostrarChuva ? 'ativo' : ''}`}
                   onClick={() => setMostrarChuva(v => !v)}
                   aria-pressed={mostrarChuva}
@@ -2163,10 +2166,6 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
                 <span>Leituras oficiais · acumulado na última hora (mm)</span>
               </div>
               <div className="mapa-chuva-opacidades">
-                <label>
-                  Nuvens <input type="range" min="0.35" max="0.70" step="0.05" value={opacidadeNuvensGoes} onChange={e => setOpacidadeNuvensGoes(Number(e.target.value))} />
-                  <output>{Math.round(opacidadeNuvensGoes * 100)}%</output>
-                </label>
                 <label>
                   Radar <input type="range" min="0.35" max="0.90" step="0.05" value={opacidadeRadar} onChange={e => setOpacidadeRadar(Number(e.target.value))} />
                   <output>{Math.round(opacidadeRadar * 100)}%</output>
@@ -2198,14 +2197,10 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
                   </strong>
                 </div>
                 <div>
-                  <span className="mapa-chuva-resumo-label">Nuvens</span>
+                  <span className="mapa-chuva-resumo-label">Raios</span>
                   <strong>
-                    {templateTilesHttpsValido(GOES_CLOUD_TILE_URL) ? 'Fonte configurada' : 'Indisponível'}
-                    <small className="mapa-chuva-quadro-tipo">
-                      {templateTilesHttpsValido(GOES_CLOUD_TILE_URL)
-                        ? 'GOES · horário não informado pela fonte'
-                        : 'sem tiles HTTPS'}
-                    </small>
+                    {previsaoRaiosMapa?.pontos?.length ?? '—'} locais
+                    <small className="mapa-chuva-quadro-tipo">Open‑Meteo · previsto</small>
                   </strong>
                 </div>
                 <div>

@@ -3417,6 +3417,26 @@ const RAIOS_MODELOS = [
   { id: 'gfs_seamless', nome: 'GFS Global' },
   { id: 'icon_seamless', nome: 'DWD ICON Global' },
 ]
+const RAIOS_PONTOS_MINAS = [
+  { id: 'belo-horizonte', nome: 'Belo Horizonte', latitude: -19.9167, longitude: -43.9345 },
+  { id: 'conselheiro-lafaiete', nome: 'Conselheiro Lafaiete', latitude: -20.6604, longitude: -43.7863 },
+  { id: 'barbacena', nome: 'Barbacena', latitude: -21.2214, longitude: -43.7703 },
+  { id: 'juiz-de-fora', nome: 'Juiz de Fora', latitude: -21.7642, longitude: -43.3503 },
+  { id: 'divinopolis', nome: 'Divinópolis', latitude: -20.1436, longitude: -44.8906 },
+  { id: 'sete-lagoas', nome: 'Sete Lagoas', latitude: -19.456, longitude: -44.2413 },
+  { id: 'montes-claros', nome: 'Montes Claros', latitude: -16.7282, longitude: -43.8578 },
+  { id: 'governador-valadares', nome: 'Governador Valadares', latitude: -18.8549, longitude: -41.9559 },
+  { id: 'ipatinga', nome: 'Ipatinga', latitude: -19.4708, longitude: -42.5471 },
+  { id: 'teofilo-otoni', nome: 'Teófilo Otoni', latitude: -17.8575, longitude: -41.505 },
+  { id: 'uberlandia', nome: 'Uberlândia', latitude: -18.9186, longitude: -48.2772 },
+  { id: 'patos-de-minas', nome: 'Patos de Minas', latitude: -18.5789, longitude: -46.518 },
+  { id: 'uberaba', nome: 'Uberaba', latitude: -19.7476, longitude: -47.9382 },
+  { id: 'araxa', nome: 'Araxá', latitude: -19.5902, longitude: -46.9438 },
+  { id: 'pocos-de-caldas', nome: 'Poços de Caldas', latitude: -21.7878, longitude: -46.5614 },
+  { id: 'varginha', nome: 'Varginha', latitude: -21.551, longitude: -45.430 },
+  { id: 'pouso-alegre', nome: 'Pouso Alegre', latitude: -22.23, longitude: -45.933 },
+  { id: 'montes-claros-oeste', nome: 'Januária', latitude: -15.484, longitude: -44.36 },
+]
 let raiosCache = null
 let raiosCacheTs = 0
 const RAIOS_TTL_MS = 10 * 60 * 1000
@@ -3534,6 +3554,70 @@ async function buscarPrevisaoRaiosOpenMeteo() {
   }
 }
 
+async function buscarPontosRaiosOpenMeteo() {
+  const params = new URLSearchParams({
+    latitude: RAIOS_PONTOS_MINAS.map(ponto => ponto.latitude).join(','),
+    longitude: RAIOS_PONTOS_MINAS.map(ponto => ponto.longitude).join(','),
+    timezone: 'America/Sao_Paulo',
+    forecast_days: '2',
+    models: RAIOS_MODELOS.map(modelo => modelo.id).join(','),
+    hourly: 'precipitation_probability,precipitation,rain,weather_code',
+    precipitation_unit: 'mm',
+  })
+  const resposta = await fetch(`https://api.open-meteo.com/v1/forecast?${params.toString()}`, {
+    headers: { Accept: 'application/json' },
+    signal: AbortSignal.timeout(15000),
+  })
+  if (!resposta.ok) throw new Error(`Open-Meteo raios regionais: ${resposta.status}`)
+  const dados = await resposta.json()
+  if (!Array.isArray(dados)) throw new Error('Resposta regional de raios inválida da Open-Meteo')
+
+  return RAIOS_PONTOS_MINAS.map((ponto, pontoIndex) => {
+    const local = dados[pontoIndex]
+    const times = Array.isArray(local?.hourly?.time) ? local.hourly.time : []
+    const leituras = times.slice(0, 36).map((time, horaIndex) => {
+      const porModelo = RAIOS_MODELOS.map(modelo => {
+        const sufixo = `_${modelo.id}`
+        return {
+          codigo: Number(local?.hourly?.[`weather_code${sufixo}`]?.[horaIndex]) || 0,
+          probabilidade: Number(local?.hourly?.[`precipitation_probability${sufixo}`]?.[horaIndex]) || 0,
+          precipitacao: Number(local?.hourly?.[`precipitation${sufixo}`]?.[horaIndex]) || 0,
+          chuva: Number(local?.hourly?.[`rain${sufixo}`]?.[horaIndex]) || 0,
+        }
+      })
+      const trovoadas = porModelo.filter(leitura => leitura.codigo >= 95)
+      return {
+        time,
+        modelosComTrovoada: trovoadas.length,
+        codigoMaisGrave: Math.max(...porModelo.map(leitura => leitura.codigo), 0),
+        maiorProbabilidadeChuva: Math.max(...porModelo.map(leitura => leitura.probabilidade), 0),
+        maiorPrecipitacao: Math.max(...porModelo.map(leitura => leitura.precipitacao), 0),
+        maiorChuva: Math.max(...porModelo.map(leitura => leitura.chuva), 0),
+      }
+    })
+    const comTrovoada = leituras.filter(leitura => leitura.modelosComTrovoada > 0)
+    const maisGrave = Math.max(...comTrovoada.map(leitura => leitura.codigoMaisGrave), 0)
+    const maiorConsenso = Math.max(...comTrovoada.map(leitura => leitura.modelosComTrovoada), 0)
+    const primeiraTrovoada = comTrovoada[0]?.time || null
+    if (!primeiraTrovoada) return null
+
+    return {
+      ...ponto,
+      primeiraTrovoada,
+      modelosComTrovoada: maiorConsenso,
+      codigoMaisGrave: maisGrave,
+      intensidade: maisGrave >= 99
+        ? 'Trovoada forte'
+        : maisGrave >= 96 ? 'Trovoada com granizo' : 'Trovoada',
+      intensidadeNivel: maisGrave >= 99 ? 3 : maisGrave >= 96 ? 2 : 1,
+      probabilidadeChuva: Math.max(...comTrovoada.map(leitura => leitura.maiorProbabilidadeChuva), 0),
+      precipitacao: Math.max(...comTrovoada.map(leitura => leitura.maiorPrecipitacao), 0),
+      chuva: Math.max(...comTrovoada.map(leitura => leitura.maiorChuva), 0),
+      risco: maiorConsenso >= 2 ? 'alto' : 'atenção',
+    }
+  }).filter(Boolean)
+}
+
 app.get('/api/tempo-raios', async (_req, res) => {
   try {
     const agora = Date.now()
@@ -3541,6 +3625,7 @@ app.get('/api/tempo-raios', async (_req, res) => {
       return res.json({ ...raiosCache, cache: true })
     }
     const previsao = await buscarPrevisaoRaiosOpenMeteo()
+    previsao.pontos = await buscarPontosRaiosOpenMeteo()
     raiosCache = previsao
     raiosCacheTs = agora
     return res.json(previsao)

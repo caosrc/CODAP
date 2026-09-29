@@ -79,6 +79,41 @@ interface TempoMapa {
   erroAtualizacao?: boolean
 }
 
+interface PrevisaoRaiosMapa {
+  atualizadoEm?: string
+  atual?: {
+    time?: string
+    modelosComTrovoada?: number
+    maiorProbabilidadeChuva?: number
+    codigoMaisGrave?: number
+    risco?: 'baixo' | 'atenção' | 'alto' | string
+  } | null
+  modelos?: Array<{
+    id: string
+    nome: string
+    horas?: Array<{
+      time: string
+      codigoTempo?: number | null
+      probabilidadeChuva?: number | null
+    }>
+    primeiraTrovoada?: string | null
+    maiorCodigo?: number
+  }>
+  consenso?: Array<{
+    time: string
+    modelosComTrovoada?: number
+    maiorProbabilidadeChuva?: number
+    codigoMaisGrave?: number
+    risco?: string
+  }>
+  proximaTrovoada?: string | null
+  riscoAtual?: string
+  fonte?: string
+  observacao?: string
+  cache?: boolean
+  erroAtualizacao?: boolean
+}
+
 interface AlertaTempoMapa {
   id: number
   titulo: string
@@ -198,6 +233,34 @@ function criarIconeTempoMapa(tempo: TempoMapa) {
     `,
     iconSize: [78, 30],
     iconAnchor: [39, 15],
+    popupAnchor: [0, -18],
+  })
+}
+
+function nomeRiscoRaiosMapa(risco?: string): string {
+  if (risco === 'alto') return 'Alto'
+  if (risco === 'atenção') return 'Atenção'
+  return 'Baixo'
+}
+
+function corRiscoRaiosMapa(risco?: string): string {
+  if (risco === 'alto') return '#dc2626'
+  if (risco === 'atenção') return '#d97706'
+  return '#15803d'
+}
+
+function criarIconeRaiosMapa(raios: PrevisaoRaiosMapa) {
+  const risco = raios.atual?.risco || raios.riscoAtual
+  const cor = corRiscoRaiosMapa(risco)
+  return L.divIcon({
+    className: 'mapa-raios-marker',
+    html: `
+      <div class="mapa-raios-marker-balao" style="--raios-cor:${cor}">
+        <span>⚡</span><strong>${nomeRiscoRaiosMapa(risco)}</strong>
+      </div>
+    `,
+    iconSize: [104, 30],
+    iconAnchor: [52, 15],
     popupAnchor: [0, -18],
   })
 }
@@ -725,6 +788,10 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
   const [tempoMapa, setTempoMapa] = useState<TempoMapa | null>(null)
   const [tempoMapaCarregando, setTempoMapaCarregando] = useState(false)
   const [tempoMapaErro, setTempoMapaErro] = useState<string | null>(null)
+  const [previsaoRaiosMapa, setPrevisaoRaiosMapa] = useState<PrevisaoRaiosMapa | null>(null)
+  const [previsaoRaiosCarregando, setPrevisaoRaiosCarregando] = useState(false)
+  const [previsaoRaiosErro, setPrevisaoRaiosErro] = useState<string | null>(null)
+  const [mostrarPrevisaoRaios, setMostrarPrevisaoRaios] = useState(true)
   const [alertasTempoMapa, setAlertasTempoMapa] = useState<AlertaTempoMapa[]>([])
   const [alertasTempoCarregando, setAlertasTempoCarregando] = useState(false)
   const [alertasTempoErro, setAlertasTempoErro] = useState<string | null>(null)
@@ -869,6 +936,23 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
     }
   }, [])
 
+  const buscarPrevisaoRaiosMapa = useCallback(async () => {
+    setPrevisaoRaiosCarregando(true)
+    setPrevisaoRaiosErro(null)
+    try {
+      const resposta = await fetch(`/api/tempo-raios?_ts=${Date.now()}`, { cache: 'no-store' })
+      const dados = await resposta.json().catch(() => ({}))
+      if (!resposta.ok || !dados?.atual) {
+        throw new Error(typeof dados?.erro === 'string' ? dados.erro : 'Previsão de raios indisponível')
+      }
+      setPrevisaoRaiosMapa(dados)
+    } catch (erro) {
+      setPrevisaoRaiosErro(erro instanceof Error ? erro.message : 'Previsão de raios indisponível')
+    } finally {
+      setPrevisaoRaiosCarregando(false)
+    }
+  }, [])
+
   const buscarAlertasTempoMapa = useCallback(async () => {
     setAlertasTempoCarregando(true)
     setAlertasTempoErro(null)
@@ -886,13 +970,15 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
 
   useEffect(() => {
     buscarTempoMapa()
+    buscarPrevisaoRaiosMapa()
     buscarAlertasTempoMapa()
     const intervalo = setInterval(() => {
       buscarTempoMapa()
+      buscarPrevisaoRaiosMapa()
       buscarAlertasTempoMapa()
     }, 10 * 60 * 1000)
     return () => clearInterval(intervalo)
-  }, [buscarTempoMapa, buscarAlertasTempoMapa])
+  }, [buscarTempoMapa, buscarPrevisaoRaiosMapa, buscarAlertasTempoMapa])
 
   // Mapa offline — inicializa tiles do localStorage para mostrar status imediatamente
   const [statusOffline, setStatusOffline] = useState<StatusOffline>('idle')
@@ -1539,6 +1625,31 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
             </Popup>
           </Marker>
         )}
+        {mostrarChuva && mostrarPrevisaoRaios && previsaoRaiosMapa?.atual && (
+          <Marker
+            position={CONSELHEIRO_LAFAIETE}
+            icon={criarIconeRaiosMapa(previsaoRaiosMapa)}
+            zIndexOffset={700}
+          >
+            <Popup>
+              <div className="mapa-raios-popup">
+                <strong>⚡ Previsão de raios e trovoadas</strong>
+                <b style={{ color: corRiscoRaiosMapa(previsaoRaiosMapa.atual.risco) }}>
+                  Risco {nomeRiscoRaiosMapa(previsaoRaiosMapa.atual.risco)}
+                </b>
+                <span>
+                  {previsaoRaiosMapa.atual.modelosComTrovoada || 0}/3 modelos indicam trovoada neste horário
+                </span>
+                <small>
+                  Próxima indicação: {previsaoRaiosMapa.proximaTrovoada
+                    ? dataHoraTempoMapa(previsaoRaiosMapa.proximaTrovoada)
+                    : 'nenhuma nas próximas 36 horas'}
+                </small>
+                <small>Fonte: Open-Meteo · previsão numérica</small>
+              </div>
+            </Popup>
+          </Marker>
+        )}
         {mostrarNuvensGoes && templateTilesHttpsValido(GOES_CLOUD_TILE_URL) && (
           <Pane name="nuvensGoesPane" style={{ zIndex: 410 }}>
             <TileLayer
@@ -1924,6 +2035,70 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
                   {tempoMapaErro && <div className="mapa-chuva-status mapa-chuva-status--erro">{tempoMapaErro}</div>}
                 </div>
               )}
+              <div className="mapa-raios-painel">
+                <div className="mapa-raios-painel-header">
+                  <div>
+                    <strong>⚡ Previsão de raios e trovoadas</strong>
+                    <span>Consenso dos modelos para Conselheiro Lafaiete</span>
+                  </div>
+                  <button
+                    className={`mapa-chuva-fonte-btn ${mostrarPrevisaoRaios ? 'ativo' : ''}`}
+                    onClick={() => setMostrarPrevisaoRaios(v => !v)}
+                    aria-pressed={mostrarPrevisaoRaios}
+                  >
+                    {mostrarPrevisaoRaios ? 'No mapa' : 'No painel'}
+                  </button>
+                </div>
+                {previsaoRaiosMapa?.atual ? (
+                  <>
+                    <div className="mapa-raios-resumo">
+                      <div>
+                        <span>Risco agora</span>
+                        <strong style={{ color: corRiscoRaiosMapa(previsaoRaiosMapa.atual.risco) }}>
+                          {nomeRiscoRaiosMapa(previsaoRaiosMapa.atual.risco)}
+                        </strong>
+                      </div>
+                      <div>
+                        <span>Consenso</span>
+                        <strong>{previsaoRaiosMapa.atual.modelosComTrovoada || 0}/3 modelos</strong>
+                      </div>
+                      <div>
+                        <span>Próxima indicação</span>
+                        <strong>{previsaoRaiosMapa.proximaTrovoada
+                          ? dataHoraTempoMapa(previsaoRaiosMapa.proximaTrovoada)
+                          : 'Sem trovoada'}</strong>
+                      </div>
+                    </div>
+                    <div className="mapa-raios-modelos">
+                      {(previsaoRaiosMapa.modelos || []).map(modelo => (
+                        <div key={modelo.id} className="mapa-raios-modelo">
+                          <span>{modelo.nome}</span>
+                          <b className={modelo.maiorCodigo && modelo.maiorCodigo >= 95 ? 'indica-trovoada' : ''}>
+                            {modelo.primeiraTrovoada ? `⚡ ${dataHoraTempoMapa(modelo.primeiraTrovoada)}` : 'Sem trovoada'}
+                          </b>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="mapa-raios-horarios">
+                      {(previsaoRaiosMapa.consenso || []).slice(0, 6).map(hora => (
+                        <span key={hora.time} className={hora.modelosComTrovoada ? 'tem-raios' : ''}>
+                          <b>{dataHoraTempoMapa(hora.time)}</b>
+                          <strong>{hora.modelosComTrovoada ? '⚡' : '·'}</strong>
+                          <small>{hora.modelosComTrovoada || 0}/3</small>
+                        </span>
+                      ))}
+                    </div>
+                    <p className="mapa-raios-nota">
+                      Atualização automática a cada 10 min. Esta é uma previsão de trovoadas:
+                      o Open‑Meteo não detecta a posição de descargas elétricas já ocorridas.
+                    </p>
+                  </>
+                ) : (
+                  <div className={`mapa-chuva-status ${previsaoRaiosErro ? 'mapa-chuva-status--erro' : ''}`}>
+                    {previsaoRaiosCarregando ? '⏳ Consultando ECMWF, GFS e ICON…' : (previsaoRaiosErro || 'Previsão de raios indisponível')}
+                  </div>
+                )}
+              </div>
               <div className="mapa-tempo-alertas">
                 <div className="mapa-tempo-alertas-titulo">
                   <strong>⚠️ Alertas e condições</strong>

@@ -3407,6 +3407,150 @@ app.get('/api/tempo', async (_req, res) => {
   }
 })
 
+// ── Previsão de trovoadas / raios por modelos Open-Meteo ───────────────────
+// Open-Meteo não fornece a posição de descargas elétricas observadas. Os
+// códigos WMO 95/96/99 são a previsão de trovoada de cada modelo numérico.
+// Mantemos os modelos separados para que o mapa possa mostrar o consenso,
+// em vez de transformar um único modelo em um falso "detector de raios".
+const RAIOS_MODELOS = [
+  { id: 'ecmwf_ifs025', nome: 'ECMWF IFS' },
+  { id: 'gfs_seamless', nome: 'GFS Global' },
+  { id: 'icon_seamless', nome: 'DWD ICON Global' },
+]
+let raiosCache = null
+let raiosCacheTs = 0
+const RAIOS_TTL_MS = 10 * 60 * 1000
+
+function nomeRiscoTrovoada(consenso, maxModelos = RAIOS_MODELOS.length) {
+  if (consenso >= Math.max(2, maxModelos)) return 'alto'
+  if (consenso > 0) return 'atenção'
+  return 'baixo'
+}
+
+function horaMaisProximaOpenMeteo(times, alvo = Date.now()) {
+  if (!Array.isArray(times) || times.length === 0) return -1
+  let melhor = 0
+  let distancia = Infinity
+  times.forEach((time, index) => {
+    const valor = new Date(time).getTime()
+    if (!Number.isFinite(valor)) return
+    const atual = Math.abs(valor - alvo)
+    if (atual < distancia) {
+      distancia = atual
+      melhor = index
+    }
+  })
+  return melhor
+}
+
+async function buscarPrevisaoRaiosOpenMeteo() {
+  const params = new URLSearchParams({
+    latitude: String(CONSELHEIRO_LAFAIETE_LAT),
+    longitude: String(CONSELHEIRO_LAFAIETE_LON),
+    timezone: 'America/Sao_Paulo',
+    forecast_days: '2',
+    models: RAIOS_MODELOS.map(modelo => modelo.id).join(','),
+    hourly: [
+      'temperature_2m',
+      'relative_humidity_2m',
+      'precipitation_probability',
+      'precipitation',
+      'rain',
+      'weather_code',
+      'wind_speed_10m',
+      'wind_gusts_10m',
+    ].join(','),
+    wind_speed_unit: 'kmh',
+    precipitation_unit: 'mm',
+  })
+
+  const resposta = await fetch(`https://api.open-meteo.com/v1/forecast?${params.toString()}`, {
+    headers: { Accept: 'application/json' },
+    signal: AbortSignal.timeout(10000),
+  })
+  if (!resposta.ok) throw new Error(`Open-Meteo raios: ${resposta.status}`)
+
+  const json = await resposta.json()
+  const hourly = json?.hourly
+  if (!Array.isArray(hourly?.time)) throw new Error('Resposta de raios inválida da Open-Meteo')
+
+  const modelos = RAIOS_MODELOS.map(modelo => {
+    const sufixo = `_${modelo.id}`
+    const valores = hourly.time.map((time, index) => ({
+      time,
+      temperatura: hourly[`temperature_2m${sufixo}`]?.[index] ?? null,
+      umidade: hourly[`relative_humidity_2m${sufixo}`]?.[index] ?? null,
+      probabilidadeChuva: hourly[`precipitation_probability${sufixo}`]?.[index] ?? null,
+      precipitacao: hourly[`precipitation${sufixo}`]?.[index] ?? null,
+      chuva: hourly[`rain${sufixo}`]?.[index] ?? null,
+      codigoTempo: hourly[`weather_code${sufixo}`]?.[index] ?? null,
+      vento: hourly[`wind_speed_10m${sufixo}`]?.[index] ?? null,
+      rajada: hourly[`wind_gusts_10m${sufixo}`]?.[index] ?? null,
+    }))
+    const horasTrovoada = valores.filter(item => Number(item.codigoTempo) >= 95)
+    return {
+      id: modelo.id,
+      nome: modelo.nome,
+      horas: valores.slice(0, 36),
+      primeiraTrovoada: horasTrovoada[0]?.time ?? null,
+      maiorCodigo: horasTrovoada.reduce((maior, item) => Math.max(maior, Number(item.codigoTempo) || 0), 0),
+    }
+  })
+
+  const tamanho = Math.min(...modelos.map(modelo => modelo.horas.length))
+  const consenso = Array.from({ length: tamanho }, (_, index) => {
+    const leituras = modelos.map(modelo => modelo.horas[index])
+    const modelosComTrovoada = leituras.filter(item => Number(item.codigoTempo) >= 95).length
+    const maiorProbabilidade = Math.max(
+      ...leituras.map(item => Number(item.probabilidadeChuva) || 0),
+      0,
+    )
+    return {
+      time: hourly.time[index],
+      modelosComTrovoada,
+      maiorProbabilidadeChuva: maiorProbabilidade,
+      codigoMaisGrave: Math.max(...leituras.map(item => Number(item.codigoTempo) || 0), 0),
+      risco: nomeRiscoTrovoada(modelosComTrovoada),
+    }
+  })
+
+  const agoraIndex = horaMaisProximaOpenMeteo(hourly.time)
+  const atual = consenso[agoraIndex] || consenso[0] || null
+  const proximasTrovoadas = consenso.filter(item => item.modelosComTrovoada > 0)
+
+  return {
+    local: 'Conselheiro Lafaiete - MG',
+    latitude: CONSELHEIRO_LAFAIETE_LAT,
+    longitude: CONSELHEIRO_LAFAIETE_LON,
+    timezone: json.timezone,
+    atualizadoEm: new Date().toISOString(),
+    atual,
+    modelos,
+    consenso,
+    proximaTrovoada: proximasTrovoadas[0]?.time ?? null,
+    riscoAtual: atual?.risco || 'baixo',
+    fonte: 'Open-Meteo',
+    observacao: 'Previsão de trovoadas pelos modelos numéricos; não é detecção de descargas observadas.',
+  }
+}
+
+app.get('/api/tempo-raios', async (_req, res) => {
+  try {
+    const agora = Date.now()
+    if (raiosCache && agora - raiosCacheTs < RAIOS_TTL_MS) {
+      return res.json({ ...raiosCache, cache: true })
+    }
+    const previsao = await buscarPrevisaoRaiosOpenMeteo()
+    raiosCache = previsao
+    raiosCacheTs = agora
+    return res.json(previsao)
+  } catch (erro) {
+    console.error('Erro ao buscar previsão de raios:', erro?.message || erro)
+    if (raiosCache) return res.json({ ...raiosCache, cache: true, erroAtualizacao: true })
+    return res.status(503).json({ erro: 'Previsão de raios indisponível' })
+  }
+})
+
 // ── Alertas meteorológicos do INMET para Conselheiro Lafaiete ───────────────
 // O INMET publica os avisos ativos em formato JSON. Mantemos a consulta no
 // servidor para evitar CORS e para não expor uma chamada externa em cada mapa.

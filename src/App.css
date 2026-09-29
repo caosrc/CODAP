@@ -1236,45 +1236,29 @@ input, select, textarea { font-family: inherit; }
   border: 0;
 }
 .mapa-tempo-marker-balao {
-  position: relative;
-  display: grid;
-  grid-template-columns: 20px 1fr;
+  display: inline-flex;
   align-items: center;
-  width: 86px;
-  min-height: 50px;
-  padding: 5px 6px;
-  border: 2px solid var(--tempo-cor, #0369a1);
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.96);
-  color: #0f172a;
-  box-shadow: 0 3px 10px rgba(15, 23, 42, 0.28);
+  gap: 3px;
+  width: max-content;
+  min-height: 26px;
+  padding: 0;
+  color: #ffffff;
+  text-shadow: 0 1px 3px rgba(15, 23, 42, 0.95), 0 0 5px rgba(15, 23, 42, 0.8);
   font-family: inherit;
 }
 .mapa-tempo-marker-icone {
-  grid-row: span 2;
-  font-size: 1rem;
+  font-size: 1.05rem;
+  line-height: 1;
 }
 .mapa-tempo-marker-balao strong {
-  color: var(--tempo-cor, #0369a1);
-  font-size: 0.86rem;
+  color: #ffffff;
+  font-size: 1rem;
   line-height: 1;
 }
 .mapa-tempo-marker-balao small {
-  overflow: hidden;
-  color: #475569;
-  font-size: 0.48rem;
+  color: #ffffff;
+  font-size: 0.55rem;
   font-weight: 700;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.mapa-tempo-marker-ponta {
-  width: 10px;
-  height: 10px;
-  margin: -2px auto 0;
-  border-right: 2px solid var(--tempo-cor, #0369a1);
-  border-bottom: 2px solid var(--tempo-cor, #0369a1);
-  background: white;
-  transform: rotate(45deg);
 }
 .mapa-tempo-popup {
   min-width: 170px;

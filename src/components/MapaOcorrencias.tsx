@@ -185,19 +185,20 @@ function criarIconeTempoMapa(tempo: TempoMapa) {
   const temperatura = Number.isFinite(Number(atual?.temperatura))
     ? `${Math.round(Number(atual?.temperatura))}°`
     : '—'
+  const quente = Number(atual?.temperatura) >= 30
+  const icone = quente ? '☀️' : iconeTempoMapa(atual?.codigoTempo)
   return L.divIcon({
     className: 'mapa-tempo-marker',
     html: `
       <div class="mapa-tempo-marker-balao" style="--tempo-cor:${estado.cor}">
-        <span class="mapa-tempo-marker-icone">${iconeTempoMapa(atual?.codigoTempo)}</span>
+        <span class="mapa-tempo-marker-icone">${icone}</span>
         <strong>${temperatura}</strong>
-        <small>${estado.nome}</small>
+        ${quente ? '<small>Calor</small>' : ''}
       </div>
-      <div class="mapa-tempo-marker-ponta" style="--tempo-cor:${estado.cor}"></div>
     `,
-    iconSize: [86, 64],
-    iconAnchor: [43, 64],
-    popupAnchor: [0, -64],
+    iconSize: [78, 30],
+    iconAnchor: [39, 15],
+    popupAnchor: [0, -18],
   })
 }
 
@@ -727,7 +728,6 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
   const [alertasTempoMapa, setAlertasTempoMapa] = useState<AlertaTempoMapa[]>([])
   const [alertasTempoCarregando, setAlertasTempoCarregando] = useState(false)
   const [alertasTempoErro, setAlertasTempoErro] = useState<string | null>(null)
-  const [mostrarTermometroMapa, setMostrarTermometroMapa] = useState(true)
   const [mostrarOcorrencias, setMostrarOcorrencias] = useState(false)
   const [mostrarMateriais, setMostrarMateriais] = useState(false)
   const [painelMaterialAberto, setPainelMaterialAberto] = useState(false)
@@ -1517,7 +1517,7 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
             updateWhenIdle={true}
           />
         )}
-        {mostrarTermometroMapa && tempoMapa?.atual && (
+        {mostrarChuva && tempoMapa?.atual && (
           <Marker
             position={CONSELHEIRO_LAFAIETE}
             icon={criarIconeTempoMapa(tempoMapa)}
@@ -1863,14 +1863,6 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
           onClick={() => setCamadaMapa('satelite')}
         >
           🛰️ Satélite
-        </button>
-        <button
-          className={`mapa-camada-btn ${mostrarTermometroMapa ? 'ativo' : ''}`}
-          onClick={() => setMostrarTermometroMapa(v => !v)}
-          aria-pressed={mostrarTermometroMapa}
-          title="Mostrar ou ocultar a temperatura atual da cidade"
-        >
-          🌡️ Tempo
         </button>
         <div className="mapa-chuva-wrap">
           <button

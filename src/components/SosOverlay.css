@@ -96,6 +96,21 @@
 }
 .sos-info-linha { display: flex; align-items: center; gap: 6px; }
 .sos-info-linha strong { font-weight: 800; }
+.sos-info-coordenadas-link {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 3px;
+  color: #fff;
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-underline-offset: 3px;
+}
+.sos-info-coordenadas-link span {
+  color: #fee2e2;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
 .sos-info-erro    { opacity: 0.85; font-style: italic; }
 .sos-info-aguarde { opacity: 0.85; font-style: italic; }
 

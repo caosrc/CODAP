@@ -112,6 +112,9 @@ function connect() {
       if (!tipo) return
       const dedupKey = `${tipo}-${msg.id ?? msg.ts ?? JSON.stringify(msg).slice(0, 60)}`
       if (!novaMsg(dedupKey)) return
+      if (tipo === 'sos-cancelado') {
+        sbBroadcast({ ...msg, tipo: 'sos-cancelar' })
+      }
       dispatch(tipo, msg)
     } catch { /* ignore */ }
   }
@@ -137,6 +140,68 @@ function connect() {
 
 let sbChannel: ReturnType<typeof supabase.channel> | null = null
 let sbPresenceTracked = false
+const SOS_API_TYPES = new Set(['sos', 'sos-audio', 'sos-cancelar', 'sos-mensagem'])
+
+async function broadcastSosFallback(mensagem: Record<string, unknown>): Promise<boolean> {
+  if (!sbChannel || !supabaseDisponivel) return false
+  try {
+    const status = await sbChannel.send({ type: 'broadcast', event: 'msg', payload: mensagem })
+    return status === 'ok'
+  } catch {
+    return false
+  }
+}
+
+async function enviarSosViaApi(mensagem: Record<string, unknown>) {
+  const tipo = String(mensagem.tipo || '')
+  const controller = new AbortController()
+  const timeoutId = window.setTimeout(() => controller.abort(), 8000)
+  const confirmarCancelamentoLocal = () => {
+    if (tipo !== 'sos-cancelar') return
+    dispatch('sos-cancelado', { ...mensagem, tipo: 'sos-cancelado' })
+  }
+  try {
+    const response = await fetch('/api/sos', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(mensagem),
+      signal: controller.signal,
+    })
+    const contentType = response.headers.get('content-type') || ''
+    if (contentType.includes('application/json')) {
+      if (response.ok) {
+        await broadcastSosFallback(mensagem)
+        confirmarCancelamentoLocal()
+        return
+      }
+      const erro = await response.json().catch(() => ({}))
+      const tipoErro = tipo === 'sos-cancelar' ? 'sos-cancelamento-erro' : 'sos-operacao-erro'
+      dispatch(tipoErro, {
+        tipo: tipoErro,
+        id: mensagem.id,
+        erro: String(erro.error || 'Não foi possível concluir a operação do SOS.'),
+      })
+      return
+    }
+  } catch {
+    // API indisponível (por exemplo, hospedagem estática): mantém o canal realtime.
+  } finally {
+    window.clearTimeout(timeoutId)
+  }
+  const entregue = await broadcastSosFallback(mensagem)
+  if (entregue) {
+    confirmarCancelamentoLocal()
+    return
+  }
+  const tipoErro = tipo === 'sos-cancelar' ? 'sos-cancelamento-erro' : 'sos-operacao-erro'
+  dispatch(tipoErro, {
+    tipo: tipoErro,
+    id: mensagem.id,
+    erro: tipo === 'sos-cancelar'
+      ? 'Não foi possível cancelar o SOS para todos. Verifique a conexão e tente novamente.'
+      : 'Não foi possível salvar o SOS no servidor.',
+  })
+}
 
 function conectarSupabaseRealtime() {
   if (!supabaseDisponivel) return
@@ -233,7 +298,6 @@ function sbBroadcast(msg: Record<string, unknown>) {
 
 async function loadSosAtivos() {
   try {
-    const limiteTs = Date.now() - 60 * 60 * 1000
     let alertas: Record<string, unknown>[] = []
     const res = await fetch('/api/sos-ativos').catch(() => null)
     if (res?.ok) {
@@ -246,14 +310,10 @@ async function loadSosAtivos() {
     if (alertas.length === 0 && supabaseDisponivel) {
       const { data } = await supabase
         .from('sos_ativos_db')
-        .select('id,agente,lat,lng,bateria,timestamp,visualizadores,mensagens')
-        .gt('timestamp', limiteTs)
-        .limit(20)
+        .select('id,agente,lat,lng,bateria,audio,timestamp,visualizadores,mensagens')
       alertas = data ?? []
     }
-    const filtrados = alertas
-      .filter((row) => Number(row.timestamp) > limiteTs)
-      .map((row) => ({
+    const filtrados = alertas.map((row) => ({
         tipo: 'sos',
         id: row.id,
         agente: row.agente,
@@ -321,6 +381,13 @@ export function wsSend(msg: Record<string, unknown>): void {
 
   if (ws && ws.readyState === WebSocket.OPEN) {
     ws.send(JSON.stringify(mensagem))
+    if (!SOS_API_TYPES.has(tipo)) sbBroadcast(mensagem)
+    return
+  }
+
+  if (SOS_API_TYPES.has(tipo)) {
+    void enviarSosViaApi(mensagem)
+    return
   }
 
   sbBroadcast(mensagem)

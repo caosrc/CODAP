@@ -12,3 +12,4 @@
 - [Migrações Supabase idempotentes](supabase-migrations-existing-tables.md) — CREATE TABLE IF NOT EXISTS não atualiza tabelas antigas; inclua colunas, chaves, RLS e GRANTs compatíveis.
 - [Supabase em funções Netlify](supabase-netlify-runtime.md) — variáveis VITE do build podem não bastar para funções; operações públicas precisam de runtime env ou cliente direto.
 - [Previsão de raios](previsao-raios.md) — Open-Meteo fornece trovoadas previstas por modelos, não descargas observadas; manter essa distinção na interface.
+- [Ciclo de vida do SOS](sos-lifecycle.md) — alertas permanecem persistidos até cancelamento global pelo emissor ou por um agente receptor.

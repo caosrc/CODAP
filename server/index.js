@@ -122,7 +122,6 @@ function broadcastParaTodos(payload, excluirWs = null) {
 }
 
 const sosAtivos = new Map()
-const SOS_TTL_MS = 60 * 60 * 1000
 
 async function enviarPushSosServidor(msg) {
   if (!vapidConfigured) return
@@ -253,48 +252,47 @@ async function notificarEventosDoDia() {
   }
 }
 
-function processarSos(msg, wsRemetente = null) {
+async function processarSos(msg, wsRemetente = null) {
   if (!msg || !msg.id) return
   const existente = sosAtivos.get(msg.id)
-  if (existente) {
-    const fundido = { ...existente, ...msg }
-    sosAtivos.set(msg.id, fundido)
-    broadcastParaTodos(fundido, wsRemetente)
-  } else {
-    const novo = { ...msg, visualizadores: [], mensagens: [] }
-    sosAtivos.set(msg.id, novo)
-    broadcastParaTodos(msg, wsRemetente)
+  const novo = existente
+    ? { ...existente, ...msg }
+    : { ...msg, visualizadores: [], mensagens: [] }
+  await query(
+    `INSERT INTO sos_ativos_db (id, agente, lat, lng, bateria, audio, timestamp, visualizadores, mensagens)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+     ON CONFLICT (id) DO UPDATE SET agente=$2, lat=$3, lng=$4, bateria=$5,
+       audio=COALESCE($6, sos_ativos_db.audio), timestamp=$7,
+       visualizadores=$8, mensagens=$9`,
+    [novo.id, novo.agente || '', novo.lat ?? null, novo.lng ?? null, novo.bateria ?? null,
+      novo.audio ?? null, novo.timestamp || Date.now(),
+      JSON.stringify(novo.visualizadores || []), JSON.stringify(novo.mensagens || [])],
+  )
+  sosAtivos.set(msg.id, novo)
+  if (!existente) {
     enviarPushSosServidor(msg).catch(() => {})
-    // Persiste no banco de dados
-    query(
-      `INSERT INTO sos_ativos_db (id, agente, lat, lng, bateria, audio, timestamp, visualizadores, mensagens)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
-       ON CONFLICT (id) DO UPDATE SET agente=$2, lat=$3, lng=$4, bateria=$5, audio=COALESCE($6, sos_ativos_db.audio), timestamp=$7`,
-      [msg.id, msg.agente || '', msg.lat ?? null, msg.lng ?? null, msg.bateria ?? null,
-       msg.audio ?? null, msg.timestamp || Date.now(), JSON.stringify([]), JSON.stringify([])]
-    ).catch(e => console.warn('[SOS-DB] erro ao salvar:', e?.message))
   }
+  broadcastParaTodos(novo, wsRemetente)
 }
 
-function processarSosAudio(msg, wsRemetente = null) {
+async function processarSosAudio(msg, wsRemetente = null) {
   if (!msg || !msg.id || !msg.audio) return
   const existente = sosAtivos.get(msg.id)
   if (existente) {
+    await query('UPDATE sos_ativos_db SET audio=$1 WHERE id=$2', [msg.audio, msg.id])
     sosAtivos.set(msg.id, { ...existente, audio: msg.audio })
-    // Atualiza áudio no banco
-    query('UPDATE sos_ativos_db SET audio=$1 WHERE id=$2', [msg.audio, msg.id])
-      .catch(e => console.warn('[SOS-DB] erro ao atualizar áudio:', e?.message))
   }
   broadcastParaTodos(msg, wsRemetente)
 }
 
-function processarSosCancelar(msg, wsRemetente = null) {
+async function processarSosCancelar(msg, wsRemetente = null) {
   if (!msg || !msg.id) return
+  await query('DELETE FROM sos_ativos_db WHERE id=$1', [msg.id])
   sosAtivos.delete(msg.id)
-  broadcastParaTodos(msg, wsRemetente)
-  // Remove do banco de dados
-  query('DELETE FROM sos_ativos_db WHERE id=$1', [msg.id])
-    .catch(e => console.warn('[SOS-DB] erro ao remover:', e?.message))
+  broadcastParaTodos({ ...msg, tipo: 'sos-cancelar' }, wsRemetente)
+  if (wsRemetente?.readyState === WebSocket.OPEN) {
+    wsRemetente.send(JSON.stringify({ ...msg, tipo: 'sos-cancelado', ts: Date.now() }))
+  }
 }
 
 wss.on('connection', (ws) => {
@@ -312,11 +310,7 @@ wss.on('connection', (ws) => {
     ws.send(JSON.stringify({ tipo: 'posicoes_iniciais', posicoes: posicoeAtuais }))
   }
 
-  const agora = Date.now()
-  const sosValidos = []
-  for (const [, alerta] of sosAtivos) {
-    if (agora - alerta.timestamp < SOS_TTL_MS) sosValidos.push(alerta)
-  }
+  const sosValidos = [...sosAtivos.values()]
   if (sosValidos.length > 0) {
     ws.send(JSON.stringify({ tipo: 'sos_persistidos', alertas: sosValidos }))
   }
@@ -417,19 +411,36 @@ wss.on('connection', (ws) => {
         if (posicoes.length > 0) {
           ws.send(JSON.stringify({ tipo: 'posicoes_iniciais', posicoes }))
         }
-        const agoraEstado = Date.now()
-        const sosValidos = []
-        for (const [, alerta] of sosAtivos) {
-          if (agoraEstado - alerta.timestamp < SOS_TTL_MS) sosValidos.push(alerta)
-        }
+        const sosValidos = [...sosAtivos.values()]
         if (sosValidos.length > 0) {
           ws.send(JSON.stringify({ tipo: 'sos_persistidos', alertas: sosValidos }))
         }
       }
 
-      if (msg.tipo === 'sos') processarSos(msg, ws)
-      if (msg.tipo === 'sos-audio') processarSosAudio(msg, ws)
-      if (msg.tipo === 'sos-cancelar') processarSosCancelar(msg, ws)
+      if (msg.tipo === 'sos') {
+        processarSos(msg, ws).catch((e) => {
+          console.warn('[SOS] erro ao persistir acionamento:', e?.message)
+          if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({
+            tipo: 'sos-operacao-erro', id: msg.id, erro: 'Não foi possível salvar o SOS no servidor.',
+          }))
+        })
+      }
+      if (msg.tipo === 'sos-audio') {
+        processarSosAudio(msg, ws).catch((e) => {
+          console.warn('[SOS] erro ao atualizar áudio:', e?.message)
+          if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({
+            tipo: 'sos-operacao-erro', id: msg.id, erro: 'Não foi possível salvar o áudio do SOS.',
+          }))
+        })
+      }
+      if (msg.tipo === 'sos-cancelar') {
+        processarSosCancelar(msg, ws).catch((e) => {
+          console.warn('[SOS] erro ao cancelar alerta:', e?.message)
+          if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({
+            tipo: 'sos-cancelamento-erro', id: msg.id, erro: 'Não foi possível cancelar o SOS para todos.',
+          }))
+        })
+      }
       if (msg.tipo === 'radar_notificacao_agente') {
         broadcastParaTodos(msg, ws)
       }
@@ -1144,10 +1155,8 @@ async function initDb() {
 
   // Carrega SOS ainda válidos do banco ao iniciar
   try {
-    const limiteTs = Date.now() - SOS_TTL_MS
     const result = await query(
-      'SELECT * FROM sos_ativos_db WHERE timestamp > $1',
-      [limiteTs]
+      'SELECT * FROM sos_ativos_db'
     )
     for (const row of result.rows) {
       sosAtivos.set(row.id, {
@@ -1166,8 +1175,6 @@ async function initDb() {
     if (result.rows.length > 0) {
       console.log(`[SOS] ${result.rows.length} alerta(s) ativo(s) carregado(s) do banco`)
     }
-    // Limpa SOS expirados do banco
-    await query('DELETE FROM sos_ativos_db WHERE timestamp <= $1', [limiteTs]).catch(() => {})
   } catch (e) {
     console.warn('[SOS] erro ao carregar alertas do banco:', e?.message)
   }
@@ -2505,16 +2512,16 @@ async function processarSosMensagem(msg) {
     .catch(e => console.warn('[SOS-DB] erro ao atualizar mensagens:', e?.message))
 }
 
-app.post('/api/sos', (req, res) => {
+app.post('/api/sos', async (req, res) => {
   const msg = req.body
   if (!msg || typeof msg !== 'object' || !msg.tipo || !msg.id) {
     return res.status(400).json({ error: 'Mensagem SOS inválida' })
   }
   try {
-    if (msg.tipo === 'sos') processarSos(msg, null)
-    else if (msg.tipo === 'sos-audio') processarSosAudio(msg, null)
-    else if (msg.tipo === 'sos-cancelar') processarSosCancelar(msg, null)
-    else if (msg.tipo === 'sos-mensagem') { processarSosMensagem(msg).catch(() => {}) }
+    if (msg.tipo === 'sos') await processarSos(msg, null)
+    else if (msg.tipo === 'sos-audio') await processarSosAudio(msg, null)
+    else if (msg.tipo === 'sos-cancelar') await processarSosCancelar(msg)
+    else if (msg.tipo === 'sos-mensagem') await processarSosMensagem(msg)
     else return res.status(400).json({ error: `Tipo SOS desconhecido: ${msg.tipo}` })
     res.json({ ok: true })
   } catch (err) {
@@ -3108,8 +3115,7 @@ app.post('/api/send-sos-push', async (req, res) => {
 // ── SOS Ativos (REST fallback para wsClient) ─────────────────────────────────
 app.get('/api/sos-ativos', async (_req, res) => {
   try {
-    const limiteTs = Date.now() - SOS_TTL_MS
-    const result = await query('SELECT * FROM sos_ativos_db WHERE timestamp > $1', [limiteTs])
+    const result = await query('SELECT * FROM sos_ativos_db')
     res.json(result.rows)
   } catch (err) {
     res.status(500).json({ error: err.message })

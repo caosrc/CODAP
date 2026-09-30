@@ -22,6 +22,15 @@ function tempoDecorrido(ts: number, agora: number) {
   return `há ${Math.floor(min / 60)}h${String(min % 60).padStart(2, '0')}`
 }
 
+function linkRotaGoogleMaps(lat: number, lng: number) {
+  const params = new URLSearchParams({
+    api: '1',
+    destination: `${lat},${lng}`,
+    travelmode: 'driving',
+  })
+  return `https://www.google.com/maps/dir/?${params.toString()}`
+}
+
 export default function SosOverlay() {
   const { alertas, dispensar } = useSosListener()
   const [agora, setAgora] = useState(Date.now())
@@ -55,7 +64,11 @@ export default function SosOverlay() {
           key={a.id}
           alerta={a}
           agora={agora}
-          onDispensar={() => dispensar(a.id)}
+          onDispensar={() => {
+            if (window.confirm(`Cancelar o SOS de ${a.agente} para todos os agentes?`)) {
+              dispensar(a.id)
+            }
+          }}
           onSilenciar={() => { pararSirene(); tocandoRef.current = false }}
         />
       ))}
@@ -192,7 +205,17 @@ function SosCard({
           )}
           {temGps ? (
             <div className="sos-info-linha">
-              <span>📍 GPS: <strong>{alerta.lat!.toFixed(5)}, {alerta.lng!.toFixed(5)}</strong></span>
+              <span>📍 GPS: </span>
+              <a
+                className="sos-info-coordenadas-link"
+                href={linkRotaGoogleMaps(alerta.lat!, alerta.lng!)}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label={`Abrir rota no Google Maps até ${alerta.lat!.toFixed(5)}, ${alerta.lng!.toFixed(5)}`}
+              >
+                <strong>{alerta.lat!.toFixed(5)}, {alerta.lng!.toFixed(5)}</strong>
+                <span> ↗ Google Maps</span>
+              </a>
             </div>
           ) : (
             <div className="sos-info-linha sos-info-erro">
@@ -311,10 +334,10 @@ function SosCard({
             </button>
           )}
           <button className="sos-btn sos-btn-secundario" onClick={onDispensar}>
-            ✅ Dispensar alerta
+            ✅ Cancelar para todos
           </button>
         </div>
-        <div className="sos-rodape">Ativo por até 1 hora ou até ser dispensado</div>
+        <div className="sos-rodape">O alerta permanece ativo até ser cancelado pelo agente que acionou ou por um agente que o recebeu.</div>
       </div>
     </div>
   )

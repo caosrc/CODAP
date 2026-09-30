@@ -21,8 +21,6 @@ export interface SosAlerta {
   mensagens?: SosMensagem[]
 }
 
-const TTL_MS = 60 * 60 * 1000
-
 async function lerBateria(): Promise<number | null> {
   try {
     const nav: any = navigator
@@ -239,49 +237,6 @@ export function dispararSos(
   }
 }
 
-// ─── Persistência local de SOS já dispensados ──────────────────────────────
-const STORAGE_DISPENSADOS = 'sos_dispensados_v1'
-
-function lerDispensados(): Record<string, number> {
-  try {
-    const raw = localStorage.getItem(STORAGE_DISPENSADOS)
-    if (!raw) return {}
-    const obj = JSON.parse(raw) as Record<string, number>
-    const agora = Date.now()
-    let mudou = false
-    for (const id of Object.keys(obj)) {
-      if (typeof obj[id] !== 'number' || obj[id] < agora) {
-        delete obj[id]
-        mudou = true
-      }
-    }
-    if (mudou) localStorage.setItem(STORAGE_DISPENSADOS, JSON.stringify(obj))
-    return obj
-  } catch { return {} }
-}
-
-function marcarDispensado(id: string) {
-  try {
-    const atual = lerDispensados()
-    atual[id] = Date.now() + TTL_MS
-    localStorage.setItem(STORAGE_DISPENSADOS, JSON.stringify(atual))
-  } catch { /* ignore */ }
-}
-
-function esquecerDispensado(id: string) {
-  try {
-    const atual = lerDispensados()
-    if (atual[id] != null) {
-      delete atual[id]
-      localStorage.setItem(STORAGE_DISPENSADOS, JSON.stringify(atual))
-    }
-  } catch { /* ignore */ }
-}
-
-function foiDispensado(id: string): boolean {
-  return id in lerDispensados()
-}
-
 async function mostrarNotificacaoSos(a: SosAlerta) {
   if (typeof window === 'undefined' || !('Notification' in window)) return
 
@@ -316,14 +271,17 @@ async function mostrarNotificacaoSos(a: SosAlerta) {
 
 export function useSosListener() {
   const [alertas, setAlertas] = useState<SosAlerta[]>([])
-  const timersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
+  const idsConhecidosRef = useRef<Set<string>>(new Set())
+  const idsCanceladosRef = useRef<Set<string>>(new Set())
+  const cancelamentosPendentesRef = useRef<Set<string>>(new Set())
 
   function adicionarAlerta(a: SosAlerta, notificar = true) {
     if (!a?.id) return
-    if (foiDispensado(a.id)) return
+    if (idsCanceladosRef.current.has(a.id)) return
     const meuNome = getAgenteLogado()
     if (meuNome && a.agente && a.agente === meuNome) return
-    const isNovo = !timersRef.current.has(a.id)
+    const isNovo = !idsConhecidosRef.current.has(a.id)
+    idsConhecidosRef.current.add(a.id)
     setAlertas((prev) => {
       const idx = prev.findIndex(x => x.id === a.id)
       if (idx >= 0) {
@@ -333,11 +291,7 @@ export function useSosListener() {
       }
       return [...prev, a]
     })
-    if (isNovo) {
-      if (notificar) mostrarNotificacaoSos(a)
-      const t = setTimeout(() => removerLocal(a.id), TTL_MS)
-      timersRef.current.set(a.id, t)
-    }
+    if (isNovo && notificar) mostrarNotificacaoSos(a)
   }
 
   useEffect(() => {
@@ -358,11 +312,20 @@ export function useSosListener() {
       setAlertas(prev => prev.map(x => x.id === id ? { ...x, audio } : x))
     })
 
-    const offCancelar = wsOn('sos-cancelar', (msg) => {
+    const tratarCancelamento = (msg: Record<string, unknown>) => {
       const id = msg.id as string | undefined
       if (!id) return
-      esquecerDispensado(id)
+      idsCanceladosRef.current.add(id)
+      cancelamentosPendentesRef.current.delete(id)
       removerLocal(id)
+    }
+    const offCancelar = wsOn('sos-cancelar', tratarCancelamento)
+    const offCancelado = wsOn('sos-cancelado', tratarCancelamento)
+
+    const offCancelamentoErro = wsOn('sos-cancelamento-erro', (msg) => {
+      const id = msg.id as string | undefined
+      if (!id || !cancelamentosPendentesRef.current.delete(id)) return
+      window.alert(String(msg.erro || 'Não foi possível cancelar o SOS para todos.'))
     })
 
     const offVisualizado = wsOn('sos-visualizado', (msg) => {
@@ -398,25 +361,29 @@ export function useSosListener() {
       offPersistidos()
       offAudio()
       offCancelar()
+      offCancelado()
+      offCancelamentoErro()
       offVisualizado()
       offMensagem()
       offSosMensagemDireto()
       offOpen()
-      timersRef.current.forEach(t => clearTimeout(t))
-      timersRef.current.clear()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   function removerLocal(id: string) {
-    const t = timersRef.current.get(id)
-    if (t) { clearTimeout(t); timersRef.current.delete(id) }
     setAlertas(prev => prev.filter(x => x.id !== id))
   }
 
   function dispensar(id: string) {
-    marcarDispensado(id)
-    removerLocal(id)
+    const alerta = alertas.find(item => item.id === id)
+    if (!alerta || cancelamentosPendentesRef.current.has(id)) return
+    cancelamentosPendentesRef.current.add(id)
+    wsSend({
+      tipo: 'sos-cancelar',
+      id,
+      agente: getAgenteLogado() || 'Agente',
+    })
   }
 
   return { alertas, dispensar }

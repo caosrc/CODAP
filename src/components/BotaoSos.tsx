@@ -27,6 +27,7 @@ export default function BotaoSos({ modo = 'fab' }: Props) {
   const [progresso, setProgresso] = useState(0)
   const [enviando, setEnviando] = useState(false)
   const [enviado, setEnviado] = useState(false)
+  const [cancelandoSos, setCancelandoSos] = useState(false)
   const [idEnviado, setIdEnviado] = useState<string | null>(null)
   const [erro, setErro] = useState('')
   const [volumeProgresso, setVolumeProgresso] = useState(0)
@@ -45,6 +46,7 @@ export default function BotaoSos({ modo = 'fab' }: Props) {
     setErro('')
     setStatusSos(null)
     setEnviado(false)
+    setCancelandoSos(false)
     setIdEnviado(null)
     const disparo = dispararSos(getNomeAgente(), (s) => setStatusSos(s))
     disparoRef.current = disparo
@@ -96,6 +98,36 @@ export default function BotaoSos({ modo = 'fab' }: Props) {
     return off
   }, [idEnviado])
 
+  useEffect(() => {
+    if (!idEnviado) return
+    const tratarCancelado = (msg: Record<string, unknown>) => {
+      if (msg.id !== idEnviado) return
+      setCancelandoSos(false)
+      fechar()
+    }
+    const offCancelado = wsOn('sos-cancelar', tratarCancelado)
+    const offConfirmacaoCancelamento = wsOn('sos-cancelado', tratarCancelado)
+    const offFalhaCancelamento = wsOn('sos-cancelamento-erro', (msg) => {
+      if (msg.id !== idEnviado) return
+      setCancelandoSos(false)
+      setErro(String(msg.erro || 'Não foi possível cancelar o SOS para todos.'))
+    })
+    const offFalhaEnvio = wsOn('sos-operacao-erro', (msg) => {
+      if (msg.id !== idEnviado) return
+      setEnviado(false)
+      setEnviando(false)
+      setCancelandoSos(false)
+      setIdEnviado(null)
+      setErro(String(msg.erro || 'Não foi possível salvar o SOS no servidor.'))
+    })
+    return () => {
+      offCancelado()
+      offConfirmacaoCancelamento()
+      offFalhaCancelamento()
+      offFalhaEnvio()
+    }
+  }, [idEnviado])
+
   // Escuta mensagens enviadas pelos receptores
   useEffect(() => {
     if (!idEnviado) return
@@ -136,6 +168,7 @@ export default function BotaoSos({ modo = 'fab' }: Props) {
     limparSegurar()
     setEnviado(false)
     setEnviando(false)
+    setCancelandoSos(false)
     setIdEnviado(null)
     setErro('')
     setStatusSos(null)
@@ -152,12 +185,16 @@ export default function BotaoSos({ modo = 'fab' }: Props) {
     fechar()
   }
 
-  // Cancela um SOS já enviado — manda mensagem de cancelamento aos outros.
+  // Cancela um SOS já enviado — só fecha após o servidor confirmar o cancelamento.
   function cancelarSosEnviado() {
     if (idEnviado) {
-      try { wsSend({ tipo: 'sos-cancelar', id: idEnviado }) } catch {}
+      setCancelandoSos(true)
+      setErro('')
+      try { wsSend({ tipo: 'sos-cancelar', id: idEnviado, agente: getNomeAgente() }) } catch {
+        setCancelandoSos(false)
+        setErro('Não foi possível enviar o cancelamento. Tente novamente.')
+      }
     }
-    fechar()
   }
 
   function limparSegurar() {
@@ -353,11 +390,13 @@ export default function BotaoSos({ modo = 'fab' }: Props) {
                   <button
                     className="sos-fab-cancelar sos-fab-cancelar--falso"
                     onClick={cancelarSosEnviado}
+                    disabled={cancelandoSos}
                     style={{ marginTop: 10 }}
                   >
-                    🚫 Falso alarme — cancelar para todos
+                    {cancelandoSos ? '⏳ Cancelando para todos…' : '🚫 Falso alarme — cancelar para todos'}
                   </button>
                 )}
+                {erro && <div className="sos-fab-erro">{erro}</div>}
               </>
             ) : (
               <>

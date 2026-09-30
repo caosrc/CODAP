@@ -1264,25 +1264,22 @@ input, select, textarea { font-family: inherit; }
   border: 0;
   background: transparent;
 }
-.mapa-raios-marker-balao {
+.mapa-raios-marker-icones {
   display: inline-flex;
   align-items: center;
-  gap: 3px;
-  width: max-content;
-  min-height: 26px;
-  padding: 3px 6px;
-  border: 1px solid color-mix(in srgb, var(--raios-cor) 70%, white);
-  border-radius: 999px;
-  color: #fff;
-  background: color-mix(in srgb, var(--raios-cor) 88%, #0f172a);
-  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.42);
-  font-size: 0.62rem;
-  font-weight: 800;
+  justify-content: center;
+  height: 28px;
   white-space: nowrap;
+  filter: drop-shadow(0 1px 2px rgba(15, 23, 42, 0.65));
 }
-.mapa-raios-marker-balao span {
-  font-size: 0.9rem;
+.mapa-raios-marker-icones span {
+  color: var(--raios-cor);
+  font-size: 1.15rem;
+  margin-left: -3px;
   line-height: 1;
+}
+.mapa-raios-marker-icones span:first-child {
+  margin-left: 0;
 }
 .mapa-raios-popup {
   min-width: 190px;

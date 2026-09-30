@@ -256,16 +256,17 @@ function corRiscoRaiosMapa(risco?: string): string {
 
 function criarIconeRaiosMapa(ponto: NonNullable<PrevisaoRaiosMapa['pontos']>[number]) {
   const cor = corRiscoRaiosMapa(ponto.risco)
-  const simbolos = '⚡'.repeat(Math.max(1, Math.min(3, ponto.intensidadeNivel)))
+  const quantidadeRaios = Math.max(1, Math.min(3, ponto.intensidadeNivel))
+  const largura = quantidadeRaios * 20
   return L.divIcon({
     className: 'mapa-raios-marker',
     html: `
-      <div class="mapa-raios-marker-balao" style="--raios-cor:${cor}">
-        <span>${simbolos}</span><strong>${ponto.modelosComTrovoada}/3</strong>
+      <div class="mapa-raios-marker-icones" style="--raios-cor:${cor}" aria-label="${ponto.intensidade}">
+        ${Array.from({ length: quantidadeRaios }, () => '<span aria-hidden="true">⚡</span>').join('')}
       </div>
     `,
-    iconSize: [104, 30],
-    iconAnchor: [52, 15],
+    iconSize: [largura, 28],
+    iconAnchor: [largura / 2, 14],
     popupAnchor: [0, -18],
   })
 }

@@ -1268,18 +1268,15 @@ input, select, textarea { font-family: inherit; }
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  gap: 2px;
   height: 28px;
   white-space: nowrap;
   filter: drop-shadow(0 1px 2px rgba(15, 23, 42, 0.65));
 }
 .mapa-raios-marker-icones span {
-  color: var(--raios-cor);
+  color: #facc15;
   font-size: 1.15rem;
-  margin-left: -3px;
   line-height: 1;
-}
-.mapa-raios-marker-icones span:first-child {
-  margin-left: 0;
 }
 .mapa-raios-marker-composto {
   display: flex;

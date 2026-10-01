@@ -334,8 +334,8 @@ function criarIconeRaiosMapa(
   ponto: NonNullable<PrevisaoRaiosMapa['pontos']>[number],
   temperaturaAtual?: number | null,
 ) {
-  const cor = corRiscoRaiosMapa(ponto.risco)
-  const quantidadeRaios = Math.max(1, Math.min(3, ponto.intensidadeNivel))
+  const quantidadeRaios = Math.max(1, Math.min(3, Math.round(Number(ponto.modelosComTrovoada) || 1)))
+  const descricaoRaios = `${quantidadeRaios}/3 modelos com trovoada`
   const largura = quantidadeRaios * 20
   const mostrarTemperatura = ponto.id === 'conselheiro-lafaiete'
     && temperaturaAtual != null
@@ -346,13 +346,13 @@ function criarIconeRaiosMapa(
       ? `
         <div class="mapa-raios-marker-composto">
           <strong class="mapa-raios-marker-temperatura">${Math.round(Number(temperaturaAtual))}°</strong>
-          <div class="mapa-raios-marker-icones" style="--raios-cor:${cor}" aria-label="${ponto.intensidade}">
+          <div class="mapa-raios-marker-icones" role="img" aria-label="${descricaoRaios}">
             ${Array.from({ length: quantidadeRaios }, () => '<span aria-hidden="true">⚡</span>').join('')}
           </div>
         </div>
       `
       : `
-        <div class="mapa-raios-marker-icones" style="--raios-cor:${cor}" aria-label="${ponto.intensidade}">
+        <div class="mapa-raios-marker-icones" role="img" aria-label="${descricaoRaios}">
           ${Array.from({ length: quantidadeRaios }, () => '<span aria-hidden="true">⚡</span>').join('')}
         </div>
       `,

@@ -5942,3 +5942,296 @@ html:-webkit-full-screen {
     line-height: 1.25;
   }
 }
+
+.radar-tv-reminder-panel {
+  display: contents;
+}
+
+/*
+ * Radar DC TV — mapa dominante e quadros operacionais compactos.
+ * Esta regra final só se aplica a telas largas em modo TV. O layout comum
+ * e a composição mobile continuam usando a estrutura e os tamanhos atuais.
+ */
+@media (min-width: 900px) and (orientation: landscape) {
+  body.radar-tv-active .radar-page.radar-tv {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    height: 100dvh;
+    max-height: 100dvh;
+    overflow: hidden;
+  }
+
+  body.radar-tv-active .radar-tv .radar-tv-launcher {
+    flex: 0 0 22px;
+    min-height: 22px;
+  }
+
+  body.radar-tv-active .radar-tv .radar-dashboard {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.82fr);
+    grid-template-rows:
+      clamp(78px, 13vh, 112px)
+      minmax(0, .72fr)
+      minmax(0, .9fr)
+      minmax(0, 1fr);
+    grid-template-areas:
+      "weather weather weather"
+      "reminders activities map"
+      "calendar activities map"
+      "rain level map";
+    flex: 1 1 0;
+    min-width: 0;
+    min-height: 0;
+    gap: clamp(4px, .42vw, 8px);
+    padding: clamp(4px, .45vw, 8px) clamp(5px, .55vw, 10px);
+    overflow: hidden;
+  }
+
+  body.radar-tv-active .radar-tv .radar-overview,
+  body.radar-tv-active .radar-tv .radar-layout,
+  body.radar-tv-active .radar-tv .radar-note-card,
+  body.radar-tv-active .radar-tv .radar-right-column,
+  body.radar-tv-active .radar-tv .radar-cnl-inline,
+  body.radar-tv-active .radar-tv .radar-tv-hydro-panels {
+    display: contents;
+  }
+
+  body.radar-tv-active .radar-tv .radar-google-weather {
+    grid-area: weather;
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
+    max-height: none;
+    margin: 0;
+  }
+
+  body.radar-tv-active .radar-tv .weather-google-body {
+    grid-template-columns:
+      minmax(100px, .7fr)
+      minmax(135px, .95fr)
+      minmax(0, 1.55fr)
+      minmax(0, 1.55fr);
+    grid-template-rows: minmax(0, 1fr);
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+    gap: clamp(.22rem, .42vw, .42rem);
+  }
+
+  body.radar-tv-active .radar-tv .radar-tv-reminder-panel {
+    grid-area: reminders;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+    padding: clamp(.35rem, .55vw, .55rem);
+    border: 1px solid rgba(135, 185, 211, .25);
+    border-radius: 8px;
+    background: linear-gradient(145deg, #0b2d4b, #08233e);
+    box-shadow: 0 4px 12px rgba(0, 12, 27, .16);
+    overflow: hidden;
+  }
+
+  body.radar-tv-active .radar-tv .radar-tv-reminder-panel .radar-note-heading {
+    flex: 0 0 auto;
+    margin-bottom: .25rem;
+  }
+
+  body.radar-tv-active .radar-tv .radar-tv-reminder-panel .radar-mini-list {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: auto;
+    font-size: clamp(.58rem, .66vw, .72rem);
+  }
+
+  body.radar-tv-active .radar-tv .radar-calendar-card {
+    grid-area: calendar;
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
+    max-height: none;
+    padding: clamp(.3rem, .48vw, .5rem);
+    border: 1px solid rgba(135, 185, 211, .25);
+    border-radius: 8px;
+    overflow: auto;
+  }
+
+  body.radar-tv-active .radar-tv .radar-activities {
+    grid-area: activities;
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
+    padding: clamp(.35rem, .52vw, .55rem);
+    border: 1px solid rgba(135, 185, 211, .25);
+    border-radius: 8px;
+    background: linear-gradient(145deg, #0b2d4b, #08233e);
+    overflow: hidden;
+  }
+
+  body.radar-tv-active .radar-tv .radar-activities .radar-list-heading {
+    flex: 0 0 auto;
+    min-width: 0;
+    margin-bottom: .25rem;
+  }
+
+  body.radar-tv-active .radar-tv .radar-activities .radar-list-heading h2 {
+    font-size: clamp(.72rem, .82vw, .92rem);
+  }
+
+  body.radar-tv-active .radar-tv .radar-activities .radar-list-heading > strong,
+  body.radar-tv-active .radar-tv .radar-activities .card-label {
+    font-size: clamp(.48rem, .55vw, .62rem);
+  }
+
+  body.radar-tv-active .radar-tv .radar-activity-columns {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: auto;
+    gap: clamp(.22rem, .35vw, .38rem);
+  }
+
+  body.radar-tv-active .radar-tv .radar-activity-columns h3 {
+    margin: .2rem 0;
+    font-size: clamp(.58rem, .65vw, .72rem);
+    line-height: 1.15;
+  }
+
+  body.radar-tv-active .radar-tv .radar-activities .radar-activity {
+    margin: .12rem 0;
+    padding: .24rem .28rem;
+    font-size: clamp(.53rem, .58vw, .66rem);
+    line-height: 1.2;
+  }
+
+  body.radar-tv-active .radar-tv .radar-activities .radar-activity b {
+    font-size: clamp(.57rem, .62vw, .7rem);
+  }
+
+  body.radar-tv-active .radar-tv .radar-activities .radar-activity span,
+  body.radar-tv-active .radar-tv .radar-activities .radar-activity small,
+  body.radar-tv-active .radar-tv .radar-activities .radar-empty {
+    font-size: clamp(.5rem, .54vw, .62rem);
+  }
+
+  body.radar-tv-active .radar-tv .radar-live-map-card {
+    grid-area: map;
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
+    margin: 0;
+    padding: clamp(.3rem, .45vw, .5rem);
+    border: 1px solid rgba(135, 185, 211, .3);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+
+  body.radar-tv-active .radar-tv .radar-live-map {
+    flex: 1 1 0;
+    width: 100%;
+    height: auto;
+    min-width: 0;
+    min-height: 0;
+    max-height: none;
+  }
+
+  body.radar-tv-active .radar-tv .radar-cnl-card-heading {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  body.radar-tv-active .radar-tv .radar-tv-hydro-panel {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+    padding: clamp(.28rem, .4vw, .42rem);
+    border: 1px solid rgba(186, 213, 224, .7);
+    border-radius: 8px;
+    background: #f6fafc;
+    color: #14334a;
+    overflow: hidden;
+  }
+
+  body.radar-tv-active .radar-tv .radar-tv-hydro-level {
+    grid-area: level;
+  }
+
+  body.radar-tv-active .radar-tv .radar-tv-hydro-rain {
+    grid-area: rain;
+  }
+
+  body.radar-tv-active .radar-tv .radar-tv-hydro-title {
+    flex: 0 0 auto;
+    margin: 0 0 .2rem;
+    color: #163c55;
+    font-size: clamp(.55rem, .62vw, .7rem);
+    font-weight: 700;
+    line-height: 1.15;
+  }
+
+  body.radar-tv-active .radar-tv .radar-tv-hydro-level > *:not(.radar-tv-hydro-title) {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  body.radar-tv-active .radar-tv .radar-tv-hydro-level svg {
+    max-width: 100%;
+    max-height: 100%;
+  }
+
+  body.radar-tv-active .radar-tv .radar-tv-hydro-rain .cnl-bloco {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    min-height: 0;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+    overflow: hidden;
+  }
+
+  body.radar-tv-active .radar-tv .radar-tv-hydro-rain .cnl-bloco-cabecalho {
+    flex: 0 0 auto;
+    margin: 0 0 .15rem;
+  }
+
+  body.radar-tv-active .radar-tv .radar-tv-hydro-rain .cnl-bloco-cabecalho h2 {
+    margin: 0;
+    font-size: clamp(.55rem, .62vw, .7rem);
+  }
+
+  body.radar-tv-active .radar-tv .radar-tv-hydro-rain .cnl-badge-fonte {
+    font-size: clamp(.38rem, .42vw, .48rem);
+  }
+
+  body.radar-tv-active .radar-tv .radar-tv-hydro-rain .radar-cnl-diaria-detalhe {
+    flex: 0 0 auto;
+    max-height: 38%;
+    overflow: auto;
+  }
+
+  body.radar-tv-active .radar-tv .radar-ticker {
+    flex: 0 0 auto;
+    min-height: 22px;
+  }
+}

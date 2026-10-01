@@ -66,6 +66,36 @@ type DadosRadarChuvaLive = {
   erroAtualizacao?: boolean
 }
 
+type TempoMapaRadar = {
+  atual?: {
+    time?: string
+    temperatura?: number | null
+    umidade?: number | null
+    vento?: number | null
+    rajada?: number | null
+    codigoTempo?: number | null
+  } | null
+  fonte?: string
+}
+
+type PontoTrovoadaRadar = {
+  id: string
+  nome: string
+  latitude: number
+  longitude: number
+  primeiraTrovoada: string
+  modelosComTrovoada: number
+  intensidade: string
+  probabilidadeChuva: number
+  precipitacao: number
+  risco: string
+}
+
+type PrevisaoTrovoadaRadar = {
+  pontos?: PontoTrovoadaRadar[]
+  atualizadoEm?: string
+}
+
 const CONSELHEIRO_LAFAIETE = { latitude: -20.6604, longitude: -43.7863 }
 const RADAR_MAP_CENTER: [number, number] = [CONSELHEIRO_LAFAIETE.latitude, CONSELHEIRO_LAFAIETE.longitude]
 const RADAR_MAP_ZOOM = 12
@@ -214,6 +244,14 @@ function dataHoraRadar(valor?: string | null) {
   return valor
 }
 
+function dataHoraTrovoadaRadar(valor?: string | null) {
+  if (!valor) return '—'
+  const data = new Date(valor)
+  return Number.isNaN(data.getTime())
+    ? valor
+    : data.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
+}
+
 function RadarMapInvalidateSize({ tv }: { tv: boolean }) {
   const map = useMap()
   useEffect(() => {
@@ -226,9 +264,15 @@ function RadarMapInvalidateSize({ tv }: { tv: boolean }) {
 function RadarMapaTempoReal({ dadosCNL, tv }: { dadosCNL: DadosRadarCNL | null; tv: boolean }) {
   const [camadaBase, setCamadaBase] = useState<'mapa' | 'satelite'>('mapa')
   const [radarChuva, setRadarChuva] = useState<DadosRadarChuvaLive | null>(null)
+  const [tempoMapa, setTempoMapa] = useState<TempoMapaRadar | null>(null)
+  const [previsaoTrovoadas, setPrevisaoTrovoadas] = useState<PrevisaoTrovoadaRadar | null>(null)
   const [radarErro, setRadarErro] = useState('')
+  const [tempoMapaErro, setTempoMapaErro] = useState('')
+  const [trovoadasErro, setTrovoadasErro] = useState('')
   const [radarCarregando, setRadarCarregando] = useState(false)
   const [mostrarChuva, setMostrarChuva] = useState(true)
+  const [mostrarTemperatura, setMostrarTemperatura] = useState(true)
+  const [mostrarTrovoadas, setMostrarTrovoadas] = useState(true)
   const [mostrarNuvens] = useState(false)
 
   const carregarRadarChuva = useCallback(async () => {
@@ -255,6 +299,32 @@ function RadarMapaTempoReal({ dadosCNL, tv }: { dadosCNL: DadosRadarCNL | null; 
     }
   }, [])
 
+  const carregarTempoMapa = useCallback(async () => {
+    try {
+      const resposta = await fetch(`/api/tempo?_ts=${Date.now()}`, { cache: 'no-store' })
+      const dados = await resposta.json().catch(() => ({}))
+      if (!resposta.ok || !dados?.atual) throw new Error('Temperatura atual indisponível')
+      setTempoMapa(dados)
+      setTempoMapaErro('')
+    } catch (error) {
+      setTempoMapaErro(error instanceof Error ? error.message : 'Temperatura atual indisponível')
+    }
+  }, [])
+
+  const carregarPrevisaoTrovoadas = useCallback(async () => {
+    try {
+      const resposta = await fetch(`/api/tempo-raios?_ts=${Date.now()}`, { cache: 'no-store' })
+      const dados = await resposta.json().catch(() => ({}))
+      if (!resposta.ok || !Array.isArray(dados?.pontos)) {
+        throw new Error(typeof dados?.erro === 'string' ? dados.erro : 'Previsão de trovoadas indisponível')
+      }
+      setPrevisaoTrovoadas(dados)
+      setTrovoadasErro('')
+    } catch (error) {
+      setTrovoadasErro(error instanceof Error ? error.message : 'Previsão de trovoadas indisponível')
+    }
+  }, [])
+
   useEffect(() => {
     carregarRadarChuva()
     const timer = window.setInterval(carregarRadarChuva, 5 * 60 * 1000)
@@ -268,8 +338,28 @@ function RadarMapaTempoReal({ dadosCNL, tv }: { dadosCNL: DadosRadarCNL | null; 
     }
   }, [carregarRadarChuva])
 
+  useEffect(() => {
+    const atualizarMeteorologia = () => {
+      void carregarTempoMapa()
+      void carregarPrevisaoTrovoadas()
+    }
+    atualizarMeteorologia()
+    const timer = window.setInterval(atualizarMeteorologia, 10 * 60 * 1000)
+    const atualizarAoVoltar = () => {
+      if (document.visibilityState === 'visible') atualizarMeteorologia()
+    }
+    document.addEventListener('visibilitychange', atualizarAoVoltar)
+    return () => {
+      window.clearInterval(timer)
+      document.removeEventListener('visibilitychange', atualizarAoVoltar)
+    }
+  }, [carregarTempoMapa, carregarPrevisaoTrovoadas])
+
   const estacoes = dadosCNL?.estacoes || []
   const tileRadar = radarChuva?.tileUrl || (radarChuva ? `${radarChuva.host}${radarChuva.path}/256/{z}/{x}/{y}/2/1_0.png` : '')
+  const pontosTrovoada = (previsaoTrovoadas?.pontos || []).filter(ponto =>
+    Number.isFinite(ponto.latitude) && Number.isFinite(ponto.longitude),
+  )
 
   return (
     <section className="radar-live-map-card" aria-labelledby="radar-live-map-title">
@@ -290,6 +380,12 @@ function RadarMapaTempoReal({ dadosCNL, tv }: { dadosCNL: DadosRadarCNL | null; 
         <button type="button" className={`radar-live-map-layer-button ${mostrarChuva ? 'ativo chuva' : ''}`} onClick={() => setMostrarChuva(prev => !prev)} aria-pressed={mostrarChuva}>
           🌧️ Chuva {mostrarChuva ? 'ativa' : 'desativada'}
         </button>
+        <button type="button" className={`radar-live-map-layer-button ${mostrarTemperatura ? 'ativo temperatura' : ''}`} onClick={() => setMostrarTemperatura(prev => !prev)} aria-pressed={mostrarTemperatura}>
+          🌡️ Temperatura {mostrarTemperatura ? 'ativa' : 'desativada'}
+        </button>
+        <button type="button" className={`radar-live-map-layer-button ${mostrarTrovoadas ? 'ativo trovoadas' : ''}`} onClick={() => setMostrarTrovoadas(prev => !prev)} aria-pressed={mostrarTrovoadas}>
+          ⚡ Trovoadas {mostrarTrovoadas ? 'ativas' : 'desativadas'}
+        </button>
         <button
           type="button"
           className={`radar-live-map-layer-button ${mostrarNuvens ? 'ativo nuvens' : ''}`}
@@ -303,8 +399,10 @@ function RadarMapaTempoReal({ dadosCNL, tv }: { dadosCNL: DadosRadarCNL | null; 
       <div className="radar-live-map-status">
         <span><i className="radar-live-map-status-dot radar-live-map-status-dot-rain" /> Chuva observada</span>
         <span><i className="radar-live-map-status-dot radar-live-map-status-dot-station" /> Estações CEMADEN</span>
+        <span><i className="radar-live-map-status-dot radar-live-map-status-dot-temperature" /> Temperatura atual</span>
+        <span><i className="radar-live-map-status-dot radar-live-map-status-dot-lightning" /> Trovoada prevista · próximos 36 h</span>
         <span><i className="radar-live-map-status-dot radar-live-map-status-dot-area" /> Raio de 10 km</span>
-        {radarErro && <strong>{radarErro}</strong>}
+        {(radarErro || tempoMapaErro || trovoadasErro) && <strong>{[radarErro, tempoMapaErro, trovoadasErro].filter(Boolean).join(' · ')}</strong>}
       </div>
       <MapContainer
         className="radar-live-map"
@@ -394,6 +492,58 @@ function RadarMapaTempoReal({ dadosCNL, tv }: { dadosCNL: DadosRadarCNL | null; 
             </CircleMarker>
           )
         })}
+        {mostrarTemperatura && tempoMapa?.atual && Number.isFinite(Number(tempoMapa.atual.temperatura)) && (
+          <CircleMarker
+            center={[CONSELHEIRO_LAFAIETE.latitude, CONSELHEIRO_LAFAIETE.longitude]}
+            radius={8}
+            pathOptions={{ color: '#fff', weight: 2, fillColor: '#0284c7', fillOpacity: 1 }}
+          >
+            <Tooltip permanent direction="bottom" offset={[0, 9]} opacity={1} className="radar-live-map-tooltip radar-live-map-tooltip-temperature">
+              {`🌡️ ${Math.round(Number(tempoMapa.atual.temperatura))}°`}
+            </Tooltip>
+            <Popup>
+              <strong>🌡️ Temperatura atual · Conselheiro Lafaiete</strong>
+              <br />
+              <b>{Math.round(Number(tempoMapa.atual.temperatura))} °C</b>
+              <br />
+              Umidade: {tempoMapa.atual.umidade ?? '—'}%
+              <br />
+              Vento: {tempoMapa.atual.vento ?? '—'} km/h
+              <br />
+              Rajada: {tempoMapa.atual.rajada ?? '—'} km/h
+              <br />
+              Fonte: {tempoMapa.fonte || 'Open-Meteo'}
+            </Popup>
+          </CircleMarker>
+        )}
+        {mostrarTrovoadas && pontosTrovoada.map(ponto => (
+          <CircleMarker
+            key={`radar-live-lightning-${ponto.id}`}
+            center={[ponto.latitude, ponto.longitude]}
+            radius={9}
+            pathOptions={{
+              color: '#fff',
+              weight: 2,
+              fillColor: ponto.risco === 'alto' ? '#dc2626' : ponto.risco === 'atenção' ? '#d97706' : '#7c3aed',
+              fillOpacity: 1,
+            }}
+          >
+            <Tooltip permanent direction="top" offset={[0, -10]} opacity={1} className="radar-live-map-tooltip radar-live-map-tooltip-lightning">
+              ⚡
+            </Tooltip>
+            <Popup>
+              <strong>⚡ {ponto.nome}</strong>
+              <br />
+              Trovoada prevista: {ponto.intensidade} · {ponto.modelosComTrovoada}/3 modelos
+              <br />
+              A partir de: {dataHoraTrovoadaRadar(ponto.primeiraTrovoada)}
+              <br />
+              Probabilidade de chuva: {ponto.probabilidadeChuva}% · até {Number(ponto.precipitacao).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} mm
+              <br />
+              <small>Previsão numérica Open‑Meteo; não representa descargas observadas.</small>
+            </Popup>
+          </CircleMarker>
+        ))}
         {mostrarChuva && (
           <CircleMarker center={RADAR_MAP_CENTER} radius={5} pathOptions={{ color: '#0f172a', weight: 2, fillColor: '#f8fafc', fillOpacity: 1 }}>
             <Popup>
@@ -407,6 +557,8 @@ function RadarMapaTempoReal({ dadosCNL, tv }: { dadosCNL: DadosRadarCNL | null; 
       <div className="radar-live-map-footer">
         <span>{dadosCNL ? `${estacoes.length} estação(ões) CEMADEN` : 'Consultando estações CEMADEN…'}</span>
         <span>{radarChuva?.atualizadoEm ? `Radar: ${new Date(radarChuva.atualizadoEm).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}` : 'Radar: —'}</span>
+        <span>{tempoMapa?.atual?.temperatura != null ? `Agora: ${Math.round(Number(tempoMapa.atual.temperatura))} °C` : 'Temperatura: —'}</span>
+        <span>{previsaoTrovoadas ? `${pontosTrovoada.length} local(is) com trovoada prevista` : 'Previsão de trovoadas: —'}</span>
         {!templateTilesHttpsValido(GOES_CLOUD_TILE_URL) && <span>Nuvens GOES: fonte não configurada</span>}
       </div>
     </section>

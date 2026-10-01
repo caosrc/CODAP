@@ -255,23 +255,37 @@ function corRiscoRaiosMapa(risco?: string): string {
   return '#15803d'
 }
 
-function criarIconeRaiosMapa(ponto: NonNullable<PrevisaoRaiosMapa['pontos']>[number]) {
+function criarIconeRaiosMapa(
+  ponto: NonNullable<PrevisaoRaiosMapa['pontos']>[number],
+  temperaturaAtual?: number | null,
+) {
   const cor = corRiscoRaiosMapa(ponto.risco)
   const quantidadeRaios = Math.max(1, Math.min(3, ponto.intensidadeNivel))
   const largura = quantidadeRaios * 20
-  const deslocadoDaTemperatura = ponto.id === 'conselheiro-lafaiete'
-  const deslocamentoX = deslocadoDaTemperatura ? 46 : 0
-  const deslocamentoY = deslocadoDaTemperatura ? 38 : 0
+  const mostrarTemperatura = ponto.id === 'conselheiro-lafaiete'
+    && temperaturaAtual != null
+    && Number.isFinite(Number(temperaturaAtual))
   return L.divIcon({
-    className: `mapa-raios-marker${deslocadoDaTemperatura ? ' mapa-raios-marker--separado' : ''}`,
-    html: `
-      <div class="mapa-raios-marker-icones" style="--raios-cor:${cor}" aria-label="${ponto.intensidade}">
-        ${Array.from({ length: quantidadeRaios }, () => '<span aria-hidden="true">⚡</span>').join('')}
-      </div>
-    `,
-    iconSize: [largura, 28],
-    iconAnchor: [largura / 2 - deslocamentoX, 14 + deslocamentoY],
-    popupAnchor: [deslocamentoX, -18 - deslocamentoY],
+    className: `mapa-raios-marker${mostrarTemperatura ? ' mapa-raios-marker--composto' : ''}`,
+    html: mostrarTemperatura
+      ? `
+        <div class="mapa-raios-marker-composto">
+          <strong class="mapa-raios-marker-temperatura">${Math.round(Number(temperaturaAtual))}°</strong>
+          <div class="mapa-raios-marker-icones" style="--raios-cor:${cor}" aria-label="${ponto.intensidade}">
+            ${Array.from({ length: quantidadeRaios }, () => '<span aria-hidden="true">⚡</span>').join('')}
+          </div>
+        </div>
+      `
+      : `
+        <div class="mapa-raios-marker-icones" style="--raios-cor:${cor}" aria-label="${ponto.intensidade}">
+          ${Array.from({ length: quantidadeRaios }, () => '<span aria-hidden="true">⚡</span>').join('')}
+        </div>
+      `,
+    iconSize: mostrarTemperatura ? [60, 44] : [largura, 28],
+    // No ponto central, o raio fica ancorado exatamente na coordenada prevista.
+    // A temperatura é mostrada acima para não deslocar nem encobrir o símbolo.
+    iconAnchor: mostrarTemperatura ? [30, 30] : [largura / 2, 14],
+    popupAnchor: [0, -18],
   })
 }
 
@@ -1656,7 +1670,7 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
           <Marker
             key={`raios-${ponto.id}`}
             position={[ponto.latitude, ponto.longitude]}
-            icon={criarIconeRaiosMapa(ponto)}
+            icon={criarIconeRaiosMapa(ponto, tempoMapa?.atual?.temperatura)}
             zIndexOffset={700}
           >
             <Popup>
@@ -1667,6 +1681,9 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
                 </b>
                 <span>Previsão a partir de {dataHoraTempoMapa(ponto.primeiraTrovoada)}</span>
                 <span>Chuva prevista: {ponto.probabilidadeChuva}% · até {ponto.precipitacao.toLocaleString('pt-BR', { maximumFractionDigits: 1 })} mm</span>
+                {ponto.id === 'conselheiro-lafaiete' && tempoMapa?.atual?.temperatura != null && (
+                  <span>Temperatura atual em Conselheiro Lafaiete: {Math.round(Number(tempoMapa.atual.temperatura))} °C</span>
+                )}
                 <small>Open‑Meteo · previsão numérica</small>
               </div>
             </Popup>

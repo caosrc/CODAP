@@ -390,6 +390,14 @@
   color: #fff;
   background: #4f46a5;
 }
+.radar-live-map-toolbar button.temperatura.ativo {
+  border-color: #38bdf8;
+  background: #0369a1;
+}
+.radar-live-map-toolbar button.trovoadas.ativo {
+  border-color: #a78bfa;
+  background: #6d28d9;
+}
 .radar-live-map-toolbar button:disabled {
   cursor: not-allowed;
   opacity: .48;
@@ -421,6 +429,8 @@
 }
 .radar-live-map-status-dot-rain { background: #5b9cff; }
 .radar-live-map-status-dot-station { background: #f97316; }
+.radar-live-map-status-dot-temperature { background: #0ea5e9; }
+.radar-live-map-status-dot-lightning { background: #a78bfa; }
 .radar-live-map-status-dot-area { border: 1px dashed #7db8ff; }
 .radar-live-map {
   z-index: 0;
@@ -447,6 +457,14 @@
   white-space: nowrap;
 }
 .radar-live-map-tooltip::before { display: none; }
+.radar-live-map-tooltip-temperature {
+  color: #0369a1 !important;
+  font-size: .78rem;
+}
+.radar-live-map-tooltip-lightning {
+  color: #7c3aed !important;
+  font-size: .9rem;
+}
 .radar-live-map-footer {
   display: flex;
   flex-wrap: wrap;

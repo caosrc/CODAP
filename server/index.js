@@ -4202,7 +4202,7 @@ app.get('/api/monitoramento-cnl', async (_req, res) => {
 // própria API, sempre usando o último quadro disponível.
 let radarChuvaCache = null
 let radarChuvaCacheTs = 0
-const RADAR_CHUVA_TTL_MS = 2 * 60 * 1000
+const RADAR_CHUVA_TTL_MS = 60 * 1000
 
 app.get('/api/radar-chuva', async (_req, res) => {
   try {
@@ -4226,7 +4226,9 @@ app.get('/api/radar-chuva', async (_req, res) => {
     )
     const quadrosObservados = (Array.isArray(dados?.radar?.past) ? dados.radar.past : [])
       .filter(validarQuadro)
-    const ultimo = quadrosObservados.at(-1)
+    const ultimo = quadrosObservados.reduce((maisRecente, quadro) => (
+      !maisRecente || Number(quadro.time) > Number(maisRecente.time) ? quadro : maisRecente
+    ), null)
 
     if (!host || !ultimo) throw new Error('RainViewer não retornou quadros de radar')
 

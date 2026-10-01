@@ -964,7 +964,7 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
   useEffect(() => {
     if (!mostrarChuva) return
     buscarRadarChuva()
-    const intervalo = setInterval(buscarRadarChuva, 5 * 60 * 1000)
+    const intervalo = setInterval(buscarRadarChuva, 3 * 60 * 1000)
     const atualizarAoVoltar = () => {
       if (document.visibilityState === 'visible') buscarRadarChuva()
     }
@@ -2231,7 +2231,7 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
                 >
                   🌧️ Radar RainViewer
                 </button>
-                <span>Precipitação observada · atualização automática a cada 5 min</span>
+                <span>Precipitação observada · consulta a cada 3 min; quadros da fonte em intervalos de 10 min</span>
               </div>
               <div className="mapa-chuva-fontes">
                 <button
@@ -2264,7 +2264,7 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
                   <span className="mapa-chuva-resumo-label">Radar</span>
                   <strong>
                     {radarChuva ? horaChuva(radarChuva.atualizadoEm) : '—'}
-                    <small className="mapa-chuva-quadro-tipo">RainViewer · observado</small>
+                    <small className="mapa-chuva-quadro-tipo">RainViewer · horário de geração do quadro</small>
                   </strong>
                 </div>
                 <div>
@@ -2298,7 +2298,7 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
                 <span><i className="chuva-cor chuva-cor--extrema" /> extrema</span>
               </div>
               <p className="mapa-chuva-ajuda">
-                O radar mostra a chuva que já foi observada se deslocando em direção à cidade.
+                O radar mostra a chuva observada se deslocando em direção à cidade. A RainViewer publica quadros em intervalos de 10 minutos; o horário acima indica quando o quadro foi gerado, não o instante exato em que a chuva começou.
                 Para acompanhar se ela está chegando, observe as áreas coloridas se aproximando do círculo tracejado de 10 km.
                 Ele não calcula sozinho o horário de chegada nem substitui uma previsão meteorológica.
                 Os pontos no mapa são leituras reais das estações CEMADEN de Lafaiete, em mm acumulados na última hora.

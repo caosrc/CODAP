@@ -25,6 +25,9 @@ const PONTOS_MINAS = [
   { id: 'pouso-alegre', nome: 'Pouso Alegre', latitude: -22.23, longitude: -45.933 },
   { id: 'januaria', nome: 'Januária', latitude: -15.484, longitude: -44.36 },
 ]
+let previsaoCache = null
+let previsaoCacheTs = 0
+const CACHE_TTL_MS = 5 * 60 * 1000
 
 function resposta(statusCode, body, cache = 'public, max-age=300, stale-while-revalidate=600') {
   return {
@@ -85,10 +88,18 @@ function montarPontosRaios(dados) {
 }
 
 export const handler = async () => {
+  const agora = Date.now()
+  if (previsaoCache && agora - previsaoCacheTs < CACHE_TTL_MS) {
+    return resposta(200, { ...previsaoCache, cache: true })
+  }
+
   try {
+    // Busca a previsão local e os municípios em uma chamada única. Isso evita
+    // estourar o tempo limite das Functions do Netlify com chamadas em sequência.
+    const locais = [{ latitude: LAT, longitude: LNG }, ...PONTOS_MINAS]
     const params = new URLSearchParams({
-      latitude: String(LAT),
-      longitude: String(LNG),
+      latitude: locais.map(local => local.latitude).join(','),
+      longitude: locais.map(local => local.longitude).join(','),
       timezone: 'America/Sao_Paulo',
       forecast_days: '2',
       models: MODELOS.map(modelo => modelo.id).join(','),
@@ -96,12 +107,16 @@ export const handler = async () => {
       wind_speed_unit: 'kmh',
       precipitation_unit: 'mm',
     })
-    const response = await fetch(`https://api.open-meteo.com/v1/forecast?${params}`, {
+    const response = await fetch(`https://api.open-meteo.com/v1/forecast?${params.toString()}`, {
       headers: { Accept: 'application/json' },
-      signal: AbortSignal.timeout(10000),
+      signal: AbortSignal.timeout(8000),
     })
     if (!response.ok) throw new Error(`Open-Meteo raios: ${response.status}`)
-    const json = await response.json()
+    const dados = await response.json()
+    if (!Array.isArray(dados) || !dados[0]?.hourly) {
+      throw new Error('Resposta de raios inválida da Open-Meteo')
+    }
+    const json = dados[0]
     const hourly = json.hourly || {}
     if (!Array.isArray(hourly.time)) throw new Error('Resposta de raios inválida da Open-Meteo')
 
@@ -140,45 +155,31 @@ export const handler = async () => {
         risco: riscoTrovoada(modelosComTrovoada),
       }
     })
-    const agora = Date.now()
+    const horaAtual = Date.now()
     const atualIndex = hourly.time.reduce((melhor, time, index) => {
       const distancia = Math.abs(new Date(time).getTime() - agora)
       return distancia < melhor.distancia ? { index, distancia } : melhor
     }, { index: 0, distancia: Infinity }).index
     const atual = consenso[atualIndex] || consenso[0] || null
     const proximaTrovoada = consenso.find(item => item.modelosComTrovoada > 0)?.time || null
-    const pontosParams = new URLSearchParams({
-      latitude: PONTOS_MINAS.map(ponto => ponto.latitude).join(','),
-      longitude: PONTOS_MINAS.map(ponto => ponto.longitude).join(','),
-      timezone: 'America/Sao_Paulo',
-      forecast_days: '2',
-      models: MODELOS.map(modelo => modelo.id).join(','),
-      hourly: 'precipitation_probability,precipitation,rain,weather_code',
-      precipitation_unit: 'mm',
-    })
-    const pontosResponse = await fetch(`https://api.open-meteo.com/v1/forecast?${pontosParams}`, {
-      headers: { Accept: 'application/json' },
-      signal: AbortSignal.timeout(15000),
-    })
-    if (!pontosResponse.ok) throw new Error(`Open-Meteo raios regionais: ${pontosResponse.status}`)
-    const pontosJson = await pontosResponse.json()
-    if (!Array.isArray(pontosJson)) throw new Error('Resposta regional de raios inválida da Open-Meteo')
-
-    return resposta(200, {
+    const resultado = {
       local: 'Conselheiro Lafaiete - MG',
       latitude: LAT,
       longitude: LNG,
       timezone: json.timezone,
-      atualizadoEm: new Date().toISOString(),
+      atualizadoEm: new Date(horaAtual).toISOString(),
       atual,
       modelos,
       consenso,
-      pontos: montarPontosRaios(pontosJson),
+      pontos: montarPontosRaios(dados.slice(1)),
       proximaTrovoada,
       riscoAtual: atual?.risco || 'baixo',
       fonte: 'Open-Meteo',
       observacao: 'Previsão de trovoadas pelos modelos numéricos; não é detecção de descargas observadas.',
-    })
+    }
+    previsaoCache = resultado
+    previsaoCacheTs = Date.now()
+    return resposta(200, resultado)
   } catch (error) {
     return resposta(503, { erro: 'Previsão de raios indisponível', detalhe: error?.message }, 'no-store')
   }

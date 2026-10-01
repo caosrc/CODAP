@@ -226,7 +226,8 @@ function criarIconeTempoMapa(tempo: TempoMapa) {
     ? `${Math.round(Number(atual?.temperatura))}°`
     : '—'
   const quente = Number(atual?.temperatura) >= 30
-  const icone = quente ? '☀️' : iconeTempoMapa(atual?.codigoTempo)
+  const trovoada = Number(atual?.codigoTempo) >= 95
+  const icone = quente ? '☀️' : trovoada ? '🌧️' : iconeTempoMapa(atual?.codigoTempo)
   return L.divIcon({
     className: 'mapa-tempo-marker',
     html: `
@@ -258,16 +259,19 @@ function criarIconeRaiosMapa(ponto: NonNullable<PrevisaoRaiosMapa['pontos']>[num
   const cor = corRiscoRaiosMapa(ponto.risco)
   const quantidadeRaios = Math.max(1, Math.min(3, ponto.intensidadeNivel))
   const largura = quantidadeRaios * 20
+  const deslocadoDaTemperatura = ponto.id === 'conselheiro-lafaiete'
+  const deslocamentoX = deslocadoDaTemperatura ? 46 : 0
+  const deslocamentoY = deslocadoDaTemperatura ? 38 : 0
   return L.divIcon({
-    className: 'mapa-raios-marker',
+    className: `mapa-raios-marker${deslocadoDaTemperatura ? ' mapa-raios-marker--separado' : ''}`,
     html: `
       <div class="mapa-raios-marker-icones" style="--raios-cor:${cor}" aria-label="${ponto.intensidade}">
         ${Array.from({ length: quantidadeRaios }, () => '<span aria-hidden="true">⚡</span>').join('')}
       </div>
     `,
     iconSize: [largura, 28],
-    iconAnchor: [largura / 2, 14],
-    popupAnchor: [0, -18],
+    iconAnchor: [largura / 2 - deslocamentoX, 14 + deslocamentoY],
+    popupAnchor: [deslocamentoX, -18 - deslocamentoY],
   })
 }
 

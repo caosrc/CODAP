@@ -5971,12 +5971,12 @@ html:-webkit-full-screen {
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.82fr);
     grid-template-rows:
-      clamp(78px, 13vh, 112px)
+      clamp(70px, 9vh, 90px)
       minmax(0, .72fr)
       minmax(0, .9fr)
       minmax(0, 1fr);
     grid-template-areas:
-      "weather weather weather"
+      "weather weather map"
       "reminders activities map"
       "calendar activities map"
       "rain level map";

@@ -255,7 +255,10 @@ function dataHoraTrovoadaRadar(valor?: string | null) {
 function RadarMapInvalidateSize({ tv }: { tv: boolean }) {
   const map = useMap()
   useEffect(() => {
-    const frame = window.requestAnimationFrame(() => map.invalidateSize())
+    const frame = window.requestAnimationFrame(() => {
+      map.invalidateSize()
+      map.setView(RADAR_MAP_CENTER, tv ? RADAR_MAP_ZOOM + 1 : RADAR_MAP_ZOOM, { animate: false })
+    })
     return () => window.cancelAnimationFrame(frame)
   }, [map, tv])
   return null

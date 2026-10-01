@@ -131,6 +131,35 @@ interface PrevisaoRaiosMapa {
   erroAtualizacao?: boolean
 }
 
+const PREVISAO_RAIOS_MAPA_CACHE_KEY = 'mapa-previsao-raios-cache-v1'
+const PREVISAO_RAIOS_MAPA_CACHE_TTL_MS = 60 * 60 * 1000
+
+function lerCachePrevisaoRaiosMapa(): PrevisaoRaiosMapa | null {
+  if (typeof window === 'undefined') return null
+  try {
+    const serializado = window.localStorage.getItem(PREVISAO_RAIOS_MAPA_CACHE_KEY)
+    if (!serializado) return null
+    const dados = JSON.parse(serializado) as PrevisaoRaiosMapa
+    const atualizadoEm = Date.parse(dados?.atualizadoEm || '')
+    if (!dados?.atual || !Number.isFinite(atualizadoEm) || Date.now() - atualizadoEm > PREVISAO_RAIOS_MAPA_CACHE_TTL_MS) {
+      window.localStorage.removeItem(PREVISAO_RAIOS_MAPA_CACHE_KEY)
+      return null
+    }
+    return dados
+  } catch {
+    return null
+  }
+}
+
+function salvarCachePrevisaoRaiosMapa(dados: PrevisaoRaiosMapa) {
+  if (typeof window === 'undefined') return
+  try {
+    window.localStorage.setItem(PREVISAO_RAIOS_MAPA_CACHE_KEY, JSON.stringify(dados))
+  } catch {
+    // A previsão continua disponível em memória se o navegador bloquear o armazenamento.
+  }
+}
+
 interface AlertaTempoMapa {
   id: number
   titulo: string
@@ -884,7 +913,7 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
   const [tempoMapa, setTempoMapa] = useState<TempoMapa | null>(null)
   const [tempoMapaCarregando, setTempoMapaCarregando] = useState(false)
   const [tempoMapaErro, setTempoMapaErro] = useState<string | null>(null)
-  const [previsaoRaiosMapa, setPrevisaoRaiosMapa] = useState<PrevisaoRaiosMapa | null>(null)
+  const [previsaoRaiosMapa, setPrevisaoRaiosMapa] = useState<PrevisaoRaiosMapa | null>(lerCachePrevisaoRaiosMapa)
   const [previsaoRaiosCarregando, setPrevisaoRaiosCarregando] = useState(false)
   const [previsaoRaiosErro, setPrevisaoRaiosErro] = useState<string | null>(null)
   const [mostrarPrevisaoRaios, setMostrarPrevisaoRaios] = useState(true)
@@ -1040,9 +1069,15 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
       const resposta = await fetch(`/api/tempo-raios?_ts=${Date.now()}`, { cache: 'no-store' })
       const dados = await resposta.json().catch(() => ({}))
       if (!resposta.ok || !dados?.atual) {
-        throw new Error(typeof dados?.erro === 'string' ? dados.erro : 'Previsão de raios indisponível')
+        const erroBase = typeof dados?.erro === 'string'
+          ? dados.erro
+          : 'Previsão de raios indisponível'
+        const erro = !resposta.ok ? `${erroBase} (HTTP ${resposta.status})` : erroBase
+        const detalhe = typeof dados?.detalhe === 'string' ? dados.detalhe.trim() : ''
+        throw new Error(detalhe ? `${erro}: ${detalhe}` : erro)
       }
       setPrevisaoRaiosMapa(dados)
+      salvarCachePrevisaoRaiosMapa(dados)
     } catch (erro) {
       setPrevisaoRaiosErro(erro instanceof Error ? erro.message : 'Previsão de raios indisponível')
     } finally {
@@ -2142,6 +2177,14 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
                     </button>
                   </div>
                 </div>
+                {previsaoRaiosMapa?.atual && previsaoRaiosErro && (
+                  <div className="mapa-chuva-status mapa-chuva-status--erro">
+                    Atualização indisponível; exibindo a última previsão válida
+                    {previsaoRaiosMapa.atualizadoEm
+                      ? ` de ${new Date(previsaoRaiosMapa.atualizadoEm).toLocaleString('pt-BR')}`
+                      : ''}. {previsaoRaiosErro}
+                  </div>
+                )}
                 {previsaoRaiosMapa?.atual ? (
                   <>
                     <div className="mapa-raios-resumo">

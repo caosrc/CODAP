@@ -5639,10 +5639,18 @@ html:-webkit-full-screen {
     gap: 1px;
   }
 
+  body.radar-tv-active .radar-tv .radar-calendar-card .weekdays {
+    font-size: .72rem;
+  }
+
   body.radar-tv-active .radar-tv .radar-calendar-card .calendar-grid button {
     min-height: 16px;
     border-radius: 2px;
     font-size: .4rem;
+  }
+
+  body.radar-tv-active .radar-tv .radar-calendar-card .calendar-grid button > span {
+    font-size: .8rem;
   }
 
   body.radar-tv-active .radar-tv .radar-calendar-card .calendar-grid i {

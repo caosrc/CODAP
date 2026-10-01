@@ -181,6 +181,10 @@ export const handler = async () => {
     previsaoCacheTs = Date.now()
     return resposta(200, resultado)
   } catch (error) {
+    console.error('Erro ao buscar previsão de raios:', error?.message || error)
+    if (previsaoCache) {
+      return resposta(200, { ...previsaoCache, cache: true, erroAtualizacao: true })
+    }
     return resposta(503, { erro: 'Previsão de raios indisponível', detalhe: error?.message }, 'no-store')
   }
 }

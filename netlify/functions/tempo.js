@@ -18,8 +18,8 @@ export const handler = async () => {
       forecast_days: '7',
       wind_speed_unit: 'kmh',
       precipitation_unit: 'mm',
-      current: 'temperature_2m,relative_humidity_2m,precipitation,rain,showers,weather_code,wind_speed_10m,wind_gusts_10m',
-      hourly: 'temperature_2m,relative_humidity_2m,precipitation_probability,precipitation,rain,showers,weather_code,wind_speed_10m,wind_direction_10m,wind_gusts_10m',
+      current: 'temperature_2m,relative_humidity_2m,precipitation,rain,showers,weather_code,is_day,wind_speed_10m,wind_gusts_10m',
+      hourly: 'temperature_2m,relative_humidity_2m,precipitation_probability,precipitation,rain,showers,weather_code,is_day,wind_speed_10m,wind_direction_10m,wind_gusts_10m',
       daily: 'temperature_2m_max,temperature_2m_min,precipitation_sum,rain_sum,precipitation_hours,precipitation_probability_max,wind_speed_10m_max,wind_gusts_10m_max',
     })
     const response = await fetch(`https://api.open-meteo.com/v1/forecast?${params}`, {
@@ -31,6 +31,7 @@ export const handler = async () => {
     const h = json.hourly || {}
     const horas = (h.time || []).map((time, i) => ({
       time,
+      dia: h.is_day?.[i] ?? null,
       temperatura: h.temperature_2m?.[i] ?? null,
       umidade: h.relative_humidity_2m?.[i] ?? null,
       probabilidadeChuva: h.precipitation_probability?.[i] ?? null,
@@ -51,6 +52,7 @@ export const handler = async () => {
       atualizadoEm: new Date().toISOString(),
       atual: json.current ? {
         time: json.current.time ?? null,
+        dia: json.current.is_day ?? null,
         temperatura: json.current.temperature_2m ?? null,
         umidade: json.current.relative_humidity_2m ?? null,
         precipitacao: json.current.precipitation ?? null,

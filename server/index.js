@@ -3228,6 +3228,7 @@ async function buscarPrevisaoOpenMeteo() {
       'rain',
       'showers',
       'weather_code',
+      'is_day',
       'wind_speed_10m',
       'wind_direction_10m',
       'wind_gusts_10m'
@@ -3240,6 +3241,7 @@ async function buscarPrevisaoOpenMeteo() {
       'rain',
       'showers',
       'weather_code',
+      'is_day',
       'wind_speed_10m',
       'wind_gusts_10m'
     ].join(','),
@@ -3281,6 +3283,7 @@ async function buscarPrevisaoOpenMeteo() {
 
   const horas = h.time.map((time, i) => ({
     time,
+    dia: h.is_day?.[i] ?? null,
 
     temperatura: h.temperature_2m?.[i] ?? null,
     umidade: h.relative_humidity_2m?.[i] ?? null,
@@ -3346,6 +3349,7 @@ async function buscarPrevisaoOpenMeteo() {
 
     atual: atual ? {
       time: atual.time ?? null,
+      dia: atual.is_day ?? null,
       temperatura: atual.temperature_2m ?? null,
       umidade: atual.relative_humidity_2m ?? null,
       precipitacao: atual.precipitation ?? null,

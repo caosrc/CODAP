@@ -58,6 +58,7 @@ interface TempoMapa {
     time?: string
     temperatura?: number | null
     umidade?: number | null
+    dia?: number | boolean | null
     precipitacao?: number | null
     chuva?: number | null
     codigoTempo?: number | null
@@ -68,6 +69,7 @@ interface TempoMapa {
     time: string
     temperatura?: number | null
     umidade?: number | null
+    dia?: number | boolean | null
     precipitacao?: number | null
     probabilidadeChuva?: number | null
     codigoTempo?: number | null
@@ -167,25 +169,61 @@ function valorChuvaMarcadorFormatado(valor: number | null): string {
 
 function codigoTempoMapa(codigo: number | null | undefined): string {
   const valor = Number(codigo)
-  if (valor >= 95) return 'Trovoada'
-  if (valor >= 80) return 'Pancadas de chuva'
-  if (valor >= 61) return 'Chuva'
-  if (valor >= 51) return 'Garoa'
-  if (valor >= 45) return 'Neblina'
-  if (valor === 3) return 'Nublado'
-  if (valor === 2) return 'Parcialmente nublado'
+  if (valor === 0) return 'Céu limpo'
   if (valor === 1) return 'Predominantemente limpo'
-  return 'Céu limpo'
+  if (valor === 2) return 'Parcialmente nublado'
+  if (valor === 3) return 'Nublado'
+  if (valor === 45 || valor === 48) return 'Neblina'
+  if (valor >= 51 && valor <= 57) return 'Garoa'
+  if (valor >= 61 && valor <= 67) return 'Chuva'
+  if (valor >= 71 && valor <= 77) return 'Neve'
+  if (valor >= 80 && valor <= 82) return 'Pancadas de chuva'
+  if (valor === 85 || valor === 86) return 'Pancadas de neve'
+  if (valor >= 95) return valor >= 96 ? 'Trovoada com granizo' : 'Trovoada'
+  return 'Condição indisponível'
 }
 
-function iconeTempoMapa(codigo: number | null | undefined): string {
+function ehDiaTempoMapa(isDay?: number | boolean | null, time?: string | null): boolean {
+  if (isDay !== null && isDay !== undefined) {
+    return typeof isDay === 'boolean' ? isDay : Number(isDay) === 1
+  }
+
+  const horarioLocal = String(time || '').match(/T(\d{2}):\d{2}/)
+  if (horarioLocal) {
+    const temFuso = /(?:Z|[+-]\d{2}:?\d{2})$/i.test(String(time))
+    const hora = temFuso
+      ? Number(new Date(String(time)).toLocaleTimeString('pt-BR', {
+        hour: '2-digit',
+        hourCycle: 'h23',
+        timeZone: 'America/Sao_Paulo',
+      }))
+      : Number(horarioLocal[1])
+    return hora >= 6 && hora < 18
+  }
+
+  return true
+}
+
+function iconeTempoMapa(
+  codigo: number | null | undefined,
+  isDay?: number | boolean | null,
+  time?: string | null,
+): string {
   const valor = Number(codigo)
+  const duranteDia = ehDiaTempoMapa(isDay, time)
+
+  if (valor === 0) return duranteDia ? '☀️' : '🌙'
+  if (valor === 1) return duranteDia ? '🌤️' : '🌙☁️'
+  if (valor === 2) return duranteDia ? '⛅' : '☁️🌙'
+  if (valor === 3) return '☁️'
+  if (valor === 45 || valor === 48) return '🌫️'
+  if (valor === 56 || valor === 57 || valor === 66 || valor === 67) return '🌧️❄️'
+  if (valor >= 71 && valor <= 77 || valor === 85 || valor === 86) return '🌨️'
   if (valor >= 95) return '⛈️'
-  if (valor >= 80) return '🌦️'
-  if (valor >= 51) return '🌧️'
-  if (valor >= 45) return '🌫️'
-  if (valor >= 2) return '⛅'
-  return '☀️'
+  if (valor >= 80 && valor <= 82 || valor >= 51 && valor <= 55 || valor >= 61 && valor <= 65) {
+    return duranteDia && (valor <= 55 || valor >= 80) ? '🌦️' : '🌧️'
+  }
+  return '☁️'
 }
 
 function estadoTempoMapa(tempo: TempoMapa | null): {
@@ -194,7 +232,7 @@ function estadoTempoMapa(tempo: TempoMapa | null): {
   detalhe: string
 } {
   const atual = tempo?.atual
-  const horas = tempo?.horas?.slice(0, 6) || []
+  const horas = proximasHorasTempoMapa(tempo)
   const temperatura = Number(atual?.temperatura)
   const umidade = Number(atual?.umidade)
   const temTrovoada = Number(atual?.codigoTempo) >= 95
@@ -219,6 +257,15 @@ function estadoTempoMapa(tempo: TempoMapa | null): {
   return { nome: 'Condição normal', cor: '#15803d', detalhe: 'Sem condição crítica detectada' }
 }
 
+function proximasHorasTempoMapa(tempo: TempoMapa | null): NonNullable<TempoMapa['horas']> {
+  const horas = tempo?.horas || []
+  const horarioAtual = tempo?.atual?.time
+  if (!horas.length || !horarioAtual) return horas.slice(0, 6)
+
+  const indiceAtual = horas.findIndex(hora => hora.time >= horarioAtual)
+  return (indiceAtual >= 0 ? horas.slice(indiceAtual) : horas.slice(-6)).slice(0, 6)
+}
+
 function criarIconeTempoMapa(tempo: TempoMapa) {
   const atual = tempo.atual
   const estado = estadoTempoMapa(tempo)
@@ -226,8 +273,7 @@ function criarIconeTempoMapa(tempo: TempoMapa) {
     ? `${Math.round(Number(atual?.temperatura))}°`
     : '—'
   const quente = Number(atual?.temperatura) >= 30
-  const trovoada = Number(atual?.codigoTempo) >= 95
-  const icone = quente ? '☀️' : trovoada ? '🌧️' : iconeTempoMapa(atual?.codigoTempo)
+  const icone = iconeTempoMapa(atual?.codigoTempo, atual?.dia, atual?.time)
   return L.divIcon({
     className: 'mapa-tempo-marker',
     html: `
@@ -291,10 +337,20 @@ function criarIconeRaiosMapa(
 
 function dataHoraTempoMapa(valor?: string | null): string {
   if (!valor) return '—'
-  const data = new Date(valor)
+  const texto = String(valor)
+  const horarioLocal = texto.match(/^\d{4}-\d{2}-\d{2}T(\d{2}):(\d{2})/)
+  const temFuso = /(?:Z|[+-]\d{2}:?\d{2})$/i.test(texto)
+  if (horarioLocal && !temFuso) return `${horarioLocal[1]}:${horarioLocal[2]}`
+
+  const data = new Date(texto)
   return Number.isNaN(data.getTime())
     ? '—'
-    : data.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+    : data.toLocaleTimeString('pt-BR', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hourCycle: 'h23',
+      timeZone: 'America/Sao_Paulo',
+    })
 }
 
 function distanciaMetros(lat1: number, lng1: number, lat2: number, lng2: number): number {
@@ -2032,7 +2088,7 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
                 <div className="mapa-tempo-painel">
                   <div className="mapa-tempo-painel-atual">
                     <span className="mapa-tempo-painel-icone">
-                      {iconeTempoMapa(tempoMapa.atual?.codigoTempo)}
+                      {iconeTempoMapa(tempoMapa.atual?.codigoTempo, tempoMapa.atual?.dia, tempoMapa.atual?.time)}
                     </span>
                     <div>
                       <strong>
@@ -2052,10 +2108,10 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
                     <span>{estadoTempoMapa(tempoMapa).detalhe}</span>
                   </div>
                   <div className="mapa-tempo-painel-previsao">
-                    {(tempoMapa.horas || []).slice(0, 6).map(hora => (
+                    {proximasHorasTempoMapa(tempoMapa).map(hora => (
                       <span key={hora.time}>
                         <b>{dataHoraTempoMapa(hora.time)}</b>
-                        <strong>{iconeTempoMapa(hora.codigoTempo)}</strong>
+                        <strong>{iconeTempoMapa(hora.codigoTempo, hora.dia, hora.time)}</strong>
                         <small>{Math.round(Number(hora.temperatura) || 0)}° · {Math.round(Number(hora.probabilidadeChuva) || 0)}%</small>
                       </span>
                     ))}

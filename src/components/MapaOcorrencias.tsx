@@ -196,8 +196,8 @@ function valorChuvaFormatado(valor: number | null): string {
 }
 
 function valorChuvaMarcadorFormatado(valor: number | null): string {
-  const valorSeguro = valor != null && Number.isFinite(valor) ? valor : 0
-  return `${valorSeguro.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} mm`
+  if (valor == null || !Number.isFinite(valor)) return '—'
+  return `${valor.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} mm`
 }
 
 function codigoTempoMapa(codigo: number | null | undefined): string {
@@ -336,34 +336,19 @@ function corRiscoRaiosMapa(risco?: string): string {
 
 function criarIconeRaiosMapa(
   ponto: NonNullable<PrevisaoRaiosMapa['pontos']>[number],
-  temperaturaAtual?: number | null,
 ) {
   const quantidadeRaios = Math.max(1, Math.min(3, Math.round(Number(ponto.modelosComTrovoada) || 1)))
   const descricaoRaios = `${quantidadeRaios}/3 modelos com trovoada`
   const largura = quantidadeRaios * 20
-  const mostrarTemperatura = ponto.id === 'conselheiro-lafaiete'
-    && temperaturaAtual != null
-    && Number.isFinite(Number(temperaturaAtual))
   return L.divIcon({
-    className: `mapa-raios-marker${mostrarTemperatura ? ' mapa-raios-marker--composto' : ''}`,
-    html: mostrarTemperatura
-      ? `
-        <div class="mapa-raios-marker-composto">
-          <strong class="mapa-raios-marker-temperatura">${Math.round(Number(temperaturaAtual))}°</strong>
-          <div class="mapa-raios-marker-icones" role="img" aria-label="${descricaoRaios}">
-            ${Array.from({ length: quantidadeRaios }, () => '<span aria-hidden="true">⚡</span>').join('')}
-          </div>
-        </div>
-      `
-      : `
-        <div class="mapa-raios-marker-icones" role="img" aria-label="${descricaoRaios}">
-          ${Array.from({ length: quantidadeRaios }, () => '<span aria-hidden="true">⚡</span>').join('')}
-        </div>
-      `,
-    iconSize: mostrarTemperatura ? [60, 44] : [largura, 28],
-    // No ponto central, o raio fica ancorado exatamente na coordenada prevista.
-    // A temperatura é mostrada acima para não deslocar nem encobrir o símbolo.
-    iconAnchor: mostrarTemperatura ? [30, 30] : [largura / 2, 14],
+    className: 'mapa-raios-marker',
+    html: `
+      <div class="mapa-raios-marker-icones" role="img" aria-label="${descricaoRaios}">
+        ${Array.from({ length: quantidadeRaios }, () => '<span aria-hidden="true">⚡</span>').join('')}
+      </div>
+    `,
+    iconSize: [largura, 28],
+    iconAnchor: [largura / 2, 14],
     popupAnchor: [0, -18],
   })
 }
@@ -865,6 +850,9 @@ function nomeDiaSemana(dateStr: string): string {
 
 // Centro de Conselheiro Lafaiete; zoom 12 enquadra a cidade e suas ruas.
 const CONSELHEIRO_LAFAIETE: [number, number] = [-20.6604, -43.7863]
+// Posição elevada para exibir a temperatura junto ao bairro Jardim dos Cristais,
+// sem cobrir o centro municipal usado pelas outras camadas meteorológicas.
+const POSICAO_TEMPERATURA_LAFAIETE: [number, number] = [-20.635, -43.7869]
 const RAIO_RADAR_CHUVA_METROS = 10_000
 const MAX_ZOOM_MAPA_PADRAO = 19
 // Acima deste nível a cobertura Esri da região exibe "Map data not yet available".
@@ -1744,8 +1732,9 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
         )}
         {mostrarChuva && zoomMapa >= 9 && tempoMapa?.atual && (
           <Marker
-            position={CONSELHEIRO_LAFAIETE}
+            position={POSICAO_TEMPERATURA_LAFAIETE}
             icon={criarIconeTempoMapa(tempoMapa)}
+            zIndexOffset={800}
           >
             <Popup>
               <div className="mapa-tempo-popup">
@@ -1768,7 +1757,7 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
           <Marker
             key={`raios-${ponto.id}`}
             position={[ponto.latitude, ponto.longitude]}
-            icon={criarIconeRaiosMapa(ponto, tempoMapa?.atual?.temperatura)}
+            icon={criarIconeRaiosMapa(ponto)}
             zIndexOffset={700}
           >
             <Popup>
@@ -1835,9 +1824,11 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
                       direction="top"
                       offset={[0, -8]}
                       opacity={0.96}
-                      className="mapa-chuva-estacao-tooltip"
+                      className={`mapa-chuva-estacao-tooltip${estadoLeitura === 'atualizada' ? '' : ' mapa-chuva-estacao-tooltip--indisponivel'}`}
                     >
-                      {valorChuvaMarcadorFormatado(estacao.precipitacaoAtual)}
+                      {estadoLeitura === 'atualizada'
+                        ? valorChuvaMarcadorFormatado(estacao.precipitacaoAtual)
+                        : estadoLeitura === 'atrasada' ? 'Leitura atrasada' : 'Sem leitura recente'}
                     </Tooltip>
                     <Popup>
                       <div style={{ minWidth: 190, fontFamily: 'inherit' }}>

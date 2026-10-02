@@ -1663,23 +1663,25 @@ input, select, textarea { font-family: inherit; }
   mix-blend-mode: multiply;
 }
 .mapa-chuva-estacao-tooltip {
-  border: 0 !important;
-  padding: 0 !important;
-  background: transparent !important;
-  box-shadow: none !important;
-  color: #ea580c !important;
-  font-size: 0.62rem;
+  border: 1px solid rgba(15, 23, 42, 0.12) !important;
+  border-radius: 999px !important;
+  padding: 0.16rem 0.34rem !important;
+  background: rgba(255, 255, 255, 0.97) !important;
+  box-shadow: 0 1px 5px rgba(15, 23, 42, 0.3) !important;
+  color: #0f172a !important;
+  font-size: 0.68rem;
   font-weight: 800;
-  line-height: 1.1;
-  text-shadow:
-    -1px -1px 0 #fff,
-    1px -1px 0 #fff,
-    -1px 1px 0 #fff,
-    1px 1px 0 #fff;
+  line-height: 1.15;
+  text-shadow: none;
   white-space: nowrap;
 }
 .mapa-chuva-estacao-tooltip::before {
   display: none;
+}
+.mapa-chuva-estacao-tooltip--indisponivel {
+  background: #f1f5f9 !important;
+  color: #64748b !important;
+  font-size: 0.58rem;
 }
 .mapa-chuva-ponto-fonte {
   color: #94a3b8;

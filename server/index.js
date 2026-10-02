@@ -3823,6 +3823,13 @@ function extrairPontosChuvaCnl(payload) {
   return pontos.sort((a, b) => a.dataHoraMs - b.dataHoraMs)
 }
 
+function dataHoraPontoChuvaCnl(ponto) {
+  if (!ponto) return ''
+  const hora = horaCemadenParaNumero(ponto.hora)
+  if (hora == null || !/^\d{2}\/\d{2}\/\d{4}$/.test(String(ponto.data || ''))) return ''
+  return `${ponto.data} ${String(hora).padStart(2, '0')}:00`
+}
+
 function montarSerieHorariaCnl(payload) {
   return extrairPontosChuvaCnl(payload)
     .slice(-24)
@@ -4237,8 +4244,31 @@ app.get('/api/monitoramento-mg', async (_req, res) => {
       }).filter(([id]) => Number.isFinite(id)),
     )
     const catalogoMg = catalogo.filter((item) => String(item?.uf || '').toUpperCase() === 'MG')
+    const estacoesLafaiete = catalogoMg.filter((item) =>
+      /conselheiro\s+lafaiete/i.test(String(item?.cidade || '')),
+    )
+    const respostasChuva = await Promise.allSettled(
+      estacoesLafaiete.map(async (item) => {
+        const id = Number(item?.idestacao)
+        const resposta = await fetch(`${CNL_RECURSOS_URL}/horario/${id}/96`, {
+          signal: controlador.signal,
+          headers: { 'User-Agent': 'CODAP/1.0 (Conselheiro Lafaiete, MG)' },
+        })
+        if (!resposta.ok) throw new Error(`estação ${id} respondeu ${resposta.status}`)
+        const payload = await resposta.json()
+        return { id, ultimaLeitura: extrairPontosChuvaCnl(payload).at(-1) || null }
+      }),
+    )
+    const chuvaPorEstacao = new Map()
+    respostasChuva.forEach((resultado) => {
+      if (resultado.status === 'fulfilled') {
+        chuvaPorEstacao.set(resultado.value.id, resultado.value.ultimaLeitura)
+      }
+    })
     const estacoes = catalogoMg.map((item) => {
       const localizacao = coordenadasPorId.get(Number(item?.idestacao)) || {}
+      const chuvaCatalogo = numeroCemaden(item?.acc1hr)
+      const ultimaChuva = chuvaPorEstacao.get(Number(item?.idestacao))
       return {
         id: Number(item?.idestacao),
         nome: String(item?.nomeestacao || localizacao.nomeestacao || ''),
@@ -4246,8 +4276,10 @@ app.get('/api/monitoramento-mg', async (_req, res) => {
         codigo: String(localizacao.codestacao || ''),
         latitude: numeroCemaden(localizacao.latitude),
         longitude: numeroCemaden(localizacao.longitude),
-        precipitacaoAtual: numeroCemaden(item?.acc1hr),
-        precipitacaoDataHora: String(item?.datahoraUltimovalor || ''),
+        precipitacaoAtual: chuvaCatalogo ?? ultimaChuva?.valor ?? null,
+        precipitacaoDataHora: chuvaCatalogo != null
+          ? String(item?.datahoraUltimovalor || '')
+          : dataHoraPontoChuvaCnl(ultimaChuva) || String(item?.datahoraUltimovalor || ''),
       }
     })
     const estacoesGeorreferenciadas = estacoes.filter(

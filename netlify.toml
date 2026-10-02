@@ -60,6 +60,12 @@
   force = true
 
 [[redirects]]
+  from = "/api/alertas-tempo"
+  to = "/.netlify/functions/alertas-tempo"
+  status = 200
+  force = true
+
+[[redirects]]
   from = "/api/tempo-raios"
   to = "/.netlify/functions/tempo-raios"
   status = 200

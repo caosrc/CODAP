@@ -1819,17 +1819,17 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
                       fillOpacity: 0.95,
                     }}
                   >
-                    <Tooltip
-                      permanent={zoomMapa >= 11}
-                      direction="top"
-                      offset={[0, -8]}
-                      opacity={0.96}
-                      className={`mapa-chuva-estacao-tooltip${estadoLeitura === 'atualizada' ? '' : ' mapa-chuva-estacao-tooltip--indisponivel'}`}
-                    >
-                      {estadoLeitura === 'atualizada'
-                        ? valorChuvaMarcadorFormatado(estacao.precipitacaoAtual)
-                        : estadoLeitura === 'atrasada' ? 'Leitura atrasada' : 'Sem leitura recente'}
-                    </Tooltip>
+                    {estadoLeitura === 'atualizada' && Number.isFinite(estacao.precipitacaoAtual) && (
+                      <Tooltip
+                        permanent
+                        direction="top"
+                        offset={[0, -8]}
+                        opacity={0.96}
+                        className="mapa-chuva-estacao-tooltip"
+                      >
+                        {valorChuvaMarcadorFormatado(estacao.precipitacaoAtual)}
+                      </Tooltip>
+                    )}
                     <Popup>
                       <div style={{ minWidth: 190, fontFamily: 'inherit' }}>
                         <strong style={{ display: 'block', marginBottom: 4 }}>

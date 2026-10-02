@@ -1188,9 +1188,6 @@ input, select, textarea { font-family: inherit; }
 .mapa-chuva-btn.ativo {
   background: #0369a1;
 }
-.mapa-cemaden-mg-btn.ativo {
-  background: #c2410c;
-}
 .mapa-chuva-painel {
   position: absolute;
   top: calc(100% + 8px);
@@ -1200,11 +1197,17 @@ input, select, textarea { font-family: inherit; }
   background: white;
   border-radius: 11px;
   box-shadow: 0 8px 28px rgba(0,0,0,0.25);
-  overflow: hidden;
+  max-height: calc(100vh - 110px);
+  max-height: calc(100dvh - 110px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
   color: #1f2937;
   z-index: 800;
 }
 .mapa-chuva-painel-header {
+  position: sticky;
+  top: 0;
+  z-index: 1;
   display: flex;
   align-items: flex-start;
   justify-content: space-between;

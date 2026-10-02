@@ -289,6 +289,17 @@ function RadarMapaTempoReal({ tv }: { tv: boolean }) {
   const mapaLeafletRef = useRef<LeafletMap | null>(null)
   const cemadenMg = useEstacoesCemadenMg(true)
   const estacoes = cemadenMg.dados?.estacoes ?? ESTACOES_CEMADEN_VAZIAS_RADAR
+  const estacoesLafaiete = useMemo(
+    () => estacoes.filter(estacao => /conselheiro\s+lafaiete/i.test(estacao.municipio)),
+    [estacoes],
+  )
+  const estacoesLafaieteGeorreferenciadas = useMemo(
+    () => estacoesLafaiete.filter(estacao =>
+      Number.isFinite(estacao.latitude) && Number.isFinite(estacao.longitude),
+    ),
+    [estacoesLafaiete],
+  )
+  const estacoesLafaieteSemCoordenadas = estacoesLafaiete.length - estacoesLafaieteGeorreferenciadas.length
 
   const carregarRadarChuva = useCallback(async () => {
     setRadarCarregando(true)
@@ -430,7 +441,7 @@ function RadarMapaTempoReal({ tv }: { tv: boolean }) {
       </div>
       <div className="radar-live-map-status">
         <span><i className="radar-live-map-status-dot radar-live-map-status-dot-rain" /> Chuva observada</span>
-        <span><i className="radar-live-map-status-dot radar-live-map-status-dot-station" /> CEMADEN MG</span>
+        <span><i className="radar-live-map-status-dot radar-live-map-status-dot-station" /> CEMADEN · Lafaiete</span>
         {zoomMapa >= 9 && <span><i className="radar-live-map-status-dot radar-live-map-status-dot-temperature" /> Temperatura local</span>}
         {zoomMapa >= 9 && <span><i className="radar-live-map-status-dot radar-live-map-status-dot-lightning" /> Trovoadas previstas localmente · 36 h</span>}
         {mostrarChuva && zoomMapa >= 9 && <span><i className="radar-live-map-status-dot radar-live-map-status-dot-area" /> Raio local de 10 km</span>}
@@ -506,7 +517,7 @@ function RadarMapaTempoReal({ tv }: { tv: boolean }) {
         )}
         {mostrarChuva && (
           <Pane name="radarLiveCemadenStations" style={{ zIndex: 450 }}>
-            {estacoes.filter(estacao => Number.isFinite(estacao.latitude) && Number.isFinite(estacao.longitude)).map(estacao => {
+            {estacoesLafaieteGeorreferenciadas.map(estacao => {
               const intensidade = intensidadeCemadenRadar(estacao.precipitacaoAtual ?? 0)
               return (
                 <CircleMarker
@@ -597,11 +608,11 @@ function RadarMapaTempoReal({ tv }: { tv: boolean }) {
       <div className="radar-live-map-footer">
         <span>
           {cemadenMg.dados
-            ? `${cemadenMg.dados.estacoesGeorreferenciadas} de ${cemadenMg.dados.totalEstacoes} estações CEMADEN com posição em MG`
+            ? `${estacoesLafaieteGeorreferenciadas.length} de ${estacoesLafaiete.length} estações CEMADEN de Conselheiro Lafaiete com posição`
             : cemadenMg.carregando ? 'Consultando estações CEMADEN…' : 'Estações CEMADEN indisponíveis'}
         </span>
-        {cemadenMg.dados && cemadenMg.dados.estacoesSemCoordenadas > 0 && (
-          <span>{cemadenMg.dados.estacoesSemCoordenadas} sem posição no cadastro geográfico</span>
+        {cemadenMg.dados && estacoesLafaieteSemCoordenadas > 0 && (
+          <span>{estacoesLafaieteSemCoordenadas} estação(ões) de Lafaiete sem posição no cadastro geográfico</span>
         )}
         <span>{radarChuva?.atualizadoEm ? `Radar: ${new Date(radarChuva.atualizadoEm).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}` : 'Radar: —'}</span>
         <span>{tempoMapa?.atual?.temperatura != null ? `Lafaiete: ${Math.round(Number(tempoMapa.atual.temperatura))} °C` : 'Temperatura local: —'}</span>

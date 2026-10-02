@@ -1849,9 +1849,18 @@ input, select, textarea { font-family: inherit; }
     flex: 1;
   }
   .mapa-chuva-painel {
+    position: fixed;
+    top: 94px;
+    top: calc(env(safe-area-inset-top, 0px) + 94px);
     left: auto;
-    right: -4px;
+    right: 10px;
     transform: none;
+    width: min(340px, calc(100vw - 20px));
+    max-height: min(50vh, calc(100vh - 116px));
+    max-height: min(
+      50dvh,
+      calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 116px)
+    );
   }
   .mapa-legenda {
     top: 94px;

@@ -1800,65 +1800,69 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
         {mostrarIntensidadeCemaden && zoomMapa >= 9 && (
           <CemadenIntensityLayer estacoes={estacoesCemaden} opacidade={opacidadeCemaden} />
         )}
-        {mostrarChuva && estacoesCemaden
-          .filter(estacao => estacao.latitude != null && estacao.longitude != null)
-          .map(estacao => {
-            const estadoLeitura = statusLeituraCemaden(estacao.precipitacaoDataHora)
-            const cor = estadoLeitura === 'atualizada'
-              ? intensidadeCemaden(estacao.precipitacaoAtual ?? 0).cor
-              : '#94a3b8'
-            return (
-              <CircleMarker
-                key={`cemaden-estacao-${estacao.id}`}
-                center={[estacao.latitude!, estacao.longitude!]}
-                radius={zoomMapa < 8 ? 2.5 : zoomMapa < 11 ? 4 : 9}
-                pathOptions={{
-                  color: '#ffffff',
-                  weight: 2,
-                  fillColor: cor,
-                  fillOpacity: 0.95,
-                }}
-              >
-                <Tooltip
-                  permanent={zoomMapa >= 11}
-                  direction="top"
-                  offset={[0, -8]}
-                  opacity={0.96}
-                  className="mapa-chuva-estacao-tooltip"
-                >
-                  {valorChuvaMarcadorFormatado(estacao.precipitacaoAtual)}
-                </Tooltip>
-                <Popup>
-                  <div style={{ minWidth: 190, fontFamily: 'inherit' }}>
-                    <strong style={{ display: 'block', marginBottom: 4 }}>
-                      🌧️ {estacao.nome || 'Estação CEMADEN'}
-                    </strong>
-                    {estacao.municipio && (
-                      <div style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: 3 }}>
-                        {estacao.municipio} · Minas Gerais
+        {mostrarChuva && (
+          <Pane name="mapaEstacoesCemaden" style={{ zIndex: 450 }}>
+            {estacoesCemaden
+              .filter(estacao => estacao.latitude != null && estacao.longitude != null)
+              .map(estacao => {
+                const estadoLeitura = statusLeituraCemaden(estacao.precipitacaoDataHora)
+                const cor = estadoLeitura === 'atualizada'
+                  ? intensidadeCemaden(estacao.precipitacaoAtual ?? 0).cor
+                  : '#94a3b8'
+                return (
+                  <CircleMarker
+                    key={`cemaden-estacao-${estacao.id}`}
+                    center={[estacao.latitude!, estacao.longitude!]}
+                    radius={zoomMapa < 8 ? 2.5 : zoomMapa < 11 ? 4 : 9}
+                    pathOptions={{
+                      color: '#ffffff',
+                      weight: 2,
+                      fillColor: cor,
+                      fillOpacity: 0.95,
+                    }}
+                  >
+                    <Tooltip
+                      permanent={zoomMapa >= 11}
+                      direction="top"
+                      offset={[0, -8]}
+                      opacity={0.96}
+                      className="mapa-chuva-estacao-tooltip"
+                    >
+                      {valorChuvaMarcadorFormatado(estacao.precipitacaoAtual)}
+                    </Tooltip>
+                    <Popup>
+                      <div style={{ minWidth: 190, fontFamily: 'inherit' }}>
+                        <strong style={{ display: 'block', marginBottom: 4 }}>
+                          🌧️ {estacao.nome || 'Estação CEMADEN'}
+                        </strong>
+                        {estacao.municipio && (
+                          <div style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: 3 }}>
+                            {estacao.municipio} · Minas Gerais
+                          </div>
+                        )}
+                        <div style={{ fontSize: '0.8rem', color: '#374151', marginBottom: 3 }}>
+                          <strong>Última hora:</strong> {valorChuvaFormatado(estacao.precipitacaoAtual)}
+                        </div>
+                        <div style={{ fontSize: '0.76rem', color: estadoLeitura === 'atualizada' ? '#166534' : '#b45309', marginBottom: 3 }}>
+                          {estadoLeitura === 'atualizada'
+                            ? situacaoChuva(estacao.precipitacaoAtual)
+                            : estadoLeitura === 'atrasada' ? 'Leitura atrasada' : 'Sem dados recentes'}
+                        </div>
+                        <div style={{ fontSize: '0.72rem', color: '#6b7280' }}>
+                          Leitura: {dataHoraCemadenFormatada(estacao.precipitacaoDataHora)} · CEMADEN
+                        </div>
+                        {estacao.codigo && (
+                          <div style={{ fontSize: '0.7rem', color: '#9ca3af', marginTop: 3 }}>
+                            Estação {estacao.codigo}
+                          </div>
+                        )}
                       </div>
-                    )}
-                    <div style={{ fontSize: '0.8rem', color: '#374151', marginBottom: 3 }}>
-                      <strong>Última hora:</strong> {valorChuvaFormatado(estacao.precipitacaoAtual)}
-                    </div>
-                    <div style={{ fontSize: '0.76rem', color: estadoLeitura === 'atualizada' ? '#166534' : '#b45309', marginBottom: 3 }}>
-                      {estadoLeitura === 'atualizada'
-                        ? situacaoChuva(estacao.precipitacaoAtual)
-                        : estadoLeitura === 'atrasada' ? 'Leitura atrasada' : 'Sem dados recentes'}
-                    </div>
-                    <div style={{ fontSize: '0.72rem', color: '#6b7280' }}>
-                      Leitura: {dataHoraCemadenFormatada(estacao.precipitacaoDataHora)} · CEMADEN
-                    </div>
-                    {estacao.codigo && (
-                      <div style={{ fontSize: '0.7rem', color: '#9ca3af', marginTop: 3 }}>
-                        Estação {estacao.codigo}
-                      </div>
-                    )}
-                  </div>
-                </Popup>
-              </CircleMarker>
-            )
-          })}
+                    </Popup>
+                  </CircleMarker>
+                )
+              })}
+          </Pane>
+        )}
         {mostrarChuva && zoomMapa >= 9 && (
           <Circle
             center={CONSELHEIRO_LAFAIETE}

@@ -370,7 +370,6 @@ function RadarMapaTempoReal({ tv }: { tv: boolean }) {
     }
   }, [carregarTempoMapa, carregarPrevisaoTrovoadas])
 
-  const estacoes = dadosCNL?.estacoes || []
   const tileRadar = radarChuva?.tileUrl || (radarChuva ? `${radarChuva.host}${radarChuva.path}/256/{z}/{x}/{y}/2/1_0.png` : '')
   const pontosTrovoada = (previsaoTrovoadas?.pontos || []).filter(ponto =>
     Number.isFinite(ponto.latitude) && Number.isFinite(ponto.longitude),
@@ -505,30 +504,34 @@ function RadarMapaTempoReal({ tv }: { tv: boolean }) {
             </Popup>
           </Circle>
         )}
-        {mostrarChuva && estacoes.filter(estacao => Number.isFinite(estacao.latitude) && Number.isFinite(estacao.longitude)).map(estacao => {
-          const intensidade = intensidadeCemadenRadar(estacao.precipitacaoAtual ?? 0)
-          return (
-            <CircleMarker
-              key={`radar-live-station-${estacao.id}`}
-              center={[estacao.latitude as number, estacao.longitude as number]}
-              radius={zoomMapa < 8 ? 2.5 : zoomMapa < 11 ? 4 : 8}
-              pathOptions={{ color: '#fff', weight: 2, fillColor: intensidade.cor, fillOpacity: 0.95 }}
-            >
-              <Tooltip permanent={zoomMapa >= 11} direction="top" offset={[0, -7]} opacity={0.96} className="radar-live-map-tooltip">
-                {formatarMmMapaRadar(estacao.precipitacaoAtual)}
-              </Tooltip>
-              <Popup>
-                <strong>🌧️ {estacao.nome || 'Estação CEMADEN'}</strong>
-                {estacao.municipio && <><br />{estacao.municipio} · Minas Gerais</>}
-                <br />
-                Precipitação atual: <b>{formatarMmMapaRadar(estacao.precipitacaoAtual)}</b>
-                <br />
-                Leitura: {dataHoraRadar(estacao.precipitacaoDataHora)}
-                {estacao.codigo ? <><br />Estação {estacao.codigo}</> : null}
-              </Popup>
-            </CircleMarker>
-          )
-        })}
+        {mostrarChuva && (
+          <Pane name="radarLiveCemadenStations" style={{ zIndex: 450 }}>
+            {estacoes.filter(estacao => Number.isFinite(estacao.latitude) && Number.isFinite(estacao.longitude)).map(estacao => {
+              const intensidade = intensidadeCemadenRadar(estacao.precipitacaoAtual ?? 0)
+              return (
+                <CircleMarker
+                  key={`radar-live-station-${estacao.id}`}
+                  center={[estacao.latitude as number, estacao.longitude as number]}
+                  radius={zoomMapa < 8 ? 2.5 : zoomMapa < 11 ? 4 : 8}
+                  pathOptions={{ color: '#fff', weight: 2, fillColor: intensidade.cor, fillOpacity: 0.95 }}
+                >
+                  <Tooltip permanent={zoomMapa >= 11} direction="top" offset={[0, -7]} opacity={0.96} className="radar-live-map-tooltip">
+                    {formatarMmMapaRadar(estacao.precipitacaoAtual)}
+                  </Tooltip>
+                  <Popup>
+                    <strong>🌧️ {estacao.nome || 'Estação CEMADEN'}</strong>
+                    {estacao.municipio && <><br />{estacao.municipio} · Minas Gerais</>}
+                    <br />
+                    Precipitação atual: <b>{formatarMmMapaRadar(estacao.precipitacaoAtual)}</b>
+                    <br />
+                    Leitura: {dataHoraRadar(estacao.precipitacaoDataHora)}
+                    {estacao.codigo ? <><br />Estação {estacao.codigo}</> : null}
+                  </Popup>
+                </CircleMarker>
+              )
+            })}
+          </Pane>
+        )}
         {mostrarTemperatura && zoomMapa >= 9 && tempoMapa?.atual && Number.isFinite(Number(tempoMapa.atual.temperatura)) && (
           <CircleMarker
             center={[CONSELHEIRO_LAFAIETE.latitude, CONSELHEIRO_LAFAIETE.longitude]}

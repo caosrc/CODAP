@@ -276,7 +276,7 @@ function RadarMapaTempoReal({ dadosCNL, tv }: { dadosCNL: DadosRadarCNL | null; 
   const [mostrarChuva, setMostrarChuva] = useState(true)
   const [mostrarTemperatura, setMostrarTemperatura] = useState(true)
   const [mostrarTrovoadas, setMostrarTrovoadas] = useState(true)
-  const [mostrarNuvens] = useState(false)
+  const [mostrarNuvens, setMostrarNuvens] = useState(false)
 
   const carregarRadarChuva = useCallback(async () => {
     setRadarCarregando(true)
@@ -392,11 +392,11 @@ function RadarMapaTempoReal({ dadosCNL, tv }: { dadosCNL: DadosRadarCNL | null; 
         <button
           type="button"
           className={`radar-live-map-layer-button ${mostrarNuvens ? 'ativo nuvens' : ''}`}
-          disabled
           aria-pressed={mostrarNuvens}
-          title="Camada de nuvens desabilitada neste mapa"
+          title="Imagem infravermelha de nuvens NOAA GOES; não mede chuva"
+          onClick={() => setMostrarNuvens(prev => !prev)}
         >
-          ☁️ Nuvens
+          ☁️ Nuvens GOES
         </button>
       </div>
       <div className="radar-live-map-status">

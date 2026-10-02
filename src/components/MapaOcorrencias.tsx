@@ -174,6 +174,14 @@ interface AlertaTempoMapa {
 
 const ESTIMATIVA_CEMADEN_RAIO_METROS = 10_000
 const CEMADEN_ESTACOES_ESPERADAS = new Set([4146, 4144, 3121, 6622, 4145, 4143, 4142])
+const GOES_CLOUD_TILE_URL = String(
+  import.meta.env.VITE_GOES_CLOUD_TILES_URL
+    || 'https://gis.nnvl.noaa.gov/arcgis/rest/services/GOES/GOES_current/ImageServer/tile/{z}/{y}/{x}',
+)
+
+function templateTilesHttpsValido(url: string) {
+  return /^https:\/\//i.test(url) && ['{z}', '{x}', '{y}'].every(token => url.includes(token))
+}
 
 function intensidadeCemaden(valor: number): { cor: string; alpha: number } {
   if (!Number.isFinite(valor) || valor <= 0) return { cor: '#38bdf8', alpha: 0 }
@@ -440,7 +448,7 @@ function idadeLeituraCemadenHoras(valor?: string | null): number | null {
 function statusLeituraCemaden(valor?: string | null): 'atualizada' | 'atrasada' | 'sem-dados' {
   const idade = idadeLeituraCemadenHoras(valor)
   if (idade == null) return 'sem-dados'
-  if (idade <= 3) return 'atualizada'
+  if (idade <= 1) return 'atualizada'
   if (idade <= 24) return 'atrasada'
   return 'sem-dados'
 }
@@ -450,6 +458,12 @@ function dataHoraCemadenFormatada(valor?: string | null): string {
   return data
     ? data.toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short', timeZone: 'America/Sao_Paulo' })
     : valor || 'Sem horário'
+}
+
+function numeroOuNuloMapa(valor: unknown): number | null {
+  if (valor == null || valor === '') return null
+  const numero = Number(valor)
+  return Number.isFinite(numero) ? numero : null
 }
 
 function CemadenIntensityLayer({
@@ -483,7 +497,8 @@ function CemadenIntensityLayer({
         Number.isFinite(estacao.latitude) &&
         Number.isFinite(estacao.longitude) &&
         Number.isFinite(estacao.precipitacaoAtual) &&
-        (estacao.precipitacaoAtual || 0) >= 0,
+        (estacao.precipitacaoAtual || 0) >= 0 &&
+        statusLeituraCemaden(estacao.precipitacaoDataHora) === 'atualizada',
       )
       .map((estacao) => ({
         lat: estacao.latitude as number,
@@ -501,7 +516,8 @@ function CemadenIntensityLayer({
       canvas.height = Math.max(1, Math.round(tamanho.y * dpr))
       contexto.setTransform(dpr, 0, 0, dpr, 0, 0)
       contexto.clearRect(0, 0, tamanho.x, tamanho.y)
-      if (pontos.length === 0) return
+      // Não invente uma superfície contínua com menos de três leituras atuais.
+      if (pontos.length < 3) return
 
       const deltaLat = raio / 111_320
       const deltaLng = raio / (111_320 * Math.cos(centro[0] * Math.PI / 180))
@@ -899,6 +915,7 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
   const [legendaAberta, setLegendaAberta] = useState(false)
   const [camadaMapa, setCamadaMapa] = useState<CamadaMapa>('padrao')
   const [mostrarChuva, setMostrarChuva] = useState(false)
+  const [mostrarNuvens, setMostrarNuvens] = useState(false)
   const [painelChuvaAberto, setPainelChuvaAberto] = useState(false)
   const [radarChuva, setRadarChuva] = useState<DadosRadarChuva | null>(null)
   const [radarChuvaCarregando, setRadarChuvaCarregando] = useState(false)
@@ -1017,11 +1034,9 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
           id: Number(estacao.id),
           nome: String(estacao.nome || ''),
           codigo: String(estacao.codigo || ''),
-          latitude: Number.isFinite(Number(estacao.latitude)) ? Number(estacao.latitude) : null,
-          longitude: Number.isFinite(Number(estacao.longitude)) ? Number(estacao.longitude) : null,
-          precipitacaoAtual: Number.isFinite(Number(estacao.precipitacaoAtual))
-            ? Number(estacao.precipitacaoAtual)
-            : null,
+          longitude: numeroOuNuloMapa(estacao.longitude),
+          latitude: numeroOuNuloMapa(estacao.latitude),
+          precipitacaoAtual: numeroOuNuloMapa(estacao.precipitacaoAtual),
           precipitacaoDataHora: String(estacao.precipitacaoDataHora || ''),
         }))
       setEstacoesCemaden(estacoes)
@@ -1735,6 +1750,20 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
             updateWhenIdle={true}
           />
         )}
+        {mostrarNuvens && templateTilesHttpsValido(GOES_CLOUD_TILE_URL) && (
+          <Pane name="mapaGoesNuvens" style={{ zIndex: 410 }}>
+            <TileLayer
+              key={`mapa-goes-nuvens-${GOES_CLOUD_TILE_URL}`}
+              url={GOES_CLOUD_TILE_URL}
+              opacity={0.5}
+              maxNativeZoom={8}
+              maxZoom={19}
+              attribution='Cloud imagery &copy; <a href="https://gis.nnvl.noaa.gov/arcgis/rest/services/GOES/GOES_current/ImageServer" target="_blank" rel="noreferrer">NOAA GOES</a>'
+              updateWhenZooming={false}
+              updateWhenIdle={true}
+            />
+          </Pane>
+        )}
         {mostrarChuva && tempoMapa?.atual && (
           <Marker
             position={CONSELHEIRO_LAFAIETE}
@@ -2278,6 +2307,18 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
               </div>
               <div className="mapa-chuva-fontes">
                 <button
+                  className={`mapa-chuva-fonte-btn ${mostrarNuvens ? 'ativo' : ''}`}
+                  onClick={() => setMostrarNuvens(v => !v)}
+                  aria-pressed={mostrarNuvens}
+                  disabled={!templateTilesHttpsValido(GOES_CLOUD_TILE_URL)}
+                  title="Imagem infravermelha de nuvens do satélite NOAA GOES; não mede chuva"
+                >
+                  ☁️ Nuvens GOES
+                </button>
+                <span>NOAA · imagem infravermelha com resolução aproximada de 5 km; mostra nuvens, não confirma precipitação</span>
+              </div>
+              <div className="mapa-chuva-fontes">
+                <button
                   className={`mapa-chuva-fonte-btn ${mostrarIntensidadeCemaden ? 'ativo' : ''}`}
                   onClick={() => setMostrarIntensidadeCemaden(v => !v)}
                   aria-pressed={mostrarIntensidadeCemaden}
@@ -2345,7 +2386,7 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
                 Para acompanhar se ela está chegando, observe as áreas coloridas se aproximando do círculo tracejado de 10 km.
                 Ele não calcula sozinho o horário de chegada nem substitui uma previsão meteorológica.
                 Os pontos no mapa são leituras reais das estações CEMADEN de Lafaiete, em mm acumulados na última hora.
-                A superfície colorida é uma interpolação entre essas estações e não uma medição contínua.
+                A superfície colorida é uma estimativa interpolada, só aparece com pelo menos três leituras válidas da última hora e não equivale a radar. A rede consultada não tem pluviômetro identificado em Ouro Branco; para nuvens, use a imagem GOES, que não confirma chuva no solo.
               </p>
               {cemadenCarregando && <div className="mapa-chuva-status">⏳ Atualizando estações CEMADEN…</div>}
               {cemadenErro && <div className="mapa-chuva-status mapa-chuva-status--erro">{cemadenErro}. O mapa continua disponível.</div>}

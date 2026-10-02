@@ -940,6 +940,15 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
   const mapaLeafletRef = useRef<L.Map | null>(null)
   const cemadenMg = useEstacoesCemadenMg(mostrarChuva || mostrarIntensidadeCemaden || painelChuvaAberto)
   const estacoesCemaden = cemadenMg.dados?.estacoes ?? ESTACOES_CEMADEN_VAZIAS
+  const estacoesCemadenLafaiete = useMemo(
+    () => estacoesCemaden.filter(estacao => /conselheiro\s+lafaiete/i.test(estacao.municipio)),
+    [estacoesCemaden],
+  )
+  const estacoesCemadenLafaieteGeorreferenciadas = useMemo(
+    () => estacoesCemadenLafaiete.filter(estacao => estacao.latitude != null && estacao.longitude != null),
+    [estacoesCemadenLafaiete],
+  )
+  const estacoesCemadenLafaieteSemCoordenadas = estacoesCemadenLafaiete.length - estacoesCemadenLafaieteGeorreferenciadas.length
   const cemadenAtualizadoEm = cemadenMg.dados?.atualizadoEm || null
   const cemadenCarregando = cemadenMg.carregando
   const cemadenErro = cemadenMg.erro || null
@@ -1644,7 +1653,7 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
   const dispositivosArray = useMemo(() => Array.from(dispositivos.values()), [dispositivos])
   const totalOnline = dispositivosArray.length + (statusGps === 'ativo' ? 1 : 0)
   const intensidadeEstimada = useMemo(() => {
-    const valores = estacoesCemaden
+    const valores = estacoesCemadenLafaiete
       .filter(estacao =>
         estacao.latitude != null &&
         estacao.longitude != null &&
@@ -1659,7 +1668,7 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
       .map(estacao => estacao.precipitacaoAtual)
       .filter((valor): valor is number => Number.isFinite(valor))
     return valores.length > 0 ? Math.max(...valores) : null
-  }, [estacoesCemaden])
+  }, [estacoesCemadenLafaiete])
 
   // ── Viewport culling ─────────────────────────────────────────────
   // Só renderiza marcadores dentro da área visível do mapa + 15% de margem.
@@ -1769,7 +1778,9 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
                   {ponto.intensidade} · {ponto.modelosComTrovoada}/3 modelos
                 </b>
                 <span>Previsão a partir de {dataHoraTempoMapa(ponto.primeiraTrovoada)}</span>
-                <span>Chuva prevista: {ponto.probabilidadeChuva}% · até {ponto.precipitacao.toLocaleString('pt-BR', { maximumFractionDigits: 1 })} mm</span>
+                {ponto.id === 'conselheiro-lafaiete' && (
+                  <span>Chuva prevista: {ponto.probabilidadeChuva}% · até {ponto.precipitacao.toLocaleString('pt-BR', { maximumFractionDigits: 1 })} mm</span>
+                )}
                 {ponto.id === 'conselheiro-lafaiete' && tempoMapa?.atual?.temperatura != null && (
                   <span>Temperatura atual em Conselheiro Lafaiete: {Math.round(Number(tempoMapa.atual.temperatura))} °C</span>
                 )}
@@ -1798,13 +1809,11 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
           </Pane>
         )}
         {mostrarIntensidadeCemaden && zoomMapa >= 9 && (
-          <CemadenIntensityLayer estacoes={estacoesCemaden} opacidade={opacidadeCemaden} />
+          <CemadenIntensityLayer estacoes={estacoesCemadenLafaiete} opacidade={opacidadeCemaden} />
         )}
         {mostrarChuva && (
           <Pane name="mapaEstacoesCemaden" style={{ zIndex: 450 }}>
-            {estacoesCemaden
-              .filter(estacao => estacao.latitude != null && estacao.longitude != null)
-              .map(estacao => {
+            {estacoesCemadenLafaieteGeorreferenciadas.map(estacao => {
                 const estadoLeitura = statusLeituraCemaden(estacao.precipitacaoDataHora)
                 const cor = estadoLeitura === 'atualizada'
                   ? intensidadeCemaden(estacao.precipitacaoAtual ?? 0).cor
@@ -1860,7 +1869,7 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
                     </Popup>
                   </CircleMarker>
                 )
-              })}
+            })}
           </Pane>
         )}
         {mostrarChuva && zoomMapa >= 9 && (
@@ -2318,12 +2327,12 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
                   onClick={() => setMostrarIntensidadeCemaden(v => !v)}
                   aria-pressed={mostrarIntensidadeCemaden}
                 >
-                  🌧️ Estações CEMADEN MG
+                  🌧️ CEMADEN · Lafaiete
                 </button>
                 <span>
                   {cemadenMg.dados
-                    ? `${cemadenMg.dados.estacoesGeorreferenciadas} de ${cemadenMg.dados.totalEstacoes} estações com coordenadas · acumulado na última hora`
-                    : 'Leituras oficiais de Minas Gerais · acumulado na última hora (mm)'}
+                    ? `${estacoesCemadenLafaieteGeorreferenciadas.length} estação(ões) do município · acumulado na última hora`
+                    : 'Leituras oficiais de Conselheiro Lafaiete · acumulado na última hora (mm)'}
                 </span>
               </div>
               <div className="mapa-chuva-opacidades">
@@ -2381,14 +2390,14 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
                 <span><i className="chuva-cor chuva-cor--extrema" /> extrema</span>
               </div>
               <p className="mapa-chuva-ajuda">
-                RainViewer mostra precipitação observada nos tiles da área visível; a imagem GOES mostra nuvens e não confirma chuva no solo. Os pontos CEMADEN usam medições atuais do catálogo e posições do Observatório de Infraestrutura de MG; estações sem coordenadas disponíveis não são desenhadas.
-                Temperatura e trovoadas previstas são pontos locais de Conselheiro Lafaiete e ficam ocultos no enquadramento estadual. A superfície interpolada também é estritamente local, limitada a 10 km de Lafaiete, aparece somente com pelo menos três leituras válidas da última hora e não equivale a radar nem a uma medição estadual.
+                RainViewer mostra precipitação observada nos tiles da área visível; a imagem GOES mostra nuvens e não confirma chuva no solo. Os valores e marcadores CEMADEN exibem somente estações de Conselheiro Lafaiete.
+                A previsão de trovoadas continua cobrindo localidades de Minas Gerais, mas os valores de precipitação prevista são exibidos somente para Lafaiete. A superfície interpolada permanece limitada a 10 km do centro de Lafaiete e só aparece com pelo menos três leituras válidas da última hora; não equivale a radar nem a uma medição estadual.
               </p>
               {cemadenCarregando && <div className="mapa-chuva-status">⏳ Atualizando estações CEMADEN…</div>}
               {cemadenErro && <div className="mapa-chuva-status mapa-chuva-status--erro">{cemadenErro}. O mapa continua disponível.</div>}
-              {cemadenMg.dados && cemadenMg.dados.estacoesSemCoordenadas > 0 && (
+              {cemadenMg.dados && estacoesCemadenLafaieteSemCoordenadas > 0 && (
                 <div className="mapa-chuva-status">
-                  {cemadenMg.dados.estacoesSemCoordenadas} estação(ões) do catálogo atual ainda não têm posição disponível no mapa estadual.
+                  {estacoesCemadenLafaieteSemCoordenadas} estação(ões) de Conselheiro Lafaiete sem posição disponível no mapa.
                 </div>
               )}
               <div className="mapa-chuva-rodape">

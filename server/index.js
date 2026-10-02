@@ -3752,11 +3752,15 @@ const CNL_CATALOGO_URL = 'https://resources.cemaden.gov.br/graficos/interativo/g
 const CNL_RECURSOS_URL = 'https://mapservices.cemaden.gov.br/MapaInterativoWS/resources'
 const CNL_NIVEL_URL = 'https://resources.cemaden.gov.br/graficos/cemaden/hidro/resources/json/MedidaResource.php?est=6622&sen=20&pag=24'
 const CNL_FONTE_URL = `https://resources.cemaden.gov.br/graficos/interativo/grafico_CEMADEN.php?idpcd=${CNL_ESTACAO_ID}&uf=MG`
+const CNL_GEOGRAFIA_MG_URL = 'https://observatorio.infraestrutura.mg.gov.br/server/rest/services/00_PUBLICACOES/cemaden_estacoes_pluviometricas/MapServer/1/query?where=uf%3D%27MG%27&outFields=idestacao%2Ccodestacao%2Clatitude%2Clongitude%2Ccidade%2Cnomeestacao&returnGeometry=false&resultRecordCount=2000&f=json'
 const CNL_FUSO_HORARIO = 'America/Sao_Paulo'
 const CNL_COTAS_CHAVE = 1
 let monitoramentoCnlCache = null
 let monitoramentoCnlCacheTs = 0
 const MONITORAMENTO_CNL_TTL_MS = 2 * 60 * 1000
+let monitoramentoMgCache = null
+let monitoramentoMgCacheTs = 0
+const MONITORAMENTO_MG_TTL_MS = 5 * 60 * 1000
 
 function numeroCemaden(valor) {
   if (valor == null || valor === '') return null
@@ -4190,6 +4194,89 @@ app.get('/api/monitoramento-cnl', async (_req, res) => {
     return res.status(503).json({
       sucesso: false,
       erro: 'Não foi possível consultar o monitoramento do CEMADEN.',
+    })
+  } finally {
+    clearTimeout(timeout)
+  }
+})
+
+app.get('/api/monitoramento-mg', async (_req, res) => {
+  const agora = Date.now()
+  if (monitoramentoMgCache && agora - monitoramentoMgCacheTs < MONITORAMENTO_MG_TTL_MS) {
+    return res.json({ ...monitoramentoMgCache, cache: true })
+  }
+
+  const controlador = new AbortController()
+  const timeout = setTimeout(() => controlador.abort(), 15000)
+  try {
+    const [catalogoResposta, geografiaResposta] = await Promise.all([
+      fetch(CNL_CATALOGO_URL, {
+        signal: controlador.signal,
+        headers: { 'User-Agent': 'CODAP/1.0 (Minas Gerais)' },
+      }),
+      fetch(CNL_GEOGRAFIA_MG_URL, {
+        signal: controlador.signal,
+        headers: { 'User-Agent': 'CODAP/1.0 (Minas Gerais)', Accept: 'application/json' },
+      }),
+    ])
+    if (!catalogoResposta.ok) throw new Error(`CEMADEN respondeu ${catalogoResposta.status}`)
+    if (!geografiaResposta.ok) throw new Error(`Localização das estações respondeu ${geografiaResposta.status}`)
+
+    const [catalogo, geografia] = await Promise.all([
+      catalogoResposta.json(),
+      geografiaResposta.json(),
+    ])
+    if (!Array.isArray(catalogo) || !Array.isArray(geografia?.features)) {
+      throw new Error('Formato inesperado no catálogo de estações de Minas Gerais')
+    }
+
+    const coordenadasPorId = new Map(
+      geografia.features.map((feature) => {
+        const item = feature?.attributes || {}
+        return [Number(item.idestacao), item]
+      }).filter(([id]) => Number.isFinite(id)),
+    )
+    const catalogoMg = catalogo.filter((item) => String(item?.uf || '').toUpperCase() === 'MG')
+    const estacoes = catalogoMg.map((item) => {
+      const localizacao = coordenadasPorId.get(Number(item?.idestacao)) || {}
+      return {
+        id: Number(item?.idestacao),
+        nome: String(item?.nomeestacao || localizacao.nomeestacao || ''),
+        municipio: String(item?.cidade || localizacao.cidade || ''),
+        codigo: String(localizacao.codestacao || ''),
+        latitude: numeroCemaden(localizacao.latitude),
+        longitude: numeroCemaden(localizacao.longitude),
+        precipitacaoAtual: numeroCemaden(item?.acc1hr),
+        precipitacaoDataHora: String(item?.datahoraUltimovalor || ''),
+      }
+    })
+    const estacoesGeorreferenciadas = estacoes.filter(
+      (estacao) => estacao.latitude != null && estacao.longitude != null,
+    ).length
+    if (estacoesGeorreferenciadas === 0) {
+      throw new Error('Nenhuma estação do catálogo atual pôde ser posicionada no mapa')
+    }
+
+    monitoramentoMgCache = {
+      sucesso: true,
+      estacoes,
+      totalEstacoes: estacoes.length,
+      estacoesGeorreferenciadas,
+      estacoesSemCoordenadas: estacoes.length - estacoesGeorreferenciadas,
+      atualizadoEm: new Date().toISOString(),
+      fonte: 'CEMADEN · posições: Observatório de Infraestrutura de Minas Gerais',
+    }
+    monitoramentoMgCacheTs = agora
+    res.set('Cache-Control', 'no-store')
+    return res.json(monitoramentoMgCache)
+  } catch (erro) {
+    console.error('[CEMADEN MG] Falha ao consultar pluviômetros:', erro?.message || erro)
+    if (monitoramentoMgCache) {
+      return res.json({ ...monitoramentoMgCache, cache: true, erroAtualizacao: true })
+    }
+    return res.status(503).json({
+      sucesso: false,
+      erro: 'Não foi possível consultar as estações CEMADEN de Minas Gerais.',
     })
   } finally {
     clearTimeout(timeout)

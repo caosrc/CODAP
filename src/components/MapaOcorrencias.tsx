@@ -28,6 +28,12 @@ import {
   subscribeGps,
   getEstadoGps,
 } from '../gpsService'
+import {
+  CapturaEstadoMapa,
+  MINAS_GERAIS_BOUNDS,
+  useEstacoesCemadenMg,
+  type EstacaoCemadenMg,
+} from '../meteorologiaMapa'
 
 
 interface DadosRadarChuva {
@@ -40,16 +46,6 @@ interface DadosRadarChuva {
   tipoQuadro?: 'observado'
   cache?: boolean
   erroAtualizacao?: boolean
-}
-
-interface EstacaoCemadenMapa {
-  id: number
-  nome: string
-  codigo: string
-  latitude: number | null
-  longitude: number | null
-  precipitacaoAtual: number | null
-  precipitacaoDataHora: string
 }
 
 interface TempoMapa {
@@ -173,7 +169,7 @@ interface AlertaTempoMapa {
 }
 
 const ESTIMATIVA_CEMADEN_RAIO_METROS = 10_000
-const CEMADEN_ESTACOES_ESPERADAS = new Set([4146, 4144, 3121, 6622, 4145, 4143, 4142])
+const ESTACOES_CEMADEN_VAZIAS: EstacaoCemadenMg[] = []
 const GOES_CLOUD_TILE_URL = String(
   import.meta.env.VITE_GOES_CLOUD_TILES_URL
     || 'https://gis.nnvl.noaa.gov/arcgis/rest/services/GOES/GOES_current/ImageServer/tile/{z}/{y}/{x}',
@@ -460,17 +456,11 @@ function dataHoraCemadenFormatada(valor?: string | null): string {
     : valor || 'Sem horário'
 }
 
-function numeroOuNuloMapa(valor: unknown): number | null {
-  if (valor == null || valor === '') return null
-  const numero = Number(valor)
-  return Number.isFinite(numero) ? numero : null
-}
-
 function CemadenIntensityLayer({
   estacoes,
   opacidade,
 }: {
-  estacoes: EstacaoCemadenMapa[]
+  estacoes: EstacaoCemadenMg[]
   opacidade: number
 }) {
   const map = useMap()
@@ -492,12 +482,20 @@ function CemadenIntensityLayer({
     const contexto = canvas.getContext('2d')
     if (!contexto) return () => canvas.remove()
 
+    const centro = CONSELHEIRO_LAFAIETE
+    const raio = ESTIMATIVA_CEMADEN_RAIO_METROS
     const pontos = estacoes
       .filter((estacao) =>
         Number.isFinite(estacao.latitude) &&
         Number.isFinite(estacao.longitude) &&
         Number.isFinite(estacao.precipitacaoAtual) &&
         (estacao.precipitacaoAtual || 0) >= 0 &&
+        distanciaMetros(
+          centro[0],
+          centro[1],
+          estacao.latitude as number,
+          estacao.longitude as number,
+        ) <= raio &&
         statusLeituraCemaden(estacao.precipitacaoDataHora) === 'atualizada',
       )
       .map((estacao) => ({
@@ -505,8 +503,6 @@ function CemadenIntensityLayer({
         lng: estacao.longitude as number,
         valor: estacao.precipitacaoAtual as number,
       }))
-    const centro = CONSELHEIRO_LAFAIETE
-    const raio = ESTIMATIVA_CEMADEN_RAIO_METROS
     const passos = 72
 
     const desenhar = () => {
@@ -923,10 +919,6 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
   const [mostrarIntensidadeCemaden, setMostrarIntensidadeCemaden] = useState(false)
   const [opacidadeRadar, setOpacidadeRadar] = useState(0.72)
   const [opacidadeCemaden, setOpacidadeCemaden] = useState(0.52)
-  const [estacoesCemaden, setEstacoesCemaden] = useState<EstacaoCemadenMapa[]>([])
-  const [cemadenAtualizadoEm, setCemadenAtualizadoEm] = useState<string | null>(null)
-  const [cemadenCarregando, setCemadenCarregando] = useState(false)
-  const [cemadenErro, setCemadenErro] = useState<string | null>(null)
   const [tempoMapa, setTempoMapa] = useState<TempoMapa | null>(null)
   const [tempoMapaCarregando, setTempoMapaCarregando] = useState(false)
   const [tempoMapaErro, setTempoMapaErro] = useState<string | null>(null)
@@ -944,6 +936,13 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
   const [submenuFiltroAberto, setSubmenuFiltroAberto] = useState(false)
   const [naturezasOcultas, setNaturezasOcultas] = useState<Set<string>>(new Set())
   const [mapaBounds, setMapaBounds] = useState<L.LatLngBounds | null>(null)
+  const [zoomMapa, setZoomMapa] = useState(12)
+  const mapaLeafletRef = useRef<L.Map | null>(null)
+  const cemadenMg = useEstacoesCemadenMg(mostrarChuva || mostrarIntensidadeCemaden || painelChuvaAberto)
+  const estacoesCemaden = cemadenMg.dados?.estacoes ?? ESTACOES_CEMADEN_VAZIAS
+  const cemadenAtualizadoEm = cemadenMg.dados?.atualizadoEm || null
+  const cemadenCarregando = cemadenMg.carregando
+  const cemadenErro = cemadenMg.erro || null
 
   // Busca de endereço + rota (estilo Google Maps)
   const [enderecoBusca, setEnderecoBusca] = useState('')
@@ -1020,47 +1019,6 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
       document.removeEventListener('visibilitychange', atualizarAoVoltar)
     }
   }, [mostrarChuva, buscarRadarChuva])
-
-  const buscarCemadenMapa = useCallback(async () => {
-    setCemadenCarregando(true)
-    setCemadenErro(null)
-    try {
-      const resposta = await fetch(`/api/monitoramento-cnl?_ts=${Date.now()}`, { cache: 'no-store' })
-      const dados = await resposta.json().catch(() => ({}))
-      if (!resposta.ok || !dados?.sucesso) throw new Error(typeof dados?.erro === 'string' ? dados.erro : 'CEMADEN indisponível')
-      const estacoes = (Array.isArray(dados?.estacoes) ? dados.estacoes : [])
-        .filter((estacao: EstacaoCemadenMapa) => CEMADEN_ESTACOES_ESPERADAS.has(Number(estacao?.id)))
-        .map((estacao: EstacaoCemadenMapa) => ({
-          id: Number(estacao.id),
-          nome: String(estacao.nome || ''),
-          codigo: String(estacao.codigo || ''),
-          longitude: numeroOuNuloMapa(estacao.longitude),
-          latitude: numeroOuNuloMapa(estacao.latitude),
-          precipitacaoAtual: numeroOuNuloMapa(estacao.precipitacaoAtual),
-          precipitacaoDataHora: String(estacao.precipitacaoDataHora || ''),
-        }))
-      setEstacoesCemaden(estacoes)
-      setCemadenAtualizadoEm(typeof dados?.atualizadoEm === 'string' ? dados.atualizadoEm : null)
-    } catch (erro) {
-      setCemadenErro(erro instanceof Error && erro.message ? erro.message : 'Não foi possível consultar o CEMADEN agora.')
-    } finally {
-      setCemadenCarregando(false)
-    }
-  }, [])
-
-  useEffect(() => {
-    if (!mostrarIntensidadeCemaden && !painelChuvaAberto) return
-    buscarCemadenMapa()
-    const intervalo = setInterval(buscarCemadenMapa, 5 * 60 * 1000)
-    const atualizarAoVoltar = () => {
-      if (document.visibilityState === 'visible') buscarCemadenMapa()
-    }
-    document.addEventListener('visibilitychange', atualizarAoVoltar)
-    return () => {
-      clearInterval(intervalo)
-      document.removeEventListener('visibilitychange', atualizarAoVoltar)
-    }
-  }, [mostrarIntensidadeCemaden, painelChuvaAberto, buscarCemadenMapa])
 
   const buscarTempoMapa = useCallback(async () => {
     setTempoMapaCarregando(true)
@@ -1687,7 +1645,17 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
   const totalOnline = dispositivosArray.length + (statusGps === 'ativo' ? 1 : 0)
   const intensidadeEstimada = useMemo(() => {
     const valores = estacoesCemaden
-      .filter(estacao => statusLeituraCemaden(estacao.precipitacaoDataHora) === 'atualizada')
+      .filter(estacao =>
+        estacao.latitude != null &&
+        estacao.longitude != null &&
+        distanciaMetros(
+          CONSELHEIRO_LAFAIETE[0],
+          CONSELHEIRO_LAFAIETE[1],
+          estacao.latitude,
+          estacao.longitude,
+        ) <= ESTIMATIVA_CEMADEN_RAIO_METROS &&
+        statusLeituraCemaden(estacao.precipitacaoDataHora) === 'atualizada',
+      )
       .map(estacao => estacao.precipitacaoAtual)
       .filter((valor): valor is number => Number.isFinite(valor))
     return valores.length > 0 ? Math.max(...valores) : null
@@ -1718,7 +1686,7 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
       <MapContainer
         center={CONSELHEIRO_LAFAIETE}
         zoom={12}
-        minZoom={8}
+        minZoom={5}
         // O mapa pode ser arrastado livremente para consultar outras regiões.
         dragging={true}
         style={{ width: '100%', height: '100%' }}
@@ -1726,6 +1694,7 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
         whenReady={() => {}}
       >
         <LimiteZoomCamada camada={camadaMapa} />
+        <CapturaEstadoMapa referencia={mapaLeafletRef} aoMudarZoom={setZoomMapa} />
         {camadaMapa === 'padrao' ? (
           <TileLayer
             key="mapa-padrao"
@@ -1764,7 +1733,7 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
             />
           </Pane>
         )}
-        {mostrarChuva && tempoMapa?.atual && (
+        {mostrarChuva && zoomMapa >= 9 && tempoMapa?.atual && (
           <Marker
             position={CONSELHEIRO_LAFAIETE}
             icon={criarIconeTempoMapa(tempoMapa)}
@@ -1786,7 +1755,7 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
             </Popup>
           </Marker>
         )}
-        {mostrarChuva && mostrarPrevisaoRaios && (previsaoRaiosMapa?.pontos || []).map(ponto => (
+        {mostrarChuva && zoomMapa >= 9 && mostrarPrevisaoRaios && (previsaoRaiosMapa?.pontos || []).map(ponto => (
           <Marker
             key={`raios-${ponto.id}`}
             position={[ponto.latitude, ponto.longitude]}
@@ -1828,7 +1797,7 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
             />
           </Pane>
         )}
-        {mostrarIntensidadeCemaden && (
+        {mostrarIntensidadeCemaden && zoomMapa >= 9 && (
           <CemadenIntensityLayer estacoes={estacoesCemaden} opacidade={opacidadeCemaden} />
         )}
         {mostrarChuva && estacoesCemaden
@@ -1842,7 +1811,7 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
               <CircleMarker
                 key={`cemaden-estacao-${estacao.id}`}
                 center={[estacao.latitude!, estacao.longitude!]}
-                radius={9}
+                radius={zoomMapa < 8 ? 2.5 : zoomMapa < 11 ? 4 : 9}
                 pathOptions={{
                   color: '#ffffff',
                   weight: 2,
@@ -1851,7 +1820,7 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
                 }}
               >
                 <Tooltip
-                  permanent
+                  permanent={zoomMapa >= 11}
                   direction="top"
                   offset={[0, -8]}
                   opacity={0.96}
@@ -1864,6 +1833,11 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
                     <strong style={{ display: 'block', marginBottom: 4 }}>
                       🌧️ {estacao.nome || 'Estação CEMADEN'}
                     </strong>
+                    {estacao.municipio && (
+                      <div style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: 3 }}>
+                        {estacao.municipio} · Minas Gerais
+                      </div>
+                    )}
                     <div style={{ fontSize: '0.8rem', color: '#374151', marginBottom: 3 }}>
                       <strong>Última hora:</strong> {valorChuvaFormatado(estacao.precipitacaoAtual)}
                     </div>
@@ -1885,7 +1859,7 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
               </CircleMarker>
             )
           })}
-        {mostrarChuva && (
+        {mostrarChuva && zoomMapa >= 9 && (
           <Circle
             center={CONSELHEIRO_LAFAIETE}
             radius={RAIO_RADAR_CHUVA_METROS}
@@ -1905,7 +1879,7 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
             </Popup>
           </Circle>
         )}
-        {mostrarChuva && (
+        {mostrarChuva && zoomMapa >= 9 && (
           <CircleMarker
             center={CONSELHEIRO_LAFAIETE}
             radius={5}
@@ -2297,6 +2271,23 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
               </div>
               <div className="mapa-chuva-fontes">
                 <button
+                  className="mapa-chuva-fonte-btn"
+                  onClick={() => mapaLeafletRef.current?.fitBounds(MINAS_GERAIS_BOUNDS, { padding: [24, 24], maxZoom: 7, animate: true })}
+                  title="Enquadrar Minas Gerais; os tiles de chuva e nuvens cobrem a área visível"
+                >
+                  🗺️ Toda MG
+                </button>
+                <button
+                  className="mapa-chuva-fonte-btn"
+                  onClick={() => mapaLeafletRef.current?.setView(CONSELHEIRO_LAFAIETE, 12, { animate: true })}
+                  title="Voltar ao enquadramento local de Conselheiro Lafaiete"
+                >
+                  📍 Lafaiete
+                </button>
+                <span>Enquadramento local continua sendo o padrão</span>
+              </div>
+              <div className="mapa-chuva-fontes">
+                <button
                   className={`mapa-chuva-fonte-btn ${mostrarChuva ? 'ativo' : ''}`}
                   onClick={() => setMostrarChuva(v => !v)}
                   aria-pressed={mostrarChuva}
@@ -2323,9 +2314,13 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
                   onClick={() => setMostrarIntensidadeCemaden(v => !v)}
                   aria-pressed={mostrarIntensidadeCemaden}
                 >
-                  🌈 Estações CEMADEN
+                  🌧️ Estações CEMADEN MG
                 </button>
-                <span>Leituras oficiais · acumulado na última hora (mm)</span>
+                <span>
+                  {cemadenMg.dados
+                    ? `${cemadenMg.dados.estacoesGeorreferenciadas} de ${cemadenMg.dados.totalEstacoes} estações com coordenadas · acumulado na última hora`
+                    : 'Leituras oficiais de Minas Gerais · acumulado na última hora (mm)'}
+                </span>
               </div>
               <div className="mapa-chuva-opacidades">
                 <label>
@@ -2382,20 +2377,22 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
                 <span><i className="chuva-cor chuva-cor--extrema" /> extrema</span>
               </div>
               <p className="mapa-chuva-ajuda">
-                O radar mostra a chuva observada se deslocando em direção à cidade. A RainViewer publica quadros em intervalos de 10 minutos; o horário acima indica quando o quadro foi gerado, não o instante exato em que a chuva começou.
-                Para acompanhar se ela está chegando, observe as áreas coloridas se aproximando do círculo tracejado de 10 km.
-                Ele não calcula sozinho o horário de chegada nem substitui uma previsão meteorológica.
-                Os pontos no mapa são leituras reais das estações CEMADEN de Lafaiete, em mm acumulados na última hora.
-                A superfície colorida é uma estimativa interpolada, só aparece com pelo menos três leituras válidas da última hora e não equivale a radar. A rede consultada não tem pluviômetro identificado em Ouro Branco; para nuvens, use a imagem GOES, que não confirma chuva no solo.
+                RainViewer mostra precipitação observada nos tiles da área visível; a imagem GOES mostra nuvens e não confirma chuva no solo. Os pontos CEMADEN usam medições atuais do catálogo e posições do Observatório de Infraestrutura de MG; estações sem coordenadas disponíveis não são desenhadas.
+                Temperatura e trovoadas previstas são pontos locais de Conselheiro Lafaiete e ficam ocultos no enquadramento estadual. A superfície interpolada também é estritamente local, limitada a 10 km de Lafaiete, aparece somente com pelo menos três leituras válidas da última hora e não equivale a radar nem a uma medição estadual.
               </p>
               {cemadenCarregando && <div className="mapa-chuva-status">⏳ Atualizando estações CEMADEN…</div>}
               {cemadenErro && <div className="mapa-chuva-status mapa-chuva-status--erro">{cemadenErro}. O mapa continua disponível.</div>}
+              {cemadenMg.dados && cemadenMg.dados.estacoesSemCoordenadas > 0 && (
+                <div className="mapa-chuva-status">
+                  {cemadenMg.dados.estacoesSemCoordenadas} estação(ões) do catálogo atual ainda não têm posição disponível no mapa estadual.
+                </div>
+              )}
               <div className="mapa-chuva-rodape">
                 <span>{radarChuva?.erroAtualizacao ? 'Último radar salvo' : 'Weather data by RainViewer'}</span>
                 <button
                   onClick={() => {
                     buscarRadarChuva()
-                    buscarCemadenMapa()
+                    cemadenMg.atualizar()
                   }}
                   disabled={radarChuvaCarregando || cemadenCarregando}
                 >

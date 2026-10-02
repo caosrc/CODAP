@@ -10,6 +10,13 @@ import { supabase, supabaseDisponivel } from '../supabaseClient'
 import { AGENTES } from '../types'
 import { ehFerramentalPorLitro } from '../ferramentalUtils'
 import { ChartaChuva, GraficoNivel, type EstacaoCNL, type LeituraCNL, type PontoNivel, type PontoSerie } from './MonitoramentoCNL'
+import type { Map as LeafletMap } from 'leaflet'
+import {
+  CapturaEstadoMapa,
+  MINAS_GERAIS_BOUNDS,
+  useEstacoesCemadenMg,
+  type EstacaoCemadenMg,
+} from '../meteorologiaMapa'
 import './MonitoramentoCNL.css'
 import ModalSenha from './ModalSenha'
 
@@ -100,6 +107,7 @@ const CONSELHEIRO_LAFAIETE = { latitude: -20.6604, longitude: -43.7863 }
 const RADAR_MAP_CENTER: [number, number] = [CONSELHEIRO_LAFAIETE.latitude, CONSELHEIRO_LAFAIETE.longitude]
 const RADAR_MAP_ZOOM = 12
 const RADAR_CHUVA_RAIO_METROS = 10_000
+const ESTACOES_CEMADEN_VAZIAS_RADAR: EstacaoCemadenMg[] = []
 // Serviço público NOAA/NNVL com imagens infravermelhas diárias do GOES.
 // A variável de ambiente continua disponível para trocar a fonte sem alterar o código.
 const GOES_CLOUD_TILE_URL = String(
@@ -264,7 +272,7 @@ function RadarMapInvalidateSize({ tv }: { tv: boolean }) {
   return null
 }
 
-function RadarMapaTempoReal({ dadosCNL, tv }: { dadosCNL: DadosRadarCNL | null; tv: boolean }) {
+function RadarMapaTempoReal({ tv }: { tv: boolean }) {
   const [camadaBase, setCamadaBase] = useState<'mapa' | 'satelite'>('mapa')
   const [radarChuva, setRadarChuva] = useState<DadosRadarChuvaLive | null>(null)
   const [tempoMapa, setTempoMapa] = useState<TempoMapaRadar | null>(null)
@@ -277,6 +285,10 @@ function RadarMapaTempoReal({ dadosCNL, tv }: { dadosCNL: DadosRadarCNL | null; 
   const [mostrarTemperatura, setMostrarTemperatura] = useState(true)
   const [mostrarTrovoadas, setMostrarTrovoadas] = useState(true)
   const [mostrarNuvens, setMostrarNuvens] = useState(false)
+  const [zoomMapa, setZoomMapa] = useState(RADAR_MAP_ZOOM)
+  const mapaLeafletRef = useRef<LeafletMap | null>(null)
+  const cemadenMg = useEstacoesCemadenMg(true)
+  const estacoes = cemadenMg.dados?.estacoes ?? ESTACOES_CEMADEN_VAZIAS_RADAR
 
   const carregarRadarChuva = useCallback(async () => {
     setRadarCarregando(true)
@@ -369,7 +381,9 @@ function RadarMapaTempoReal({ dadosCNL, tv }: { dadosCNL: DadosRadarCNL | null; 
       <div className="radar-live-map-heading">
         <div>
           <span className="card-label">MAPA METEOROLÓGICO</span>
-          <h3 id="radar-live-map-title">Conselheiro Lafaiete em tempo real</h3>
+          <h3 id="radar-live-map-title">
+            {zoomMapa < 9 ? 'Minas Gerais · chuva e nuvens' : 'Conselheiro Lafaiete em tempo real'}
+          </h3>
         </div>
         <span className="radar-live-map-updated">
           {radarCarregando ? 'Atualizando…' : radarChuva?.erroAtualizacao ? 'Último quadro salvo' : 'Atualização automática · 5 min'}
@@ -398,24 +412,43 @@ function RadarMapaTempoReal({ dadosCNL, tv }: { dadosCNL: DadosRadarCNL | null; 
         >
           ☁️ Nuvens GOES
         </button>
+        <button
+          type="button"
+          className="radar-live-map-layer-button"
+          onClick={() => mapaLeafletRef.current?.fitBounds(MINAS_GERAIS_BOUNDS, { padding: [20, 20], maxZoom: 7, animate: true })}
+          title="Enquadrar todo o estado; as camadas de chuva e nuvens cobrem a área visível"
+        >
+          🗺️ Toda MG
+        </button>
+        <button
+          type="button"
+          className="radar-live-map-layer-button"
+          onClick={() => mapaLeafletRef.current?.setView(RADAR_MAP_CENTER, RADAR_MAP_ZOOM, { animate: true })}
+          title="Voltar ao enquadramento local de Conselheiro Lafaiete"
+        >
+          📍 Lafaiete
+        </button>
       </div>
       <div className="radar-live-map-status">
         <span><i className="radar-live-map-status-dot radar-live-map-status-dot-rain" /> Chuva observada</span>
-        <span><i className="radar-live-map-status-dot radar-live-map-status-dot-station" /> Estações CEMADEN</span>
-        <span><i className="radar-live-map-status-dot radar-live-map-status-dot-temperature" /> Temperatura atual</span>
-        <span><i className="radar-live-map-status-dot radar-live-map-status-dot-lightning" /> Trovoada prevista · próximos 36 h</span>
-        <span><i className="radar-live-map-status-dot radar-live-map-status-dot-area" /> Raio de 10 km</span>
-        {(radarErro || tempoMapaErro || trovoadasErro) && <strong>{[radarErro, tempoMapaErro, trovoadasErro].filter(Boolean).join(' · ')}</strong>}
+        <span><i className="radar-live-map-status-dot radar-live-map-status-dot-station" /> CEMADEN MG</span>
+        {zoomMapa >= 9 && <span><i className="radar-live-map-status-dot radar-live-map-status-dot-temperature" /> Temperatura local</span>}
+        {zoomMapa >= 9 && <span><i className="radar-live-map-status-dot radar-live-map-status-dot-lightning" /> Trovoadas previstas localmente · 36 h</span>}
+        {mostrarChuva && zoomMapa >= 9 && <span><i className="radar-live-map-status-dot radar-live-map-status-dot-area" /> Raio local de 10 km</span>}
+        {(radarErro || tempoMapaErro || trovoadasErro || cemadenMg.erro) && (
+          <strong>{[radarErro, tempoMapaErro, trovoadasErro, cemadenMg.erro].filter(Boolean).join(' · ')}</strong>
+        )}
       </div>
       <MapContainer
         className="radar-live-map"
         center={RADAR_MAP_CENTER}
         zoom={RADAR_MAP_ZOOM}
-        minZoom={8}
+        minZoom={5}
         maxZoom={18}
         scrollWheelZoom
         zoomControl
       >
+        <CapturaEstadoMapa referencia={mapaLeafletRef} aoMudarZoom={setZoomMapa} />
         <RadarMapInvalidateSize tv={tv} />
         {camadaBase === 'mapa' ? (
           <TileLayer
@@ -459,7 +492,7 @@ function RadarMapaTempoReal({ dadosCNL, tv }: { dadosCNL: DadosRadarCNL | null; 
             />
           </Pane>
         )}
-        {mostrarChuva && (
+        {mostrarChuva && zoomMapa >= 9 && (
           <Circle
             center={RADAR_MAP_CENTER}
             radius={RADAR_CHUVA_RAIO_METROS}
@@ -473,19 +506,20 @@ function RadarMapaTempoReal({ dadosCNL, tv }: { dadosCNL: DadosRadarCNL | null; 
           </Circle>
         )}
         {mostrarChuva && estacoes.filter(estacao => Number.isFinite(estacao.latitude) && Number.isFinite(estacao.longitude)).map(estacao => {
-          const intensidade = intensidadeCemadenRadar(estacao.precipitacaoAtual)
+          const intensidade = intensidadeCemadenRadar(estacao.precipitacaoAtual ?? 0)
           return (
             <CircleMarker
               key={`radar-live-station-${estacao.id}`}
-              center={[estacao.latitude, estacao.longitude]}
-              radius={8}
+              center={[estacao.latitude as number, estacao.longitude as number]}
+              radius={zoomMapa < 8 ? 2.5 : zoomMapa < 11 ? 4 : 8}
               pathOptions={{ color: '#fff', weight: 2, fillColor: intensidade.cor, fillOpacity: 0.95 }}
             >
-              <Tooltip permanent direction="top" offset={[0, -7]} opacity={0.96} className="radar-live-map-tooltip">
+              <Tooltip permanent={zoomMapa >= 11} direction="top" offset={[0, -7]} opacity={0.96} className="radar-live-map-tooltip">
                 {formatarMmMapaRadar(estacao.precipitacaoAtual)}
               </Tooltip>
               <Popup>
                 <strong>🌧️ {estacao.nome || 'Estação CEMADEN'}</strong>
+                {estacao.municipio && <><br />{estacao.municipio} · Minas Gerais</>}
                 <br />
                 Precipitação atual: <b>{formatarMmMapaRadar(estacao.precipitacaoAtual)}</b>
                 <br />
@@ -495,7 +529,7 @@ function RadarMapaTempoReal({ dadosCNL, tv }: { dadosCNL: DadosRadarCNL | null; 
             </CircleMarker>
           )
         })}
-        {mostrarTemperatura && tempoMapa?.atual && Number.isFinite(Number(tempoMapa.atual.temperatura)) && (
+        {mostrarTemperatura && zoomMapa >= 9 && tempoMapa?.atual && Number.isFinite(Number(tempoMapa.atual.temperatura)) && (
           <CircleMarker
             center={[CONSELHEIRO_LAFAIETE.latitude, CONSELHEIRO_LAFAIETE.longitude]}
             radius={8}
@@ -519,7 +553,7 @@ function RadarMapaTempoReal({ dadosCNL, tv }: { dadosCNL: DadosRadarCNL | null; 
             </Popup>
           </CircleMarker>
         )}
-        {mostrarTrovoadas && pontosTrovoada.map(ponto => (
+        {mostrarTrovoadas && zoomMapa >= 9 && pontosTrovoada.map(ponto => (
           <CircleMarker
             key={`radar-live-lightning-${ponto.id}`}
             center={[ponto.latitude, ponto.longitude]}
@@ -547,7 +581,7 @@ function RadarMapaTempoReal({ dadosCNL, tv }: { dadosCNL: DadosRadarCNL | null; 
             </Popup>
           </CircleMarker>
         ))}
-        {mostrarChuva && (
+        {mostrarChuva && zoomMapa >= 9 && (
           <CircleMarker center={RADAR_MAP_CENTER} radius={5} pathOptions={{ color: '#0f172a', weight: 2, fillColor: '#f8fafc', fillOpacity: 1 }}>
             <Popup>
               <strong>Centro de Conselheiro Lafaiete</strong>
@@ -558,10 +592,17 @@ function RadarMapaTempoReal({ dadosCNL, tv }: { dadosCNL: DadosRadarCNL | null; 
         )}
       </MapContainer>
       <div className="radar-live-map-footer">
-        <span>{dadosCNL ? `${estacoes.length} estação(ões) CEMADEN` : 'Consultando estações CEMADEN…'}</span>
+        <span>
+          {cemadenMg.dados
+            ? `${cemadenMg.dados.estacoesGeorreferenciadas} de ${cemadenMg.dados.totalEstacoes} estações CEMADEN com posição em MG`
+            : cemadenMg.carregando ? 'Consultando estações CEMADEN…' : 'Estações CEMADEN indisponíveis'}
+        </span>
+        {cemadenMg.dados && cemadenMg.dados.estacoesSemCoordenadas > 0 && (
+          <span>{cemadenMg.dados.estacoesSemCoordenadas} sem posição no cadastro geográfico</span>
+        )}
         <span>{radarChuva?.atualizadoEm ? `Radar: ${new Date(radarChuva.atualizadoEm).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}` : 'Radar: —'}</span>
-        <span>{tempoMapa?.atual?.temperatura != null ? `Agora: ${Math.round(Number(tempoMapa.atual.temperatura))} °C` : 'Temperatura: —'}</span>
-        <span>{previsaoTrovoadas ? `${pontosTrovoada.length} local(is) com trovoada prevista` : 'Previsão de trovoadas: —'}</span>
+        <span>{tempoMapa?.atual?.temperatura != null ? `Lafaiete: ${Math.round(Number(tempoMapa.atual.temperatura))} °C` : 'Temperatura local: —'}</span>
+        <span>{previsaoTrovoadas ? `${pontosTrovoada.length} ponto(s) previsto(s) perto de Lafaiete` : 'Previsão local de trovoadas: —'}</span>
         {!templateTilesHttpsValido(GOES_CLOUD_TILE_URL) && <span>Nuvens GOES: fonte não configurada</span>}
       </div>
     </section>
@@ -1707,7 +1748,7 @@ export default function RadarDC() {
           <div><h3>⚠️ Ocorrências do dia</h3>{atividades.ocorrencias.length === 0 ? <div className="radar-empty">Nenhuma ocorrência registrada.</div> : atividades.ocorrencias.map(o => <button className="radar-activity" key={o.id} onClick={() => disparar('dc:abrir-ocorrencia', { id: o.id })}><b>{o.agente}</b><span>{o.hora} · {o.natureza || 'Natureza não informada'}</span><small>{o.endereco || 'Endereço não informado'}</small><em>abrir ›</em></button>)}</div>
         </div>
          </section>
-         <RadarMapaTempoReal dadosCNL={dadosCNL} tv={tv} />
+         <RadarMapaTempoReal tv={tv} />
        {lembreteParaApagar && (
          <ModalSenha
            titulo={`Apagar lembrete de ${lembreteParaApagar.criadoPor}`}

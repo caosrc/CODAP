@@ -1595,6 +1595,7 @@ export default function RadarDC() {
                       <ChartaChuva
                         pontos={dadosCNL.serieChuvaCentro || []}
                         estacao={dadosCNL.estacaoChuvaCentro}
+                        margemEixoEsquerdo={100}
                       />
                     </section>
                     <details className="radar-cnl-diaria-detalhe">

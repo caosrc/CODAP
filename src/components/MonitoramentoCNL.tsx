@@ -187,16 +187,18 @@ export function ChartaChuva({
   pontos,
   estacao,
   mostrarControles = false,
+  margemEixoEsquerdo = 56,
 }: {
   pontos: PontoSerie[]
   estacao?: { nome: string; codigo?: string } | null
   mostrarControles?: boolean
+  margemEixoEsquerdo?: number
 }) {
   const [periodo, setPeriodo] = useState<6 | 12 | 24>(24)
   const pontosVisiveis = pontos.slice(-periodo)
   const largura = 900
   const altura = 330
-  const margem = { topo: 42, direita: 20, baixo: 58, esquerda: 56 }
+  const margem = { topo: 42, direita: 20, baixo: 58, esquerda: margemEixoEsquerdo }
   const acumulados = pontosVisiveis.reduce<number[]>((totais, ponto) => {
     totais.push((totais.at(-1) || 0) + ponto.valor)
     return totais

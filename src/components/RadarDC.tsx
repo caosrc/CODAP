@@ -531,17 +531,10 @@ function RadarMapaTempoReal({ tv }: { tv: boolean }) {
                   radius={zoomMapa < 8 ? 2.5 : zoomMapa < 11 ? 4 : 8}
                   pathOptions={{ color: '#fff', weight: 2, fillColor: intensidade.cor, fillOpacity: 0.95 }}
                 >
-                  <Tooltip permanent={zoomMapa >= 11} direction="top" offset={[0, -7]} opacity={0.96} className="radar-live-map-tooltip radar-live-map-tooltip-station">
-                    <span>
-                      <strong>{estacao.nome || 'Estação CEMADEN'}</strong>
-                      <small>
-                        {estadoLeitura === 'atualizada' && estacao.precipitacaoAtual != null
-                          ? `${formatarMmMapaRadar(estacao.precipitacaoAtual)} · última hora`
-                          : estadoLeitura === 'atrasada' && estacao.precipitacaoAtual != null
-                            ? `${formatarMmMapaRadar(estacao.precipitacaoAtual)} · atrasada`
-                            : 'Sem leitura'}
-                      </small>
-                    </span>
+                  <Tooltip permanent={zoomMapa >= 11} direction="top" offset={[0, -7]} opacity={0.96} className="radar-live-map-tooltip">
+                    {estadoLeitura === 'atualizada' && estacao.precipitacaoAtual != null
+                      ? formatarMmMapaRadar(estacao.precipitacaoAtual)
+                      : '—'}
                   </Tooltip>
                   <Popup>
                     <strong>🌧️ {estacao.nome || 'Estação CEMADEN'}</strong>

@@ -3,8 +3,8 @@ name: Chuva CEMADEN nos mapas
 description: Requisito de produto para exibição das estações meteorológicas nos mapas operacionais.
 ---
 
-As camadas “Chuva” de Mapa e Radar DC devem mostrar as estações CEMADEN georreferenciadas de Conselheiro Lafaiete com a precipitação acumulada na última hora. Leitura atrasada e ausência de leitura devem ficar distintas de um valor atual.
+As camadas “Chuva” de Mapa e Radar DC mostram pontos CEMADEN de Conselheiro Lafaiete, com apenas o valor da precipitação sobre cada ponto — sem caixas persistentes com nomes. Leituras atrasadas ou ausentes aparecem como “—”, nunca como zero.
 
-**Why:** O usuário pediu que as estações meteorológicas e a precipitação atual apareçam nas duas visualizações do mapa.
+**Why:** O usuário pediu que as duas visualizações mostrem somente as bolinhas e os valores de precipitação, sem os quadrinhos brancos com nomes.
 
-**How to apply:** Ao alterar as camadas de chuva, mantenha nomes e valores das estações visíveis nos dois mapas, indique quando a leitura não for recente ou não existir e não substitua valor ausente por zero.
+**How to apply:** Ao alterar as camadas, mantenha os marcadores e etiquetas numéricas sem fundo; reserve nomes e detalhes para os popups abertos ao clicar. Dado ausente ou antigo não deve parecer uma medição atual.

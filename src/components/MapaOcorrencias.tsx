@@ -1786,16 +1786,9 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
                         opacity={0.96}
                         className="mapa-cemaden-mg-tooltip"
                       >
-                        <span className="mapa-cemaden-mg-tooltip-conteudo">
-                          <strong>{estacao.nome || 'Estação CEMADEN'}</strong>
-                          <small>
-                            {estadoLeitura === 'atualizada' && estacao.precipitacaoAtual != null
-                              ? `${valorChuvaMarcadorFormatado(estacao.precipitacaoAtual)} · última hora`
-                              : estadoLeitura === 'atrasada' && estacao.precipitacaoAtual != null
-                                ? `${valorChuvaMarcadorFormatado(estacao.precipitacaoAtual)} · atrasada`
-                                : 'Sem leitura'}
-                          </small>
-                        </span>
+                        {estadoLeitura === 'atualizada' && estacao.precipitacaoAtual != null
+                          ? valorChuvaMarcadorFormatado(estacao.precipitacaoAtual)
+                          : '—'}
                       </Tooltip>
                     )}
                     <Popup>

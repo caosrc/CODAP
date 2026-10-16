@@ -1690,35 +1690,19 @@ input, select, textarea { font-family: inherit; }
   font-size: 0.58rem;
 }
 .mapa-cemaden-mg-tooltip {
-  border: 1px solid #cbd5e1 !important;
-  border-radius: 5px !important;
-  padding: 3px 5px !important;
-  background: rgba(255, 255, 255, 0.94) !important;
-  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.22) !important;
-  color: #0f172a !important;
-  font-size: 0.6rem;
-  font-weight: 600;
-  line-height: 1.2;
-  text-shadow: none;
+  border: 0 !important;
+  padding: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: #f97316 !important;
+  font-size: 0.62rem;
+  font-weight: 900;
+  line-height: 1.1;
+  text-shadow: -1px -1px 0 #fff, 1px -1px 0 #fff, -1px 1px 0 #fff, 1px 1px 0 #fff;
   white-space: nowrap;
 }
 .mapa-cemaden-mg-tooltip::before {
   display: none;
-}
-.mapa-cemaden-mg-tooltip-conteudo {
-  display: grid;
-  gap: 1px;
-  text-align: center;
-}
-.mapa-cemaden-mg-tooltip-conteudo strong {
-  color: #1e3a5f;
-  font-size: 0.62rem;
-  font-weight: 800;
-}
-.mapa-cemaden-mg-tooltip-conteudo small {
-  color: #475569;
-  font-size: 0.55rem;
-  font-weight: 700;
 }
 .mapa-chuva-ponto-fonte {
   color: #94a3b8;

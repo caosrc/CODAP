@@ -1207,14 +1207,21 @@ app.get('/api/ocorrencias/fotos-lote', async (req, res) => {
 
 app.get('/api/ocorrencias', async (req, res) => {
   try {
+    const dataFiltro = req.query.data
+    if (dataFiltro !== undefined && (typeof dataFiltro !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(dataFiltro))) {
+      return res.status(400).json({ error: 'Data inválida' })
+    }
     // Exclui fotos e vistorias (base64 pesado) da listagem — carregados sob demanda ao abrir
     const result = await query(
       `SELECT id, tipo, natureza, subnatureza, nivel_risco, status_oc,
                lat, lng, endereco, proprietario, telefone_proprietario, situacao, recomendacao, conclusao,
               data_ocorrencia, hora_inicio, hora_fim, horas_total, horas_sobreaviso,
               agentes, responsavel_registro, focos_incendio, poligono_area_queimada, chuva,
-              created_at
-       FROM ocorrencias ORDER BY created_at DESC`
+               created_at
+       FROM ocorrencias
+       ${dataFiltro ? 'WHERE data_ocorrencia = $1' : ''}
+       ORDER BY created_at DESC`,
+      dataFiltro ? [dataFiltro] : [],
     )
     res.json(result.rows)
   } catch (err) {

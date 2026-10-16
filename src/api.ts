@@ -251,6 +251,35 @@ export async function listarOcorrencias(): Promise<Ocorrencia[]> {
   return (await getCachedOcorrencias()) as Ocorrencia[]
 }
 
+export async function listarOcorrenciasPorData(dataOcorrencia: string): Promise<Ocorrencia[]> {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dataOcorrencia)) return []
+
+  if (supabaseDisponivel) {
+    try {
+      const { data, error } = await supabase
+        .from('ocorrencias')
+        .select('id,tipo,natureza,lat,lng,endereco,data_ocorrencia,created_at')
+        .eq('data_ocorrencia', dataOcorrencia)
+        .order('created_at', { ascending: false })
+      if (error) throw new Error(error.message)
+      return (data || []) as Ocorrencia[]
+    } catch (error) {
+      console.warn('[api] listarOcorrenciasPorData Supabase falhou:', error)
+    }
+  }
+
+  try {
+    const res = await fetch(`/api/ocorrencias?data=${encodeURIComponent(dataOcorrencia)}`)
+    if (respostaExpressValida(res)) {
+      const data = await res.json()
+      return Array.isArray(data) ? data as Ocorrencia[] : []
+    }
+  } catch { /* tenta o cache offline */ }
+
+  return ((await getCachedOcorrencias()) as Ocorrencia[])
+    .filter(ocorrencia => ocorrencia.data_ocorrencia === dataOcorrencia)
+}
+
 // Busca dados completos de uma ocorrência (incluindo fotos e vistorias)
 // Chamado pelo DetalheOcorrencia ao abrir, para não sobrecarregar o select da listagem
 export async function buscarOcorrenciaCompleta(id: number): Promise<Ocorrencia | null> {

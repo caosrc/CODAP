@@ -1,13 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { CircleMarker, MapContainer, Pane, Popup, TileLayer, Tooltip, useMap } from 'react-leaflet'
+import { CircleMarker, MapContainer, Marker, Pane, Popup, TileLayer, Tooltip, useMap } from 'react-leaflet'
+import L from 'leaflet'
 import './RadarDC.css'
 import './RadarDCResponsive.css'
 import 'leaflet/dist/leaflet.css'
 import { getAgenteLogado } from './Login'
-import { agentePodeGerenciarCriacao, getSenhaAgente } from '../types'
+import { agentePodeGerenciarCriacao, AGENTES, getSenhaAgente, NATUREZA_COR, NATUREZA_ICONE } from '../types'
 import { wsOn, wsSend } from '../wsClient'
 import { supabase, supabaseDisponivel } from '../supabaseClient'
-import { AGENTES } from '../types'
+import { listarOcorrenciasPorData } from '../api'
+import type { Ocorrencia } from '../types'
 import { ehFerramentalPorLitro } from '../ferramentalUtils'
 import { ChartaChuva, GraficoNivel, type EstacaoCNL, type LeituraCNL, type PontoNivel, type PontoSerie } from './MonitoramentoCNL'
 import type { Map as LeafletMap } from 'leaflet'
@@ -108,6 +110,25 @@ const CONSELHEIRO_LAFAIETE = { latitude: -20.6604, longitude: -43.7863 }
 const RADAR_MAP_CENTER: [number, number] = [CONSELHEIRO_LAFAIETE.latitude, CONSELHEIRO_LAFAIETE.longitude]
 const RADAR_MAP_ZOOM = 12
 const ESTACOES_CEMADEN_VAZIAS_RADAR: EstacaoCemadenMg[] = []
+const ICONES_OCORRENCIA_RADAR = new Map<string, L.DivIcon>()
+
+function iconeOcorrenciaRadar(natureza: string): L.DivIcon {
+  const existente = ICONES_OCORRENCIA_RADAR.get(natureza)
+  if (existente) return existente
+
+  const emoji = NATUREZA_ICONE[natureza] || '📋'
+  const cor = NATUREZA_COR[natureza] || '#1a4b8c'
+  const icone = L.divIcon({
+    className: '',
+    html: `<div style="background:${cor};width:38px;height:38px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center"><span style="transform:rotate(45deg);font-size:18px;line-height:1">${emoji}</span></div>`,
+    iconSize: [38, 38],
+    iconAnchor: [19, 38],
+    popupAnchor: [0, -40],
+  })
+  ICONES_OCORRENCIA_RADAR.set(natureza, icone)
+  return icone
+}
+
 // Serviço público NOAA/NNVL com imagens infravermelhas diárias do GOES.
 // A variável de ambiente continua disponível para trocar a fonte sem alterar o código.
 const GOES_CLOUD_TILE_URL = String(
@@ -288,6 +309,7 @@ function RadarMapaTempoReal({ tv }: { tv: boolean }) {
   const [mostrarNuvens, setMostrarNuvens] = useState(false)
   const [zoomMapa, setZoomMapa] = useState(RADAR_MAP_ZOOM)
   const mapaLeafletRef = useRef<LeafletMap | null>(null)
+  const [ocorrenciasDoDia, setOcorrenciasDoDia] = useState<Ocorrencia[]>([])
   const cemadenMg = useEstacoesCemadenMg(true)
   const estacoes = cemadenMg.dados?.estacoes ?? ESTACOES_CEMADEN_VAZIAS_RADAR
   const estacoesLafaiete = useMemo(
@@ -301,6 +323,37 @@ function RadarMapaTempoReal({ tv }: { tv: boolean }) {
     [estacoesLafaiete],
   )
   const estacoesLafaieteSemCoordenadas = estacoesLafaiete.length - estacoesLafaieteGeorreferenciadas.length
+  const ocorrenciasComGps = useMemo(
+    () => ocorrenciasDoDia.filter(ocorrencia =>
+      ocorrencia.lat != null &&
+      ocorrencia.lng != null &&
+      Number.isFinite(Number(ocorrencia.lat)) &&
+      Number.isFinite(Number(ocorrencia.lng)),
+    ),
+    [ocorrenciasDoDia],
+  )
+
+  useEffect(() => {
+    let ativo = true
+    const carregarOcorrenciasDeHoje = async () => {
+      try {
+        const dados = await listarOcorrenciasPorData(hoje())
+        if (ativo) setOcorrenciasDoDia(dados)
+      } catch {
+        if (ativo) setOcorrenciasDoDia([])
+      }
+    }
+    const atualizar = () => { void carregarOcorrenciasDeHoje() }
+
+    atualizar()
+    const pararEscuta = wsOn('ocorrencias_atualizadas', atualizar)
+    const intervalo = window.setInterval(atualizar, 5 * 60 * 1000)
+    return () => {
+      ativo = false
+      pararEscuta()
+      window.clearInterval(intervalo)
+    }
+  }, [])
 
   const carregarRadarChuva = useCallback(async () => {
     setRadarCarregando(true)
@@ -447,6 +500,9 @@ function RadarMapaTempoReal({ tv }: { tv: boolean }) {
         {zoomMapa >= 9 && <span><i className="radar-live-map-status-dot radar-live-map-status-dot-lightning" /> Trovoadas previstas localmente · 36 h</span>}
         {(radarErro || tempoMapaErro || trovoadasErro || cemadenMg.erro) && (
           <strong>{[radarErro, tempoMapaErro, trovoadasErro, cemadenMg.erro].filter(Boolean).join(' · ')}</strong>
+        )}
+        {ocorrenciasComGps.length > 0 && (
+          <span>📍 {ocorrenciasComGps.length} ocorrência(s) de hoje no mapa</span>
         )}
       </div>
       <MapContainer
@@ -598,6 +654,28 @@ function RadarMapaTempoReal({ tv }: { tv: boolean }) {
             </Popup>
           </CircleMarker>
         )}
+        <Pane name="radarLiveTodayOccurrences" style={{ zIndex: 680 }}>
+          {ocorrenciasComGps.map(ocorrencia => {
+            const natureza = ocorrencia.natureza || ''
+            return (
+              <Marker
+                key={`radar-live-occurrence-${ocorrencia.id}`}
+                position={[Number(ocorrencia.lat), Number(ocorrencia.lng)]}
+                icon={iconeOcorrenciaRadar(natureza)}
+                zIndexOffset={1200}
+              >
+                <Popup>
+                  <strong>
+                    {NATUREZA_ICONE[natureza] || '📋'} {natureza || ocorrencia.tipo || 'Ocorrência'}
+                  </strong>
+                  {ocorrencia.tipo && <><br />Tipo: {ocorrencia.tipo}</>}
+                  {ocorrencia.endereco && <><br />{ocorrencia.endereco}</>}
+                  {ocorrencia.hora_inicio && <><br />Horário: {ocorrencia.hora_inicio}</>}
+                </Popup>
+              </Marker>
+            )
+          })}
+        </Pane>
       </MapContainer>
       <div className="radar-live-map-footer">
         <span>

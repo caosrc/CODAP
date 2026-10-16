@@ -18,13 +18,14 @@
 .arm-panel {
   position: absolute;
   z-index: 1200;
-  top: 14px;
-  left: 14px;
+  top: 0;
+  left: 50%;
   display: flex;
-  width: min(358px, calc(100% - 28px));
-  max-height: calc(100% - 28px);
+  width: min(358px, calc(100vw - 32px));
+  max-height: min(calc(100vh - 120px), 560px);
   flex-direction: column;
   overflow: hidden;
+  transform: translateX(-50%);
   border: 1px solid #326383;
   border-radius: 11px;
   background: linear-gradient(150deg, rgba(12, 39, 64, .98), rgba(8, 30, 50, .97));
@@ -124,8 +125,20 @@
 }
 
 .arm-collapse:hover { background: #1a567a; }
-.arm-panel-recolhido { width: min(265px, calc(100% - 28px)); }
+.arm-panel-recolhido { width: min(245px, calc(100vw - 32px)); }
 .arm-panel-recolhido .arm-panel-head { border-bottom: 0; }
+
+@media (max-width: 850px) {
+  .arm-panel {
+    position: relative;
+    top: auto;
+    left: auto;
+    width: min(358px, calc(100vw - 32px));
+    max-height: min(calc(100vh - 180px), 560px);
+    transform: none;
+  }
+  .arm-panel-recolhido { width: min(245px, 100%); }
+}
 
 .arm-summary {
   display: grid;

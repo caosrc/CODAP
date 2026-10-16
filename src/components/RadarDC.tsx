@@ -345,6 +345,7 @@ function RadarMapaTempoReal({ tv, dataOcorrencias }: { tv: boolean; dataOcorrenc
   const [mostrarTrovoadas, setMostrarTrovoadas] = useState(true)
   const [mostrarNuvens, setMostrarNuvens] = useState(false)
   const [zoomMapa, setZoomMapa] = useState(RADAR_MAP_ZOOM)
+  const [painelAreasRiscoHost, setPainelAreasRiscoHost] = useState<HTMLDivElement | null>(null)
   const mapaLeafletRef = useRef<LeafletMap | null>(null)
   const [ocorrenciasDoDia, setOcorrenciasDoDia] = useState<Ocorrencia[]>([])
   const [areasRisco, setAreasRisco] = useState<AreaRisco[]>([])
@@ -690,6 +691,7 @@ function RadarMapaTempoReal({ tv, dataOcorrencias }: { tv: boolean; dataOcorrenc
             {zoomMapa < 9 ? 'Minas Gerais · chuva e nuvens' : 'Conselheiro Lafaiete em tempo real'}
           </h3>
         </div>
+        <div className="radar-live-map-risk-anchor" ref={setPainelAreasRiscoHost} data-testid="radar-live-map-risk-anchor" />
         <span className="radar-live-map-updated">
           {radarCarregando ? 'Atualizando…' : radarChuva?.erroAtualizacao ? 'Último quadro salvo' : 'Atualização automática · 5 min'}
         </span>
@@ -920,6 +922,7 @@ function RadarMapaTempoReal({ tv, dataOcorrencias }: { tv: boolean; dataOcorrenc
           })}
         </Pane>
         <AreasRiscoMapa
+          painelHost={painelAreasRiscoHost}
           areas={areasRisco}
           previsaoPorArea={previsaoAreasRisco}
           carregando={areasRiscoCarregando}

@@ -1,4 +1,5 @@
-import { Fragment, useEffect, useMemo, useRef, useState, type CSSProperties, type FormEvent } from 'react'
+import { Fragment, useMemo, useState, type CSSProperties, type FormEvent } from 'react'
+import { createPortal } from 'react-dom'
 import { Marker, Polygon, Popup, Tooltip, useMapEvents } from 'react-leaflet'
 import L from 'leaflet'
 import ModalSenha from './ModalSenha'
@@ -6,6 +7,7 @@ import './AreasRiscoMapa.css'
 import { ESTILO_AREA_RISCO, TIPOS_AREAS_RISCO, type AreaRisco, type AreaRiscoInput, type TipoAreaRisco } from '../areasRisco'
 
 export interface AreasRiscoMapaProps {
+  painelHost: HTMLDivElement | null
   areas: AreaRisco[]
   previsaoPorArea: Record<string, number | null>
   carregando: boolean
@@ -108,6 +110,7 @@ function formatarPrecipitacao(valor: number | null | undefined) {
 }
 
 export default function AreasRiscoMapa({
+  painelHost,
   areas,
   previsaoPorArea,
   carregando,
@@ -125,13 +128,7 @@ export default function AreasRiscoMapa({
   const [modoMapa, setModoMapa] = useState<'marcador' | 'poligono' | null>(null)
   const [portao, setPortao] = useState<GateAction | null>(null)
   const [localErro, setLocalErro] = useState('')
-  const [recolhido, setRecolhido] = useState(false)
-  const painelRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    const painel = painelRef.current
-    if (painel) L.DomEvent.disableClickPropagation(painel)
-  }, [])
+  const [recolhido, setRecolhido] = useState(true)
 
   const contagens = useMemo(() => {
     const iniciais = Object.fromEntries(TIPOS.map(tipo => [tipo, 0])) as Record<TipoAreaRisco, number>
@@ -351,7 +348,8 @@ export default function AreasRiscoMapa({
           }}
         />
       ))}
-      <div className={`arm-panel${recolhido ? ' arm-panel-recolhido' : ''}`} ref={painelRef}>
+      {painelHost && createPortal(
+      <div className={`arm-panel${recolhido ? ' arm-panel-recolhido' : ''}`}>
         <div className="arm-panel-head">
           <div className="arm-head-mark" aria-hidden="true"><span /></div>
           <div className="arm-head-copy">
@@ -457,7 +455,9 @@ export default function AreasRiscoMapa({
             </div>
           </>
         )}
-      </div>
+      </div>,
+      painelHost,
+      )}
       {rascunho && (
         <div className="arm-form-card" ref={node => {
           if (node) L.DomEvent.disableClickPropagation(node)

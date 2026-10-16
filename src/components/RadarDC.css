@@ -431,7 +431,6 @@
 .radar-live-map-status-dot-station { background: #f97316; }
 .radar-live-map-status-dot-temperature { background: #0ea5e9; }
 .radar-live-map-status-dot-lightning { background: #a78bfa; }
-.radar-live-map-status-dot-area { border: 1px dashed #7db8ff; }
 .radar-live-map {
   z-index: 0;
   width: 100%;

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Circle, CircleMarker, MapContainer, Pane, Popup, TileLayer, Tooltip, useMap } from 'react-leaflet'
+import { CircleMarker, MapContainer, Pane, Popup, TileLayer, Tooltip, useMap } from 'react-leaflet'
 import './RadarDC.css'
 import './RadarDCResponsive.css'
 import 'leaflet/dist/leaflet.css'
@@ -107,7 +107,6 @@ type PrevisaoTrovoadaRadar = {
 const CONSELHEIRO_LAFAIETE = { latitude: -20.6604, longitude: -43.7863 }
 const RADAR_MAP_CENTER: [number, number] = [CONSELHEIRO_LAFAIETE.latitude, CONSELHEIRO_LAFAIETE.longitude]
 const RADAR_MAP_ZOOM = 12
-const RADAR_CHUVA_RAIO_METROS = 10_000
 const ESTACOES_CEMADEN_VAZIAS_RADAR: EstacaoCemadenMg[] = []
 // Serviço público NOAA/NNVL com imagens infravermelhas diárias do GOES.
 // A variável de ambiente continua disponível para trocar a fonte sem alterar o código.
@@ -446,7 +445,6 @@ function RadarMapaTempoReal({ tv }: { tv: boolean }) {
         <span><i className="radar-live-map-status-dot radar-live-map-status-dot-station" /> CEMADEN · Lafaiete</span>
         {zoomMapa >= 9 && <span><i className="radar-live-map-status-dot radar-live-map-status-dot-temperature" /> Temperatura local</span>}
         {zoomMapa >= 9 && <span><i className="radar-live-map-status-dot radar-live-map-status-dot-lightning" /> Trovoadas previstas localmente · 36 h</span>}
-        {mostrarChuva && zoomMapa >= 9 && <span><i className="radar-live-map-status-dot radar-live-map-status-dot-area" /> Raio local de 10 km</span>}
         {(radarErro || tempoMapaErro || trovoadasErro || cemadenMg.erro) && (
           <strong>{[radarErro, tempoMapaErro, trovoadasErro, cemadenMg.erro].filter(Boolean).join(' · ')}</strong>
         )}
@@ -503,19 +501,6 @@ function RadarMapaTempoReal({ tv }: { tv: boolean }) {
               attribution='Weather data by <a href="https://www.rainviewer.com/" target="_blank" rel="noreferrer">RainViewer</a>'
             />
           </Pane>
-        )}
-        {mostrarChuva && zoomMapa >= 9 && (
-          <Circle
-            center={RADAR_MAP_CENTER}
-            radius={RADAR_CHUVA_RAIO_METROS}
-            pathOptions={{ color: '#1d4ed8', weight: 2, opacity: 0.9, dashArray: '7 5', fillColor: '#60a5fa', fillOpacity: 0.05 }}
-          >
-            <Popup>
-              <strong>Área de observação da chuva</strong>
-              <br />
-              Raio de 10 km a partir do centro de Conselheiro Lafaiete
-            </Popup>
-          </Circle>
         )}
         {mostrarChuva && (
           <Pane name="radarLiveCemadenStations" style={{ zIndex: 450 }}>

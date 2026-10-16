@@ -812,7 +812,6 @@ const CONSELHEIRO_LAFAIETE: [number, number] = [-20.6604, -43.7863]
 // Posição elevada para exibir a temperatura junto ao bairro Jardim dos Cristais,
 // sem cobrir o centro municipal usado pelas outras camadas meteorológicas.
 const POSICAO_TEMPERATURA_LAFAIETE: [number, number] = [-20.635, -43.7869]
-const RAIO_RADAR_CHUVA_METROS = 10_000
 const MAX_ZOOM_MAPA_PADRAO = 19
 // Acima deste nível a cobertura Esri da região exibe "Map data not yet available".
 const MAX_ZOOM_SATELITE = 18
@@ -1824,45 +1823,6 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
             })}
           </Pane>
         )}
-        {mostrarChuva && zoomMapa >= 9 && (
-          <Circle
-            center={CONSELHEIRO_LAFAIETE}
-            radius={RAIO_RADAR_CHUVA_METROS}
-            pathOptions={{
-              color: '#1d4ed8',
-              weight: 2,
-              opacity: 0.95,
-              dashArray: '7 5',
-              fillColor: '#60a5fa',
-              fillOpacity: 0.04,
-            }}
-          >
-            <Popup>
-              <strong>Área de observação da chuva</strong>
-              <br />
-              Raio de 10 km a partir do centro de Conselheiro Lafaiete
-            </Popup>
-          </Circle>
-        )}
-        {mostrarChuva && zoomMapa >= 9 && (
-          <CircleMarker
-            center={CONSELHEIRO_LAFAIETE}
-            radius={5}
-            pathOptions={{
-              color: '#0f172a',
-              weight: 2,
-              fillColor: '#f8fafc',
-              fillOpacity: 1,
-            }}
-          >
-            <Popup>
-              <strong>Centro da área de observação</strong>
-              <br />
-              Conselheiro Lafaiete — raio de 10 km
-            </Popup>
-          </CircleMarker>
-        )}
-
         <MapClickHandler onMapClick={() => setSelecionada(null)} />
         <BoundsTracker onChange={setMapaBounds} />
 

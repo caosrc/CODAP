@@ -376,7 +376,7 @@ function RadarMapaTempoReal({ tv, dataOcorrencias }: { tv: boolean; dataOcorrenc
   const carregarRadarChuva = useCallback(async () => {
     setRadarCarregando(true)
     try {
-      const resposta = await fetch(`/api/radar-chuva?_ts=${Date.now()}`, { cache: 'no-store' })
+      const resposta = await fetch('/api/radar-chuva')
       const corpo = await resposta.json().catch(() => ({}))
       if (!resposta.ok || typeof corpo?.host !== 'string' || typeof corpo?.path !== 'string') {
         throw new Error('Radar indisponível')

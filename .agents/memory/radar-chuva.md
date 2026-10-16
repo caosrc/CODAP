@@ -9,6 +9,13 @@ O mapa usa RainViewer para os quadros observados de radar meteorológico, com at
 
 **How to apply:** Se for adicionada uma camada de nuvens GOES-16 ou RRQPE, criar um pequeno serviço de processamento geoespacial separado, gerar raster/tiles recortados para a área de interesse e manter RainViewer como comparação/contingência.
 
+## Cache do endpoint do radar na Netlify
+- Não acrescente timestamp à URL nem use `cache: 'no-store'` nas chamadas ao radar; use cache HTTP curto e mantenha o último quadro válido como resposta de contingência quando a consulta à RainViewer falhar.
+
+**Why:** A URL única por chamada impede a Netlify e o navegador de reutilizar metadados, podendo multiplicar requisições à API pública e transformar falhas temporárias em erro visível.
+
+**How to apply:** Ao mexer em `/api/radar-chuva`, mantenha TTL no handler, cabeçalhos `s-maxage`/`stale-while-revalidate` na função Netlify e fallback do último quadro em memória.
+
 ## Cadência e horário dos quadros RainViewer
 - A API pública `weather-maps.json` publica quadros `radar.past` em passos de 10 minutos. O `time` representa a geração do quadro, não o instante exato da observação de chuva.
 

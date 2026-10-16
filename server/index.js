@@ -4331,10 +4331,12 @@ let radarChuvaCacheTs = 0
 const RADAR_CHUVA_TTL_MS = 60 * 1000
 
 app.get('/api/radar-chuva', async (_req, res) => {
+  res.set('Cache-Control', 'public, max-age=60, stale-while-revalidate=300')
   try {
     const agora = Date.now()
     if (radarChuvaCache && (agora - radarChuvaCacheTs) < RADAR_CHUVA_TTL_MS) {
-      return res.json({ ...radarChuvaCache, cache: true })
+      return res.set('Cache-Control', 'public, max-age=60, stale-while-revalidate=300')
+        .json({ ...radarChuvaCache, cache: true })
     }
 
     const resposta = await fetch('https://api.rainviewer.com/public/weather-maps.json', {
@@ -4368,13 +4370,16 @@ app.get('/api/radar-chuva', async (_req, res) => {
       tipoQuadro: 'observado',
     }
     radarChuvaCacheTs = agora
-    return res.json(radarChuvaCache)
+    return res.set('Cache-Control', 'public, max-age=60, stale-while-revalidate=300')
+      .json(radarChuvaCache)
   } catch (err) {
     console.error('Erro no radar de chuva:', err?.message || err)
     if (radarChuvaCache) {
-      return res.json({ ...radarChuvaCache, cache: true, erroAtualizacao: true })
+      return res.set('Cache-Control', 'public, max-age=60, stale-while-revalidate=300')
+        .json({ ...radarChuvaCache, cache: true, erroAtualizacao: true })
     }
-    return res.status(503).json({ erro: 'Radar de chuva indisponível' })
+    return res.set('Cache-Control', 'no-store')
+      .status(503).json({ erro: 'Radar de chuva indisponível' })
   }
 })
 

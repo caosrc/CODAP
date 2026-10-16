@@ -938,7 +938,7 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
     setRadarChuvaCarregando(true)
     setRadarChuvaErro(null)
     try {
-      const respostaRadar = await fetch(`/api/radar-chuva?_ts=${Date.now()}`, { cache: 'no-store' })
+      const respostaRadar = await fetch('/api/radar-chuva')
       if (!respostaRadar.ok) throw new Error('Radar indisponível')
 
       const dadosRadar = await respostaRadar.json()

@@ -1219,9 +1219,9 @@ app.get('/api/ocorrencias', async (req, res) => {
               agentes, responsavel_registro, focos_incendio, poligono_area_queimada, chuva,
                created_at
        FROM ocorrencias
-       ${dataFiltro ? 'WHERE data_ocorrencia = $1' : ''}
+       ${dataFiltro ? 'WHERE (data_ocorrencia::text LIKE $1 OR created_at::date = $2::date)' : ''}
        ORDER BY created_at DESC`,
-      dataFiltro ? [dataFiltro] : [],
+      dataFiltro ? [`${dataFiltro}%`, dataFiltro] : [],
     )
     res.json(result.rows)
   } catch (err) {

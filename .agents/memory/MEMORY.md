@@ -14,4 +14,4 @@
 - [Previsão de raios](previsao-raios.md) — Open-Meteo fornece trovoadas previstas por modelos, não descargas observadas; manter essa distinção na interface.
 - [Ciclo de vida do SOS](sos-lifecycle.md) — alertas permanecem persistidos até cancelamento global pelo emissor ou por um agente receptor.
 - [Chuva CEMADEN nos mapas](chuva-cemaden-mapas.md) — API e camadas exibem somente estações de Conselheiro Lafaiete; leituras antigas ou ausentes não parecem atuais.
-- [Ocorrências no mapa do Radar DC](radar-ocorrencias-dia.md) — ao abrir o Radar, marque ocorrências georreferenciadas da data local atual com o ícone da natureza.
+- [Ocorrências no mapa do Radar DC](radar-ocorrencias-dia.md) — o mapa acompanha a data selecionada no calendário e marca ocorrências georreferenciadas pela natureza.

@@ -294,7 +294,7 @@ function RadarMapInvalidateSize({ tv }: { tv: boolean }) {
   return null
 }
 
-function RadarMapaTempoReal({ tv }: { tv: boolean }) {
+function RadarMapaTempoReal({ tv, dataOcorrencias }: { tv: boolean; dataOcorrencias: string }) {
   const [camadaBase, setCamadaBase] = useState<'mapa' | 'satelite'>('mapa')
   const [radarChuva, setRadarChuva] = useState<DadosRadarChuvaLive | null>(null)
   const [tempoMapa, setTempoMapa] = useState<TempoMapaRadar | null>(null)
@@ -335,15 +335,16 @@ function RadarMapaTempoReal({ tv }: { tv: boolean }) {
 
   useEffect(() => {
     let ativo = true
-    const carregarOcorrenciasDeHoje = async () => {
+    setOcorrenciasDoDia([])
+    const carregarOcorrenciasDaDataSelecionada = async () => {
       try {
-        const dados = await listarOcorrenciasPorData(hoje())
+        const dados = await listarOcorrenciasPorData(dataOcorrencias)
         if (ativo) setOcorrenciasDoDia(dados)
       } catch {
         if (ativo) setOcorrenciasDoDia([])
       }
     }
-    const atualizar = () => { void carregarOcorrenciasDeHoje() }
+    const atualizar = () => { void carregarOcorrenciasDaDataSelecionada() }
 
     atualizar()
     const pararEscuta = wsOn('ocorrencias_atualizadas', atualizar)
@@ -353,7 +354,24 @@ function RadarMapaTempoReal({ tv }: { tv: boolean }) {
       pararEscuta()
       window.clearInterval(intervalo)
     }
-  }, [])
+  }, [dataOcorrencias])
+
+  useEffect(() => {
+    const mapa = mapaLeafletRef.current
+    if (!mapa || ocorrenciasComGps.length === 0) return
+    const pontos = ocorrenciasComGps.map(ocorrencia => [
+      Number(ocorrencia.lat),
+      Number(ocorrencia.lng),
+    ] as [number, number])
+    const foraDoEnquadramento = pontos.some(ponto => !mapa.getBounds().contains(ponto))
+    if (foraDoEnquadramento) {
+      mapa.fitBounds(L.latLngBounds(pontos), {
+        padding: [36, 36],
+        maxZoom: RADAR_MAP_ZOOM,
+        animate: true,
+      })
+    }
+  }, [dataOcorrencias, ocorrenciasComGps])
 
   const carregarRadarChuva = useCallback(async () => {
     setRadarCarregando(true)
@@ -502,7 +520,9 @@ function RadarMapaTempoReal({ tv }: { tv: boolean }) {
           <strong>{[radarErro, tempoMapaErro, trovoadasErro, cemadenMg.erro].filter(Boolean).join(' · ')}</strong>
         )}
         {ocorrenciasComGps.length > 0 && (
-          <span>📍 {ocorrenciasComGps.length} ocorrência(s) de hoje no mapa</span>
+          <span>
+            📍 {ocorrenciasComGps.length} ocorrência(s) em {dataBonita(dataOcorrencias)} no mapa
+          </span>
         )}
       </div>
       <MapContainer
@@ -1834,7 +1854,7 @@ export default function RadarDC() {
           <div><h3>⚠️ Ocorrências do dia</h3>{atividades.ocorrencias.length === 0 ? <div className="radar-empty">Nenhuma ocorrência registrada.</div> : atividades.ocorrencias.map(o => <button className="radar-activity" key={o.id} onClick={() => disparar('dc:abrir-ocorrencia', { id: o.id })}><b>{o.agente}</b><span>{o.hora} · {o.natureza || 'Natureza não informada'}</span><small>{o.endereco || 'Endereço não informado'}</small><em>abrir ›</em></button>)}</div>
         </div>
          </section>
-         <RadarMapaTempoReal tv={tv} />
+          <RadarMapaTempoReal tv={tv} dataOcorrencias={dataSelecionada} />
        {lembreteParaApagar && (
          <ModalSenha
            titulo={`Apagar lembrete de ${lembreteParaApagar.criadoPor}`}

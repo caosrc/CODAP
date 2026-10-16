@@ -34,6 +34,7 @@ import {
   useEstacoesCemadenMg,
   type EstacaoCemadenMg,
 } from '../meteorologiaMapa'
+import { dataHoraCemadenFormatada, statusLeituraCemaden } from '../cemadenLeitura'
 
 
 interface DadosRadarChuva {
@@ -397,48 +398,6 @@ function horaChuva(iso?: string | null): string {
   return Number.isNaN(data.getTime())
     ? '—'
     : data.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
-}
-
-function dataCemadenMapa(valor?: string | null): Date | null {
-  const texto = String(valor || '').trim()
-  if (!texto) return null
-  const brasileiro = texto.match(/^(\d{2})\/(\d{2})\/(\d{2,4})\s+(\d{2}):(\d{2})(?::(\d{2}))?$/)
-  if (brasileiro) {
-    const ano = Number(brasileiro[3].length === 2 ? `20${brasileiro[3]}` : brasileiro[3])
-    const data = new Date(Date.UTC(
-      ano,
-      Number(brasileiro[2]) - 1,
-      Number(brasileiro[1]),
-      Number(brasileiro[4]),
-      Number(brasileiro[5]),
-      Number(brasileiro[6] || 0),
-    ))
-    return Number.isNaN(data.getTime()) ? null : data
-  }
-  const isoSemFuso = texto.match(/^(\d{4}-\d{2}-\d{2})\s+(\d{2}:\d{2}(?::\d{2})?)/)
-  const data = new Date(isoSemFuso ? `${isoSemFuso[1]}T${isoSemFuso[2]}Z` : texto)
-  return Number.isNaN(data.getTime()) ? null : data
-}
-
-function idadeLeituraCemadenHoras(valor?: string | null): number | null {
-  const data = dataCemadenMapa(valor)
-  if (!data) return null
-  return Math.max(0, (Date.now() - data.getTime()) / (60 * 60 * 1000))
-}
-
-function statusLeituraCemaden(valor?: string | null): 'atualizada' | 'atrasada' | 'sem-dados' {
-  const idade = idadeLeituraCemadenHoras(valor)
-  if (idade == null) return 'sem-dados'
-  if (idade <= 1) return 'atualizada'
-  if (idade <= 24) return 'atrasada'
-  return 'sem-dados'
-}
-
-function dataHoraCemadenFormatada(valor?: string | null): string {
-  const data = dataCemadenMapa(valor)
-  return data
-    ? data.toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short', timeZone: 'America/Sao_Paulo' })
-    : valor || 'Sem horário'
 }
 
 function CemadenIntensityLayer({
@@ -1827,7 +1786,16 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
                         opacity={0.96}
                         className="mapa-cemaden-mg-tooltip"
                       >
-                        {valorChuvaMarcadorFormatado(estacao.precipitacaoAtual ?? 0)}
+                        <span className="mapa-cemaden-mg-tooltip-conteudo">
+                          <strong>{estacao.nome || 'Estação CEMADEN'}</strong>
+                          <small>
+                            {estadoLeitura === 'atualizada' && estacao.precipitacaoAtual != null
+                              ? `${valorChuvaMarcadorFormatado(estacao.precipitacaoAtual)} · última hora`
+                              : estadoLeitura === 'atrasada' && estacao.precipitacaoAtual != null
+                                ? `${valorChuvaMarcadorFormatado(estacao.precipitacaoAtual)} · atrasada`
+                                : 'Sem leitura'}
+                          </small>
+                        </span>
                       </Tooltip>
                     )}
                     <Popup>

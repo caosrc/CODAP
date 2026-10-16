@@ -457,6 +457,19 @@
   white-space: nowrap;
 }
 .radar-live-map-tooltip::before { display: none; }
+.radar-live-map-tooltip-station {
+  border: 1px solid #cbd5e1 !important;
+  border-radius: 5px !important;
+  padding: 3px 5px !important;
+  background: rgba(255, 255, 255, .94) !important;
+  box-shadow: 0 1px 4px rgba(15, 23, 42, .22) !important;
+  color: #0f172a !important;
+  text-align: center;
+  text-shadow: none;
+}
+.radar-live-map-tooltip-station span { display: grid; gap: 1px; }
+.radar-live-map-tooltip-station strong { color: #1e3a5f; font-size: .62rem; font-weight: 800; }
+.radar-live-map-tooltip-station small { color: #475569; font-size: .55rem; font-weight: 700; }
 .radar-live-map-tooltip-temperature {
   color: #0369a1 !important;
   font-size: .78rem;

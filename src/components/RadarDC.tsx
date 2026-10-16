@@ -17,6 +17,7 @@ import {
   useEstacoesCemadenMg,
   type EstacaoCemadenMg,
 } from '../meteorologiaMapa'
+import { statusLeituraCemaden } from '../cemadenLeitura'
 import './MonitoramentoCNL.css'
 import ModalSenha from './ModalSenha'
 
@@ -224,8 +225,9 @@ function formatarMmRadar(valor: number | null | undefined) {
 }
 
 function formatarMmMapaRadar(valor: number | null | undefined) {
-  const numero = valor != null && Number.isFinite(valor) ? valor : 0
-  return `${numero.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} mm`
+  return valor == null || !Number.isFinite(valor)
+    ? 'Sem leitura'
+    : `${valor.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} mm`
 }
 
 function templateTilesHttpsValido(url: string) {
@@ -518,7 +520,10 @@ function RadarMapaTempoReal({ tv }: { tv: boolean }) {
         {mostrarChuva && (
           <Pane name="radarLiveCemadenStations" style={{ zIndex: 450 }}>
             {estacoesLafaieteGeorreferenciadas.map(estacao => {
-              const intensidade = intensidadeCemadenRadar(estacao.precipitacaoAtual ?? 0)
+              const estadoLeitura = statusLeituraCemaden(estacao.precipitacaoDataHora)
+              const intensidade = estadoLeitura === 'atualizada'
+                ? intensidadeCemadenRadar(estacao.precipitacaoAtual)
+                : { cor: '#94a3b8', alpha: 0 }
               return (
                 <CircleMarker
                   key={`radar-live-station-${estacao.id}`}
@@ -526,14 +531,25 @@ function RadarMapaTempoReal({ tv }: { tv: boolean }) {
                   radius={zoomMapa < 8 ? 2.5 : zoomMapa < 11 ? 4 : 8}
                   pathOptions={{ color: '#fff', weight: 2, fillColor: intensidade.cor, fillOpacity: 0.95 }}
                 >
-                  <Tooltip permanent={zoomMapa >= 11} direction="top" offset={[0, -7]} opacity={0.96} className="radar-live-map-tooltip">
-                    {formatarMmMapaRadar(estacao.precipitacaoAtual)}
+                  <Tooltip permanent={zoomMapa >= 11} direction="top" offset={[0, -7]} opacity={0.96} className="radar-live-map-tooltip radar-live-map-tooltip-station">
+                    <span>
+                      <strong>{estacao.nome || 'Estação CEMADEN'}</strong>
+                      <small>
+                        {estadoLeitura === 'atualizada' && estacao.precipitacaoAtual != null
+                          ? `${formatarMmMapaRadar(estacao.precipitacaoAtual)} · última hora`
+                          : estadoLeitura === 'atrasada' && estacao.precipitacaoAtual != null
+                            ? `${formatarMmMapaRadar(estacao.precipitacaoAtual)} · atrasada`
+                            : 'Sem leitura'}
+                      </small>
+                    </span>
                   </Tooltip>
                   <Popup>
                     <strong>🌧️ {estacao.nome || 'Estação CEMADEN'}</strong>
                     {estacao.municipio && <><br />{estacao.municipio} · Minas Gerais</>}
                     <br />
-                    Precipitação atual: <b>{formatarMmMapaRadar(estacao.precipitacaoAtual)}</b>
+                    Última hora: <b>{formatarMmMapaRadar(estacao.precipitacaoAtual)}</b>
+                    <br />
+                    {estadoLeitura === 'atualizada' ? 'Leitura atualizada' : estadoLeitura === 'atrasada' ? 'Leitura atrasada' : 'Sem dados recentes'}
                     <br />
                     Leitura: {dataHoraRadar(estacao.precipitacaoDataHora)}
                     {estacao.codigo ? <><br />Estação {estacao.codigo}</> : null}

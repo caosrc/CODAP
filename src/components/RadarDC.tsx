@@ -10,6 +10,7 @@ import { wsOn, wsSend } from '../wsClient'
 import { supabase, supabaseDisponivel } from '../supabaseClient'
 import { listarOcorrenciasPorData } from '../api'
 import type { Ocorrencia } from '../types'
+import { TIPOS_AREAS_RISCO, type AreaRisco, type AreaRiscoInput, type TipoAreaRisco } from '../areasRisco'
 import { ehFerramentalPorLitro } from '../ferramentalUtils'
 import { ChartaChuva, GraficoNivel, type EstacaoCNL, type LeituraCNL, type PontoNivel, type PontoSerie } from './MonitoramentoCNL'
 import type { Map as LeafletMap } from 'leaflet'
@@ -22,6 +23,7 @@ import {
 import { statusLeituraCemaden } from '../cemadenLeitura'
 import './MonitoramentoCNL.css'
 import ModalSenha from './ModalSenha'
+import AreasRiscoMapa from './AreasRiscoMapa'
 
 type Prioridade = 'normal' | 'importante' | 'urgente'
 type ConfirmacaoRadar = { agente: string; confirmado: boolean; confirmedAt?: string }
@@ -104,6 +106,41 @@ type PontoTrovoadaRadar = {
 type PrevisaoTrovoadaRadar = {
   pontos?: PontoTrovoadaRadar[]
   atualizadoEm?: string
+}
+
+function normalizarAreaRisco(valor: Record<string, unknown>): AreaRisco | null {
+  const tipo = String(valor.tipo || '')
+  if (!TIPOS_AREAS_RISCO.includes(tipo as TipoAreaRisco)) return null
+  const latitude = Number(valor.latitude)
+  const longitude = Number(valor.longitude)
+  const limite = Number(valor.limite_precipitacao_mm)
+  const poligono = Array.isArray(valor.poligono)
+    ? valor.poligono
+      .filter((ponto): ponto is [number, number] =>
+        Array.isArray(ponto) && ponto.length >= 2 &&
+        Number.isFinite(Number(ponto[0])) && Number.isFinite(Number(ponto[1])),
+      )
+      .map(ponto => [Number(ponto[0]), Number(ponto[1])] as [number, number])
+    : []
+  if (
+    !String(valor.id || '') ||
+    !Number.isFinite(latitude) || !Number.isFinite(longitude) ||
+    !Number.isFinite(limite) || poligono.length < 3
+  ) return null
+
+  return {
+    id: String(valor.id),
+    tipo: tipo as TipoAreaRisco,
+    latitude,
+    longitude,
+    poligono,
+    data_inicio: String(valor.data_inicio || ''),
+    limite_precipitacao_mm: limite,
+    referencia: valor.referencia == null ? null : String(valor.referencia),
+    observacao: valor.observacao == null ? null : String(valor.observacao),
+    criado_por: String(valor.criado_por || ''),
+    created_at: String(valor.created_at || ''),
+  }
 }
 
 const CONSELHEIRO_LAFAIETE = { latitude: -20.6604, longitude: -43.7863 }
@@ -310,6 +347,13 @@ function RadarMapaTempoReal({ tv, dataOcorrencias }: { tv: boolean; dataOcorrenc
   const [zoomMapa, setZoomMapa] = useState(RADAR_MAP_ZOOM)
   const mapaLeafletRef = useRef<LeafletMap | null>(null)
   const [ocorrenciasDoDia, setOcorrenciasDoDia] = useState<Ocorrencia[]>([])
+  const [areasRisco, setAreasRisco] = useState<AreaRisco[]>([])
+  const [areasRiscoCarregando, setAreasRiscoCarregando] = useState(true)
+  const [areasRiscoSalvando, setAreasRiscoSalvando] = useState(false)
+  const [areasRiscoErro, setAreasRiscoErro] = useState<string | null>(null)
+  const [previsaoAreasRisco, setPrevisaoAreasRisco] = useState<Record<string, number | null>>({})
+  const [previsaoAreasRiscoErro, setPrevisaoAreasRiscoErro] = useState<string | null>(null)
+  const agenteLogado = getAgenteLogado()
   const cemadenMg = useEstacoesCemadenMg(true)
   const estacoes = cemadenMg.dados?.estacoes ?? ESTACOES_CEMADEN_VAZIAS_RADAR
   const estacoesLafaiete = useMemo(
@@ -332,6 +376,185 @@ function RadarMapaTempoReal({ tv, dataOcorrencias }: { tv: boolean; dataOcorrenc
     ),
     [ocorrenciasDoDia],
   )
+
+  const carregarAreasRisco = useCallback(async () => {
+    setAreasRiscoCarregando(true)
+    if (!supabaseDisponivel) {
+      setAreasRiscoErro('O Supabase não está configurado para carregar as áreas de risco.')
+      setAreasRiscoCarregando(false)
+      return
+    }
+    try {
+      const { data, error } = await supabase
+        .from('areas_risco')
+        .select('*')
+        .order('created_at', { ascending: false })
+      if (error) throw error
+      const normalizadas = (Array.isArray(data) ? data : [])
+        .map((registro: Record<string, unknown>) => normalizarAreaRisco(registro))
+        .filter((area: AreaRisco | null): area is AreaRisco => area !== null)
+      setAreasRisco(normalizadas)
+      setAreasRiscoErro(null)
+    } catch (error) {
+      const mensagem = error instanceof Error ? error.message : 'Erro desconhecido'
+      const mensagemUsuario = /areas_risco|schema cache|does not exist/i.test(mensagem)
+        ? 'A tabela de áreas de risco ainda não existe no Supabase. Aplique a migração incluída no projeto.'
+        : `Não foi possível carregar as áreas de risco: ${mensagem}`
+      setAreasRiscoErro(mensagemUsuario)
+    } finally {
+      setAreasRiscoCarregando(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    const carregamentoInicial = window.setTimeout(() => {
+      void carregarAreasRisco()
+    }, 0)
+    if (!supabaseDisponivel) return () => window.clearTimeout(carregamentoInicial)
+
+    const channel = supabase
+      .channel('radar-areas-risco')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'areas_risco' }, () => {
+        void carregarAreasRisco()
+      })
+      .subscribe()
+    const timer = window.setInterval(() => {
+      if (document.visibilityState === 'visible') void carregarAreasRisco()
+    }, 60 * 1000)
+    const atualizarAoVoltar = () => {
+      if (document.visibilityState === 'visible') void carregarAreasRisco()
+    }
+    document.addEventListener('visibilitychange', atualizarAoVoltar)
+    return () => {
+      window.clearTimeout(carregamentoInicial)
+      window.clearInterval(timer)
+      document.removeEventListener('visibilitychange', atualizarAoVoltar)
+      void supabase.removeChannel(channel)
+    }
+  }, [carregarAreasRisco])
+
+  const salvarAreaRisco = useCallback(async (entrada: AreaRiscoInput) => {
+    if (!supabaseDisponivel) throw new Error('Supabase indisponível; a área não foi salva.')
+    if (!agenteLogado) throw new Error('Entre com o agente responsável antes de cadastrar uma área.')
+    setAreasRiscoSalvando(true)
+    setAreasRiscoErro(null)
+    try {
+      const { data, error } = await supabase
+        .from('areas_risco')
+        .insert({ ...entrada, criado_por: agenteLogado })
+        .select('*')
+        .single()
+      if (error) throw error
+      const area = normalizarAreaRisco(data as Record<string, unknown>)
+      if (!area) throw new Error('O Supabase retornou a área em um formato inválido.')
+      setAreasRisco(prev => [area, ...prev.filter(item => item.id !== area.id)])
+    } catch (error) {
+      const mensagem = error instanceof Error ? error.message : 'Não foi possível salvar a área.'
+      setAreasRiscoErro(mensagem)
+      throw error
+    } finally {
+      setAreasRiscoSalvando(false)
+    }
+  }, [agenteLogado])
+
+  const editarAreaRisco = useCallback(async (id: string, entrada: AreaRiscoInput) => {
+    if (!supabaseDisponivel) throw new Error('Supabase indisponível; a alteração não foi salva.')
+    setAreasRiscoSalvando(true)
+    setAreasRiscoErro(null)
+    try {
+      const { data, error } = await supabase
+        .from('areas_risco')
+        .update({ ...entrada, updated_at: new Date().toISOString() })
+        .eq('id', id)
+        .select('*')
+        .single()
+      if (error) throw error
+      const area = normalizarAreaRisco(data as Record<string, unknown>)
+      if (!area) throw new Error('O Supabase retornou a área em um formato inválido.')
+      setAreasRisco(prev => prev.map(item => item.id === id ? area : item))
+    } catch (error) {
+      const mensagem = error instanceof Error ? error.message : 'Não foi possível atualizar a área.'
+      setAreasRiscoErro(mensagem)
+      throw error
+    } finally {
+      setAreasRiscoSalvando(false)
+    }
+  }, [])
+
+  const excluirAreaRisco = useCallback(async (id: string) => {
+    if (!supabaseDisponivel) throw new Error('Supabase indisponível; a área não foi excluída.')
+    setAreasRiscoSalvando(true)
+    setAreasRiscoErro(null)
+    try {
+      const { error } = await supabase.from('areas_risco').delete().eq('id', id)
+      if (error) throw error
+      setAreasRisco(prev => prev.filter(item => item.id !== id))
+      setPrevisaoAreasRisco(prev => {
+        const proxima = { ...prev }
+        delete proxima[id]
+        return proxima
+      })
+    } catch (error) {
+      const mensagem = error instanceof Error ? error.message : 'Não foi possível excluir a área.'
+      setAreasRiscoErro(mensagem)
+      throw error
+    } finally {
+      setAreasRiscoSalvando(false)
+    }
+  }, [])
+
+  const carregarPrevisaoAreasRisco = useCallback(async () => {
+    if (areasRisco.length === 0) {
+      setPrevisaoAreasRisco({})
+      setPrevisaoAreasRiscoErro(null)
+      return
+    }
+    try {
+      const previsoes: Record<string, number | null> = {}
+      for (let inicio = 0; inicio < areasRisco.length; inicio += 50) {
+        const lote = areasRisco.slice(inicio, inicio + 50)
+        const response = await fetch('/api/tempo-areas-risco', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            areas: lote.map(area => ({ id: area.id, latitude: area.latitude, longitude: area.longitude })),
+          }),
+        })
+        const corpo = await response.json().catch(() => ({}))
+        if (!response.ok || !Array.isArray(corpo?.previsoes)) {
+          throw new Error(typeof corpo?.erro === 'string' ? corpo.erro : 'Previsão indisponível.')
+        }
+        for (const previsao of corpo.previsoes) {
+          previsoes[String(previsao.id)] = Number.isFinite(Number(previsao.precipitacao_24h_mm))
+            ? Number(previsao.precipitacao_24h_mm)
+            : null
+        }
+      }
+      setPrevisaoAreasRisco(previsoes)
+      setPrevisaoAreasRiscoErro(null)
+    } catch (error) {
+      setPrevisaoAreasRiscoErro(error instanceof Error ? error.message : 'Previsão de chuva indisponível.')
+    }
+  }, [areasRisco])
+
+  useEffect(() => {
+    const carregamentoInicial = window.setTimeout(() => {
+      void carregarPrevisaoAreasRisco()
+    }, 0)
+    if (areasRisco.length === 0) return () => window.clearTimeout(carregamentoInicial)
+    const timer = window.setInterval(() => {
+      if (document.visibilityState === 'visible') void carregarPrevisaoAreasRisco()
+    }, 10 * 60 * 1000)
+    const atualizarAoVoltar = () => {
+      if (document.visibilityState === 'visible') void carregarPrevisaoAreasRisco()
+    }
+    document.addEventListener('visibilitychange', atualizarAoVoltar)
+    return () => {
+      window.clearTimeout(carregamentoInicial)
+      window.clearInterval(timer)
+      document.removeEventListener('visibilitychange', atualizarAoVoltar)
+    }
+  }, [areasRisco.length, carregarPrevisaoAreasRisco])
 
   useEffect(() => {
     let ativo = true
@@ -696,6 +919,18 @@ function RadarMapaTempoReal({ tv, dataOcorrencias }: { tv: boolean; dataOcorrenc
             )
           })}
         </Pane>
+        <AreasRiscoMapa
+          areas={areasRisco}
+          previsaoPorArea={previsaoAreasRisco}
+          carregando={areasRiscoCarregando}
+          salvando={areasRiscoSalvando}
+          agenteLogado={agenteLogado}
+          senhaAgente={getSenhaAgente(agenteLogado)}
+          erro={[areasRiscoErro, previsaoAreasRiscoErro].filter(Boolean).join(' ') || null}
+          onSalvar={salvarAreaRisco}
+          onEditar={editarAreaRisco}
+          onExcluir={excluirAreaRisco}
+        />
       </MapContainer>
       <div className="radar-live-map-footer">
         <span>

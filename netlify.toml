@@ -54,6 +54,12 @@
   force = true
 
 [[redirects]]
+  from = "/api/tempo-areas-risco"
+  to = "/.netlify/functions/tempo-areas-risco"
+  status = 200
+  force = true
+
+[[redirects]]
   from = "/api/tempo"
   to = "/.netlify/functions/tempo"
   status = 200

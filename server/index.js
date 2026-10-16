@@ -3424,6 +3424,81 @@ app.get('/api/tempo', async (_req, res) => {
   }
 })
 
+const areasRiscoPrevisaoCache = new Map()
+const AREAS_RISCO_PREVISAO_TTL_MS = 10 * 60 * 1000
+
+app.post('/api/tempo-areas-risco', async (req, res) => {
+  const areas = Array.isArray(req.body?.areas) ? req.body.areas : []
+  if (areas.length < 1 || areas.length > 50) {
+    return res.status(400).json({ erro: 'Envie de 1 a 50 áreas para consultar a previsão.' })
+  }
+
+  const areasValidas = areas.map((area) => ({
+    id: String(area?.id ?? '').trim(),
+    latitude: Number(area?.latitude),
+    longitude: Number(area?.longitude),
+  }))
+  if (areasValidas.some(area =>
+    !area.id ||
+    !Number.isFinite(area.latitude) || area.latitude < -90 || area.latitude > 90 ||
+    !Number.isFinite(area.longitude) || area.longitude < -180 || area.longitude > 180,
+  )) {
+    return res.status(400).json({ erro: 'Uma ou mais áreas têm coordenadas inválidas.' })
+  }
+
+  const chaveCache = areasValidas
+    .map(area => `${area.id}:${area.latitude.toFixed(3)}:${area.longitude.toFixed(3)}`)
+    .join('|')
+  const cache = areasRiscoPrevisaoCache.get(chaveCache)
+  if (cache && Date.now() - cache.atualizadoEm < AREAS_RISCO_PREVISAO_TTL_MS) {
+    return res.json({ previsoes: cache.previsoes, atualizadoEm: new Date(cache.atualizadoEm).toISOString(), cache: true })
+  }
+
+  try {
+    const params = new URLSearchParams({
+      latitude: areasValidas.map(area => area.latitude.toFixed(4)).join(','),
+      longitude: areasValidas.map(area => area.longitude.toFixed(4)).join(','),
+      timezone: 'America/Sao_Paulo',
+      forecast_days: '2',
+      precipitation_unit: 'mm',
+      hourly: 'precipitation',
+    })
+    const resposta = await fetch(`https://api.open-meteo.com/v1/forecast?${params}`, {
+      headers: { Accept: 'application/json' },
+      signal: AbortSignal.timeout(10000),
+    })
+    if (!resposta.ok) throw new Error(`Open-Meteo: ${resposta.status}`)
+
+    const corpo = await resposta.json()
+    const previsoes = areasValidas.map((area, indice) => {
+      const dadosPonto = Array.isArray(corpo) ? corpo[indice] : corpo
+      const precipitacoes = dadosPonto?.hourly?.precipitation
+      const total24h = Array.isArray(precipitacoes)
+        ? precipitacoes.slice(0, 24).reduce((total, valor) => total + (Number.isFinite(Number(valor)) ? Math.max(0, Number(valor)) : 0), 0)
+        : null
+      return { id: area.id, precipitacao_24h_mm: total24h }
+    })
+    const atualizadoEm = Date.now()
+    areasRiscoPrevisaoCache.set(chaveCache, { previsoes, atualizadoEm })
+    if (areasRiscoPrevisaoCache.size > 100) {
+      const primeiraChave = areasRiscoPrevisaoCache.keys().next().value
+      if (primeiraChave) areasRiscoPrevisaoCache.delete(primeiraChave)
+    }
+    return res.json({ previsoes, atualizadoEm: new Date(atualizadoEm).toISOString(), cache: false })
+  } catch (erro) {
+    console.error('Erro na previsão para áreas de risco:', erro?.message || erro)
+    if (cache) {
+      return res.json({
+        previsoes: cache.previsoes,
+        atualizadoEm: new Date(cache.atualizadoEm).toISOString(),
+        cache: true,
+        erroAtualizacao: true,
+      })
+    }
+    return res.status(503).json({ erro: 'Previsão de precipitação para as áreas de risco indisponível.' })
+  }
+})
+
 // ── Previsão de trovoadas / raios por modelos Open-Meteo ───────────────────
 // Open-Meteo não fornece a posição de descargas elétricas observadas. Os
 // códigos WMO 95/96/99 são a previsão de trovoada de cada modelo numérico.

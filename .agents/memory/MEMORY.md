@@ -15,3 +15,4 @@
 - [Ciclo de vida do SOS](sos-lifecycle.md) — alertas permanecem persistidos até cancelamento global pelo emissor ou por um agente receptor.
 - [Chuva CEMADEN nos mapas](chuva-cemaden-mapas.md) — API e camadas exibem somente estações de Conselheiro Lafaiete; leituras antigas ou ausentes não parecem atuais.
 - [Ocorrências no mapa do Radar DC](radar-ocorrencias-dia.md) — o mapa acompanha a data selecionada no calendário e marca ocorrências georreferenciadas pela natureza.
+- [Alertas de áreas de risco](areas-risco-alertas.md) — cada limite usa o acumulado Open-Meteo das próximas 24 h no ponto georreferenciado da área.

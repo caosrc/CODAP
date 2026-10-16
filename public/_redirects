@@ -6,6 +6,7 @@
 /api/monitoramento-cnl  /.netlify/functions/monitoramento-cnl  200!
 /api/monitoramento-mg  /.netlify/functions/monitoramento-mg  200!
 /api/monitoramento-cnl/cotas  /.netlify/functions/monitoramento-cnl-cotas  200!
+/api/tempo-areas-risco  /.netlify/functions/tempo-areas-risco  200!
 /api/tempo  /.netlify/functions/tempo  200!
 /api/alertas-tempo  /.netlify/functions/alertas-tempo  200!
 /api/tempo-raios  /.netlify/functions/tempo-raios  200!

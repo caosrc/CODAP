@@ -110,6 +110,26 @@ CREATE TABLE IF NOT EXISTS public.radar_bilhetes (
   confirmacoes_agentes JSONB NOT NULL DEFAULT '[]'::jsonb
 );
 
+CREATE TABLE IF NOT EXISTS public.areas_risco (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tipo TEXT NOT NULL CHECK (tipo IN (
+    'Encostas', 'Erosões', 'Drenagem', 'Alagamentos',
+    'Deslizamentos', 'Problemas de vias', 'Obras'
+  )),
+  latitude DOUBLE PRECISION NOT NULL CHECK (latitude BETWEEN -90 AND 90),
+  longitude DOUBLE PRECISION NOT NULL CHECK (longitude BETWEEN -180 AND 180),
+  poligono JSONB NOT NULL CHECK (jsonb_typeof(poligono) = 'array'),
+  data_inicio DATE NOT NULL DEFAULT CURRENT_DATE,
+  limite_precipitacao_mm NUMERIC(8, 2) NOT NULL CHECK (limite_precipitacao_mm >= 0),
+  referencia TEXT,
+  observacao TEXT,
+  criado_por TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS areas_risco_tipo_idx ON public.areas_risco (tipo);
+CREATE INDEX IF NOT EXISTS areas_risco_created_at_idx ON public.areas_risco (created_at DESC);
+
 CREATE TABLE IF NOT EXISTS public.curral_registros (
   id BIGSERIAL PRIMARY KEY, especie TEXT NOT NULL, porte TEXT NOT NULL, sexo TEXT,
   identificacao TEXT, local_descricao TEXT NOT NULL, observacoes TEXT,
@@ -193,6 +213,7 @@ ALTER TABLE public.checklists_ferramental ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.sos_ativos_db ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.planejamentos ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.radar_bilhetes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.areas_risco ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.curral_registros ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.procon_relatorios ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.push_subscriptions ENABLE ROW LEVEL SECURITY;
@@ -218,6 +239,8 @@ DROP POLICY IF EXISTS codap_acesso ON public.planejamentos;
 CREATE POLICY codap_acesso ON public.planejamentos FOR ALL USING (true) WITH CHECK (true);
 DROP POLICY IF EXISTS codap_acesso ON public.radar_bilhetes;
 CREATE POLICY codap_acesso ON public.radar_bilhetes FOR ALL USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS codap_acesso ON public.areas_risco;
+CREATE POLICY codap_acesso ON public.areas_risco FOR ALL USING (true) WITH CHECK (true);
 DROP POLICY IF EXISTS codap_acesso ON public.curral_registros;
 CREATE POLICY codap_acesso ON public.curral_registros FOR ALL USING (true) WITH CHECK (true);
 DROP POLICY IF EXISTS codap_acesso ON public.procon_relatorios;
@@ -236,7 +259,7 @@ DECLARE tabela TEXT;
 BEGIN
   FOREACH tabela IN ARRAY ARRAY[
     'ocorrencias', 'materiais', 'emprestimos', 'equipamentos_campo',
-    'sos_ativos_db', 'planejamentos', 'radar_bilhetes', 'curral_registros',
+    'sos_ativos_db', 'planejamentos', 'radar_bilhetes', 'areas_risco', 'curral_registros',
     'procon_relatorios', 'escala_estado', 'checklists_viatura',
     'checklists_ferramental'
   ] LOOP

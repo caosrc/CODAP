@@ -54,6 +54,7 @@ Required env vars (all set in Replit shared env / secrets):
 
 ## Product
 - Register and manage civil defense incidents with photos and GPS
+- Register risk areas on the Radar DC meteorological map with a marked point, polygon, risk type, start date, rainfall threshold, and agent-password-gated editing/deletion
 - Real-time team tracking via WebSocket
 - SOS alert system with Web Push notifications
 - Agent schedule and hour bank management (escala)
@@ -70,6 +71,7 @@ Required env vars (all set in Replit shared env / secrets):
 ## Gotchas
 - `VITE_USE_SUPABASE=true` is required for Netlify. The Supabase URL and anon key are public frontend configuration; never put a service-role key in the browser
 - Supabase tables and RLS policies must exist before the Netlify app can save data. The anon key cannot create tables, so run the SQL files in `supabase/` once in the Supabase SQL Editor
+- For risk areas, apply `supabase/migrations/add_areas_risco.sql` to the configured Supabase project before using the Radar DC map
 - Production on Netlify: `npm run build`, publish `dist`, and load Functions from `netlify/functions`
 - Push notifications require `VAPID_PRIVATE_KEY` secret to be set in Replit secrets
 - Earth Engine requires the service account to have Earth Engine access and the `Service Usage Consumer` role on the Google Cloud project

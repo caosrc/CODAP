@@ -90,6 +90,12 @@
   force = true
 
 [[redirects]]
+  from = "/api/monitoramento-mg"
+  to = "/.netlify/functions/monitoramento-mg"
+  status = 200
+  force = true
+
+[[redirects]]
   from = "/api/monitoramento-cnl/cotas"
   to = "/.netlify/functions/monitoramento-cnl-cotas"
   status = 200

@@ -4243,8 +4243,8 @@ app.get('/api/monitoramento-mg', async (_req, res) => {
         return [Number(item.idestacao), item]
       }).filter(([id]) => Number.isFinite(id)),
     )
-    const catalogoMg = catalogo.filter((item) => String(item?.uf || '').toUpperCase() === 'MG')
-    const estacoesLafaiete = catalogoMg.filter((item) =>
+    const estacoesLafaiete = catalogo.filter((item) =>
+      String(item?.uf || '').toUpperCase() === 'MG' &&
       /conselheiro\s+lafaiete/i.test(String(item?.cidade || '')),
     )
     const respostasChuva = await Promise.allSettled(
@@ -4265,7 +4265,7 @@ app.get('/api/monitoramento-mg', async (_req, res) => {
         chuvaPorEstacao.set(resultado.value.id, resultado.value.ultimaLeitura)
       }
     })
-    const estacoes = catalogoMg.map((item) => {
+    const estacoes = estacoesLafaiete.map((item) => {
       const localizacao = coordenadasPorId.get(Number(item?.idestacao)) || {}
       const chuvaCatalogo = numeroCemaden(item?.acc1hr)
       const ultimaChuva = chuvaPorEstacao.get(Number(item?.idestacao))
@@ -4296,7 +4296,7 @@ app.get('/api/monitoramento-mg', async (_req, res) => {
       estacoesGeorreferenciadas,
       estacoesSemCoordenadas: estacoes.length - estacoesGeorreferenciadas,
       atualizadoEm: new Date().toISOString(),
-      fonte: 'CEMADEN · posições: Observatório de Infraestrutura de Minas Gerais',
+      fonte: 'CEMADEN · Conselheiro Lafaiete · posições: Observatório de Infraestrutura de Minas Gerais',
     }
     monitoramentoMgCacheTs = agora
     res.set('Cache-Control', 'no-store')

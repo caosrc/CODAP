@@ -143,6 +143,37 @@ function normalizarAreaRisco(valor: Record<string, unknown>): AreaRisco | null {
   }
 }
 
+function mensagemErroAreaRisco(erro: unknown, fallback: string): string {
+  const detalhe = erro && typeof erro === 'object'
+    ? erro as { code?: unknown; message?: unknown; details?: unknown; hint?: unknown }
+    : null
+  const codigo = String(detalhe?.code ?? '')
+  const mensagem = erro instanceof Error
+    ? erro.message
+    : typeof erro === 'string'
+      ? erro
+      : String(detalhe?.message ?? '')
+
+  if (
+    codigo === 'PGRST205' ||
+    /could not find the table .*areas_risco|relation .*areas_risco.*does not exist/i.test(mensagem)
+  ) {
+    return 'A tabela de áreas de risco não existe no Supabase. A migração supabase/migrations/add_areas_risco.sql precisa ser aplicada.'
+  }
+  if (codigo === 'PGRST204' || /column .*areas_risco|areas_risco.*column/i.test(mensagem)) {
+    return 'A tabela de áreas de risco está desatualizada no Supabase. Aplique a migração supabase/migrations/add_areas_risco.sql.'
+  }
+  if (codigo === '42501' || /row-level security|permission denied/i.test(mensagem)) {
+    return 'O Supabase bloqueou a gravação da área por falta de permissão.'
+  }
+
+  const detalhes = [detalhe?.details, detalhe?.hint]
+    .filter((item): item is string => typeof item === 'string' && item.length > 0)
+  return mensagem
+    ? [mensagem, ...detalhes].join(' — ')
+    : fallback
+}
+
 const CONSELHEIRO_LAFAIETE = { latitude: -20.6604, longitude: -43.7863 }
 const RADAR_MAP_CENTER: [number, number] = [CONSELHEIRO_LAFAIETE.latitude, CONSELHEIRO_LAFAIETE.longitude]
 const RADAR_MAP_ZOOM = 12
@@ -397,11 +428,9 @@ function RadarMapaTempoReal({ tv, dataOcorrencias }: { tv: boolean; dataOcorrenc
       setAreasRisco(normalizadas)
       setAreasRiscoErro(null)
     } catch (error) {
-      const mensagem = error instanceof Error ? error.message : 'Erro desconhecido'
-      const mensagemUsuario = /areas_risco|schema cache|does not exist/i.test(mensagem)
-        ? 'A tabela de áreas de risco ainda não existe no Supabase. Aplique a migração incluída no projeto.'
-        : `Não foi possível carregar as áreas de risco: ${mensagem}`
-      setAreasRiscoErro(mensagemUsuario)
+      setAreasRiscoErro(
+        mensagemErroAreaRisco(error, 'Não foi possível carregar as áreas de risco.'),
+      )
     } finally {
       setAreasRiscoCarregando(false)
     }
@@ -450,9 +479,9 @@ function RadarMapaTempoReal({ tv, dataOcorrencias }: { tv: boolean; dataOcorrenc
       if (!area) throw new Error('O Supabase retornou a área em um formato inválido.')
       setAreasRisco(prev => [area, ...prev.filter(item => item.id !== area.id)])
     } catch (error) {
-      const mensagem = error instanceof Error ? error.message : 'Não foi possível salvar a área.'
+      const mensagem = mensagemErroAreaRisco(error, 'Não foi possível salvar a área.')
       setAreasRiscoErro(mensagem)
-      throw error
+      throw new Error(mensagem)
     } finally {
       setAreasRiscoSalvando(false)
     }
@@ -474,9 +503,9 @@ function RadarMapaTempoReal({ tv, dataOcorrencias }: { tv: boolean; dataOcorrenc
       if (!area) throw new Error('O Supabase retornou a área em um formato inválido.')
       setAreasRisco(prev => prev.map(item => item.id === id ? area : item))
     } catch (error) {
-      const mensagem = error instanceof Error ? error.message : 'Não foi possível atualizar a área.'
+      const mensagem = mensagemErroAreaRisco(error, 'Não foi possível atualizar a área.')
       setAreasRiscoErro(mensagem)
-      throw error
+      throw new Error(mensagem)
     } finally {
       setAreasRiscoSalvando(false)
     }
@@ -496,9 +525,9 @@ function RadarMapaTempoReal({ tv, dataOcorrencias }: { tv: boolean; dataOcorrenc
         return proxima
       })
     } catch (error) {
-      const mensagem = error instanceof Error ? error.message : 'Não foi possível excluir a área.'
+      const mensagem = mensagemErroAreaRisco(error, 'Não foi possível excluir a área.')
       setAreasRiscoErro(mensagem)
-      throw error
+      throw new Error(mensagem)
     } finally {
       setAreasRiscoSalvando(false)
     }

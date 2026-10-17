@@ -118,7 +118,7 @@ CREATE TABLE IF NOT EXISTS public.areas_risco (
   )),
   latitude DOUBLE PRECISION NOT NULL CHECK (latitude BETWEEN -90 AND 90),
   longitude DOUBLE PRECISION NOT NULL CHECK (longitude BETWEEN -180 AND 180),
-  poligono JSONB NOT NULL CHECK (jsonb_typeof(poligono) = 'array'),
+  poligono JSONB NOT NULL DEFAULT '[]'::jsonb CHECK (jsonb_typeof(poligono) = 'array'),
   data_inicio DATE NOT NULL DEFAULT CURRENT_DATE,
   limite_precipitacao_mm NUMERIC(8, 2) NOT NULL CHECK (limite_precipitacao_mm >= 0),
   referencia TEXT,

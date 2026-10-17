@@ -47,3 +47,6 @@ BEGIN
     ALTER PUBLICATION supabase_realtime ADD TABLE public.areas_risco;
   END IF;
 END $$;
+
+-- Atualiza o cache REST do Supabase assim que a migração for aplicada.
+NOTIFY pgrst, 'reload schema';

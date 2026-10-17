@@ -125,7 +125,7 @@ function normalizarAreaRisco(valor: Record<string, unknown>): AreaRisco | null {
   if (
     !String(valor.id || '') ||
     !Number.isFinite(latitude) || !Number.isFinite(longitude) ||
-    !Number.isFinite(limite) || poligono.length < 3
+    !Number.isFinite(limite)
   ) return null
 
   return {

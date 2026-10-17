@@ -218,10 +218,6 @@ export default function AreasRiscoMapa({
       setLocalErro('Marque a localização no mapa antes de salvar.')
       return
     }
-    if (rascunho.poligono.length < 3) {
-      setLocalErro('Desenhe o perímetro com pelo menos três pontos.')
-      return
-    }
     const limite = Number(rascunho.limite_precipitacao_mm)
     if (!Number.isFinite(limite) || limite < 0) {
       setLocalErro('Informe um limite de precipitação válido, em milímetros.')
@@ -427,7 +423,7 @@ export default function AreasRiscoMapa({
                 <div className="arm-empty" data-testid="status-sem-areas">
                   <span className="arm-empty-rule" />
                   <strong>{filtro === 'Todas' ? 'Nenhuma área cadastrada' : `Sem áreas de ${filtro.toLowerCase()}`}</strong>
-                  <span>Registre um ponto e delimite o perímetro diretamente no mapa.</span>
+                  <span>Registre um ponto no mapa; desenhar o perímetro é opcional.</span>
                 </div>
               ) : areasVisiveis.map(area => {
                 const previsao = previsaoPorArea[area.id]
@@ -476,7 +472,7 @@ export default function AreasRiscoMapa({
             <div className="arm-map-instructions">
               <div className="arm-step-row"><b className={rascunho.latitude != null ? 'arm-step-done' : ''}>01</b><span>{rascunho.latitude == null ? 'Posicione o ponto de referência' : `${rascunho.latitude.toFixed(5)}, ${rascunho.longitude?.toFixed(5)}`}</span></div>
               <button type="button" className={modoMapa === 'marcador' ? 'arm-map-action arm-map-action-active' : 'arm-map-action'} data-testid="button-marcar-localizacao" onClick={() => setModoMapa('marcador')}>Marcar no mapa</button>
-              <div className="arm-step-row"><b className={rascunho.poligono.length >= 3 ? 'arm-step-done' : ''}>02</b><span>Perímetro · {rascunho.poligono.length} vértice(s)</span></div>
+              <div className="arm-step-row"><b className={rascunho.poligono.length >= 3 ? 'arm-step-done' : ''}>02</b><span>Perímetro · opcional · {rascunho.poligono.length} vértice(s)</span></div>
               <div className="arm-draw-actions">
                 <button type="button" className={modoMapa === 'poligono' ? 'arm-map-action arm-map-action-active' : 'arm-map-action'} disabled={rascunho.latitude == null} data-testid="button-desenhar-poligono" onClick={() => setModoMapa('poligono')}>Adicionar vértices</button>
                 <button type="button" className="arm-quiet-action" disabled={!rascunho.poligono.length} data-testid="button-desfazer-vertice" onClick={() => atualizarRascunho({ poligono: rascunho.poligono.slice(0, -1) })}>Desfazer</button>

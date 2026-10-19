@@ -323,6 +323,18 @@
   scrollbar-width: thin;
 }
 
+.arm-panel-form-active {
+  max-height: min(calc(100vh - 32px), 820px);
+  overflow-y: auto;
+  scrollbar-color: #396c8a transparent;
+  scrollbar-width: thin;
+}
+
+.arm-panel-form-active .arm-area-list {
+  max-height: min(180px, 24vh);
+  flex: 0 0 auto;
+}
+
 .arm-area-row {
   display: flex;
   min-height: 48px;
@@ -405,13 +417,11 @@
 .arm-foot-dot { width: 6px; height: 6px; border-radius: 50%; background: #66c2a0; box-shadow: 0 0 0 2px rgba(102, 194, 160, .15); }
 
 .arm-form-card {
-  position: absolute;
-  z-index: 1201;
-  top: 14px;
-  right: 14px;
-  width: min(340px, calc(100% - 28px));
-  max-height: calc(100% - 28px);
-  overflow: auto;
+  position: relative;
+  width: auto;
+  max-height: none;
+  overflow: visible;
+  margin: 10px;
   padding: 13px;
   border: 1px solid #3b6e8c;
   border-radius: 10px;
@@ -612,14 +622,6 @@
     width: min(355px, calc(100% - 20px));
     max-height: min(55%, 440px);
     border-radius: 9px;
-  }
-
-  .arm-form-card {
-    top: 10px;
-    right: 10px;
-    width: min(340px, calc(100% - 20px));
-    max-height: min(66%, 510px);
-    padding: 11px;
   }
 
   .arm-panel-recolhido { width: min(260px, calc(100% - 20px)); max-height: none; }

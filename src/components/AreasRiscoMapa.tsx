@@ -1,4 +1,4 @@
-import { Fragment, useMemo, useState, type CSSProperties, type FormEvent } from 'react'
+import { Fragment, useEffect, useMemo, useRef, useState, type CSSProperties, type FormEvent } from 'react'
 import { createPortal } from 'react-dom'
 import { Marker, Polygon, Popup, Tooltip, useMapEvents } from 'react-leaflet'
 import L from 'leaflet'
@@ -129,6 +129,20 @@ export default function AreasRiscoMapa({
   const [portao, setPortao] = useState<GateAction | null>(null)
   const [localErro, setLocalErro] = useState('')
   const [recolhido, setRecolhido] = useState(true)
+  const painelRef = useRef<HTMLDivElement>(null)
+  const scrollAntesDoFormularioRef = useRef(0)
+  const formularioAberto = rascunho !== null
+
+  useEffect(() => {
+    const painel = painelRef.current
+    if (!painel) return
+
+    if (formularioAberto) {
+      painel.scrollTo({ top: painel.scrollHeight, behavior: 'smooth' })
+    } else {
+      painel.scrollTo({ top: scrollAntesDoFormularioRef.current, behavior: 'auto' })
+    }
+  }, [formularioAberto])
 
   const contagens = useMemo(() => {
     const iniciais = Object.fromEntries(TIPOS.map(tipo => [tipo, 0])) as Record<TipoAreaRisco, number>
@@ -149,6 +163,7 @@ export default function AreasRiscoMapa({
   const areasVisiveis = filtro === 'Todas' ? areas : areas.filter(area => area.tipo === filtro)
 
   function iniciarCadastro() {
+    scrollAntesDoFormularioRef.current = painelRef.current?.scrollTop ?? 0
     setRascunho(novaArea(filtro === 'Todas' ? 'Encostas' : filtro))
     setEditandoId(null)
     setModoMapa('marcador')
@@ -178,6 +193,7 @@ export default function AreasRiscoMapa({
     if (!portao) return
     if (portao.tipo === 'editar') {
       const area = portao.area
+      scrollAntesDoFormularioRef.current = painelRef.current?.scrollTop ?? 0
       setRascunho({
         tipo: area.tipo,
         latitude: area.latitude,
@@ -196,6 +212,12 @@ export default function AreasRiscoMapa({
       void excluirArea(portao.area)
     }
     setPortao(null)
+  }
+
+  function fecharFormulario() {
+    setRascunho(null)
+    setEditandoId(null)
+    setModoMapa(null)
   }
 
   async function excluirArea(area: AreaRisco) {
@@ -345,7 +367,10 @@ export default function AreasRiscoMapa({
         />
       ))}
       {painelHost && createPortal(
-      <div className={`arm-panel${recolhido ? ' arm-panel-recolhido' : ''}`}>
+        <div
+          ref={painelRef}
+          className={`arm-panel${recolhido ? ' arm-panel-recolhido' : ''}${formularioAberto ? ' arm-panel-form-active' : ''}`}
+        >
         <div className="arm-panel-head">
           <div className="arm-head-mark" aria-hidden="true"><span /></div>
           <div className="arm-head-copy">
@@ -446,6 +471,49 @@ export default function AreasRiscoMapa({
             </div>
             {erro && <div className="arm-error" role="alert" data-testid="status-erro-servidor">{erro}</div>}
             {localErro && <div className="arm-error" role="alert" data-testid="status-erro-local">{localErro}</div>}
+            {rascunho && (
+              <div className="arm-form-card" ref={node => {
+                if (node) L.DomEvent.disableClickPropagation(node)
+              }}>
+                <div className="arm-form-heading">
+                  <div><span className="arm-eyebrow">{editandoId ? 'ATUALIZAÇÃO DE CADASTRO' : 'NOVO REGISTRO'}</span><h3>{editandoId ? 'Editar área de risco' : 'Cadastrar área'}</h3></div>
+                  <button type="button" aria-label="Fechar formulário" data-testid="button-fechar-formulario-area" onClick={fecharFormulario}>×</button>
+                </div>
+                <form onSubmit={salvar}>
+                  <label className="arm-field">
+                    <span>Tipo de risco</span>
+                    <select value={rascunho.tipo} onChange={event => atualizarRascunho({ tipo: event.target.value as TipoAreaRisco })} data-testid="select-tipo-risco">
+                      {TIPOS.map(tipo => <option key={tipo} value={tipo}>{tipo}</option>)}
+                    </select>
+                  </label>
+                  <div className="arm-map-instructions">
+                    <div className="arm-step-row"><b className={rascunho.latitude != null ? 'arm-step-done' : ''}>01</b><span>{rascunho.latitude == null ? 'Posicione o ponto de referência' : `${rascunho.latitude.toFixed(5)}, ${rascunho.longitude?.toFixed(5)}`}</span></div>
+                    <button type="button" className={modoMapa === 'marcador' ? 'arm-map-action arm-map-action-active' : 'arm-map-action'} data-testid="button-marcar-localizacao" onClick={() => setModoMapa('marcador')}>Marcar no mapa</button>
+                    <div className="arm-step-row"><b className={rascunho.poligono.length >= 3 ? 'arm-step-done' : ''}>02</b><span>Perímetro · opcional · {rascunho.poligono.length} vértice(s)</span></div>
+                    <div className="arm-draw-actions">
+                      <button type="button" className={modoMapa === 'poligono' ? 'arm-map-action arm-map-action-active' : 'arm-map-action'} disabled={rascunho.latitude == null} data-testid="button-desenhar-poligono" onClick={() => setModoMapa('poligono')}>Adicionar vértices</button>
+                      <button type="button" className="arm-quiet-action" disabled={!rascunho.poligono.length} data-testid="button-desfazer-vertice" onClick={() => atualizarRascunho({ poligono: rascunho.poligono.slice(0, -1) })}>Desfazer</button>
+                      <button type="button" className="arm-quiet-action" disabled={!rascunho.poligono.length} data-testid="button-limpar-poligono" onClick={() => atualizarRascunho({ poligono: [] })}>Limpar</button>
+                    </div>
+                    {modoMapa && <div className="arm-map-mode" role="status" data-testid="status-modo-mapa">{mapModeLabel}</div>}
+                    {rascunho.poligono.length > 0 && <div className="arm-vertex-hint">Arraste os nós no mapa para ajustar o contorno.</div>}
+                  </div>
+                  <div className="arm-field-grid">
+                    <label className="arm-field"><span>Início do risco</span><input type="date" value={rascunho.data_inicio} onChange={event => atualizarRascunho({ data_inicio: event.target.value })} required data-testid="input-data-inicio" /></label>
+                    <label className="arm-field"><span>Limite de chuva <small>mm</small></span><input type="number" min="0" step="0.1" placeholder="Ex.: 35" value={rascunho.limite_precipitacao_mm} onChange={event => atualizarRascunho({ limite_precipitacao_mm: event.target.value })} required data-testid="input-limite-precipitacao" /></label>
+                  </div>
+                  <label className="arm-field"><span>Referência local <small>opcional</small></span><input type="text" maxLength={120} placeholder="Rua, bairro ou ponto próximo" value={rascunho.referencia} onChange={event => atualizarRascunho({ referencia: event.target.value })} data-testid="input-referencia-local" /></label>
+                  <label className="arm-field"><span>Observações <small>opcional</small></span><textarea rows={2} maxLength={500} placeholder="Condição observada, acesso ou orientação à equipe" value={rascunho.observacao} onChange={event => atualizarRascunho({ observacao: event.target.value })} data-testid="input-observacao-risco" /></label>
+                  {(localErro || erro) && <div className="arm-error" role="alert" data-testid="status-erro-formulario">{localErro || erro}</div>}
+                  <div className="arm-form-actions">
+                    <button type="button" className="arm-cancel" data-testid="button-cancelar-area" disabled={salvando} onClick={fecharFormulario}>Cancelar</button>
+                    <button type="submit" className="arm-submit" data-testid="button-salvar-area" disabled={salvando}>
+                      {salvando ? 'Salvando…' : editandoId ? 'Salvar alterações' : 'Registrar área'}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            )}
             <div className="arm-panel-foot">
               <span className="arm-foot-dot" /> Operador: <strong>{agenteLogado || 'Não identificado'}</strong>
             </div>
@@ -453,49 +521,6 @@ export default function AreasRiscoMapa({
         )}
       </div>,
       painelHost,
-      )}
-      {rascunho && (
-        <div className="arm-form-card" ref={node => {
-          if (node) L.DomEvent.disableClickPropagation(node)
-        }}>
-          <div className="arm-form-heading">
-            <div><span className="arm-eyebrow">{editandoId ? 'ATUALIZAÇÃO DE CADASTRO' : 'NOVO REGISTRO'}</span><h3>{editandoId ? 'Editar área de risco' : 'Cadastrar área'}</h3></div>
-            <button type="button" aria-label="Fechar formulário" data-testid="button-fechar-formulario-area" onClick={() => { setRascunho(null); setEditandoId(null); setModoMapa(null) }}>×</button>
-          </div>
-          <form onSubmit={salvar}>
-            <label className="arm-field">
-              <span>Tipo de risco</span>
-              <select value={rascunho.tipo} onChange={event => atualizarRascunho({ tipo: event.target.value as TipoAreaRisco })} data-testid="select-tipo-risco">
-                {TIPOS.map(tipo => <option key={tipo} value={tipo}>{tipo}</option>)}
-              </select>
-            </label>
-            <div className="arm-map-instructions">
-              <div className="arm-step-row"><b className={rascunho.latitude != null ? 'arm-step-done' : ''}>01</b><span>{rascunho.latitude == null ? 'Posicione o ponto de referência' : `${rascunho.latitude.toFixed(5)}, ${rascunho.longitude?.toFixed(5)}`}</span></div>
-              <button type="button" className={modoMapa === 'marcador' ? 'arm-map-action arm-map-action-active' : 'arm-map-action'} data-testid="button-marcar-localizacao" onClick={() => setModoMapa('marcador')}>Marcar no mapa</button>
-              <div className="arm-step-row"><b className={rascunho.poligono.length >= 3 ? 'arm-step-done' : ''}>02</b><span>Perímetro · opcional · {rascunho.poligono.length} vértice(s)</span></div>
-              <div className="arm-draw-actions">
-                <button type="button" className={modoMapa === 'poligono' ? 'arm-map-action arm-map-action-active' : 'arm-map-action'} disabled={rascunho.latitude == null} data-testid="button-desenhar-poligono" onClick={() => setModoMapa('poligono')}>Adicionar vértices</button>
-                <button type="button" className="arm-quiet-action" disabled={!rascunho.poligono.length} data-testid="button-desfazer-vertice" onClick={() => atualizarRascunho({ poligono: rascunho.poligono.slice(0, -1) })}>Desfazer</button>
-                <button type="button" className="arm-quiet-action" disabled={!rascunho.poligono.length} data-testid="button-limpar-poligono" onClick={() => atualizarRascunho({ poligono: [] })}>Limpar</button>
-              </div>
-              {modoMapa && <div className="arm-map-mode" role="status" data-testid="status-modo-mapa">{mapModeLabel}</div>}
-              {rascunho.poligono.length > 0 && <div className="arm-vertex-hint">Arraste os nós no mapa para ajustar o contorno.</div>}
-            </div>
-            <div className="arm-field-grid">
-              <label className="arm-field"><span>Início do risco</span><input type="date" value={rascunho.data_inicio} onChange={event => atualizarRascunho({ data_inicio: event.target.value })} required data-testid="input-data-inicio" /></label>
-              <label className="arm-field"><span>Limite de chuva <small>mm</small></span><input type="number" min="0" step="0.1" placeholder="Ex.: 35" value={rascunho.limite_precipitacao_mm} onChange={event => atualizarRascunho({ limite_precipitacao_mm: event.target.value })} required data-testid="input-limite-precipitacao" /></label>
-            </div>
-            <label className="arm-field"><span>Referência local <small>opcional</small></span><input type="text" maxLength={120} placeholder="Rua, bairro ou ponto próximo" value={rascunho.referencia} onChange={event => atualizarRascunho({ referencia: event.target.value })} data-testid="input-referencia-local" /></label>
-            <label className="arm-field"><span>Observações <small>opcional</small></span><textarea rows={2} maxLength={500} placeholder="Condição observada, acesso ou orientação à equipe" value={rascunho.observacao} onChange={event => atualizarRascunho({ observacao: event.target.value })} data-testid="input-observacao-risco" /></label>
-            {(localErro || erro) && <div className="arm-error" role="alert" data-testid="status-erro-formulario">{localErro || erro}</div>}
-            <div className="arm-form-actions">
-              <button type="button" className="arm-cancel" data-testid="button-cancelar-area" disabled={salvando} onClick={() => { setRascunho(null); setEditandoId(null); setModoMapa(null) }}>Cancelar</button>
-              <button type="submit" className="arm-submit" data-testid="button-salvar-area" disabled={salvando}>
-                {salvando ? 'Salvando…' : editandoId ? 'Salvar alterações' : 'Registrar área'}
-              </button>
-            </div>
-          </form>
-        </div>
       )}
       {portao && (
         <ModalSenha

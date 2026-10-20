@@ -128,6 +128,28 @@
 .arm-panel-recolhido { width: min(245px, calc(100vw - 32px)); }
 .arm-panel-recolhido .arm-panel-head { border-bottom: 0; }
 
+.arm-add-tv {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  flex: 0 0 30px;
+  padding: 0;
+  place-items: center;
+  border: 1px solid #258db6;
+  border-radius: 7px;
+  color: #f1faff;
+  background: #087ba6;
+  font: inherit;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.arm-add-tv:hover { background: #0d93c3; }
+.arm-add-tv:disabled { cursor: not-allowed; opacity: .48; }
+.arm-add-tv:focus-visible,
+.arm-collapse:focus-visible { outline: 2px solid #8ce2ff; outline-offset: 2px; }
+
 @media (max-width: 850px) {
   .arm-panel {
     position: relative;

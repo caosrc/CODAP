@@ -6279,7 +6279,7 @@ body.radar-tv-active .radar-tv .radar-live-map-risk-anchor-tv .arm-panel {
   bottom: auto;
   right: 0;
   left: auto;
-  width: clamp(132px, 11vw, 200px);
+  width: clamp(168px, 12vw, 210px);
   max-height: min(calc(100dvh - 36px), 560px);
   transform: none;
 }
@@ -6341,6 +6341,12 @@ body.radar-tv-active .radar-tv .arm-panel-tv .arm-panel-head {
   min-height: clamp(38px, 3.8vh, 50px);
   gap: clamp(5px, .4vw, 8px);
   padding: clamp(5px, .42vw, 8px);
+}
+
+body.radar-tv-active .radar-tv .arm-panel-tv .arm-add-tv {
+  width: clamp(22px, 1.6vw, 28px);
+  height: clamp(22px, 1.6vw, 28px);
+  flex-basis: clamp(22px, 1.6vw, 28px);
 }
 
 body.radar-tv-active .radar-tv .arm-panel-tv .arm-head-mark {

@@ -383,6 +383,19 @@ export default function AreasRiscoMapa({
             <div className="arm-eyebrow">DEFESA CIVIL · LAFAIETE</div>
             <h2>Áreas de risco</h2>
           </div>
+          {modoTv && (
+            <button
+              type="button"
+              className="arm-add-tv"
+              aria-label="Cadastrar área de risco"
+              title="Cadastrar área de risco"
+              data-testid="button-nova-area-tv"
+              onClick={iniciarCadastro}
+              disabled={Boolean(rascunho)}
+            >
+              <span aria-hidden="true">+</span>
+            </button>
+          )}
           <button
             type="button"
             className="arm-collapse"

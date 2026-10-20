@@ -6,6 +6,7 @@ export const TIPOS_AREAS_RISCO = [
   'Deslizamentos',
   'Problemas de vias',
   'Obras',
+  'Interdições',
 ] as const
 
 export type TipoAreaRisco = typeof TIPOS_AREAS_RISCO[number]
@@ -23,6 +24,7 @@ export interface AreaRisco {
   observacao: string | null
   criado_por: string
   created_at: string
+  ocorrencia_id?: number | null
 }
 
 export type AreaRiscoInput = Omit<AreaRisco, 'id' | 'criado_por' | 'created_at'>
@@ -35,4 +37,5 @@ export const ESTILO_AREA_RISCO: Record<TipoAreaRisco, { cor: string; icone: stri
   Deslizamentos: { cor: '#b4233b', icone: 'landslide' },
   'Problemas de vias': { cor: '#7854a8', icone: 'road' },
   Obras: { cor: '#5c7b36', icone: 'works' },
+  Interdições: { cor: '#c2410c', icone: 'closure' },
 }

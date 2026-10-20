@@ -5,7 +5,7 @@ import './RadarDC.css'
 import './RadarDCResponsive.css'
 import 'leaflet/dist/leaflet.css'
 import { getAgenteLogado } from './Login'
-import { agentePodeGerenciarCriacao, AGENTES, getSenhaAgente, NATUREZA_COR, NATUREZA_ICONE } from '../types'
+import { agentePodeGerenciarCriacao, AGENTES, getSenhaAgente, NATUREZA_COR, NATUREZA_ICONE, naturezaEhInterdicao } from '../types'
 import { wsOn, wsSend } from '../wsClient'
 import { supabase, supabaseDisponivel } from '../supabaseClient'
 import { listarOcorrenciasPorData } from '../api'
@@ -140,6 +140,9 @@ function normalizarAreaRisco(valor: Record<string, unknown>): AreaRisco | null {
     observacao: valor.observacao == null ? null : String(valor.observacao),
     criado_por: String(valor.criado_por || ''),
     created_at: String(valor.created_at || ''),
+    ocorrencia_id: valor.ocorrencia_id == null || !Number.isFinite(Number(valor.ocorrencia_id))
+      ? null
+      : Number(valor.ocorrencia_id),
   }
 }
 
@@ -158,10 +161,10 @@ function mensagemErroAreaRisco(erro: unknown, fallback: string): string {
     codigo === 'PGRST205' ||
     /could not find the table .*areas_risco|relation .*areas_risco.*does not exist/i.test(mensagem)
   ) {
-    return 'A tabela de áreas de risco não existe no Supabase. A migração supabase/migrations/add_areas_risco.sql precisa ser aplicada.'
+    return 'A tabela de áreas de risco não existe no Supabase. Aplique primeiro supabase/migrations/add_areas_risco.sql e depois supabase/migrations/add_interdicoes.sql.'
   }
   if (codigo === 'PGRST204' || /column .*areas_risco|areas_risco.*column/i.test(mensagem)) {
-    return 'A tabela de áreas de risco está desatualizada no Supabase. Aplique a migração supabase/migrations/add_areas_risco.sql.'
+    return 'A tabela de áreas de risco está desatualizada no Supabase. Aplique supabase/migrations/add_interdicoes.sql.'
   }
   if (codigo === '42501' || /row-level security|permission denied/i.test(mensagem)) {
     return 'O Supabase bloqueou a gravação da área por falta de permissão.'
@@ -401,6 +404,7 @@ function RadarMapaTempoReal({ tv, dataOcorrencias }: { tv: boolean; dataOcorrenc
   const estacoesLafaieteSemCoordenadas = estacoesLafaiete.length - estacoesLafaieteGeorreferenciadas.length
   const ocorrenciasComGps = useMemo(
     () => ocorrenciasDoDia.filter(ocorrencia =>
+      !naturezaEhInterdicao(ocorrencia.natureza) &&
       ocorrencia.lat != null &&
       ocorrencia.lng != null &&
       Number.isFinite(Number(ocorrencia.lat)) &&
@@ -534,15 +538,16 @@ function RadarMapaTempoReal({ tv, dataOcorrencias }: { tv: boolean; dataOcorrenc
   }, [])
 
   const carregarPrevisaoAreasRisco = useCallback(async () => {
-    if (areasRisco.length === 0) {
+    const areasComPrevisao = areasRisco.filter(area => area.tipo !== 'Interdições')
+    if (areasComPrevisao.length === 0) {
       setPrevisaoAreasRisco({})
       setPrevisaoAreasRiscoErro(null)
       return
     }
     try {
       const previsoes: Record<string, number | null> = {}
-      for (let inicio = 0; inicio < areasRisco.length; inicio += 50) {
-        const lote = areasRisco.slice(inicio, inicio + 50)
+      for (let inicio = 0; inicio < areasComPrevisao.length; inicio += 50) {
+        const lote = areasComPrevisao.slice(inicio, inicio + 50)
         const response = await fetch('/api/tempo-areas-risco', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -969,6 +974,7 @@ function RadarMapaTempoReal({ tv, dataOcorrencias }: { tv: boolean; dataOcorrenc
           onSalvar={salvarAreaRisco}
           onEditar={editarAreaRisco}
           onExcluir={excluirAreaRisco}
+          onAbrirOcorrencia={id => disparar('dc:abrir-ocorrencia', { id })}
           modoTv={tv}
         />
       </MapContainer>

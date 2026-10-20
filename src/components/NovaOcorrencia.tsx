@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react'
 import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
-import { TIPOS_OCORRENCIA, NATUREZAS, AGENTES } from '../types'
+import { TIPOS_OCORRENCIA, NATUREZAS, AGENTES, naturezaEhInterdicao } from '../types'
 import type { NivelRisco, StatusOc } from '../types'
 import { criarOcorrencia } from '../api'
 import { geocodificarEndereco } from '../offline'
@@ -384,6 +384,15 @@ export default function NovaOcorrencia({ onSalvo, onVoltar, isOnline, orgao = 'd
     if (!finalLat && enderecoEspecializado.trim() && navigator.onLine) {
       const geo = await geocodificarEndereco(enderecoEspecializado)
       if (geo) { finalLat = geo.lat; finalLng = geo.lng }
+    }
+    if (
+      naturezaEhInterdicao(natureza) &&
+      statusOc === 'ativo' &&
+      (finalLat == null || finalLng == null)
+    ) {
+      setSalvando(false)
+      setErro('Para exibir a interdição no mapa, marque o local no mapa, obtenha o GPS ou informe um endereço que possa ser localizado.')
+      return
     }
 
     const tipoFinal = tipo === 'Outro' ? (tipoOutro.trim() || 'Outro') : tipo

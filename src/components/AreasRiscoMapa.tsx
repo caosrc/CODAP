@@ -19,6 +19,7 @@ export interface AreasRiscoMapaProps {
   onSalvar: (input: AreaRiscoInput) => Promise<void>
   onEditar: (id: string, input: AreaRiscoInput) => Promise<void>
   onExcluir: (id: string) => Promise<void>
+  onAbrirOcorrencia?: (id: number) => void
 }
 
 const TIPOS = TIPOS_AREAS_RISCO
@@ -34,6 +35,7 @@ const ICONES: Record<TipoAreaRisco, string> = {
   Deslizamentos: '<path d="m4 18 5-8 3 4 3-7 5 11H4Z"/><path d="m7 5 2 2m8 7 2 2"/>',
   'Problemas de vias': '<path d="M8 3 5 21m11-18 3 18"/><path d="M12 4v3m0 3v3m0 3v3"/>',
   Obras: '<path d="m14 6 4 4M5 19l8-8"/><path d="m16 4 4 4-3 3-4-4 3-3ZM4 20l2-5 3 3-5 2Z"/>',
+  Interdições: '<path d="M3 9h18M3 15h18M6 9v6m12-6v6"/><path d="m4 9 4 6m4-6 4 6m4-6 4 6"/>',
 }
 
 interface DraftArea {
@@ -62,7 +64,7 @@ function novaArea(tipo: TipoAreaRisco = 'Encostas'): DraftArea {
     longitude: null,
     poligono: [],
     data_inicio: dataHoje(),
-    limite_precipitacao_mm: '',
+    limite_precipitacao_mm: tipo === 'Interdições' ? '0' : '',
     referencia: '',
     observacao: '',
   }
@@ -123,6 +125,7 @@ export default function AreasRiscoMapa({
   onSalvar,
   onEditar,
   onExcluir,
+  onAbrirOcorrencia,
 }: AreasRiscoMapaProps) {
   const [filtro, setFiltro] = useState<TipoAreaRisco | 'Todas'>('Todas')
   const [rascunho, setRascunho] = useState<DraftArea | null>(null)
@@ -160,6 +163,7 @@ export default function AreasRiscoMapa({
 
   const alertas = useMemo(
     () => areas.filter(area => {
+      if (area.tipo === 'Interdições') return false
       const previsto = previsaoPorArea[area.id]
       return previsto != null && Number.isFinite(previsto) && previsto > area.limite_precipitacao_mm
     }),
@@ -178,6 +182,10 @@ export default function AreasRiscoMapa({
   }
 
   function abrirEdicao(area: AreaRisco) {
+    if (area.ocorrencia_id != null) {
+      setLocalErro('Esta interdição é gerenciada pela ocorrência vinculada. Abra a ocorrência para alterá-la.')
+      return
+    }
     if (!agenteLogado || !senhaAgente) {
       setLocalErro('Não foi possível validar a senha do agente desta sessão.')
       return
@@ -187,6 +195,10 @@ export default function AreasRiscoMapa({
   }
 
   function abrirExclusao(area: AreaRisco) {
+    if (area.ocorrencia_id != null) {
+      setLocalErro('Esta interdição é gerenciada pela ocorrência vinculada. Abra a ocorrência para alterá-la.')
+      return
+    }
     if (!agenteLogado || !senhaAgente) {
       setLocalErro('Não foi possível validar a senha do agente desta sessão.')
       return
@@ -246,8 +258,9 @@ export default function AreasRiscoMapa({
       setLocalErro('Marque a localização no mapa antes de salvar.')
       return
     }
-    const limite = Number(rascunho.limite_precipitacao_mm)
-    if (!Number.isFinite(limite) || limite < 0) {
+    const isInterdicao = rascunho.tipo === 'Interdições'
+    const limite = isInterdicao ? 0 : Number(rascunho.limite_precipitacao_mm)
+    if (!isInterdicao && (!Number.isFinite(limite) || limite < 0)) {
       setLocalErro('Informe um limite de precipitação válido, em milímetros.')
       return
     }
@@ -294,7 +307,7 @@ export default function AreasRiscoMapa({
       />
       {areas.map(area => {
         const previsto = previsaoPorArea[area.id]
-        const emAlerta = previsto != null && Number.isFinite(previsto) && previsto > area.limite_precipitacao_mm
+        const emAlerta = area.tipo !== 'Interdições' && previsto != null && Number.isFinite(previsto) && previsto > area.limite_precipitacao_mm
         const cor = CORES[area.tipo]
         return (
           <Fragment key={`area-layer-${area.id}`}>
@@ -322,15 +335,31 @@ export default function AreasRiscoMapa({
                 <div className="arm-popup">
                   <div className="arm-popup-title" style={{ color: cor }}>{area.tipo}</div>
                   {emAlerta && <div className="arm-popup-alert">PREVISÃO ACIMA DO LIMITE</div>}
-                  <div>Início: <strong>{formatarData(area.data_inicio)}</strong></div>
-                  <div>Limite: <strong>{area.limite_precipitacao_mm} mm</strong></div>
-                  <div>Previsão 24 h: <strong>{formatarPrecipitacao(previsto)}</strong></div>
+                  <div>{area.tipo === 'Interdições' ? 'Interdição desde:' : 'Início:'} <strong>{formatarData(area.data_inicio)}</strong></div>
+                  {area.tipo === 'Interdições'
+                    ? <div className="arm-popup-interdiction-status">Local de interdição cadastrado</div>
+                    : <>
+                      <div>Limite: <strong>{area.limite_precipitacao_mm} mm</strong></div>
+                      <div>Previsão 24 h: <strong>{formatarPrecipitacao(previsto)}</strong></div>
+                    </>}
                   {area.referencia && <div>Referência: {area.referencia}</div>}
                   {area.observacao && <div className="arm-popup-notes">{area.observacao}</div>}
+                  {area.ocorrencia_id != null && <div className="arm-popup-linked">Vinculada à ocorrência #{area.ocorrencia_id}</div>}
                   <div className="arm-popup-by">Cadastro: {area.criado_por || '—'}</div>
                   <div className="arm-popup-actions">
-                    <button type="button" data-testid={`button-editar-area-${area.id}`} onClick={() => abrirEdicao(area)}>Editar</button>
-                    <button type="button" data-testid={`button-excluir-area-${area.id}`} onClick={() => abrirExclusao(area)}>Excluir</button>
+                    {area.ocorrencia_id != null ? (
+                      <button
+                        type="button"
+                        className="arm-popup-open-occurrence"
+                        data-testid={`button-abrir-ocorrencia-area-${area.id}`}
+                        onClick={() => onAbrirOcorrencia?.(area.ocorrencia_id!)}
+                      >
+                        Abrir ocorrência #{area.ocorrencia_id}
+                      </button>
+                    ) : <>
+                      <button type="button" data-testid={`button-editar-area-${area.id}`} onClick={() => abrirEdicao(area)}>Editar</button>
+                      <button type="button" data-testid={`button-excluir-area-${area.id}`} onClick={() => abrirExclusao(area)}>Excluir</button>
+                    </>}
                   </div>
                 </div>
               </Popup>
@@ -411,13 +440,13 @@ export default function AreasRiscoMapa({
         {!recolhido && (
           <>
             <div className="arm-summary">
-              <div><strong data-testid="text-total-areas">{areas.length}</strong><span>áreas mapeadas</span></div>
+              <div><strong data-testid="text-total-areas">{areas.length}</strong><span>locais mapeados</span></div>
               <div className={alertas.length ? 'arm-alert-count arm-alert-count-active' : 'arm-alert-count'}>
                 <strong data-testid="text-total-alertas">{alertas.length}</strong><span>em alerta</span>
               </div>
             </div>
             <div className="arm-forecast-note" data-testid="text-fonte-previsao">
-              Previsão acumulada em 24 h no ponto de referência · Open-Meteo
+              Previsão acumulada em 24 h nas áreas de risco · Open-Meteo
             </div>
             {alertas.length > 0 && (
               <div className="arm-alert-banner" role="status" data-testid="status-alerta-precipitacao">
@@ -426,9 +455,9 @@ export default function AreasRiscoMapa({
               </div>
             )}
             <div className="arm-toolbar">
-              <span>ÁREAS DE RISCO</span>
+                <span>ÁREAS DE RISCO</span>
               <button type="button" onClick={iniciarCadastro} data-testid="button-nova-area" disabled={Boolean(rascunho)}>
-                <span aria-hidden="true">+</span> Nova área
+                <span aria-hidden="true">+</span> {filtro === 'Interdições' ? 'Nova interdição' : 'Nova área'}
               </button>
             </div>
             {carregando ? (
@@ -467,7 +496,13 @@ export default function AreasRiscoMapa({
               {areasVisiveis.length === 0 && !carregando ? (
                 <div className="arm-empty" data-testid="status-sem-areas">
                   <span className="arm-empty-rule" />
-                  <strong>{filtro === 'Todas' ? 'Nenhuma área cadastrada' : `Sem áreas de ${filtro.toLowerCase()}`}</strong>
+                   <strong>
+                     {filtro === 'Todas'
+                       ? 'Nenhuma área cadastrada'
+                       : filtro === 'Interdições'
+                         ? 'Nenhuma interdição cadastrada'
+                         : `Sem áreas de ${filtro.toLowerCase()}`}
+                   </strong>
                   <span>Registre um ponto no mapa; desenhar o perímetro é opcional.</span>
                 </div>
               ) : areasVisiveis.map(area => {
@@ -480,11 +515,24 @@ export default function AreasRiscoMapa({
                       <strong>{area.tipo}{alerta && <span className="arm-alert-tag">ALERTA</span>}</strong>
                       <span>{area.referencia || `Início ${formatarData(area.data_inicio)}`}</span>
                     </div>
-                    <span className="arm-rain-value" data-testid={`status-previsao-area-${area.id}`}>
-                       {previsao == null ? '—' : formatarPrecipitacao(previsao)}
+                     <span className="arm-rain-value" data-testid={`status-previsao-area-${area.id}`}>
+                        {area.tipo === 'Interdições'
+                          ? area.ocorrencia_id != null ? `Ocorrência #${area.ocorrencia_id}` : 'Interdição'
+                          : previsao == null ? '—' : formatarPrecipitacao(previsao)}
                     </span>
-                     <button type="button" aria-label={`Editar ${area.tipo}`} data-testid={`button-editar-lista-${area.id}`} onClick={() => abrirEdicao(area)}>Editar</button>
-                     <button type="button" aria-label={`Excluir ${area.tipo}`} className="arm-delete-inline" data-testid={`button-excluir-lista-${area.id}`} onClick={() => abrirExclusao(area)}>×</button>
+                      {area.ocorrencia_id != null ? (
+                        <button
+                          type="button"
+                          aria-label={`Abrir ocorrência ${area.ocorrencia_id}`}
+                          data-testid={`button-abrir-ocorrencia-lista-${area.id}`}
+                          onClick={() => onAbrirOcorrencia?.(area.ocorrencia_id!)}
+                        >
+                          Abrir
+                        </button>
+                      ) : <>
+                        <button type="button" aria-label={`Editar ${area.tipo}`} data-testid={`button-editar-lista-${area.id}`} onClick={() => abrirEdicao(area)}>Editar</button>
+                        <button type="button" aria-label={`Excluir ${area.tipo}`} className="arm-delete-inline" data-testid={`button-excluir-lista-${area.id}`} onClick={() => abrirExclusao(area)}>×</button>
+                      </>}
                   </div>
                 )
               })}
@@ -496,13 +544,23 @@ export default function AreasRiscoMapa({
                 if (node) L.DomEvent.disableClickPropagation(node)
               }}>
                 <div className="arm-form-heading">
-                  <div><span className="arm-eyebrow">{editandoId ? 'ATUALIZAÇÃO DE CADASTRO' : 'NOVO REGISTRO'}</span><h3>{editandoId ? 'Editar área de risco' : 'Cadastrar área'}</h3></div>
+                  <div><span className="arm-eyebrow">{editandoId ? 'ATUALIZAÇÃO DE CADASTRO' : 'NOVO REGISTRO'}</span><h3>{editandoId ? 'Editar área de risco' : rascunho.tipo === 'Interdições' ? 'Cadastrar interdição' : 'Cadastrar área'}</h3></div>
                   <button type="button" aria-label="Fechar formulário" data-testid="button-fechar-formulario-area" onClick={fecharFormulario}>×</button>
                 </div>
                 <form onSubmit={salvar}>
                   <label className="arm-field">
-                    <span>Tipo de risco</span>
-                    <select value={rascunho.tipo} onChange={event => atualizarRascunho({ tipo: event.target.value as TipoAreaRisco })} data-testid="select-tipo-risco">
+                    <span>Tipo de registro</span>
+                    <select
+                      value={rascunho.tipo}
+                      onChange={event => {
+                        const tipo = event.target.value as TipoAreaRisco
+                        atualizarRascunho({
+                          tipo,
+                          limite_precipitacao_mm: tipo === 'Interdições' ? '0' : rascunho.limite_precipitacao_mm === '0' ? '' : rascunho.limite_precipitacao_mm,
+                        })
+                      }}
+                      data-testid="select-tipo-risco"
+                    >
                       {TIPOS.map(tipo => <option key={tipo} value={tipo}>{tipo}</option>)}
                     </select>
                   </label>
@@ -519,8 +577,10 @@ export default function AreasRiscoMapa({
                     {rascunho.poligono.length > 0 && <div className="arm-vertex-hint">Arraste os nós no mapa para ajustar o contorno.</div>}
                   </div>
                   <div className="arm-field-grid">
-                    <label className="arm-field"><span>Início do risco</span><input type="date" value={rascunho.data_inicio} onChange={event => atualizarRascunho({ data_inicio: event.target.value })} required data-testid="input-data-inicio" /></label>
-                    <label className="arm-field"><span>Limite de chuva <small>mm</small></span><input type="number" min="0" step="0.1" placeholder="Ex.: 35" value={rascunho.limite_precipitacao_mm} onChange={event => atualizarRascunho({ limite_precipitacao_mm: event.target.value })} required data-testid="input-limite-precipitacao" /></label>
+                    <label className="arm-field"><span>{rascunho.tipo === 'Interdições' ? 'Início da interdição' : 'Início do risco'}</span><input type="date" value={rascunho.data_inicio} onChange={event => atualizarRascunho({ data_inicio: event.target.value })} required data-testid="input-data-inicio" /></label>
+                    {rascunho.tipo !== 'Interdições' && (
+                      <label className="arm-field"><span>Limite de chuva <small>mm</small></span><input type="number" min="0" step="0.1" placeholder="Ex.: 35" value={rascunho.limite_precipitacao_mm} onChange={event => atualizarRascunho({ limite_precipitacao_mm: event.target.value })} required data-testid="input-limite-precipitacao" /></label>
+                    )}
                   </div>
                   <label className="arm-field"><span>Referência local <small>opcional</small></span><input type="text" maxLength={120} placeholder="Rua, bairro ou ponto próximo" value={rascunho.referencia} onChange={event => atualizarRascunho({ referencia: event.target.value })} data-testid="input-referencia-local" /></label>
                   <label className="arm-field"><span>Observações <small>opcional</small></span><textarea rows={2} maxLength={500} placeholder="Condição observada, acesso ou orientação à equipe" value={rascunho.observacao} onChange={event => atualizarRascunho({ observacao: event.target.value })} data-testid="input-observacao-risco" /></label>

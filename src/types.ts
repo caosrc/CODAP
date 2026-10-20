@@ -96,9 +96,16 @@ export function getSenhaAgente(nome: string): string | null {
 
 export const TIPOS_OCORRENCIA = ['Diligência', 'Vistoria de Engenharia', 'Vistoria Ambiental', 'Apoio', 'Outro']
 
+export const NATUREZAS_INTERDICAO = ['Interdição', 'Interdição de Via', 'Interdição de Imóvel'] as const
+
+export function naturezaEhInterdicao(natureza: string | null | undefined): boolean {
+  return NATUREZAS_INTERDICAO.includes(natureza as typeof NATUREZAS_INTERDICAO[number])
+}
+
 export const NATUREZAS = [
   'Incêndio em Área Urbana',
   'Incêndio em Área Rural',
+  'Interdição',
   'Vistoria Preventiva',
   'Sistema de Drenagem',
   'Precariedade em residência',
@@ -138,6 +145,7 @@ export const NATUREZA_ICONE: Record<string, string> = {
   'Talude em Risco': '🪨',
   'Interdição de Imóvel': '🚫',
   'Interdição de Via': '🚧',
+  'Interdição': '🚧',
   'Acidente de Trânsito': '🚗',
   'Sinalização de Segurança': '🚦',
   'Eventos': '🎪',
@@ -179,6 +187,7 @@ export const NATUREZA_COR: Record<string, string> = {
   'Talude em Risco': '#854d0e',
   'Interdição de Imóvel': '#b91c1c',
   'Interdição de Via': '#c2410c',
+  'Interdição': '#c2410c',
   'Acidente de Trânsito': '#ef4444',
   'Sinalização de Segurança': '#f59e0b',
   'Eventos': '#0891b2',

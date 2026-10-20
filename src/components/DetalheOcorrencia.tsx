@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import JSZip from 'jszip'
 import type { Ocorrencia, NivelRisco, StatusOc, VistoriaAdicional } from '../types'
 import { exportarPastaOcorrencia, nomePastaOcorrencia } from '../exportarPasta'
-import { NATUREZA_ICONE, NATUREZA_COR, TIPOS_OCORRENCIA, NATUREZAS, AGENTES, agentePodeGerenciarCriacao, getSenhaAgente, normalizarNomeAgente } from '../types'
+import { NATUREZA_ICONE, NATUREZA_COR, TIPOS_OCORRENCIA, NATUREZAS, AGENTES, agentePodeGerenciarCriacao, getSenhaAgente, normalizarNomeAgente, naturezaEhInterdicao } from '../types'
 import { deletarOcorrencia, atualizarOcorrencia, buscarOcorrenciaCompleta } from '../api'
 import { geocodificarEndereco, updatePending } from '../offline'
 import { exportarOcorrenciaExcel } from '../exportExcel'
@@ -299,6 +299,14 @@ export default function DetalheOcorrencia({ ocorrencia: oc, onFechar, onDeletado
     if (finalLat == null && eEndereco.trim() && navigator.onLine) {
       const geo = await geocodificarEndereco(eEndereco)
       if (geo) { finalLat = geo.lat; finalLng = geo.lng }
+    }
+    if (
+      naturezaEhInterdicao(eNatureza) &&
+      eStatus === 'ativo' &&
+      (finalLat == null || finalLng == null)
+    ) {
+      setErroEdit('Para exibir a interdição no mapa, marque o local no mapa, obtenha o GPS ou informe um endereço que possa ser localizado.')
+      return
     }
 
     setSalvando(true)

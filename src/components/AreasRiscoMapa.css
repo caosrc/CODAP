@@ -620,6 +620,10 @@
 .arm-popup-actions { display: flex; gap: 5px; margin-top: 8px; }
 .arm-popup-actions button { min-height: 27px; border-color: #267795; color: #fff; background: #136c8c; font-size: 10px; }
 .arm-popup-actions button:last-child { border-color: #b96159; background: #a8413b; }
+.arm-popup-actions .arm-popup-open-occurrence { border-color: #267795; background: #136c8c; }
+.arm-popup-actions .arm-popup-open-occurrence:hover { background: #0d93c3; }
+.arm-popup-interdiction-status { margin-top: 3px; color: #b91c1c; font-weight: 800; }
+.arm-popup-linked { margin-top: 4px; color: #136c8c; font-size: 11px; font-weight: 750; }
 
 @keyframes arm-pulse {
   0% { box-shadow: 0 0 0 0 rgba(255, 109, 90, .78); }

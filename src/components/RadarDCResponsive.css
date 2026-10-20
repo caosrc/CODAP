@@ -6150,6 +6150,40 @@ html:-webkit-full-screen {
     max-height: none;
   }
 
+  body.radar-tv-active .radar-tv .radar-live-map-frame {
+    flex: 1 1 0;
+    height: auto;
+    min-height: 0;
+  }
+
+  body.radar-tv-active .radar-tv .radar-live-map-risk-legend {
+    top: clamp(6px, .65vw, 10px);
+    right: clamp(6px, .65vw, 10px);
+    width: clamp(132px, 14vw, 190px);
+    padding: clamp(.35rem, .5vw, .55rem);
+  }
+
+  body.radar-tv-active .radar-tv .radar-live-map-risk-legend h4 {
+    margin-bottom: .3rem;
+    padding-bottom: .25rem;
+    font-size: clamp(.48rem, .56vw, .62rem);
+  }
+
+  body.radar-tv-active .radar-tv .radar-live-map-risk-legend ul {
+    gap: .24rem;
+  }
+
+  body.radar-tv-active .radar-tv .radar-live-map-risk-legend li {
+    gap: .35rem;
+    font-size: clamp(.48rem, .55vw, .62rem);
+  }
+
+  body.radar-tv-active .radar-tv .radar-live-map-risk-legend li i {
+    width: 11px;
+    height: 8px;
+    flex-basis: 11px;
+  }
+
   body.radar-tv-active .radar-tv .radar-cnl-card-heading {
     position: absolute;
     width: 1px;
@@ -6240,6 +6274,35 @@ html:-webkit-full-screen {
   body.radar-tv-active .radar-tv .radar-ticker {
     flex: 0 0 auto;
     min-height: 22px;
+  }
+}
+
+@media (min-width: 701px) and (max-width: 899px) {
+  body.radar-tv-active .radar-tv .radar-live-map-frame {
+    height: min(720px, calc(100dvh - 330px));
+    min-height: 280px;
+  }
+}
+
+@media (max-width: 700px) {
+  body.radar-tv-active .radar-tv .radar-live-map-frame {
+    height: 420px;
+    min-height: 420px;
+  }
+
+  .radar-live-map-risk-legend {
+    top: 8px;
+    right: 8px;
+    width: min(172px, calc(100% - 54px));
+    padding: .48rem .56rem;
+  }
+
+  .radar-live-map-risk-legend h4 {
+    font-size: .58rem;
+  }
+
+  .radar-live-map-risk-legend li {
+    font-size: .61rem;
   }
 }
 

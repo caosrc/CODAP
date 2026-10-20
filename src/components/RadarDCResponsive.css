@@ -6255,16 +6255,30 @@ html:-webkit-full-screen {
   }
 
   body.radar-tv-active .radar-tv .weather-google-location .weather-google-current {
-    grid-template-columns: minmax(3.9rem, .85fr) 1.4rem minmax(0, 1.15fr);
-    gap: .14rem;
+    display: block;
+    margin-top: .08rem;
+    padding: 0;
     overflow: visible;
+  }
+
+  body.radar-tv-active .radar-tv .weather-google-location {
+    align-self: start;
+    overflow: visible;
+  }
+
+  body.radar-tv-active .radar-tv .weather-google-location > p,
+  body.radar-tv-active .radar-tv .weather-google-location .weather-google-current-icon,
+  body.radar-tv-active .radar-tv .weather-google-location .weather-google-summary,
+  body.radar-tv-active .radar-tv .weather-google-location .weather-google-metrics {
+    display: none;
   }
 
   body.radar-tv-active .radar-tv .weather-google-temperature strong {
     min-width: 3.9rem;
-    font-size: clamp(2rem, 2.25vw, 2.4rem);
+    margin-left: clamp(.9rem, 1vw, 1.15rem);
+    font-size: clamp(2.3rem, 2.55vw, 2.7rem);
     font-variant-numeric: tabular-nums;
-    line-height: .96;
+    line-height: 1.05;
     white-space: nowrap;
   }
 

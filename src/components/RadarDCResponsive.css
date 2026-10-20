@@ -6256,9 +6256,13 @@ html:-webkit-full-screen {
 
   body.radar-tv-active .radar-tv .weather-google-location .weather-google-current {
     display: block;
-    margin-top: .08rem;
+    margin-top: -.35rem;
     padding: 0;
     overflow: visible;
+  }
+
+  body.radar-tv-active .radar-tv .weather-google-location h2 {
+    margin-bottom: 0;
   }
 
   body.radar-tv-active .radar-tv .weather-google-location {

@@ -6282,7 +6282,8 @@ body.radar-tv-active .radar-tv .radar-live-map-risk-anchor-tv .arm-panel {
   width: clamp(220px, 18vw, 300px);
   max-width: calc(100vw - 24px);
   max-height: min(calc(100dvh - 36px), 560px);
-  transform: none;
+  transform: scale(.6);
+  transform-origin: top right;
 }
 
 body.radar-tv-active .radar-tv .arm-panel-tv:not(.arm-panel-recolhido) {

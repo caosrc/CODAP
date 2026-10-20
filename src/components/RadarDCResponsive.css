@@ -6156,34 +6156,6 @@ html:-webkit-full-screen {
     min-height: 0;
   }
 
-  body.radar-tv-active .radar-tv .radar-live-map-risk-legend {
-    top: clamp(6px, .65vw, 10px);
-    right: clamp(6px, .65vw, 10px);
-    width: clamp(132px, 14vw, 190px);
-    padding: clamp(.35rem, .5vw, .55rem);
-  }
-
-  body.radar-tv-active .radar-tv .radar-live-map-risk-legend h4 {
-    margin-bottom: .3rem;
-    padding-bottom: .25rem;
-    font-size: clamp(.48rem, .56vw, .62rem);
-  }
-
-  body.radar-tv-active .radar-tv .radar-live-map-risk-legend ul {
-    gap: .24rem;
-  }
-
-  body.radar-tv-active .radar-tv .radar-live-map-risk-legend li {
-    gap: .35rem;
-    font-size: clamp(.48rem, .55vw, .62rem);
-  }
-
-  body.radar-tv-active .radar-tv .radar-live-map-risk-legend li i {
-    width: 11px;
-    height: 8px;
-    flex-basis: 11px;
-  }
-
   body.radar-tv-active .radar-tv .radar-cnl-card-heading {
     position: absolute;
     width: 1px;
@@ -6290,26 +6262,99 @@ html:-webkit-full-screen {
     min-height: 420px;
   }
 
-  .radar-live-map-risk-legend {
-    top: 8px;
-    right: 8px;
-    width: min(172px, calc(100% - 54px));
-    padding: .48rem .56rem;
-  }
-
-  .radar-live-map-risk-legend h4 {
-    font-size: .58rem;
-  }
-
-  .radar-live-map-risk-legend li {
-    font-size: .61rem;
-  }
 }
 
-body.radar-tv-active .radar-tv .radar-live-map-risk-legend {
-  top: clamp(54px, 6vh, 74px);
-  right: auto;
-  left: clamp(8px, .75vw, 12px);
+body.radar-tv-active .radar-tv .radar-live-map-risk-anchor-tv {
+  position: absolute;
+  z-index: 1202;
+  top: clamp(8px, .75vw, 12px);
+  right: clamp(8px, .75vw, 12px);
+  left: auto;
+  width: 0;
+  height: 0;
+}
+
+body.radar-tv-active .radar-tv .radar-live-map-risk-anchor-tv .arm-panel {
+  top: 0;
+  bottom: auto;
+  right: 0;
+  left: auto;
+  width: clamp(132px, 11vw, 200px);
+  max-height: min(calc(100dvh - 36px), 560px);
+  transform: none;
+}
+
+body.radar-tv-active .radar-tv .arm-panel-tv:not(.arm-panel-recolhido) {
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+body.radar-tv-active .radar-tv .arm-panel-tv .arm-summary,
+body.radar-tv-active .radar-tv .arm-panel-tv .arm-forecast-note,
+body.radar-tv-active .radar-tv .arm-panel-tv .arm-alert-banner,
+body.radar-tv-active .radar-tv .arm-panel-tv .arm-toolbar,
+body.radar-tv-active .radar-tv .arm-panel-tv .arm-area-list,
+body.radar-tv-active .radar-tv .arm-panel-tv .arm-panel-foot,
+body.radar-tv-active .radar-tv .arm-panel-tv .arm-error {
+  display: none;
+}
+
+body.radar-tv-active .radar-tv .arm-panel-tv .arm-types {
+  grid-template-columns: minmax(0, 1fr);
+  gap: clamp(2px, .2vw, 4px);
+  padding: 0 clamp(5px, .4vw, 8px) clamp(6px, .5vw, 10px);
+}
+
+body.radar-tv-active .radar-tv .arm-panel-tv .arm-type-all {
+  grid-column: auto;
+}
+
+body.radar-tv-active .radar-tv .arm-panel-tv .arm-type-row {
+  min-height: clamp(22px, 2.45vh, 30px);
+  gap: clamp(4px, .32vw, 6px);
+  padding: 2px clamp(3px, .3vw, 6px);
+  border-radius: 5px;
+}
+
+body.radar-tv-active .radar-tv .arm-panel-tv .arm-type-symbol {
+  width: clamp(17px, 1.3vw, 22px);
+  height: clamp(17px, 1.3vw, 22px);
+  flex-basis: clamp(17px, 1.3vw, 22px);
+  border-radius: 4px;
+}
+
+body.radar-tv-active .radar-tv .arm-panel-tv .arm-type-symbol svg {
+  width: clamp(11px, .9vw, 14px);
+  height: clamp(11px, .9vw, 14px);
+}
+
+body.radar-tv-active .radar-tv .arm-panel-tv .arm-type-name,
+body.radar-tv-active .radar-tv .arm-panel-tv .arm-type-row b {
+  font-size: clamp(8px, .52vw, 10px);
+}
+
+body.radar-tv-active .radar-tv .arm-panel-tv .arm-type-row b {
+  min-width: 14px;
+}
+
+body.radar-tv-active .radar-tv .arm-panel-tv .arm-panel-head {
+  min-height: clamp(38px, 3.8vh, 50px);
+  gap: clamp(5px, .4vw, 8px);
+  padding: clamp(5px, .42vw, 8px);
+}
+
+body.radar-tv-active .radar-tv .arm-panel-tv .arm-head-mark {
+  width: clamp(22px, 1.8vw, 31px);
+  height: clamp(22px, 1.8vw, 31px);
+  flex-basis: clamp(22px, 1.8vw, 31px);
+}
+
+body.radar-tv-active .radar-tv .arm-panel-tv .arm-eyebrow {
+  font-size: clamp(6px, .38vw, 8px);
+}
+
+body.radar-tv-active .radar-tv .arm-panel-tv .arm-head-copy h2 {
+  font-size: clamp(11px, .72vw, 15px);
 }
 
 /* Modo TV: distribuir o quadro de clima pelas três áreas que existem no JSX.

@@ -335,6 +335,10 @@
   flex: 0 0 auto;
 }
 
+.arm-panel-tv.arm-panel-form-active {
+  max-height: min(calc(100dvh - 24px), 820px);
+}
+
 .arm-area-row {
   display: flex;
   min-height: 48px;

@@ -10,7 +10,7 @@ import { wsOn, wsSend } from '../wsClient'
 import { supabase, supabaseDisponivel } from '../supabaseClient'
 import { listarOcorrenciasPorData } from '../api'
 import type { Ocorrencia } from '../types'
-import { ESTILO_AREA_RISCO, TIPOS_AREAS_RISCO, type AreaRisco, type AreaRiscoInput, type TipoAreaRisco } from '../areasRisco'
+import { TIPOS_AREAS_RISCO, type AreaRisco, type AreaRiscoInput, type TipoAreaRisco } from '../areasRisco'
 import { ehFerramentalPorLitro } from '../ferramentalUtils'
 import { ChartaChuva, GraficoNivel, type EstacaoCNL, type LeituraCNL, type PontoNivel, type PontoSerie } from './MonitoramentoCNL'
 import type { Map as LeafletMap } from 'leaflet'
@@ -710,10 +710,6 @@ function RadarMapaTempoReal({ tv, dataOcorrencias }: { tv: boolean; dataOcorrenc
   const pontosTrovoada = (previsaoTrovoadas?.pontos || []).filter(ponto =>
     Number.isFinite(ponto.latitude) && Number.isFinite(ponto.longitude),
   )
-  const tiposAreaRiscoVisiveis = TIPOS_AREAS_RISCO.filter(tipo =>
-    areasRisco.some(area => area.tipo === tipo),
-  )
-
   return (
     <section className="radar-live-map-card" aria-labelledby="radar-live-map-title">
       <div className="radar-live-map-heading">
@@ -723,7 +719,7 @@ function RadarMapaTempoReal({ tv, dataOcorrencias }: { tv: boolean; dataOcorrenc
             {zoomMapa < 9 ? 'Minas Gerais · chuva e nuvens' : 'Conselheiro Lafaiete em tempo real'}
           </h3>
         </div>
-        <div className="radar-live-map-risk-anchor" ref={setPainelAreasRiscoHost} data-testid="radar-live-map-risk-anchor" />
+        {!tv && <div className="radar-live-map-risk-anchor" ref={setPainelAreasRiscoHost} data-testid="radar-live-map-risk-anchor" />}
         <span className="radar-live-map-updated">
           {radarCarregando ? 'Atualizando…' : radarChuva?.erroAtualizacao ? 'Último quadro salvo' : 'Atualização automática · 5 min'}
         </span>
@@ -783,6 +779,13 @@ function RadarMapaTempoReal({ tv, dataOcorrencias }: { tv: boolean; dataOcorrenc
         )}
       </div>
       <div className="radar-live-map-frame">
+      {tv && (
+        <div
+          className="radar-live-map-risk-anchor radar-live-map-risk-anchor-tv"
+          ref={setPainelAreasRiscoHost}
+          data-testid="radar-live-map-risk-anchor"
+        />
+      )}
       <MapContainer
         className="radar-live-map"
         center={RADAR_MAP_CENTER}
@@ -966,21 +969,9 @@ function RadarMapaTempoReal({ tv, dataOcorrencias }: { tv: boolean; dataOcorrenc
           onSalvar={salvarAreaRisco}
           onEditar={editarAreaRisco}
           onExcluir={excluirAreaRisco}
+          modoTv={tv}
         />
       </MapContainer>
-      {tiposAreaRiscoVisiveis.length > 0 && (
-        <aside className="radar-live-map-risk-legend" aria-label="Legenda das áreas de risco">
-          <h4>ÁREAS DE RISCO</h4>
-          <ul>
-            {tiposAreaRiscoVisiveis.map(tipo => (
-              <li key={tipo} data-testid={`radar-risk-legend-item-${tipo.toLowerCase().replaceAll(' ', '-')}`}>
-                <i aria-hidden="true" style={{ backgroundColor: ESTILO_AREA_RISCO[tipo].cor }} />
-                <span>{tipo}</span>
-              </li>
-            ))}
-          </ul>
-        </aside>
-      )}
       </div>
       <div className="radar-live-map-footer">
         <span>

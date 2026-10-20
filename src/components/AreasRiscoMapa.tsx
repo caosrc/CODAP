@@ -8,6 +8,7 @@ import { ESTILO_AREA_RISCO, TIPOS_AREAS_RISCO, type AreaRisco, type AreaRiscoInp
 
 export interface AreasRiscoMapaProps {
   painelHost: HTMLDivElement | null
+  modoTv: boolean
   areas: AreaRisco[]
   previsaoPorArea: Record<string, number | null>
   carregando: boolean
@@ -111,6 +112,7 @@ function formatarPrecipitacao(valor: number | null | undefined) {
 
 export default function AreasRiscoMapa({
   painelHost,
+  modoTv,
   areas,
   previsaoPorArea,
   carregando,
@@ -128,7 +130,7 @@ export default function AreasRiscoMapa({
   const [modoMapa, setModoMapa] = useState<'marcador' | 'poligono' | null>(null)
   const [portao, setPortao] = useState<GateAction | null>(null)
   const [localErro, setLocalErro] = useState('')
-  const [recolhido, setRecolhido] = useState(true)
+  const [recolhido, setRecolhido] = useState(!modoTv)
   const painelRef = useRef<HTMLDivElement>(null)
   const scrollAntesDoFormularioRef = useRef(0)
   const formularioAberto = rascunho !== null
@@ -143,6 +145,10 @@ export default function AreasRiscoMapa({
       painel.scrollTo({ top: scrollAntesDoFormularioRef.current, behavior: 'auto' })
     }
   }, [formularioAberto])
+
+  useEffect(() => {
+    if (modoTv) setRecolhido(false)
+  }, [modoTv])
 
   const contagens = useMemo(() => {
     const iniciais = Object.fromEntries(TIPOS.map(tipo => [tipo, 0])) as Record<TipoAreaRisco, number>
@@ -369,7 +375,7 @@ export default function AreasRiscoMapa({
       {painelHost && createPortal(
         <div
           ref={painelRef}
-          className={`arm-panel${recolhido ? ' arm-panel-recolhido' : ''}${formularioAberto ? ' arm-panel-form-active' : ''}`}
+          className={`arm-panel${recolhido ? ' arm-panel-recolhido' : ''}${formularioAberto ? ' arm-panel-form-active' : ''}${modoTv ? ' arm-panel-tv' : ''}`}
         >
         <div className="arm-panel-head">
           <div className="arm-head-mark" aria-hidden="true"><span /></div>

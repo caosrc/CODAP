@@ -383,6 +383,17 @@ export default function AreasRiscoMapa({
             <div className="arm-eyebrow">DEFESA CIVIL · LAFAIETE</div>
             <h2>Áreas de risco</h2>
           </div>
+          <button
+            type="button"
+            className="arm-collapse"
+            aria-label={recolhido ? 'Expandir painel' : 'Recolher painel'}
+            title={recolhido ? 'Mostrar áreas de risco' : 'Ocultar áreas de risco'}
+            aria-expanded={!recolhido}
+            data-testid="button-recolher-painel-riscos"
+            onClick={() => setRecolhido(value => !value)}
+          >
+            <span aria-hidden="true">{recolhido ? '↓' : '↑'}</span>
+          </button>
           {modoTv && (
             <button
               type="button"
@@ -396,16 +407,6 @@ export default function AreasRiscoMapa({
               <span aria-hidden="true">+</span>
             </button>
           )}
-          <button
-            type="button"
-            className="arm-collapse"
-            aria-label={recolhido ? 'Expandir painel' : 'Recolher painel'}
-            aria-expanded={!recolhido}
-            data-testid="button-recolher-painel-riscos"
-            onClick={() => setRecolhido(value => !value)}
-          >
-            {recolhido ? '+' : '−'}
-          </button>
         </div>
         {!recolhido && (
           <>

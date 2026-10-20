@@ -6017,10 +6017,9 @@ html:-webkit-full-screen {
 
   body.radar-tv-active .radar-tv .weather-google-body {
     grid-template-columns:
-      minmax(100px, .7fr)
-      minmax(135px, .95fr)
-      minmax(0, 1.55fr)
-      minmax(0, 1.55fr);
+      minmax(132px, .95fr)
+      minmax(128px, .9fr)
+      minmax(0, 2.6fr);
     grid-template-rows: minmax(0, 1fr);
     width: 100%;
     height: 100%;
@@ -6241,5 +6240,53 @@ html:-webkit-full-screen {
   body.radar-tv-active .radar-tv .radar-ticker {
     flex: 0 0 auto;
     min-height: 22px;
+  }
+}
+
+/* Modo TV: distribuir o quadro de clima pelas três áreas que existem no JSX.
+   A quarta coluna antiga ficava vazia e comprimia os números da temperatura. */
+@media (min-width: 900px) and (orientation: landscape) {
+  body.radar-tv-active .radar-tv .weather-google-body {
+    grid-template-columns:
+      minmax(132px, .95fr)
+      minmax(128px, .9fr)
+      minmax(0, 2.6fr);
+    gap: clamp(.22rem, .42vw, .42rem);
+  }
+
+  body.radar-tv-active .radar-tv .weather-google-location .weather-google-current {
+    grid-template-columns: minmax(3.9rem, .85fr) 1.4rem minmax(0, 1.15fr);
+    gap: .14rem;
+    overflow: visible;
+  }
+
+  body.radar-tv-active .radar-tv .weather-google-temperature strong {
+    min-width: 3.9rem;
+    font-size: clamp(2rem, 2.25vw, 2.4rem);
+    font-variant-numeric: tabular-nums;
+    line-height: .96;
+    white-space: nowrap;
+  }
+
+  body.radar-tv-active .radar-tv .weather-google-forecast-column {
+    grid-column: 3;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+    align-items: stretch;
+    align-content: stretch;
+    min-height: 0;
+    gap: .12rem clamp(.2rem, .35vw, .38rem);
+  }
+
+  body.radar-tv-active .radar-tv .weather-google-hourly,
+  body.radar-tv-active .radar-tv .weather-google-days {
+    align-self: stretch;
+    min-height: 0;
+  }
+
+  body.radar-tv-active .radar-tv .weather-google-hour,
+  body.radar-tv-active .radar-tv .weather-google-day {
+    height: 100%;
+    min-height: 0;
   }
 }

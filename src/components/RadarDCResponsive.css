@@ -6306,6 +6306,12 @@ html:-webkit-full-screen {
   }
 }
 
+body.radar-tv-active .radar-tv .radar-live-map-risk-legend {
+  top: clamp(54px, 6vh, 74px);
+  right: auto;
+  left: clamp(8px, .75vw, 12px);
+}
+
 /* Modo TV: distribuir o quadro de clima pelas três áreas que existem no JSX.
    A quarta coluna antiga ficava vazia e comprimia os números da temperatura. */
 @media (min-width: 900px) and (orientation: landscape) {

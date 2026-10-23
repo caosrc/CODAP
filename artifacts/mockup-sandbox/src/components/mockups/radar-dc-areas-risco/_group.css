@@ -1,0 +1,63 @@
+@import url("https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap");
+
+.arm-preview-shell {
+  display: grid;
+  min-height: 100vh;
+  place-items: center;
+  padding: 28px;
+  color: #eaf5fc;
+  background:
+    radial-gradient(ellipse at 50% 0%, rgba(34, 107, 150, .22), transparent 58%),
+    #07192b;
+  font-family: "DM Sans", "Segoe UI", sans-serif;
+}
+
+.arm-preview-map {
+  position: relative;
+  width: min(520px, calc(100vw - 32px));
+  height: min(650px, calc(100vh - 32px));
+  overflow: hidden;
+  border: 1px solid rgba(112, 171, 201, .44);
+  border-radius: 18px;
+  background:
+    linear-gradient(35deg, transparent 47%, rgba(110, 165, 185, .16) 48%, transparent 49%),
+    linear-gradient(122deg, transparent 39%, rgba(110, 165, 185, .13) 40%, transparent 41%),
+    repeating-linear-gradient(0deg, rgba(65, 116, 141, .08) 0 1px, transparent 1px 42px),
+    repeating-linear-gradient(90deg, rgba(65, 116, 141, .08) 0 1px, transparent 1px 42px),
+    #102c42;
+  box-shadow: 0 22px 70px rgba(0, 0, 0, .4);
+}
+
+.arm-preview-map-lines {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(35deg, transparent 47%, rgba(110, 165, 185, .16) 48%, transparent 49%),
+    linear-gradient(122deg, transparent 39%, rgba(110, 165, 185, .13) 40%, transparent 41%),
+    repeating-linear-gradient(0deg, rgba(65, 116, 141, .08) 0 1px, transparent 1px 42px),
+    repeating-linear-gradient(90deg, rgba(65, 116, 141, .08) 0 1px, transparent 1px 42px);
+}
+
+.arm-preview-host {
+  position: absolute;
+  z-index: 1202;
+  inset: 16px;
+  pointer-events: none;
+}
+
+.arm-preview-host .arm-panel { pointer-events: auto; }
+
+.arm-preview-label {
+  position: absolute;
+  right: 14px;
+  bottom: 12px;
+  z-index: 401;
+  padding: 6px 9px;
+  border: 1px solid rgba(142, 191, 216, .2);
+  border-radius: 999px;
+  color: #b2ccdc;
+  background: rgba(7, 25, 43, .75);
+  font-size: 10px;
+  letter-spacing: .04em;
+  pointer-events: none;
+}

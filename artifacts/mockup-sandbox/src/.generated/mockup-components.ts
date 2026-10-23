@@ -2,10 +2,14 @@
 type ModuleMap = Record<string, () => Promise<Record<string, unknown>>>;
 export const modules: ModuleMap = {
   "./components/mockups/curral-header/Current.tsx": () => import("../components/mockups/curral-header/Current.tsx"),
+  "./components/mockups/radar-chuva-centro/CenterRain.tsx": () => import("../components/mockups/radar-chuva-centro/CenterRain.tsx"),
+  "./components/mockups/radar-chuva-centro/Current.tsx": () => import("../components/mockups/radar-chuva-centro/Current.tsx"),
   "./components/mockups/radar-chuva-acumulado-tv/ChuvaCentro24h.tsx": () => import("../components/mockups/radar-chuva-acumulado-tv/ChuvaCentro24h.tsx"),
   "./components/mockups/radar-chuva-acumulado-tv/Current.tsx": () => import("../components/mockups/radar-chuva-acumulado-tv/Current.tsx"),
   "./components/mockups/radar-chuva-acumulado-tv/TvReference.tsx": () => import("../components/mockups/radar-chuva-acumulado-tv/TvReference.tsx"),
-  "./components/mockups/radar-chuva-centro/CenterRain.tsx": () => import("../components/mockups/radar-chuva-centro/CenterRain.tsx"),
-  "./components/mockups/radar-chuva-centro/Current.tsx": () => import("../components/mockups/radar-chuva-centro/Current.tsx"),
+  "./components/mockups/radar-dc-areas-risco/AreasRiscoMapa.tsx": () => import("../components/mockups/radar-dc-areas-risco/AreasRiscoMapa.tsx"),
+  "./components/mockups/radar-dc-areas-risco/Compact.tsx": () => import("../components/mockups/radar-dc-areas-risco/Compact.tsx"),
+  "./components/mockups/radar-dc-areas-risco/LeafletPreview.tsx": () => import("../components/mockups/radar-dc-areas-risco/LeafletPreview.tsx"),
+  "./components/mockups/radar-dc-areas-risco/ModalSenha.tsx": () => import("../components/mockups/radar-dc-areas-risco/ModalSenha.tsx"),
   "./components/mockups/radar-tv/RadarTv.tsx": () => import("../components/mockups/radar-tv/RadarTv.tsx")
 };

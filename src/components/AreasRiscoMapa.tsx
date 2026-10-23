@@ -23,6 +23,10 @@ export interface AreasRiscoMapaProps {
 }
 
 const TIPOS = TIPOS_AREAS_RISCO
+const ROTULOS_TIPOS_COMPACTOS: Partial<Record<TipoAreaRisco, string>> = {
+  'Problemas de vias': 'Vias',
+  Deslizamentos: 'Desliz.',
+}
 const CORES = Object.fromEntries(
   TIPOS.map(tipo => [tipo, ESTILO_AREA_RISCO[tipo].cor]),
 ) as Record<TipoAreaRisco, string>
@@ -129,6 +133,7 @@ export default function AreasRiscoMapa({
 }: AreasRiscoMapaProps) {
   const [filtro, setFiltro] = useState<TipoAreaRisco | 'Todas'>('Todas')
   const [tiposVisiveisNoMapa, setTiposVisiveisNoMapa] = useState<Set<TipoAreaRisco>>(() => new Set(TIPOS))
+  const [listaAreasAberta, setListaAreasAberta] = useState(false)
   const [rascunho, setRascunho] = useState<DraftArea | null>(null)
   const [editandoId, setEditandoId] = useState<string | null>(null)
   const [modoMapa, setModoMapa] = useState<'marcador' | 'poligono' | null>(null)
@@ -484,16 +489,16 @@ export default function AreasRiscoMapa({
               <>
                 <div className="arm-map-layer-heading">
                   <div>
-                    <span>CAMADAS VISÍVEIS NO MAPA</span>
-                    <small>Marque os tipos que deseja exibir</small>
+                    <span>TIPOS NO MAPA</span>
                   </div>
                   <button
                     type="button"
                     onClick={alternarTodosTiposNoMapa}
                     aria-label={todosTiposVisiveisNoMapa ? 'Ocultar todas as classificações do mapa' : 'Exibir todas as classificações no mapa'}
+                    title={todosTiposVisiveisNoMapa ? 'Ocultar todas as classificações do mapa' : 'Exibir todas as classificações no mapa'}
                     data-testid="toggle-mapa-todas-areas"
                   >
-                    {todosTiposVisiveisNoMapa ? 'Desmarcar todas' : 'Marcar todas'}
+                    {todosTiposVisiveisNoMapa ? 'Nenhuma' : 'Todas'}
                   </button>
                 </div>
                 <div className="arm-types" aria-label="Filtrar lista por tipo e selecionar tipos visíveis no mapa">
@@ -517,12 +522,13 @@ export default function AreasRiscoMapa({
                           onClick={() => setFiltro(tipo)}
                           aria-label={`Filtrar lista por ${tipo}`}
                           aria-pressed={filtro === tipo}
+                          title={tipo}
                           data-testid={`filter-area-${TIPOS.indexOf(tipo)}`}
                         >
                           <span className="arm-type-symbol" style={{ '--arm-type-color': CORES[tipo] } as CSSProperties}>
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><g dangerouslySetInnerHTML={{ __html: ICONES[tipo] }} /></svg>
                           </span>
-                          <span className="arm-type-name">{tipo}</span><b>{contagens[tipo]}</b>
+                          <span className="arm-type-name">{ROTULOS_TIPOS_COMPACTOS[tipo] ?? tipo}</span><b>{contagens[tipo]}</b>
                         </button>
                         <button
                           type="button"
@@ -546,51 +552,68 @@ export default function AreasRiscoMapa({
                 )}
               </>
             )}
-            <div className="arm-area-list" data-testid="list-areas-risco">
-              {areasVisiveis.length === 0 && !carregando ? (
-                <div className="arm-empty" data-testid="status-sem-areas">
-                  <span className="arm-empty-rule" />
-                   <strong>
-                     {filtro === 'Todas'
-                       ? 'Nenhuma área cadastrada'
-                       : filtro === 'Interdições'
-                         ? 'Nenhuma interdição cadastrada'
-                         : `Sem áreas de ${filtro.toLowerCase()}`}
-                   </strong>
-                  <span>Registre um ponto no mapa; desenhar o perímetro é opcional.</span>
-                </div>
-              ) : areasVisiveis.map(area => {
-                const previsao = previsaoPorArea[area.id]
-                const alerta = previsao != null && Number.isFinite(previsao) && previsao > area.limite_precipitacao_mm
-                return (
-                  <div className={`arm-area-row${alerta ? ' arm-area-row-alerta' : ''}`} key={area.id} data-testid={`row-area-${area.id}`}>
-                    <span className="arm-area-color" style={{ backgroundColor: CORES[area.tipo] }} />
-                    <div className="arm-area-copy">
-                      <strong>{area.tipo}{alerta && <span className="arm-alert-tag">ALERTA</span>}</strong>
-                      <span>{area.referencia || `Início ${formatarData(area.data_inicio)}`}</span>
-                    </div>
-                     <span className="arm-rain-value" data-testid={`status-previsao-area-${area.id}`}>
-                        {area.tipo === 'Interdições'
-                          ? area.ocorrencia_id != null ? `Ocorrência #${area.ocorrencia_id}` : 'Interdição'
-                          : previsao == null ? '—' : formatarPrecipitacao(previsao)}
-                    </span>
-                      {area.ocorrencia_id != null ? (
-                        <button
-                          type="button"
-                          aria-label={`Abrir ocorrência ${area.ocorrencia_id}`}
-                          data-testid={`button-abrir-ocorrencia-lista-${area.id}`}
-                          onClick={() => onAbrirOcorrencia?.(area.ocorrencia_id!)}
-                        >
-                          Abrir
-                        </button>
-                      ) : <>
-                        <button type="button" aria-label={`Editar ${area.tipo}`} data-testid={`button-editar-lista-${area.id}`} onClick={() => abrirEdicao(area)}>Editar</button>
-                        <button type="button" aria-label={`Excluir ${area.tipo}`} className="arm-delete-inline" data-testid={`button-excluir-lista-${area.id}`} onClick={() => abrirExclusao(area)}>×</button>
-                      </>}
+            {areasVisiveis.length === 0 ? !carregando && (
+              <div className="arm-empty" data-testid="status-sem-areas">
+                <span className="arm-empty-rule" />
+                <strong>
+                  {filtro === 'Todas'
+                    ? 'Nenhuma área cadastrada'
+                    : filtro === 'Interdições'
+                      ? 'Nenhuma interdição cadastrada'
+                      : `Sem áreas de ${filtro.toLowerCase()}`}
+                </strong>
+                <span>Marque um ponto no mapa para cadastrar.</span>
+              </div>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  className="arm-list-toggle"
+                  aria-expanded={listaAreasAberta}
+                  aria-controls="arm-area-list"
+                  onClick={() => setListaAreasAberta(value => !value)}
+                  data-testid="toggle-lista-areas"
+                >
+                  <span>{listaAreasAberta ? 'Ocultar locais' : `Locais (${areasVisiveis.length})`}</span>
+                  <span aria-hidden="true">{listaAreasAberta ? '−' : '+'}</span>
+                </button>
+                {listaAreasAberta && (
+                  <div className="arm-area-list" id="arm-area-list" data-testid="list-areas-risco">
+                    {areasVisiveis.map(area => {
+                      const previsao = previsaoPorArea[area.id]
+                      const alerta = previsao != null && Number.isFinite(previsao) && previsao > area.limite_precipitacao_mm
+                      return (
+                        <div className={`arm-area-row${alerta ? ' arm-area-row-alerta' : ''}`} key={area.id} data-testid={`row-area-${area.id}`}>
+                          <span className="arm-area-color" style={{ backgroundColor: CORES[area.tipo] }} />
+                          <div className="arm-area-copy">
+                            <strong>{area.tipo}{alerta && <span className="arm-alert-tag">ALERTA</span>}</strong>
+                            <span>{area.referencia || `Início ${formatarData(area.data_inicio)}`}</span>
+                          </div>
+                          <span className="arm-rain-value" data-testid={`status-previsao-area-${area.id}`}>
+                            {area.tipo === 'Interdições'
+                              ? area.ocorrencia_id != null ? `Ocorrência #${area.ocorrencia_id}` : 'Interdição'
+                              : previsao == null ? '—' : formatarPrecipitacao(previsao)}
+                          </span>
+                          {area.ocorrencia_id != null ? (
+                            <button
+                              type="button"
+                              aria-label={`Abrir ocorrência ${area.ocorrencia_id}`}
+                              data-testid={`button-abrir-ocorrencia-lista-${area.id}`}
+                              onClick={() => onAbrirOcorrencia?.(area.ocorrencia_id!)}
+                            >
+                              Abrir
+                            </button>
+                          ) : <>
+                            <button type="button" aria-label={`Editar ${area.tipo}`} data-testid={`button-editar-lista-${area.id}`} onClick={() => abrirEdicao(area)}>Editar</button>
+                            <button type="button" aria-label={`Excluir ${area.tipo}`} className="arm-delete-inline" data-testid={`button-excluir-lista-${area.id}`} onClick={() => abrirExclusao(area)}>×</button>
+                          </>}
+                        </div>
+                      )
+                    })}
                   </div>
-                )
-              })}
-            </div>
+                )}
+              </>
+            )}
             {erro && <div className="arm-error" role="alert" data-testid="status-erro-servidor">{erro}</div>}
             {localErro && <div className="arm-error" role="alert" data-testid="status-erro-local">{localErro}</div>}
             {rascunho && (

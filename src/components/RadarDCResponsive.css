@@ -6546,6 +6546,7 @@ body.radar-tv-active .radar-tv .arm-panel-tv .arm-forecast-note,
 body.radar-tv-active .radar-tv .arm-panel-tv .arm-alert-banner,
 body.radar-tv-active .radar-tv .arm-panel-tv .arm-toolbar,
 body.radar-tv-active .radar-tv .arm-panel-tv .arm-area-list,
+body.radar-tv-active .radar-tv .arm-panel-tv .arm-list-toggle,
 body.radar-tv-active .radar-tv .arm-panel-tv .arm-panel-foot,
 body.radar-tv-active .radar-tv .arm-panel-tv .arm-error {
   display: none;

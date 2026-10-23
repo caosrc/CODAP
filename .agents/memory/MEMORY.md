@@ -16,3 +16,4 @@
 - [Chuva CEMADEN nos mapas](chuva-cemaden-mapas.md) — API e camadas exibem somente estações de Conselheiro Lafaiete; leituras antigas ou ausentes não parecem atuais.
 - [Ocorrências no mapa do Radar DC](radar-ocorrencias-dia.md) — o mapa acompanha a data selecionada no calendário e marca ocorrências georreferenciadas pela natureza.
 - [Alertas de áreas de risco](areas-risco-alertas.md) — cada limite usa o acumulado Open-Meteo das próximas 24 h no ponto georreferenciado da área.
+- [Gráfico de chuva no Radar TV](radar-tv-precipitacao.md) — o quadro TV precisa mostrar total, barras/linha e os quatro intervalos sem rolagem ou corte.

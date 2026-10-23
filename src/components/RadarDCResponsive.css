@@ -6249,6 +6249,198 @@ html:-webkit-full-screen {
   }
 }
 
+/*
+ * Precipitação CEMADEN no quadro compacto do Radar TV.
+ * Mantém o total, o gráfico e os quatro intervalos dentro da área sem rolagem.
+ */
+@media (min-width: 900px) and (orientation: landscape) {
+  body.radar-tv-active .radar-tv .radar-tv-hydro-rain {
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  body.radar-tv-active .radar-tv .radar-tv-hydro-rain > .chuva-centro-card {
+    display: flex;
+    flex: 1 1 0;
+    flex-direction: column;
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
+    max-height: 100%;
+    margin: 0;
+    border-radius: 6px;
+    box-shadow: none;
+  }
+
+  body.radar-tv-active .radar-tv .chuva-centro-topo {
+    flex: 0 0 auto;
+    gap: .3rem;
+    padding: clamp(.22rem, .34vw, .38rem) clamp(.34rem, .48vw, .55rem);
+  }
+
+  body.radar-tv-active .radar-tv .chuva-centro-eyebrow {
+    display: none;
+  }
+
+  body.radar-tv-active .radar-tv .chuva-centro-titulo-grupo h2 {
+    margin: 0 0 .12rem;
+    font-size: clamp(.58rem, .72vw, .82rem);
+    line-height: 1.08;
+    letter-spacing: -.015em;
+  }
+
+  body.radar-tv-active .radar-tv .chuva-centro-titulo-grupo p {
+    font-size: clamp(.43rem, .5vw, .56rem);
+    line-height: 1.15;
+  }
+
+  body.radar-tv-active .radar-tv .chuva-centro-total {
+    gap: .22rem;
+    min-width: 0;
+    max-width: 46%;
+    padding: .18rem .3rem;
+    border-radius: 6px;
+  }
+
+  body.radar-tv-active .radar-tv .chuva-centro-total-icone {
+    width: 1.12rem;
+    height: 1.12rem;
+  }
+
+  body.radar-tv-active .radar-tv .chuva-centro-total-icone svg {
+    width: .95rem;
+  }
+
+  body.radar-tv-active .radar-tv .chuva-centro-total strong {
+    font-size: clamp(.72rem, .96vw, 1.05rem);
+  }
+
+  body.radar-tv-active .radar-tv .chuva-centro-total small {
+    font-size: clamp(.38rem, .42vw, .48rem);
+    line-height: 1.15;
+  }
+
+  body.radar-tv-active .radar-tv .chuva-centro-corpo {
+    display: flex;
+    flex: 1 1 0;
+    flex-direction: column;
+    gap: clamp(.16rem, .24vw, .24rem);
+    min-height: 0;
+    padding: clamp(.2rem, .28vw, .3rem) clamp(.24rem, .34vw, .38rem);
+    overflow: hidden;
+  }
+
+  body.radar-tv-active .radar-tv .chuva-centro-meta,
+  body.radar-tv-active .radar-tv .chuva-centro-aviso-serie,
+  body.radar-tv-active .radar-tv .chuva-centro-fonte,
+  body.radar-tv-active .radar-tv .chuva-centro-indicador-fonte,
+  body.radar-tv-active .radar-tv .radar-cnl-diaria-detalhe {
+    display: none;
+  }
+
+  body.radar-tv-active .radar-tv .chuva-centro-grafico-wrap {
+    display: flex;
+    flex: 1 1 0;
+    flex-direction: column;
+    min-height: 0;
+    margin: 0;
+    padding: .12rem .24rem .08rem;
+    border-radius: 6px;
+    overflow: hidden;
+  }
+
+  body.radar-tv-active .radar-tv .chuva-centro-grafico-cabecalho {
+    flex: 0 0 auto;
+    flex-wrap: wrap;
+    gap: .12rem .35rem;
+    margin-bottom: .04rem;
+  }
+
+  body.radar-tv-active .radar-tv .chuva-centro-grafico-cabecalho > strong {
+    gap: .18rem;
+    font-size: clamp(.43rem, .5vw, .58rem);
+  }
+
+  body.radar-tv-active .radar-tv .chuva-centro-grafico-cabecalho > strong svg {
+    width: .75rem;
+    height: .75rem;
+  }
+
+  body.radar-tv-active .radar-tv .chuva-centro-legenda {
+    justify-content: flex-start;
+    gap: .1rem .38rem;
+    font-size: clamp(.38rem, .43vw, .49rem);
+    line-height: 1.1;
+  }
+
+  body.radar-tv-active .radar-tv .chuva-centro-legenda span {
+    gap: .14rem;
+  }
+
+  body.radar-tv-active .radar-tv .chuva-centro-grafico {
+    flex: 1 1 0;
+    width: 100%;
+    height: clamp(78px, 12vh, 132px);
+    min-height: 70px;
+    max-height: 100%;
+  }
+
+  body.radar-tv-active .radar-tv .chuva-centro-eixo,
+  body.radar-tv-active .radar-tv .chuva-centro-eixo-titulo {
+    font-size: 17px;
+  }
+
+  body.radar-tv-active .radar-tv .chuva-centro-eixo-categoria {
+    font-size: 17px;
+  }
+
+  body.radar-tv-active .radar-tv .chuva-centro-eixo-categoria tspan + tspan {
+    font-size: 12px;
+  }
+
+  body.radar-tv-active .radar-tv .chuva-centro-rotulo-barra,
+  body.radar-tv-active .radar-tv .chuva-centro-rotulo-acumulado {
+    font-size: 19px;
+  }
+
+  body.radar-tv-active .radar-tv .chuva-centro-indicadores {
+    flex: 0 0 auto;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    margin: 0;
+    border-radius: 6px;
+  }
+
+  body.radar-tv-active .radar-tv .chuva-centro-indicador {
+    min-height: 2.45rem;
+    padding: .22rem .12rem .2rem 1.38rem;
+  }
+
+  body.radar-tv-active .radar-tv .chuva-centro-indicador > span:not(.chuva-centro-indicador-icone) {
+    font-size: clamp(.37rem, .42vw, .48rem);
+    line-height: 1.05;
+  }
+
+  body.radar-tv-active .radar-tv .chuva-centro-indicador strong {
+    margin-top: .08rem;
+    font-size: clamp(.58rem, .75vw, .82rem);
+    line-height: 1.05;
+  }
+
+  body.radar-tv-active .radar-tv .chuva-centro-indicador small {
+    margin-top: .06rem;
+    font-size: clamp(.34rem, .39vw, .45rem);
+    line-height: 1.05;
+    overflow-wrap: anywhere;
+  }
+
+  body.radar-tv-active .radar-tv .chuva-centro-indicador-icone {
+    left: .18rem;
+    width: 1.05rem;
+    height: 1.05rem;
+  }
+}
+
 @media (min-width: 701px) and (max-width: 899px) {
   body.radar-tv-active .radar-tv .radar-live-map-frame {
     height: min(720px, calc(100dvh - 330px));

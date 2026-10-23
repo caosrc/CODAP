@@ -23,7 +23,7 @@ type Props = {
 
 const LARGURA = 960
 const ALTURA = 320
-const MARGEM = { topo: 30, direita: 42, baixo: 38, esquerda: 42 }
+const MARGEM = { topo: 42, direita: 48, baixo: 42, esquerda: 48 }
 const HORA_MS = 60 * 60 * 1000
 
 function formatarMm(valor: number | null | undefined) {
@@ -32,9 +32,17 @@ function formatarMm(valor: number | null | undefined) {
     : `${valor.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} mm`
 }
 
+function formatarNumero(valor: number) {
+  return valor.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })
+}
+
 function horaDoPonto(ponto: PontoSerie) {
   const hora = ponto.hora.match(/\d{1,2}/)?.[0]
   return hora ? `${hora.padStart(2, '0')}h` : ponto.hora
+}
+
+function horaDoInstante(instante: number) {
+  return `${String(new Date(instante).getUTCHours()).padStart(2, '0')}h`
 }
 
 function instanteDoPonto(ponto: PontoSerie): number | null {
@@ -99,6 +107,14 @@ function maiorJanelaCompleta(slots: ReturnType<typeof completarSerie>['slots'], 
   return melhor
 }
 
+function tetoEscala(valor: number) {
+  const alvo = Math.max(valor, 0.1)
+  const expoente = 10 ** Math.floor(Math.log10(alvo))
+  const escala = alvo / expoente
+  const passo = [1, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10].find(item => item >= escala) || 10
+  return passo * expoente
+}
+
 function IconeGota() {
   return (
     <svg viewBox="0 0 32 32" aria-hidden="true">
@@ -106,6 +122,20 @@ function IconeGota() {
       <path d="M11.2 20.3a5 5 0 0 0 4.4 4.8" className="chuva-centro-gota-brilho" />
     </svg>
   )
+}
+
+function IconeIndicador({ tipo }: { tipo: 'chuva' | 'total' | 'periodo' | 'horas' | 'media' }) {
+  if (tipo === 'total') return <IconeGota />
+  if (tipo === 'chuva') {
+    return <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M8 19a6 6 0 0 1 .4-12A8 8 0 0 1 23 9a5 5 0 0 1 1 10H8Z" /><path d="m11 22-2 4m9-4-2 4m9-4-2 4" /></svg>
+  }
+  if (tipo === 'periodo') {
+    return <svg viewBox="0 0 32 32" aria-hidden="true"><rect x="4" y="6" width="20" height="21" rx="2" /><path d="M9 3v6m10-6v6M4 12h20m3 9v7m-3-3h6" /></svg>
+  }
+  if (tipo === 'horas') {
+    return <svg viewBox="0 0 32 32" aria-hidden="true"><rect x="4" y="18" width="6" height="11" rx="1" /><rect x="13" y="11" width="6" height="18" rx="1" /><rect x="22" y="4" width="6" height="25" rx="1" /></svg>
+  }
+  return <svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="12" /><path d="m21 10-10 12m1-8a2 2 0 1 0 0-4 2 2 0 0 0 0 4Zm8 10a2 2 0 1 0 0-4 2 2 0 0 0 0 4Z" /></svg>
 }
 
 export function ChuvaCentro24h({ pontos, estacao }: Props) {
@@ -120,22 +150,25 @@ export function ChuvaCentro24h({ pontos, estacao }: Props) {
   const horasComChuva = observados.filter(ponto => ponto.valor > 0).length
   const somaObservada = observados.reduce((total, ponto) => total + ponto.valor, 0)
   const intensidadeMedia = horasComChuva ? somaObservada / horasComChuva : null
-  const janela6h = maiorJanelaCompleta(slots, 6)
-  const acumuladoEscala = Math.max(1, ...slots.map(slot => slot.ponto?.valor || 0))
+  const janela4h = maiorJanelaCompleta(slots, 4)
+  const acumuladoEscala = tetoEscala(Math.max(1, ...slots.map(slot => slot.ponto?.valor || 0)))
   const acumuladoObservado = slots.reduce<number[]>((totais, slot) => {
     totais.push((totais.at(-1) || 0) + (slot.ponto?.valor || 0))
     return totais
   }, [])
-  const maximoAcumulado = Math.max(1, total24h || 0, ...acumuladoObservado)
+  const maximoAcumulado = tetoEscala(Math.max(1, total24h || 0, ...acumuladoObservado))
+  const intervalosChuva = Array.from({ length: 5 }, (_, indice) => indice / 4)
   const larguraArea = LARGURA - MARGEM.esquerda - MARGEM.direita
   const alturaArea = ALTURA - MARGEM.topo - MARGEM.baixo
   const x = (indice: number) => MARGEM.esquerda + indice * larguraArea / 23
-  const yChuva = (valor: number) => MARGEM.topo + alturaArea - valor / acumuladoEscala * alturaArea
   const yAcumulado = (valor: number) => MARGEM.topo + alturaArea - valor / maximoAcumulado * alturaArea
-  const pontosLinha = slots
-    .filter(slot => slot.ponto)
-    .map(slot => `${x(slots.indexOf(slot)).toFixed(1)},${yAcumulado(acumuladoObservado[slots.indexOf(slot)]).toFixed(1)}`)
-    .join(' ')
+  const segmentosLinha: number[][] = []
+  slots.forEach((slot, indice) => {
+    if (!slot.ponto) return
+    const segmento = segmentosLinha.at(-1)
+    if (indice === 0 || !slots[indice - 1].ponto) segmentosLinha.push([indice])
+    else segmento?.push(indice)
+  })
   const janelasFallback = [
     { rotulo: '1h', valor: estacao?.acumulados.umaHora ?? null },
     { rotulo: '3h', valor: estacao?.acumulados.tresHoras ?? null },
@@ -151,13 +184,13 @@ export function ChuvaCentro24h({ pontos, estacao }: Props) {
         <div className="chuva-centro-titulo-grupo">
           <span className="chuva-centro-eyebrow">PLUVIÔMETRO CEMADEN · {estacao?.nome || 'CENTRO'}</span>
           <h2 id="chuva-centro-titulo">Precipitação acumulada nas últimas 24 horas</h2>
-          <p>Estação {estacao?.nome || 'Centro'} · Conselheiro Lafaiete/MG</p>
+          <p>Estação: {estacao?.nome || 'Centro'} · Últimas 24 horas</p>
         </div>
         <div className="chuva-centro-total" aria-label={`Acumulado em 24 horas: ${formatarMm(total24h)}`}>
           <span className="chuva-centro-total-icone"><IconeGota /></span>
           <div>
             <strong>{formatarMm(total24h)}</strong>
-            <small>Total oficial em 24 h</small>
+            <small>Total oficial CEMADEN · 24 h</small>
           </div>
         </div>
       </header>
@@ -171,9 +204,9 @@ export function ChuvaCentro24h({ pontos, estacao }: Props) {
       {serieDisponivel ? (
         <div className="chuva-centro-grafico-wrap">
           <div className="chuva-centro-legenda">
-            <span><i className="chuva-centro-legenda-barra" /> Chuva observada por hora</span>
-            <span><i className="chuva-centro-legenda-linha" /> Acumulado da série horária</span>
-            <small>{cobertura} de 24 horários com leitura</small>
+            <span><i className="chuva-centro-legenda-barra" /> Precipitação por hora</span>
+            <span><i className="chuva-centro-legenda-linha" /> Precipitação acumulada na série</span>
+            <small>{cobertura}/24 horários</small>
           </div>
           <svg
             className="chuva-centro-grafico"
@@ -188,29 +221,37 @@ export function ChuvaCentro24h({ pontos, estacao }: Props) {
                 <stop offset="100%" stopColor="#9bd0ff" />
               </linearGradient>
             </defs>
-            {[0, 0.25, 0.5, 0.75, 1].map(proporcao => {
+            {intervalosChuva.map(proporcao => {
               const linhaY = MARGEM.topo + alturaArea * (1 - proporcao)
               return (
                 <g key={proporcao}>
                   <line x1={MARGEM.esquerda} x2={LARGURA - MARGEM.direita} y1={linhaY} y2={linhaY} className="chuva-centro-grade" />
                   <text x={MARGEM.esquerda - 8} y={linhaY + 4} textAnchor="end" className="chuva-centro-eixo">
-                    {(acumuladoEscala * proporcao).toLocaleString('pt-BR', { maximumFractionDigits: 1 })}
+                    {formatarNumero(acumuladoEscala * proporcao)}
                   </text>
                   <text x={LARGURA - MARGEM.direita + 8} y={linhaY + 4} textAnchor="start" className="chuva-centro-eixo">
-                    {(maximoAcumulado * proporcao).toLocaleString('pt-BR', { maximumFractionDigits: 1 })}
+                    {formatarNumero(maximoAcumulado * proporcao)}
                   </text>
                 </g>
               )
             })}
             {slots.map((slot, indice) => {
-              if (!slot.ponto) return null
-              const alturaBarra = Math.max(1, slot.ponto.valor / acumuladoEscala * alturaArea)
               const larguraBarra = Math.max(5, larguraArea / 24 * 0.56)
+              if (!slot.ponto) {
+                return (
+                  <text key={slot.instante} x={x(indice)} y={ALTURA - 12} textAnchor="middle" className="chuva-centro-eixo">
+                    {horaDoInstante(slot.instante)}
+                  </text>
+                )
+              }
+              const alturaBarra = Math.max(1, slot.ponto.valor / acumuladoEscala * alturaArea)
+              const yBarra = MARGEM.topo + alturaArea - alturaBarra
+              const yRotuloBarra = Math.max(MARGEM.topo + 10, yBarra - 6)
               return (
                 <g key={slot.instante}>
                   <rect
                     x={x(indice) - larguraBarra / 2}
-                    y={MARGEM.topo + alturaArea - alturaBarra}
+                    y={yBarra}
                     width={larguraBarra}
                     height={alturaBarra}
                     rx="3"
@@ -218,32 +259,44 @@ export function ChuvaCentro24h({ pontos, estacao }: Props) {
                   >
                     <title>{`${rotuloInstante(slot.instante)} · ${formatarMm(slot.ponto.valor)}`}</title>
                   </rect>
-                  {indice % 3 === 0 || indice === 23 ? (
-                    <text x={x(indice)} y={ALTURA - 12} textAnchor="middle" className="chuva-centro-eixo">
-                      {horaDoPonto(slot.ponto)}
-                    </text>
-                  ) : null}
+                  <text x={x(indice)} y={yRotuloBarra} textAnchor="middle" className="chuva-centro-rotulo-barra">
+                    {formatarNumero(slot.ponto.valor)}
+                  </text>
+                  <text x={x(indice)} y={ALTURA - 12} textAnchor="middle" className="chuva-centro-eixo">
+                    {horaDoPonto(slot.ponto)}
+                  </text>
                 </g>
               )
             })}
-            {observados.length > 1 && <polyline points={pontosLinha} className="chuva-centro-curva" />}
+            {segmentosLinha.map(segmento => segmento.length > 1 ? (
+              <polyline
+                key={`linha-${segmento[0]}`}
+                points={segmento.map(indice => `${x(indice).toFixed(1)},${yAcumulado(acumuladoObservado[indice]).toFixed(1)}`).join(' ')}
+                className="chuva-centro-curva"
+              />
+            ) : null)}
             {slots.map((slot, indice) => {
               if (!slot.ponto) return null
               const acumulado = acumuladoObservado[indice]
+              const yRotuloAcumulado = Math.max(MARGEM.topo + 12, yAcumulado(acumulado) - 9)
               return (
-                <circle key={`linha-${slot.instante}`} cx={x(indice)} cy={yAcumulado(acumulado)} r="3.2" className="chuva-centro-ponto">
-                  <title>{`${rotuloInstante(slot.instante)} · acumulado observado: ${formatarMm(acumulado)}`}</title>
-                </circle>
+                <g key={`linha-${slot.instante}`}>
+                  <circle cx={x(indice)} cy={yAcumulado(acumulado)} r="3.2" className="chuva-centro-ponto">
+                    <title>{`${rotuloInstante(slot.instante)} · acumulado observado na série: ${formatarMm(acumulado)}`}</title>
+                  </circle>
+                  <text x={x(indice)} y={yRotuloAcumulado} textAnchor="middle" className="chuva-centro-rotulo-acumulado">
+                    {formatarNumero(acumulado)}
+                  </text>
+                </g>
               )
             })}
-            <text x={MARGEM.esquerda} y="14" className="chuva-centro-eixo-titulo">Chuva por hora (mm)</text>
-            <text x={LARGURA - MARGEM.direita} y="14" textAnchor="end" className="chuva-centro-eixo-titulo">Acumulado da série (mm)</text>
+            <text x={MARGEM.esquerda} y="18" className="chuva-centro-eixo-titulo">Chuva por hora (mm)</text>
+            <text x={LARGURA - MARGEM.direita} y="18" textAnchor="end" className="chuva-centro-eixo-titulo">Acumulado (mm)</text>
           </svg>
-          {cobertura < 24 && (
-            <p className="chuva-centro-aviso-serie">
-              O gráfico mostra os horários recebidos; o total de 24 h acima vem do acumulado oficial do catálogo CEMADEN.
-            </p>
-          )}
+          <p className="chuva-centro-aviso-serie">
+            Barras e curva usam registros horários recebidos; o total acima é o acumulado móvel oficial de 24 h publicado pelo CEMADEN.
+            {cobertura < 24 ? ` Há ${24 - cobertura} horário(s) sem leitura na série.` : ''}
+          </p>
         </div>
       ) : (
         <div className="chuva-centro-fallback">
@@ -274,26 +327,31 @@ export function ChuvaCentro24h({ pontos, estacao }: Props) {
 
       <div className="chuva-centro-indicadores">
         <article className="chuva-centro-indicador">
+          <span className="chuva-centro-indicador-icone chuva-centro-indicador-icone-chuva"><IconeIndicador tipo="chuva" /></span>
           <span>Maior chuva em 1 h</span>
           <strong>{formatarMm(maiorHora?.valor ?? estacao?.acumulados.umaHora)}</strong>
           <small>{maiorHora ? `às ${horaDoPonto(maiorHora)}` : 'leitura horária indisponível'}</small>
         </article>
         <article className="chuva-centro-indicador">
+          <span className="chuva-centro-indicador-icone chuva-centro-indicador-icone-total"><IconeIndicador tipo="total" /></span>
           <span>Total acumulado em 24 h</span>
           <strong>{formatarMm(total24h)}</strong>
           <small>valor oficial do catálogo CEMADEN</small>
         </article>
         <article className="chuva-centro-indicador">
-          <span>{janela6h ? 'Janela mais chuvosa · 6 h' : 'Acumulado nas últimas 12 h'}</span>
-          <strong>{formatarMm(janela6h?.valor ?? estacao?.acumulados.dozeHoras)}</strong>
-          <small>{janela6h ? `${rotuloInstante(janela6h.inicio)}–${rotuloInstante(janela6h.fim)}` : 'valor oficial do catálogo CEMADEN'}</small>
+          <span className="chuva-centro-indicador-icone chuva-centro-indicador-icone-periodo"><IconeIndicador tipo="periodo" /></span>
+          <span>{janela4h ? 'Período com mais chuva · 4 h' : 'Acumulado nas últimas 12 h'}</span>
+          <strong>{formatarMm(janela4h?.valor ?? estacao?.acumulados.dozeHoras)}</strong>
+          <small>{janela4h ? `${horaDoInstante(janela4h.inicio)}–${horaDoInstante(janela4h.fim)}` : 'valor oficial do catálogo CEMADEN'}</small>
         </article>
         <article className="chuva-centro-indicador">
+          <span className="chuva-centro-indicador-icone chuva-centro-indicador-icone-horas"><IconeIndicador tipo="horas" /></span>
           <span>Horas com chuva</span>
           <strong>{serieDisponivel ? `${horasComChuva} h` : '—'}</strong>
           <small>{serieDisponivel ? `${cobertura} horário(s) recebido(s)` : 'aguardando série horária'}</small>
         </article>
         <article className="chuva-centro-indicador">
+          <span className="chuva-centro-indicador-icone chuva-centro-indicador-icone-media"><IconeIndicador tipo="media" /></span>
           <span>Intensidade média</span>
           <strong>{intensidadeMedia == null ? '—' : `${intensidadeMedia.toLocaleString('pt-BR', { maximumFractionDigits: 2 })} mm/h`}</strong>
           <small>nas horas observadas com chuva</small>

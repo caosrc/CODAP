@@ -12,7 +12,8 @@ import { listarOcorrenciasPorData } from '../api'
 import type { Ocorrencia } from '../types'
 import { TIPOS_AREAS_RISCO, type AreaRisco, type AreaRiscoInput, type TipoAreaRisco } from '../areasRisco'
 import { ehFerramentalPorLitro } from '../ferramentalUtils'
-import { ChartaChuva, GraficoNivel, type EstacaoCNL, type LeituraCNL, type PontoNivel, type PontoSerie } from './MonitoramentoCNL'
+import { GraficoNivel, type EstacaoCNL, type LeituraCNL, type PontoNivel, type PontoSerie } from './MonitoramentoCNL'
+import { ChuvaCentro24h, type EstacaoChuvaCentro } from './ChuvaCentro24h'
 import type { Map as LeafletMap } from 'leaflet'
 import {
   CapturaEstadoMapa,
@@ -61,7 +62,7 @@ type DadosRadarCNL = {
   estacoes: RadarEstacaoCNL[]
   serie: PontoSerie[]
   serieChuvaCentro?: PontoSerie[]
-  estacaoChuvaCentro?: { nome: string; codigo?: string } | null
+  estacaoChuvaCentro?: EstacaoChuvaCentro | null
   serieNivel: PontoNivel[]
 }
 type RadarEstacaoCNL = EstacaoCNL & {
@@ -1357,7 +1358,7 @@ export default function RadarDC() {
            estacoes?: RadarEstacaoCNL[]
            serie?: PontoSerie[]
            serieChuvaCentro?: PontoSerie[]
-           estacaoChuvaCentro?: { nome: string; codigo?: string } | null
+            estacaoChuvaCentro?: EstacaoChuvaCentro | null
            serieNivel?: PontoNivel[]
          }
         if (!resposta.ok || !corpo.sucesso || !corpo.estacao || !Array.isArray(corpo.serieNivel)) {
@@ -2016,17 +2017,10 @@ export default function RadarDC() {
                     <GraficoNivel pontos={dadosCNL.serieNivel} estacao={dadosCNL.estacao} mostrarTooltip={false} mostrarFonte={false} mostrarLeituraAtual />
                   </section>
                   <section className="radar-tv-hydro-panel radar-tv-hydro-rain">
-                    <section className="cnl-bloco radar-cnl-rain-monitoramento" aria-labelledby="radar-chuva-24h-titulo">
-                      <div className="cnl-bloco-cabecalho">
-                        <div><span className="cnl-eyebrow">Chuva acumulada</span><h2 id="radar-chuva-24h-titulo">Últimas 24 horas</h2></div>
-                        <span className="cnl-badge-fonte">Atualização automática · 5 min</span>
-                      </div>
-                      <ChartaChuva
-                        pontos={dadosCNL.serieChuvaCentro || []}
-                        estacao={dadosCNL.estacaoChuvaCentro}
-                        margemEixoEsquerdo={100}
-                      />
-                    </section>
+                    <ChuvaCentro24h
+                      pontos={dadosCNL.serieChuvaCentro || []}
+                      estacao={dadosCNL.estacaoChuvaCentro}
+                    />
                     <details className="radar-cnl-diaria-detalhe">
                       <summary className="radar-precipitacao-resumo" aria-label="Precipitação atual por estação">
                         {resumoPrecipitacao || 'Consultando precipitações...'}

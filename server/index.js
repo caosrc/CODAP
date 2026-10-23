@@ -4206,13 +4206,24 @@ app.get('/api/monitoramento-cnl', async (_req, res) => {
         }]
       }),
     )
-    const estacaoCentroCatalogo = estacoesCatalogo.find((item) => Number(item?.idestacao) === CNL_ESTACAO_CHUVA_CENTRO_ID)
+    // A consulta horária pode ficar indisponível independentemente do catálogo.
+    // Ainda assim, o catálogo oficial publica os acumulados móveis da estação Centro.
+    const estacaoCentroCatalogo = (Array.isArray(catalogo) ? catalogo : [])
+      .find((item) => Number(item?.idestacao) === CNL_ESTACAO_CHUVA_CENTRO_ID)
     const estacaoCentroId = Number(estacaoCentroCatalogo?.idestacao)
     const payloadCentro = Number.isFinite(estacaoCentroId) ? chuvaPayloads.get(estacaoCentroId) : null
-    const estacaoChuvaCentro = estacaoCentroCatalogo && payloadCentro
+    const estacaoChuvaCentro = estacaoCentroCatalogo
       ? {
-          nome: String(estacaoCentroCatalogo.nomeestacao || payloadCentro.estacao?.nome || 'Centro'),
-          codigo: CNL_ESTACAO_CHUVA_CENTRO_CODIGO,
+          nome: String(estacaoCentroCatalogo.nomeestacao || payloadCentro?.estacao?.nome || 'Centro'),
+          codigo: String(payloadCentro?.estacao?.codEstacao || CNL_ESTACAO_CHUVA_CENTRO_CODIGO),
+          dataHora: String(estacaoCentroCatalogo.datahoraUltimovalor || ''),
+          acumulados: {
+            umaHora: numeroCemaden(estacaoCentroCatalogo.acc1hr),
+            tresHoras: numeroCemaden(estacaoCentroCatalogo.acc3hr),
+            seisHoras: numeroCemaden(estacaoCentroCatalogo.acc6hr),
+            dozeHoras: numeroCemaden(estacaoCentroCatalogo.acc12hr),
+            vinteQuatroHoras: numeroCemaden(estacaoCentroCatalogo.acc24hr),
+          },
         }
       : null
     const serieChuvaCentro = payloadCentro ? montarSerieHorariaCnl(payloadCentro) : []

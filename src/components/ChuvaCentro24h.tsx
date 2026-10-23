@@ -20,7 +20,7 @@ type Props = {
 
 const LARGURA = 960
 const ALTURA = 330
-const MARGEM = { topo: 48, direita: 56, baixo: 58, esquerda: 58 }
+const MARGEM = { topo: 46, direita: 34, baixo: 48, esquerda: 52 }
 const HORA_MS = 60 * 60 * 1000
 
 function formatarMm(valor: number | null | undefined) {
@@ -39,6 +39,10 @@ function rotuloLeituraCemaden(valor?: string) {
 
 function formatarNumero(valor: number) {
   return valor.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 2 })
+}
+
+function formatarEscala(valor: number) {
+  return valor.toLocaleString('pt-BR', { maximumFractionDigits: 1 })
 }
 
 function tetoEscala(valor: number) {
@@ -73,17 +77,21 @@ function intervaloJanela(horas: number, dataHora?: string) {
   return `${formatador.format(new Date(inicio))} – ${formatador.format(new Date(fim))}`
 }
 
-function IconeGota() {
+function IconeChuva() {
   return (
-    <svg viewBox="0 0 32 32" aria-hidden="true">
-      <path d="M16 2.5C12.5 8 6.5 14.2 6.5 20a9.5 9.5 0 0 0 19 0c0-5.8-6-12-9.5-17.5Z" />
-      <path d="M11.2 20.3a5 5 0 0 0 4.4 4.8" className="chuva-centro-gota-brilho" />
+    <svg viewBox="0 0 40 36" aria-hidden="true">
+      <path d="M10 23.5h18a6.5 6.5 0 0 0 .4-13A9.7 9.7 0 0 0 10 12.3a5.6 5.6 0 0 0 0 11.2Z" />
+      <path d="m14 27-2 5m10-5-2 5m10-5-2 5" className="chuva-centro-gota-brilho" />
     </svg>
   )
 }
 
 function IconeIndicador() {
   return <svg viewBox="0 0 32 32" aria-hidden="true"><rect x="4" y="6" width="20" height="21" rx="2" /><path d="M9 3v6m10-6v6M4 12h20m3 9v7m-3-3h6" /></svg>
+}
+
+function IconeRelogio() {
+  return <svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="11.5" /><path d="M16 9v7l5 3" /></svg>
 }
 
 export function ChuvaCentro24h({ estacao }: Props) {
@@ -105,14 +113,13 @@ export function ChuvaCentro24h({ estacao }: Props) {
   const temDados = janelas.some(janela => janela.valor != null)
   const maiorIncremento = Math.max(1, ...incrementoPorPeriodo.filter((valor): valor is number => valor != null))
   const maiorAcumulado = Math.max(1, ...janelas.map(janela => janela.valor ?? 0))
-  const escalaIncremento = tetoEscala(maiorIncremento)
-  const escalaAcumulado = tetoEscala(maiorAcumulado)
+  const escala = tetoEscala(Math.max(maiorIncremento, maiorAcumulado))
   const grade = Array.from({ length: 6 }, (_, indice) => indice / 5)
   const larguraArea = LARGURA - MARGEM.esquerda - MARGEM.direita
   const alturaArea = ALTURA - MARGEM.topo - MARGEM.baixo
-  const espacamento = larguraArea / (janelas.length - 1)
-  const x = (indice: number) => MARGEM.esquerda + indice * espacamento
-  const yAcumulado = (valor: number) => MARGEM.topo + alturaArea - valor / escalaAcumulado * alturaArea
+  const espacamento = larguraArea / janelas.length
+  const x = (indice: number) => MARGEM.esquerda + (indice + 0.5) * espacamento
+  const yValor = (valor: number) => MARGEM.topo + alturaArea - valor / escala * alturaArea
   const segmentosLinha: number[][] = []
   janelas.forEach((janela, indice) => {
     if (janela.valor == null) return
@@ -131,7 +138,7 @@ export function ChuvaCentro24h({ estacao }: Props) {
           <p>Estação: {tituloEstacao}</p>
         </div>
         <div className="chuva-centro-total" aria-label={`Acumulado oficial em 24 horas: ${formatarMm(total24h)}`}>
-          <span className="chuva-centro-total-icone"><IconeGota /></span>
+          <span className="chuva-centro-total-icone"><IconeChuva /></span>
           <div>
             <small>Acumulado em 24 horas</small>
             <strong>{formatarMm(total24h)}</strong>
@@ -151,8 +158,8 @@ export function ChuvaCentro24h({ estacao }: Props) {
             <div className="chuva-centro-grafico-cabecalho">
               <strong><IconeIndicador /> Acumulado de precipitação</strong>
               <div className="chuva-centro-legenda">
-                <span><i className="chuva-centro-legenda-barra" /> Chuva no intervalo</span>
-                <span><i className="chuva-centro-legenda-linha" /> Acumulado oficial da janela</span>
+                <span><i className="chuva-centro-legenda-barra" /> Acumulado no período (mm)</span>
+                <span><i className="chuva-centro-legenda-linha" /> Acumulado total (mm)</span>
               </div>
             </div>
             <svg
@@ -174,17 +181,14 @@ export function ChuvaCentro24h({ estacao }: Props) {
                   <g key={proporcao}>
                     <line x1={MARGEM.esquerda} x2={LARGURA - MARGEM.direita} y1={linhaY} y2={linhaY} className="chuva-centro-grade" />
                     <text x={MARGEM.esquerda - 10} y={linhaY + 4} textAnchor="end" className="chuva-centro-eixo">
-                      {formatarNumero(escalaIncremento * proporcao)}
-                    </text>
-                    <text x={LARGURA - MARGEM.direita + 10} y={linhaY + 4} textAnchor="start" className="chuva-centro-eixo">
-                      {formatarNumero(escalaAcumulado * proporcao)}
+                      {formatarEscala(escala * proporcao)}
                     </text>
                   </g>
                 )
               })}
               {janelas.map((janela, indice) => {
                 const incremento = incrementoPorPeriodo[indice]
-                const larguraBarra = Math.min(100, espacamento * 0.38)
+                const larguraBarra = Math.min(100, espacamento * 0.45)
                 if (incremento == null) {
                   return (
                     <g key={janela.rotulo}>
@@ -192,9 +196,23 @@ export function ChuvaCentro24h({ estacao }: Props) {
                     </g>
                   )
                 }
-                const alturaBarra = incremento > 0 ? (incremento / escalaIncremento) * alturaArea : 1
+                const alturaBarra = incremento > 0 ? (incremento / escala) * alturaArea : 1
                 const yBarra = MARGEM.topo + alturaArea - alturaBarra
-                const rotuloY = Math.max(MARGEM.topo + 13, yBarra - 8)
+                const linhaProxima = janela.valor != null && Math.abs(yValor(janela.valor) - yBarra) < 28
+                const barraBaixa = alturaBarra < Math.max(20, alturaArea * 0.08)
+                const rotuloDentro = linhaProxima && !barraBaixa
+                const rotuloDeslocado = linhaProxima && barraBaixa
+                const rotuloX = rotuloDeslocado
+                  ? x(indice) + (indice < janelas.length / 2 ? 1 : -1) * (larguraBarra / 2 + 8)
+                  : x(indice)
+                const rotuloAncora = rotuloDeslocado
+                  ? indice < janelas.length / 2 ? 'start' : 'end'
+                  : 'middle'
+                const rotuloY = rotuloDentro
+                  ? Math.min(MARGEM.topo + alturaArea - 4, yBarra + 21)
+                  : barraBaixa
+                    ? MARGEM.topo + alturaArea - 5
+                    : Math.max(MARGEM.topo + 14, yBarra - 8)
                 return (
                   <g key={janela.rotulo}>
                     <rect
@@ -207,8 +225,13 @@ export function ChuvaCentro24h({ estacao }: Props) {
                     >
                       <title>{`${janela.eixo}: ${formatarMm(incremento)} calculados pela diferença entre janelas oficiais`}</title>
                     </rect>
-                    <text x={x(indice)} y={rotuloY} textAnchor="middle" className="chuva-centro-rotulo-barra">
-                      {formatarNumero(incremento)}
+                    <text
+                      x={rotuloX}
+                      y={rotuloY}
+                      textAnchor={rotuloAncora}
+                      className={`chuva-centro-rotulo-barra${rotuloDentro ? ' chuva-centro-rotulo-barra-interno' : ''}`}
+                    >
+                      {formatarNumero(incremento)} mm
                     </text>
                   </g>
                 )
@@ -216,17 +239,17 @@ export function ChuvaCentro24h({ estacao }: Props) {
               {segmentosLinha.map(segmento => segmento.length > 1 ? (
                 <polyline
                   key={`linha-${segmento[0]}`}
-                  points={segmento.map(indice => `${x(indice).toFixed(1)},${yAcumulado(janelas[indice].valor!)}`).join(' ')}
+                  points={segmento.map(indice => `${x(indice).toFixed(1)},${yValor(janelas[indice].valor!)}`).join(' ')}
                   className="chuva-centro-curva"
                 />
               ) : null)}
               {janelas.map((janela, indice) => {
                 if (janela.valor == null) return null
-                const yPonto = yAcumulado(janela.valor)
-                const rotuloY = Math.max(MARGEM.topo + 13, yPonto - 12)
+                const yPonto = yValor(janela.valor)
+                const rotuloY = Math.max(MARGEM.topo + 14, yPonto - 24)
                 return (
                   <g key={`acumulado-${janela.rotulo}`}>
-                    <circle cx={x(indice)} cy={yPonto} r="5" className="chuva-centro-ponto">
+                    <circle cx={x(indice)} cy={yPonto} r="6" className="chuva-centro-ponto">
                       <title>{`${janela.rotulo}: acumulado oficial de ${formatarMm(janela.valor)}`}</title>
                     </circle>
                     <text x={x(indice)} y={rotuloY} textAnchor="middle" className="chuva-centro-rotulo-acumulado">
@@ -235,12 +258,10 @@ export function ChuvaCentro24h({ estacao }: Props) {
                   </g>
                 )
               })}
-              <text x={MARGEM.esquerda} y="20" className="chuva-centro-eixo-titulo">Chuva no intervalo (mm)</text>
-              <text x={LARGURA - MARGEM.direita} y="20" textAnchor="end" className="chuva-centro-eixo-titulo">Acumulado oficial (mm)</text>
+              <text x={MARGEM.esquerda} y="25" className="chuva-centro-eixo-titulo">mm</text>
               {janelas.map((janela, indice) => (
-                <text key={`eixo-${janela.rotulo}`} x={x(indice)} y={ALTURA - 29} textAnchor="middle" className="chuva-centro-eixo-categoria">
-                  <tspan x={x(indice)}>{janela.eixo}</tspan>
-                  <tspan x={x(indice)} dy="15">{intervaloJanela(janela.horas, estacao?.dataHora)}</tspan>
+                <text key={`eixo-${janela.rotulo}`} x={x(indice)} y={ALTURA - 20} textAnchor="middle" className="chuva-centro-eixo-categoria">
+                  {janela.rotulo}
                 </text>
               ))}
             </svg>
@@ -258,7 +279,7 @@ export function ChuvaCentro24h({ estacao }: Props) {
           {janelas.map((janela, indice) => (
             <article className="chuva-centro-indicador" key={janela.rotulo}>
               <span className="chuva-centro-indicador-icone chuva-centro-indicador-icone-periodo">
-                <IconeIndicador />
+                <IconeRelogio />
               </span>
               <span>{janela.rotulo}</span>
               <strong>{formatarMm(janela.valor)}</strong>

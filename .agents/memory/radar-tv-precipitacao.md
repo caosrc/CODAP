@@ -3,7 +3,7 @@ name: Gráfico de chuva no Radar TV
 description: Requisito visual do gráfico CEMADEN de precipitação de 24 horas na tela TV do Radar DC.
 ---
 
-No modo TV, o quadro de precipitação precisa exibir de uma vez o acumulado oficial, as barras e a linha do gráfico, e os quatro resumos de 1, 6, 12 e 24 horas. O conteúdo deve caber no espaço do painel sem rolagem nem cortes.
+No modo TV, o quadro de precipitação precisa exibir de uma vez o acumulado oficial, as barras e a linha do gráfico, e os quatro resumos de 1, 6, 12 e 24 horas. O conteúdo deve caber no espaço do painel sem rolagem nem cortes. A linha e os cartões exibem os totais oficiais das janelas móveis; as barras mostram os incrementos entre janelas sucessivas na mesma escala em milímetros, evitando contabilizar chuva sobreposta duas vezes.
 
 **Why:** O Radar é usado em uma tela de leitura rápida; os intervalos e o total de chuva precisam ser visíveis juntos para apoiar a avaliação operacional.
 

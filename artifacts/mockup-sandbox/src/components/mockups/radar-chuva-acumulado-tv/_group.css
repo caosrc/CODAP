@@ -1,0 +1,29 @@
+html,
+body,
+#root {
+  min-height: 100%;
+  margin: 0;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  font-family: Inter, Arial, sans-serif;
+}
+
+.chuva-demo-current,
+.chuva-demo-tv {
+  min-height: 100dvh;
+  padding: 20px;
+  background: #eaf0f5;
+}
+
+.chuva-demo-current .chuva-centro-card,
+.chuva-demo-tv .chuva-centro-card {
+  width: min(100%, 1180px);
+  margin: 0 auto;
+}

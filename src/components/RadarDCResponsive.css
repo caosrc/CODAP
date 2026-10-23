@@ -6275,8 +6275,8 @@ html:-webkit-full-screen {
 
   body.radar-tv-active .radar-tv .chuva-centro-topo {
     flex: 0 0 auto;
-    gap: .3rem;
-    padding: clamp(.22rem, .34vw, .38rem) clamp(.34rem, .48vw, .55rem);
+    gap: clamp(.28rem, .45vw, .48rem);
+    padding: clamp(.28rem, .42vw, .5rem) clamp(.38rem, .62vw, .68rem);
   }
 
   body.radar-tv-active .radar-tv .chuva-centro-eyebrow {
@@ -6284,50 +6284,55 @@ html:-webkit-full-screen {
   }
 
   body.radar-tv-active .radar-tv .chuva-centro-titulo-grupo h2 {
-    margin: 0 0 .12rem;
-    font-size: clamp(.58rem, .72vw, .82rem);
-    line-height: 1.08;
-    letter-spacing: -.015em;
+    margin: 0 0 .16rem;
+    font-size: clamp(.64rem, .82vw, .94rem);
+    line-height: 1.06;
+    letter-spacing: -.02em;
   }
 
   body.radar-tv-active .radar-tv .chuva-centro-titulo-grupo p {
-    font-size: clamp(.43rem, .5vw, .56rem);
-    line-height: 1.15;
+    font-size: clamp(.47rem, .56vw, .62rem);
+    line-height: 1.12;
   }
 
   body.radar-tv-active .radar-tv .chuva-centro-total {
-    gap: .22rem;
+    gap: clamp(.22rem, .34vw, .35rem);
     min-width: 0;
-    max-width: 46%;
-    padding: .18rem .3rem;
-    border-radius: 6px;
+    max-width: 44%;
+    padding: clamp(.2rem, .3vw, .32rem) clamp(.28rem, .42vw, .46rem);
+    border-radius: 8px;
   }
 
   body.radar-tv-active .radar-tv .chuva-centro-total-icone {
-    width: 1.12rem;
-    height: 1.12rem;
+    width: clamp(1.1rem, 1.45vw, 1.55rem);
+    height: clamp(1.1rem, 1.45vw, 1.55rem);
   }
 
   body.radar-tv-active .radar-tv .chuva-centro-total-icone svg {
-    width: .95rem;
+    width: 100%;
+    fill: none;
+    stroke: currentColor;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-width: 2;
   }
 
   body.radar-tv-active .radar-tv .chuva-centro-total strong {
-    font-size: clamp(.72rem, .96vw, 1.05rem);
+    font-size: clamp(.78rem, 1.12vw, 1.2rem);
   }
 
   body.radar-tv-active .radar-tv .chuva-centro-total small {
-    font-size: clamp(.38rem, .42vw, .48rem);
-    line-height: 1.15;
+    font-size: clamp(.4rem, .47vw, .52rem);
+    line-height: 1.12;
   }
 
   body.radar-tv-active .radar-tv .chuva-centro-corpo {
     display: flex;
     flex: 1 1 0;
     flex-direction: column;
-    gap: clamp(.16rem, .24vw, .24rem);
+    gap: clamp(.18rem, .28vw, .3rem);
     min-height: 0;
-    padding: clamp(.2rem, .28vw, .3rem) clamp(.24rem, .34vw, .38rem);
+    padding: clamp(.22rem, .32vw, .36rem) clamp(.28rem, .42vw, .46rem);
     overflow: hidden;
   }
 
@@ -6345,99 +6350,152 @@ html:-webkit-full-screen {
     flex-direction: column;
     min-height: 0;
     margin: 0;
-    padding: .12rem .24rem .08rem;
-    border-radius: 6px;
+    padding: clamp(.14rem, .2vw, .22rem) clamp(.22rem, .34vw, .36rem) .08rem;
+    border-color: #dce7f0;
+    border-radius: 8px;
+    background: linear-gradient(180deg, #fff 0%, #fbfdff 100%);
     overflow: hidden;
   }
 
   body.radar-tv-active .radar-tv .chuva-centro-grafico-cabecalho {
     flex: 0 0 auto;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
+    justify-content: space-between;
     gap: .12rem .35rem;
-    margin-bottom: .04rem;
+    margin-bottom: .06rem;
   }
 
   body.radar-tv-active .radar-tv .chuva-centro-grafico-cabecalho > strong {
-    gap: .18rem;
-    font-size: clamp(.43rem, .5vw, .58rem);
+    flex: 0 1 auto;
+    gap: .2rem;
+    font-size: clamp(.52rem, .66vw, .72rem);
+    line-height: 1.05;
   }
 
   body.radar-tv-active .radar-tv .chuva-centro-grafico-cabecalho > strong svg {
-    width: .75rem;
-    height: .75rem;
+    width: clamp(.72rem, .9vw, 1rem);
+    height: clamp(.72rem, .9vw, 1rem);
   }
 
   body.radar-tv-active .radar-tv .chuva-centro-legenda {
-    justify-content: flex-start;
-    gap: .1rem .38rem;
-    font-size: clamp(.38rem, .43vw, .49rem);
+    flex: 0 1 auto;
+    flex-wrap: nowrap;
+    justify-content: flex-end;
+    gap: .12rem .42rem;
+    font-size: clamp(.4rem, .48vw, .54rem);
     line-height: 1.1;
   }
 
   body.radar-tv-active .radar-tv .chuva-centro-legenda span {
-    gap: .14rem;
+    gap: .16rem;
+    white-space: nowrap;
   }
 
   body.radar-tv-active .radar-tv .chuva-centro-grafico {
     flex: 1 1 0;
     width: 100%;
-    height: clamp(78px, 12vh, 132px);
-    min-height: 70px;
+    height: clamp(88px, 14vh, 154px);
+    min-height: 76px;
     max-height: 100%;
   }
 
   body.radar-tv-active .radar-tv .chuva-centro-eixo,
   body.radar-tv-active .radar-tv .chuva-centro-eixo-titulo {
-    font-size: 17px;
+    font-size: 19px;
   }
 
   body.radar-tv-active .radar-tv .chuva-centro-eixo-categoria {
     font-size: 17px;
+    font-weight: 700;
   }
 
-  body.radar-tv-active .radar-tv .chuva-centro-eixo-categoria tspan + tspan {
-    font-size: 12px;
+  body.radar-tv-active .radar-tv .chuva-centro-rotulo-barra {
+    font-size: 17px;
   }
 
-  body.radar-tv-active .radar-tv .chuva-centro-rotulo-barra,
   body.radar-tv-active .radar-tv .chuva-centro-rotulo-acumulado {
-    font-size: 19px;
+    font-size: 20px;
+  }
+
+  body.radar-tv-active .radar-tv .chuva-centro-curva {
+    stroke-width: 4;
+  }
+
+  body.radar-tv-active .radar-tv .chuva-centro-ponto {
+    stroke-width: 2.5;
   }
 
   body.radar-tv-active .radar-tv .chuva-centro-indicadores {
     flex: 0 0 auto;
     grid-template-columns: repeat(4, minmax(0, 1fr));
     margin: 0;
-    border-radius: 6px;
+    border-color: #dce7f0;
+    border-radius: 8px;
+    background: #fff;
   }
 
   body.radar-tv-active .radar-tv .chuva-centro-indicador {
-    min-height: 2.45rem;
-    padding: .22rem .12rem .2rem 1.38rem;
+    min-height: 2.85rem;
+    padding: .24rem .14rem .22rem 1.32rem;
   }
 
   body.radar-tv-active .radar-tv .chuva-centro-indicador > span:not(.chuva-centro-indicador-icone) {
-    font-size: clamp(.37rem, .42vw, .48rem);
-    line-height: 1.05;
+    font-size: clamp(.4rem, .48vw, .54rem);
+    line-height: 1.08;
   }
 
   body.radar-tv-active .radar-tv .chuva-centro-indicador strong {
-    margin-top: .08rem;
-    font-size: clamp(.58rem, .75vw, .82rem);
+    margin-top: .1rem;
+    font-size: clamp(.68rem, .88vw, .94rem);
     line-height: 1.05;
   }
 
   body.radar-tv-active .radar-tv .chuva-centro-indicador small {
-    margin-top: .06rem;
-    font-size: clamp(.34rem, .39vw, .45rem);
-    line-height: 1.05;
-    overflow-wrap: anywhere;
+    margin-top: .08rem;
+    font-size: clamp(.37rem, .43vw, .48rem);
+    line-height: 1.08;
+    overflow-wrap: break-word;
   }
 
   body.radar-tv-active .radar-tv .chuva-centro-indicador-icone {
-    left: .18rem;
+    left: .2rem;
     width: 1.05rem;
     height: 1.05rem;
+    color: #1268c4;
+  }
+}
+
+@media (min-width: 900px) and (max-width: 1400px) and (orientation: landscape) {
+  body.radar-tv-active .radar-tv .chuva-centro-grafico-cabecalho {
+    flex-wrap: wrap;
+  }
+
+  body.radar-tv-active .radar-tv .chuva-centro-legenda {
+    flex: 1 1 100%;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    font-size: clamp(.45rem, .5vw, .56rem);
+  }
+
+  body.radar-tv-active .radar-tv .chuva-centro-grafico {
+    height: clamp(84px, 13vh, 118px);
+  }
+
+  body.radar-tv-active .radar-tv .chuva-centro-eixo,
+  body.radar-tv-active .radar-tv .chuva-centro-eixo-titulo {
+    font-size: 23px;
+  }
+
+  body.radar-tv-active .radar-tv .chuva-centro-eixo-categoria {
+    font-size: 21px;
+  }
+
+  body.radar-tv-active .radar-tv .chuva-centro-rotulo-barra {
+    font-size: 21px;
+  }
+
+  body.radar-tv-active .radar-tv .chuva-centro-rotulo-acumulado {
+    font-size: 23px;
   }
 }
 

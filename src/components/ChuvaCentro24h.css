@@ -160,6 +160,12 @@
 .chuva-centro-curva { fill: none; stroke: #0c2859; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
 .chuva-centro-ponto { fill: #0c2859; stroke: #fff; stroke-width: 2; }
 .chuva-centro-rotulo-barra { fill: #1768c0; font-size: 14px; font-weight: 750; }
+.chuva-centro-rotulo-barra-interno {
+  paint-order: stroke;
+  stroke: #e7f2ff;
+  stroke-linejoin: round;
+  stroke-width: 3px;
+}
 .chuva-centro-rotulo-acumulado { fill: #151b25; font-size: 14px; font-weight: 750; }
 .chuva-centro-aviso-serie { margin: .25rem .15rem 0; color: #67788a; font-size: .61rem; line-height: 1.4; }
 .chuva-centro-sem-acumulado {

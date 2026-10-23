@@ -1,0 +1,149 @@
+.chuva-demo-tv {
+  padding: clamp(10px, 2vw, 22px);
+}
+
+.chuva-demo-tv .chuva-centro-card {
+  display: flex;
+  flex-direction: column;
+  min-height: min(100%, 690px);
+  max-height: calc(100dvh - 40px);
+  border-color: #dce6ef;
+  border-radius: 14px;
+  box-shadow: 0 10px 28px rgba(13, 39, 69, .12);
+}
+
+.chuva-demo-tv .chuva-centro-topo {
+  gap: 1.1rem;
+  padding: clamp(.9rem, 2vw, 1.3rem) clamp(1rem, 2.6vw, 1.7rem);
+  background: linear-gradient(112deg, #061a3d, #082c60);
+}
+
+.chuva-demo-tv .chuva-centro-titulo-grupo h2 {
+  margin: .15rem 0 .28rem;
+  font-size: clamp(1.2rem, 2.4vw, 1.8rem);
+}
+
+.chuva-demo-tv .chuva-centro-titulo-grupo p {
+  font-size: clamp(.8rem, 1.2vw, 1rem);
+}
+
+.chuva-demo-tv .chuva-centro-total {
+  min-width: 250px;
+  padding: .72rem .9rem;
+  border-radius: 12px;
+  background: rgba(1, 21, 53, .38);
+}
+
+.chuva-demo-tv .chuva-centro-total-icone {
+  width: 2.8rem;
+  height: 2.8rem;
+}
+
+.chuva-demo-tv .chuva-centro-total strong {
+  font-size: clamp(1.65rem, 3vw, 2.2rem);
+}
+
+.chuva-demo-tv .chuva-centro-total small {
+  font-size: .7rem;
+}
+
+.chuva-demo-tv .chuva-centro-corpo {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: .65rem;
+  min-height: 0;
+  padding: .8rem 1rem 1rem;
+}
+
+.chuva-demo-tv .chuva-centro-meta,
+.chuva-demo-tv .chuva-centro-aviso-serie,
+.chuva-demo-tv .chuva-centro-fonte,
+.chuva-demo-tv .chuva-centro-indicador-fonte {
+  display: none;
+}
+
+.chuva-demo-tv .chuva-centro-grafico-wrap {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+  margin: 0;
+  padding: .75rem .85rem .45rem;
+  border-color: #dfe8f1;
+  border-radius: 12px;
+  background: #fff;
+}
+
+.chuva-demo-tv .chuva-centro-grafico-cabecalho {
+  flex: 0 0 auto;
+  margin-bottom: .2rem;
+}
+
+.chuva-demo-tv .chuva-centro-grafico-cabecalho > strong {
+  font-size: clamp(.8rem, 1.2vw, 1rem);
+}
+
+.chuva-demo-tv .chuva-centro-legenda {
+  gap: .4rem 1rem;
+  font-size: clamp(.62rem, .9vw, .75rem);
+}
+
+.chuva-demo-tv .chuva-centro-grafico {
+  flex: 1 1 auto;
+  min-height: 235px;
+  height: auto;
+}
+
+.chuva-demo-tv .chuva-centro-eixo {
+  font-size: 14px;
+}
+
+.chuva-demo-tv .chuva-centro-eixo-categoria {
+  font-size: 14px;
+}
+
+.chuva-demo-tv .chuva-centro-rotulo-barra,
+.chuva-demo-tv .chuva-centro-rotulo-acumulado {
+  font-size: 16px;
+}
+
+.chuva-demo-tv .chuva-centro-indicadores {
+  flex: 0 0 auto;
+  margin: 0;
+  border-color: #dfe8f1;
+  border-radius: 11px;
+}
+
+.chuva-demo-tv .chuva-centro-indicador {
+  min-height: 5rem;
+  padding: .7rem .6rem .6rem 3.2rem;
+}
+
+.chuva-demo-tv .chuva-centro-indicador-icone {
+  left: .8rem;
+  width: 1.9rem;
+  height: 1.9rem;
+}
+
+.chuva-demo-tv .chuva-centro-indicador > span:not(.chuva-centro-indicador-icone) {
+  font-size: .68rem;
+}
+
+.chuva-demo-tv .chuva-centro-indicador strong {
+  font-size: clamp(1rem, 1.7vw, 1.35rem);
+}
+
+.chuva-demo-tv .chuva-centro-indicador small {
+  font-size: .62rem;
+}
+
+@media (max-width: 700px) {
+  .chuva-demo-tv .chuva-centro-card {
+    max-height: none;
+  }
+
+  .chuva-demo-tv .chuva-centro-grafico {
+    min-height: 235px;
+  }
+}

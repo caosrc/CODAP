@@ -6557,6 +6557,25 @@ body.radar-tv-active .radar-tv .arm-panel-tv .arm-types {
   padding: 0 clamp(8px, .65vw, 12px) clamp(9px, .7vw, 13px);
 }
 
+body.radar-tv-active .radar-tv .arm-panel-tv .arm-map-layer-heading {
+  gap: clamp(6px, .45vw, 8px);
+  padding: clamp(7px, .45vw, 9px) clamp(8px, .65vw, 12px) clamp(5px, .35vw, 7px);
+}
+
+body.radar-tv-active .radar-tv .arm-panel-tv .arm-map-layer-heading span {
+  font-size: clamp(9px, .66vw, 11px);
+}
+
+body.radar-tv-active .radar-tv .arm-panel-tv .arm-map-layer-heading small,
+body.radar-tv-active .radar-tv .arm-panel-tv .arm-map-layer-heading > button {
+  font-size: clamp(8px, .58vw, 10px);
+}
+
+body.radar-tv-active .radar-tv .arm-panel-tv .arm-type-entry {
+  grid-template-columns: minmax(0, 1fr) clamp(36px, 2.5vw, 44px);
+  gap: clamp(5px, .4vw, 7px);
+}
+
 body.radar-tv-active .radar-tv .arm-panel-tv .arm-type-all {
   grid-column: auto;
 }
@@ -6566,6 +6585,12 @@ body.radar-tv-active .radar-tv .arm-panel-tv .arm-type-row {
   gap: clamp(7px, .5vw, 9px);
   padding: 5px clamp(7px, .5vw, 10px);
   border-radius: 7px;
+}
+
+body.radar-tv-active .radar-tv .arm-panel-tv .arm-map-toggle {
+  min-height: clamp(36px, 4vh, 44px);
+  border-radius: 7px;
+  font-size: clamp(17px, 1.15vw, 21px);
 }
 
 body.radar-tv-active .radar-tv .arm-panel-tv .arm-type-row:focus-visible {

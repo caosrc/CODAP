@@ -128,6 +128,7 @@ export default function AreasRiscoMapa({
   onAbrirOcorrencia,
 }: AreasRiscoMapaProps) {
   const [filtro, setFiltro] = useState<TipoAreaRisco | 'Todas'>('Todas')
+  const [tiposVisiveisNoMapa, setTiposVisiveisNoMapa] = useState<Set<TipoAreaRisco>>(() => new Set(TIPOS))
   const [rascunho, setRascunho] = useState<DraftArea | null>(null)
   const [editandoId, setEditandoId] = useState<string | null>(null)
   const [modoMapa, setModoMapa] = useState<'marcador' | 'poligono' | null>(null)
@@ -171,6 +172,21 @@ export default function AreasRiscoMapa({
   )
 
   const areasVisiveis = filtro === 'Todas' ? areas : areas.filter(area => area.tipo === filtro)
+  const areasNoMapa = areas.filter(area => tiposVisiveisNoMapa.has(area.tipo))
+  const todosTiposVisiveisNoMapa = tiposVisiveisNoMapa.size === TIPOS.length
+
+  function alternarTipoNoMapa(tipo: TipoAreaRisco) {
+    setTiposVisiveisNoMapa(atuais => {
+      const atualizados = new Set(atuais)
+      if (atualizados.has(tipo)) atualizados.delete(tipo)
+      else atualizados.add(tipo)
+      return atualizados
+    })
+  }
+
+  function alternarTodosTiposNoMapa() {
+    setTiposVisiveisNoMapa(todosTiposVisiveisNoMapa ? new Set() : new Set(TIPOS))
+  }
 
   function iniciarCadastro() {
     scrollAntesDoFormularioRef.current = painelRef.current?.scrollTop ?? 0
@@ -305,7 +321,7 @@ export default function AreasRiscoMapa({
           poligono: [...(rascunho?.poligono ?? []), ponto],
         })}
       />
-      {areas.map(area => {
+      {areasNoMapa.map(area => {
         const previsto = previsaoPorArea[area.id]
         const emAlerta = area.tipo !== 'Interdições' && previsto != null && Number.isFinite(previsto) && previsto > area.limite_precipitacao_mm
         const cor = CORES[area.tipo]
@@ -465,32 +481,70 @@ export default function AreasRiscoMapa({
                 <i /><i /><i /> Atualizando áreas…
               </div>
             ) : (
-              <div className="arm-types" aria-label="Filtrar áreas por tipo">
-                <button
-                  type="button"
-                  className={`arm-type-row arm-type-all${filtro === 'Todas' ? ' arm-type-selected' : ''}`}
-                  onClick={() => setFiltro('Todas')}
-                  aria-pressed={filtro === 'Todas'}
-                  data-testid="filter-area-todas"
-                >
-                  <span className="arm-type-symbol">ALL</span><span className="arm-type-name">Todas as áreas</span><b>{areas.length}</b>
-                </button>
-                {TIPOS.map(tipo => (
+              <>
+                <div className="arm-map-layer-heading">
+                  <div>
+                    <span>CAMADAS VISÍVEIS NO MAPA</span>
+                    <small>Marque os tipos que deseja exibir</small>
+                  </div>
                   <button
                     type="button"
-                    className={`arm-type-row${filtro === tipo ? ' arm-type-selected' : ''}`}
-                    key={tipo}
-                    onClick={() => setFiltro(tipo)}
-                    aria-pressed={filtro === tipo}
-                    data-testid={`filter-area-${TIPOS.indexOf(tipo)}`}
+                    onClick={alternarTodosTiposNoMapa}
+                    aria-label={todosTiposVisiveisNoMapa ? 'Ocultar todas as classificações do mapa' : 'Exibir todas as classificações no mapa'}
+                    data-testid="toggle-mapa-todas-areas"
                   >
-                    <span className="arm-type-symbol" style={{ '--arm-type-color': CORES[tipo] } as CSSProperties}>
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{/* static, authored type mark */}<g dangerouslySetInnerHTML={{ __html: ICONES[tipo] }} /></svg>
-                    </span>
-                    <span className="arm-type-name">{tipo}</span><b>{contagens[tipo]}</b>
+                    {todosTiposVisiveisNoMapa ? 'Desmarcar todas' : 'Marcar todas'}
                   </button>
-                ))}
-              </div>
+                </div>
+                <div className="arm-types" aria-label="Filtrar lista por tipo e selecionar tipos visíveis no mapa">
+                  <button
+                    type="button"
+                    className={`arm-type-row arm-type-all${filtro === 'Todas' ? ' arm-type-selected' : ''}`}
+                    onClick={() => setFiltro('Todas')}
+                    aria-label="Filtrar lista por todas as áreas"
+                    aria-pressed={filtro === 'Todas'}
+                    data-testid="filter-area-todas"
+                  >
+                    <span className="arm-type-symbol">ALL</span><span className="arm-type-name">Todas as áreas</span><b>{areas.length}</b>
+                  </button>
+                  {TIPOS.map(tipo => {
+                    const visivelNoMapa = tiposVisiveisNoMapa.has(tipo)
+                    return (
+                      <div className="arm-type-entry" key={tipo}>
+                        <button
+                          type="button"
+                          className={`arm-type-row${filtro === tipo ? ' arm-type-selected' : ''}`}
+                          onClick={() => setFiltro(tipo)}
+                          aria-label={`Filtrar lista por ${tipo}`}
+                          aria-pressed={filtro === tipo}
+                          data-testid={`filter-area-${TIPOS.indexOf(tipo)}`}
+                        >
+                          <span className="arm-type-symbol" style={{ '--arm-type-color': CORES[tipo] } as CSSProperties}>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><g dangerouslySetInnerHTML={{ __html: ICONES[tipo] }} /></svg>
+                          </span>
+                          <span className="arm-type-name">{tipo}</span><b>{contagens[tipo]}</b>
+                        </button>
+                        <button
+                          type="button"
+                          className={`arm-map-toggle${visivelNoMapa ? ' arm-map-toggle-active' : ''}`}
+                          onClick={() => alternarTipoNoMapa(tipo)}
+                          aria-label={`${visivelNoMapa ? 'Ocultar' : 'Exibir'} áreas de ${tipo} no mapa`}
+                          aria-pressed={visivelNoMapa}
+                          title={`${visivelNoMapa ? 'Ocultar' : 'Exibir'} ${tipo} no mapa`}
+                          data-testid={`toggle-mapa-area-${TIPOS.indexOf(tipo)}`}
+                        >
+                          <span aria-hidden="true">{visivelNoMapa ? '✓' : '—'}</span>
+                        </button>
+                      </div>
+                    )
+                  })}
+                </div>
+                {tiposVisiveisNoMapa.size === 0 && (
+                  <div className="arm-map-layer-empty" role="status" data-testid="status-sem-tipos-no-mapa">
+                    Nenhum tipo marcado: as áreas de risco estão ocultas no mapa.
+                  </div>
+                )}
+              </>
             )}
             <div className="arm-area-list" data-testid="list-areas-risco">
               {areasVisiveis.length === 0 && !carregando ? (

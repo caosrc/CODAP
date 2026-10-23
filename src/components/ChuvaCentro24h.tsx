@@ -97,23 +97,24 @@ function IconeRelogio() {
 export function ChuvaCentro24h({ estacao }: Props) {
   const acumulados = estacao?.acumulados
   const janelas = [
-    { rotulo: 'Última hora', eixo: 'Última hora', horas: 1, valor: acumulados?.umaHora ?? null },
-    { rotulo: 'Últimas 6 horas', eixo: '1–6 h atrás', horas: 6, valor: acumulados?.seisHoras ?? null },
-    { rotulo: 'Últimas 12 horas', eixo: '6–12 h atrás', horas: 12, valor: acumulados?.dozeHoras ?? null },
-    { rotulo: 'Últimas 24 horas', eixo: '12–24 h atrás', horas: 24, valor: acumulados?.vinteQuatroHoras ?? null },
+    { rotulo: 'Última hora', horas: 1, valor: acumulados?.umaHora ?? null },
+    { rotulo: 'Últimas 6 horas', horas: 6, valor: acumulados?.seisHoras ?? null },
+    { rotulo: 'Últimas 12 horas', horas: 12, valor: acumulados?.dozeHoras ?? null },
+    { rotulo: 'Últimas 24 horas', horas: 24, valor: acumulados?.vinteQuatroHoras ?? null },
   ]
-  const incrementoPorPeriodo = janelas.map((janela, indice) => {
+  const valorBarraPorPeriodo = janelas.map((janela, indice) => {
     if (janela.valor == null) return null
     if (indice === 0) return janela.valor
+    if (indice === janelas.length - 1) return janela.valor
     const janelaAnterior = janelas[indice - 1].valor
     if (janelaAnterior == null || janela.valor < janelaAnterior) return null
     return janela.valor - janelaAnterior
   })
   const total24h = acumulados?.vinteQuatroHoras ?? null
   const temDados = janelas.some(janela => janela.valor != null)
-  const maiorIncremento = Math.max(1, ...incrementoPorPeriodo.filter((valor): valor is number => valor != null))
+  const maiorBarra = Math.max(1, ...valorBarraPorPeriodo.filter((valor): valor is number => valor != null))
   const maiorAcumulado = Math.max(1, ...janelas.map(janela => janela.valor ?? 0))
-  const escala = tetoEscala(Math.max(maiorIncremento, maiorAcumulado))
+  const escala = tetoEscala(Math.max(maiorBarra, maiorAcumulado) * 1.2)
   const grade = Array.from({ length: 6 }, (_, indice) => indice / 5)
   const larguraArea = LARGURA - MARGEM.esquerda - MARGEM.direita
   const alturaArea = ALTURA - MARGEM.topo - MARGEM.baixo
@@ -187,16 +188,16 @@ export function ChuvaCentro24h({ estacao }: Props) {
                 )
               })}
               {janelas.map((janela, indice) => {
-                const incremento = incrementoPorPeriodo[indice]
+                const valorBarra = valorBarraPorPeriodo[indice]
                 const larguraBarra = Math.min(100, espacamento * 0.45)
-                if (incremento == null) {
+                if (valorBarra == null) {
                   return (
                     <g key={janela.rotulo}>
                       <text x={x(indice)} y={ALTURA - MARGEM.baixo - 10} textAnchor="middle" className="chuva-centro-rotulo-barra">—</text>
                     </g>
                   )
                 }
-                const alturaBarra = incremento > 0 ? (incremento / escala) * alturaArea : 1
+                const alturaBarra = valorBarra > 0 ? (valorBarra / escala) * alturaArea : 1
                 const yBarra = MARGEM.topo + alturaArea - alturaBarra
                 const linhaProxima = janela.valor != null && Math.abs(yValor(janela.valor) - yBarra) < 28
                 const barraBaixa = alturaBarra < Math.max(20, alturaArea * 0.08)
@@ -223,7 +224,11 @@ export function ChuvaCentro24h({ estacao }: Props) {
                       rx="3"
                       className="chuva-centro-barra"
                     >
-                      <title>{`${janela.eixo}: ${formatarMm(incremento)} calculados pela diferença entre janelas oficiais`}</title>
+                      <title>{indice === 0
+                        ? `Acumulado oficial na última hora: ${formatarMm(valorBarra)}`
+                        : indice === janelas.length - 1
+                          ? `Acumulado oficial nas últimas 24 horas: ${formatarMm(valorBarra)}`
+                          : `${janela.rotulo}: ${formatarMm(valorBarra)} de incremento em relação à janela anterior`}</title>
                     </rect>
                     <text
                       x={rotuloX}
@@ -231,7 +236,7 @@ export function ChuvaCentro24h({ estacao }: Props) {
                       textAnchor={rotuloAncora}
                       className={`chuva-centro-rotulo-barra${rotuloDentro ? ' chuva-centro-rotulo-barra-interno' : ''}`}
                     >
-                      {formatarNumero(incremento)} mm
+                      {formatarNumero(valorBarra)} mm
                     </text>
                   </g>
                 )
@@ -266,7 +271,7 @@ export function ChuvaCentro24h({ estacao }: Props) {
               ))}
             </svg>
             <p className="chuva-centro-aviso-serie">
-              A linha mostra o acumulado móvel oficial de cada janela. As barras mostram a diferença entre janelas consecutivas; “—” indica que o cálculo não é possível com os dados recebidos.
+              A linha e os cartões mostram os acumulados móveis oficiais. As barras seguem a referência: total de 1 h, incrementos entre as janelas de 1–6 h e 6–12 h, e total oficial de 24 h. “—” indica dado ausente ou diferença não calculável.
             </p>
           </div>
         ) : (

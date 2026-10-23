@@ -2018,7 +2018,6 @@ export default function RadarDC() {
                   </section>
                   <section className="radar-tv-hydro-panel radar-tv-hydro-rain">
                     <ChuvaCentro24h
-                      pontos={dadosCNL.serieChuvaCentro || []}
                       estacao={dadosCNL.estacaoChuvaCentro}
                     />
                     <details className="radar-cnl-diaria-detalhe">

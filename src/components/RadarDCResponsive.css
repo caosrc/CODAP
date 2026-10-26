@@ -6728,6 +6728,10 @@ body.radar-tv-active .radar-tv .arm-panel-tv .arm-collapse {
 
 /* No celular, alinhar a barra do Radar sem alterar a composição do Modo TV. */
 @media (max-width: 700px) {
+  .radar-page:not(.radar-tv) {
+    padding-bottom: calc(5.5rem + env(safe-area-inset-bottom));
+  }
+
   .radar-page:not(.radar-tv) .radar-tv-launcher {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;

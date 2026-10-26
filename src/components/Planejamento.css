@@ -8,6 +8,16 @@
   min-height: 0;
 }
 
+.planejamento-radar-scroll {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
 /* ── Sub-tabs ─────────────────────────────────────────────── */
 .plan-subtabs {
   display: flex;
@@ -727,5 +737,9 @@
   .plan-subtab.ativo {
     border-color: #bfd3ed;
     border-bottom-color: #1a4b8c;
+  }
+
+  .planejamento-radar-scroll {
+    padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
   }
 }

@@ -1,0 +1,50 @@
+@media (max-width: 700px) {
+  .plan-subtabs {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.35rem;
+    padding: 0.4rem;
+  }
+
+  .plan-subtab {
+    min-height: 60px;
+    padding: 0.4rem 0.2rem;
+    border: 1px solid #e5e7eb;
+    border-bottom: 3px solid transparent;
+    border-radius: 9px;
+    margin: 0;
+    font-size: 0.68rem;
+    line-height: 1.15;
+    white-space: normal;
+    text-align: center;
+  }
+
+  .plan-subtab.ativo {
+    border-color: #bfd3ed;
+    border-bottom-color: #1a4b8c;
+  }
+
+  .radar-page:not(.radar-tv) .radar-tv-launcher {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .radar-tv-launcher-copy {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 0.12rem;
+  }
+
+  .radar-tv-launcher-btn {
+    min-height: 42px;
+    padding: 0.5rem 0.65rem;
+    font-size: 0.64rem;
+    text-align: center;
+  }
+
+  .preview-dashboard {
+    padding: 0.7rem;
+  }
+}

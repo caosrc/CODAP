@@ -6725,3 +6725,26 @@ body.radar-tv-active .radar-tv .arm-panel-tv .arm-collapse {
     min-height: 0;
   }
 }
+
+/* No celular, alinhar a barra do Radar sem alterar a composição do Modo TV. */
+@media (max-width: 700px) {
+  .radar-page:not(.radar-tv) .radar-tv-launcher {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .radar-page:not(.radar-tv) .radar-tv-launcher-copy {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 0.12rem;
+  }
+
+  .radar-page:not(.radar-tv) .radar-tv-launcher-btn {
+    min-height: 42px;
+    padding: 0.5rem 0.65rem;
+    font-size: 0.64rem;
+    text-align: center;
+  }
+}

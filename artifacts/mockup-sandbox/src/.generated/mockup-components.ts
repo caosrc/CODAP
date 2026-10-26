@@ -11,5 +11,8 @@ export const modules: ModuleMap = {
   "./components/mockups/radar-dc-areas-risco/Compact.tsx": () => import("../components/mockups/radar-dc-areas-risco/Compact.tsx"),
   "./components/mockups/radar-dc-areas-risco/LeafletPreview.tsx": () => import("../components/mockups/radar-dc-areas-risco/LeafletPreview.tsx"),
   "./components/mockups/radar-dc-areas-risco/ModalSenha.tsx": () => import("../components/mockups/radar-dc-areas-risco/ModalSenha.tsx"),
+  "./components/mockups/radar-dc-planning-nav/Current.tsx": () => import("../components/mockups/radar-dc-planning-nav/Current.tsx"),
+  "./components/mockups/radar-dc-planning-nav/Mobile.tsx": () => import("../components/mockups/radar-dc-planning-nav/Mobile.tsx"),
+  "./components/mockups/radar-dc-planning-nav/NavigationPreview.tsx": () => import("../components/mockups/radar-dc-planning-nav/NavigationPreview.tsx"),
   "./components/mockups/radar-tv/RadarTv.tsx": () => import("../components/mockups/radar-tv/RadarTv.tsx")
 };

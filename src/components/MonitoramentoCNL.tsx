@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import './MonitoramentoCNL.css'
 import { supabase, supabaseDisponivel } from '../supabaseClient'
+import type { EstacaoChuvaCentro } from './ChuvaCentro24h'
 
 export type EstacaoCNL = {
   id: number
@@ -92,7 +93,7 @@ type DadosCNL = {
   estacoes: EstacaoCNL[]
   serie: PontoSerie[]
   serieChuvaCentro?: PontoSerie[]
-  estacaoChuvaCentro?: { nome: string; codigo?: string } | null
+  estacaoChuvaCentro?: EstacaoChuvaCentro | null
   nivelAtual: NivelAtual | null
   serieNivel: PontoNivel[]
   cotasConfiguradas?: boolean

@@ -136,10 +136,20 @@ export const handler = async () => {
     const estacaoCentroCatalogo = estacoesCatalogo.find(row => Number(row?.idestacao) === CNL_ESTACAO_CHUVA_CENTRO_ID)
     const payloadCentro = payloadPorId.get(CNL_ESTACAO_CHUVA_CENTRO_ID) || {}
     const serieChuvaCentro = serieHoraria(extrairSerie(payloadCentro))
-    const estacaoChuvaCentro = estacaoCentroCatalogo && serieChuvaCentro.length > 0
+    // O catálogo já fornece os acumulados móveis oficiais, mesmo quando a
+    // consulta opcional da série horária falha na execução serverless.
+    const estacaoChuvaCentro = estacaoCentroCatalogo
       ? {
           nome: String(estacaoCentroCatalogo.nomeestacao || payloadCentro.estacao?.nome || 'Centro'),
           codigo: CNL_ESTACAO_CHUVA_CENTRO_CODIGO,
+          dataHora: String(estacaoCentroCatalogo.datahoraUltimovalor || ''),
+          acumulados: {
+            umaHora: number(estacaoCentroCatalogo.acc1hr),
+            tresHoras: number(estacaoCentroCatalogo.acc3hr),
+            seisHoras: number(estacaoCentroCatalogo.acc6hr),
+            dozeHoras: number(estacaoCentroCatalogo.acc12hr),
+            vinteQuatroHoras: number(estacaoCentroCatalogo.acc24hr),
+          },
         }
       : null
     const estacoes = estacoesCatalogo.map(item => normalizar(item, payloadPorId.get(Number(item.idestacao)) || {})).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))

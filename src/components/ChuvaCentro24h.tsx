@@ -2,6 +2,7 @@ import './ChuvaCentro24h.css'
 
 type AcumuladosChuvaCentro = {
   umaHora: number | null
+  tresHoras: number | null
   seisHoras: number | null
   dozeHoras: number | null
   vinteQuatroHoras: number | null

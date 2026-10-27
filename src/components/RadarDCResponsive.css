@@ -2309,7 +2309,7 @@ body.radar-tv-active .radar-tv .radar-ticker-empty {
 
 .radar-page {
   min-width: 0;
-  overflow-x: hidden;
+  overflow-x: clip;
 }
 
 .radar-tv-launcher {

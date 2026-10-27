@@ -325,6 +325,7 @@
 .radar-ferramental-alerta-pendente strong { color: #b8eaff; }
 
 .radar-live-map-card {
+  position: relative;
   margin-top: 1rem;
   padding-top: 1rem;
   border-top: 1px solid #2a5877;
@@ -359,14 +360,14 @@
 @media (max-width: 850px) {
   .radar-live-map-heading { flex-wrap: wrap; }
   .radar-live-map-risk-anchor {
-    position: relative;
-    top: auto;
+    position: sticky;
+    top: 0;
     left: auto;
     display: flex;
     width: 100%;
     height: auto;
     justify-content: center;
-    order: 3;
+    margin: .35rem 0 .55rem;
   }
   .radar-live-map-updated { order: 2; margin-left: auto; }
 }
@@ -556,14 +557,14 @@ body.radar-tv-active .radar-tv .radar-live-map { height: clamp(420px, 54vh, 640p
   .radar-activity-columns { grid-template-columns: 1fr; gap: .35rem; }
   .radar-live-map-heading { align-items: flex-start; flex-direction: column; gap: .25rem; }
   .radar-live-map-risk-anchor {
-    position: relative;
-    top: auto;
+    position: sticky;
+    top: 0;
     left: auto;
     display: flex;
     width: 100%;
     height: auto;
     justify-content: flex-start;
-    order: 2;
+    margin: .35rem 0 .55rem;
   }
   .radar-live-map-updated { order: 3; }
   .radar-live-map { height: 600px; }

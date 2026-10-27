@@ -716,22 +716,30 @@
 @media (max-width: 700px) {
   .plan-subtabs {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 0.35rem;
-    padding: 0.4rem;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 0.12rem;
+    padding: 0.25rem 0.16rem;
   }
 
   .plan-subtab {
-    min-height: 60px;
-    padding: 0.4rem 0.2rem;
+    min-height: 44px;
+    padding: 0.2rem 0.02rem;
     border: 1px solid #e5e7eb;
     border-bottom: 3px solid transparent;
-    border-radius: 9px;
+    border-radius: 6px;
     margin: 0;
-    font-size: 0.68rem;
-    line-height: 1.15;
-    white-space: normal;
+    font-size: clamp(0.4rem, 2vw, 0.52rem);
+    line-height: 1;
+    letter-spacing: -0.02em;
+    white-space: nowrap;
     text-align: center;
+  }
+
+  .plan-subtab .st-emoji,
+  .plan-subtab .radar-tab-icon {
+    width: 1rem;
+    height: 1rem;
+    font-size: 0.95rem;
   }
 
   .plan-subtab.ativo {
@@ -741,5 +749,11 @@
 
   .planejamento-radar-scroll {
     padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+  }
+}
+
+@media (max-width: 480px) {
+  .app-planejamento .radar-live-map-risk-anchor {
+    top: 54px;
   }
 }

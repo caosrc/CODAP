@@ -725,11 +725,11 @@ function RadarMapaTempoReal({ tv, dataOcorrencias }: { tv: boolean; dataOcorrenc
             {zoomMapa < 9 ? 'Minas Gerais · chuva e nuvens' : 'Conselheiro Lafaiete em tempo real'}
           </h3>
         </div>
-        {!tv && <div className="radar-live-map-risk-anchor" ref={setPainelAreasRiscoHost} data-testid="radar-live-map-risk-anchor" />}
         <span className="radar-live-map-updated">
           {radarCarregando ? 'Atualizando…' : radarChuva?.erroAtualizacao ? 'Último quadro salvo' : 'Atualização automática · 5 min'}
         </span>
       </div>
+       {!tv && <div className="radar-live-map-risk-anchor" ref={setPainelAreasRiscoHost} data-testid="radar-live-map-risk-anchor" />}
       <div className="radar-live-map-toolbar" role="toolbar" aria-label="Controles do mapa meteorológico">
         <div className="radar-live-map-base-buttons">
           <button type="button" className={camadaBase === 'mapa' ? 'ativo' : ''} onClick={() => setCamadaBase('mapa')}>Mapa</button>

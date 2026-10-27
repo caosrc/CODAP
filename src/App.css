@@ -4697,11 +4697,21 @@ input, select, textarea { font-family: inherit; }
 
   .app-planejamento .conteudo {
     min-height: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior-y: contain;
+    -webkit-overflow-scrolling: touch;
   }
 
   .app-planejamento .plan-wrap {
-    flex: 1 1 0%;
-    height: 0;
+    flex: 0 0 auto;
+    height: auto;
+  }
+
+  .app-planejamento .planejamento-radar-scroll {
+    flex: 0 0 auto;
+    height: auto;
+    overflow: visible;
   }
 
   .header {

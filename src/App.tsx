@@ -1018,7 +1018,7 @@ export default function App() {
   }
 
   return (
-    <div className="app">
+    <div className={`app ${aba === 'planejamento' ? 'app-planejamento' : ''}`}>
       <BannerInstalar />
 
       {!isOnline && (

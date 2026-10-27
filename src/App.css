@@ -4699,6 +4699,11 @@ input, select, textarea { font-family: inherit; }
     min-height: 0;
   }
 
+  .app-planejamento .plan-wrap {
+    flex: 1 1 0%;
+    height: 0;
+  }
+
   .header {
     padding-top: max(0.8rem, env(safe-area-inset-top));
   }

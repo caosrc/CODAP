@@ -2,7 +2,7 @@ import { normalizarNomeAgente } from './types'
 import type { Ocorrencia } from './types'
 import type { CurralDados, CurralRegistro } from './components/Curral'
 import type { ProconRegistro } from './components/Procon'
-import { savePending, getCachedOcorrencias } from './offline'
+import { savePending, getPending, getCachedOcorrencias } from './offline'
 import { supabase, supabaseDisponivel } from './supabaseClient'
 import { wsSend } from './wsClient'
 
@@ -381,14 +381,24 @@ export async function enviarOcorrenciaServidor(
 }
 
 export async function criarOcorrencia(
-  dados: Omit<Ocorrencia, 'id' | 'created_at'>
+  dados: Omit<Ocorrencia, 'id' | 'created_at'>,
+  requestKey?: string,
 ): Promise<Ocorrencia> {
+  if (requestKey) {
+    const pendentes = await getPending().catch(() => [])
+    const existente = pendentes.find((item) => item._requestKey === requestKey)
+    if (existente) {
+      const localId = await savePending(dados, requestKey)
+      return localOffline(dados, Number(localId))
+    }
+  }
+
   try {
     return await enviarOcorrenciaServidor(dados)
   } catch (e) {
     const erroMsg = e instanceof Error ? e.message : String(e)
     console.warn('[api] criarOcorrencia falhou — salvando offline:', erroMsg)
-    const localId = await savePending(dados)
+    const localId = await savePending(dados, requestKey)
     const resultado = localOffline(dados, Number(localId))
     // Anexa o erro para que a UI mostre a causa quando o dispositivo está online
     if (navigator.onLine) {

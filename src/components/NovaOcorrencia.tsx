@@ -98,6 +98,8 @@ export default function NovaOcorrencia({ onSalvo, onVoltar, isOnline, orgao = 'd
   const [latPicker, setLatPicker] = useState<number | null>(null)
   const [lngPicker, setLngPicker] = useState<number | null>(null)
   const [salvando, setSalvando] = useState(false)
+  const salvandoRef = useRef(false)
+  const requestKeyRef = useRef(`ocorrencia-${Date.now()}-${Math.random().toString(36).slice(2)}`)
   const [erro, setErro] = useState('')
   const [tipoAberto, setTipoAberto] = useState(false)
   const [naturezaAberta, setNaturezaAberta] = useState(false)
@@ -375,91 +377,92 @@ export default function NovaOcorrencia({ onSalvo, onVoltar, isOnline, orgao = 'd
       setErro('Informe a localização (GPS ou endereço).')
       return
     }
+    // O ref bloqueia toques repetidos antes que o React atualize o estado do botão.
+    if (salvandoRef.current) return
+    salvandoRef.current = true
     setErro('')
     setSalvando(true)
 
-    // If address provided but no GPS yet, try to geocode now
-    let finalLat = lat
-    let finalLng = lng
-    if (!finalLat && enderecoEspecializado.trim() && navigator.onLine) {
-      const geo = await geocodificarEndereco(enderecoEspecializado)
-      if (geo) { finalLat = geo.lat; finalLng = geo.lng }
-    }
-    if (
-      naturezaEhInterdicao(natureza) &&
-      statusOc === 'ativo' &&
-      (finalLat == null || finalLng == null)
-    ) {
-      setSalvando(false)
-      setErro('Para exibir a interdição no mapa, marque o local no mapa, obtenha o GPS ou informe um endereço que possa ser localizado.')
-      return
-    }
-
-    const tipoFinal = tipo === 'Outro' ? (tipoOutro.trim() || 'Outro') : tipo
-
-    // Monta lista de focos válidos (com coordenadas) para incêndios
-    const focosValidos = ehIncendio
-      ? focosIncendio.filter(f => f.lat != null && f.lng != null).map(f => ({ lat: f.lat!, lng: f.lng! }))
-      : null
-
-    const horasTotalBruto = (horaInicio && horaFim) ? calcularHorasTotal(horaInicio, horaFim) : null
-    const horasTotal = horasTotalBruto  // horas brutas, sem multiplicador
-    // O banco é calculado por agente; o campo legado guarda o maior valor para
-    // manter compatibilidade com ocorrências que ainda usam um total único.
-    const horasBancoAgentes = agentes.map((agente) => (
-      horaInicio && horaFim && dataOcorrencia
-        ? calcularHorasOcorrenciaBanco(dataOcorrencia, horaInicio, horaFim, feriadosCustom, agente)
-        : 0
-    ))
-    const horasBanco = horasBancoAgentes.length > 0
-      ? Math.max(...horasBancoAgentes)
-      : (horaInicio && horaFim && dataOcorrencia
-        ? calcularHorasOcorrenciaBanco(dataOcorrencia, horaInicio, horaFim, feriadosCustom)
-        : null)
-    const detalhesOrgao = nomesCamposOrgao(orgao, curralCampos, proconCampos)
-    const situacaoFinal = [situacao.trim(), detalhesOrgao].filter(Boolean).join('\n\n')
-    const enderecoFinal = ehProcon
-      ? enderecoEspecializado || endereco
-      : ehCurral && !endereco.trim()
-        ? curralCampos.localDescricao
-        : endereco
-    const proprietarioFinal = ehCurral
-      ? curralCampos.identificacao || proprietario
-      : ehProcon
-        ? proconCampos.nomeFantasia || proconCampos.razaoSocial || proprietario
-        : proprietario
-
-    const payload = {
-      tipo: tipoFinal,
-      natureza,
-      subnatureza: precisaSubnatureza ? subnatureza : null,
-      chuva: precisaPrecipitacao && chuva !== '' ? Number(chuva) : null,
-      metragem_lona: precisaMetragemLona && metragemLona !== '' ? Number(metragemLona) : null,
-      nivel_risco: nivelRisco,
-      status_oc: statusOc,
-      data_ocorrencia: dataOcorrencia || null,
-      hora_inicio: horaInicio || null,
-      hora_fim: horaFim || null,
-      horas_total: horasTotal,
-      horas_sobreaviso: horasBanco,
-      fotos,
-      lat: finalLat,
-      lng: finalLng,
-      endereco: enderecoFinal || null,
-      proprietario: proprietarioFinal || null,
-      telefone_proprietario: telefoneProprietario.trim() || null,
-      situacao: situacaoFinal || null,
-      recomendacao: recomendacao || null,
-      conclusao: conclusao || null,
-      agentes,
-      responsavel_registro: getAgenteLogado() || null,
-      focos_incendio: focosValidos && focosValidos.length > 0 ? focosValidos : null,
-      poligono_area_queimada: poligonoArea.length >= 3 ? poligonoArea : null,
-    }
-
     try {
-      const resultado = await criarOcorrencia(payload as any)
-      setSalvando(false)
+      // If address provided but no GPS yet, try to geocode now
+      let finalLat = lat
+      let finalLng = lng
+      if (!finalLat && enderecoEspecializado.trim() && navigator.onLine) {
+        const geo = await geocodificarEndereco(enderecoEspecializado)
+        if (geo) { finalLat = geo.lat; finalLng = geo.lng }
+      }
+      if (
+        naturezaEhInterdicao(natureza) &&
+        statusOc === 'ativo' &&
+        (finalLat == null || finalLng == null)
+      ) {
+        setErro('Para exibir a interdição no mapa, marque o local no mapa, obtenha o GPS ou informe um endereço que possa ser localizado.')
+        return
+      }
+
+      const tipoFinal = tipo === 'Outro' ? (tipoOutro.trim() || 'Outro') : tipo
+
+      // Monta lista de focos válidos (com coordenadas) para incêndios
+      const focosValidos = ehIncendio
+        ? focosIncendio.filter(f => f.lat != null && f.lng != null).map(f => ({ lat: f.lat!, lng: f.lng! }))
+        : null
+
+      const horasTotalBruto = (horaInicio && horaFim) ? calcularHorasTotal(horaInicio, horaFim) : null
+      const horasTotal = horasTotalBruto  // horas brutas, sem multiplicador
+      // O banco é calculado por agente; o campo legado guarda o maior valor para
+      // manter compatibilidade com ocorrências que ainda usam um total único.
+      const horasBancoAgentes = agentes.map((agente) => (
+        horaInicio && horaFim && dataOcorrencia
+          ? calcularHorasOcorrenciaBanco(dataOcorrencia, horaInicio, horaFim, feriadosCustom, agente)
+          : 0
+      ))
+      const horasBanco = horasBancoAgentes.length > 0
+        ? Math.max(...horasBancoAgentes)
+        : (horaInicio && horaFim && dataOcorrencia
+          ? calcularHorasOcorrenciaBanco(dataOcorrencia, horaInicio, horaFim, feriadosCustom)
+          : null)
+      const detalhesOrgao = nomesCamposOrgao(orgao, curralCampos, proconCampos)
+      const situacaoFinal = [situacao.trim(), detalhesOrgao].filter(Boolean).join('\n\n')
+      const enderecoFinal = ehProcon
+        ? enderecoEspecializado || endereco
+        : ehCurral && !endereco.trim()
+          ? curralCampos.localDescricao
+          : endereco
+      const proprietarioFinal = ehCurral
+        ? curralCampos.identificacao || proprietario
+        : ehProcon
+          ? proconCampos.nomeFantasia || proconCampos.razaoSocial || proprietario
+          : proprietario
+
+      const payload = {
+        tipo: tipoFinal,
+        natureza,
+        subnatureza: precisaSubnatureza ? subnatureza : null,
+        chuva: precisaPrecipitacao && chuva !== '' ? Number(chuva) : null,
+        metragem_lona: precisaMetragemLona && metragemLona !== '' ? Number(metragemLona) : null,
+        nivel_risco: nivelRisco,
+        status_oc: statusOc,
+        data_ocorrencia: dataOcorrencia || null,
+        hora_inicio: horaInicio || null,
+        hora_fim: horaFim || null,
+        horas_total: horasTotal,
+        horas_sobreaviso: horasBanco,
+        fotos,
+        lat: finalLat,
+        lng: finalLng,
+        endereco: enderecoFinal || null,
+        proprietario: proprietarioFinal || null,
+        telefone_proprietario: telefoneProprietario.trim() || null,
+        situacao: situacaoFinal || null,
+        recomendacao: recomendacao || null,
+        conclusao: conclusao || null,
+        agentes,
+        responsavel_registro: getAgenteLogado() || null,
+        focos_incendio: focosValidos && focosValidos.length > 0 ? focosValidos : null,
+        poligono_area_queimada: poligonoArea.length >= 3 ? poligonoArea : null,
+      }
+
+      const resultado = await criarOcorrencia(payload as any, requestKeyRef.current)
       const foiOffline = !!(resultado as any)._offline
       const saveError = (resultado as any)._saveError as string | undefined
 
@@ -472,8 +475,10 @@ export default function NovaOcorrencia({ onSalvo, onVoltar, isOnline, orgao = 'd
       localStorage.removeItem(RASCUNHO_KEY)
       onSalvo(foiOffline)
     } catch (e: any) {
-      setSalvando(false)
       setErro(`Erro ao salvar: ${e?.message ?? 'tente novamente'}`)
+    } finally {
+      salvandoRef.current = false
+      setSalvando(false)
     }
   }
 

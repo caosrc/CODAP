@@ -46,9 +46,51 @@ function run<T>(storeName: string, mode: IDBTransactionMode, fn: (store: IDBObje
 }
 
 // Fila de pendentes (offline → servidor)
-export function savePending(data: object): Promise<IDBValidKey> {
-  return run(PENDING_STORE, 'readwrite', (s) =>
-    s.add({ ...data, _savedAt: new Date().toISOString() })
+export function savePending(data: object, requestKey?: string): Promise<IDBValidKey> {
+  return getDB().then((db) =>
+    new Promise<IDBValidKey>((resolve, reject) => {
+      const tx = db.transaction(PENDING_STORE, 'readwrite')
+      const store = tx.objectStore(PENDING_STORE)
+      const savedAt = new Date().toISOString()
+      let localId: IDBValidKey | undefined
+
+      const adicionar = (registro: object) => {
+        const request = store.add(registro)
+        request.onsuccess = () => { localId = request.result }
+        request.onerror = () => reject(request.error)
+      }
+
+      if (!requestKey) {
+        adicionar({ ...data, _savedAt: savedAt })
+      } else {
+        // A mesma tela mantém a chave ao repetir o salvamento. Atualiza a fila
+        // existente em vez de criar outro registro offline.
+        const buscar = store.getAll()
+        buscar.onsuccess = () => {
+          const existente = buscar.result.find((item) => item._requestKey === requestKey)
+          if (existente) {
+            localId = existente.localId
+            const request = store.put({
+              ...existente,
+              ...data,
+              _requestKey: requestKey,
+              _savedAt: existente._savedAt ?? savedAt,
+            })
+            request.onerror = () => reject(request.error)
+          } else {
+            adicionar({ ...data, _requestKey: requestKey, _savedAt: savedAt })
+          }
+        }
+        buscar.onerror = () => reject(buscar.error)
+      }
+
+      tx.oncomplete = () => {
+        if (localId === undefined) reject(new Error('Não foi possível salvar a ocorrência offline'))
+        else resolve(localId)
+      }
+      tx.onerror = () => reject(tx.error)
+      tx.onabort = () => reject(tx.error ?? new Error('Transação offline cancelada'))
+    })
   )
 }
 

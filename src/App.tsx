@@ -583,6 +583,8 @@ export default function App() {
   const [pendingCount, setPendingCount] = useState(0)
   const [sincronizando, setSincronizando] = useState(false)
   const [sincronizandoIds, setSincronizandoIds] = useState<Set<number>>(new Set())
+  const sincronizandoRef = useRef(false)
+  const sincronizandoItemIdsRef = useRef(new Set<number>())
   const [toastMsg, setToastMsg] = useState('')
   const [excelProgresso, setExcelProgresso] = useState<string | null>(null)
   const [statusNotif, setStatusNotif] = useState<'ativo'|'concedido'|'negado'|'sem-suporte'|'desconhecido'|null>(null)
@@ -642,56 +644,67 @@ export default function App() {
   }, [atualizarPendingCount])
 
   const sincronizar = useCallback(async (silencioso = false) => {
-    if (sincronizando) return
-    const pending = await getPending()
-    if (pending.length === 0) return
+    if (sincronizandoRef.current) return
+    sincronizandoRef.current = true
     setSincronizando(true)
     let ok = 0
     let falhas = 0
     let ultimoErro = ''
-    for (const item of pending) {
-      const { localId, _savedAt, _offline, _localId, ...data } = item
-      void _offline; void _localId; void _savedAt
-      try {
-        await enviarOcorrenciaServidor(data)
-        await removePending(localId)
-        ok++
-      } catch (err) {
-        if (err instanceof ApiError) {
-          if (err.status >= 400 && err.status < 500) {
-            console.error(`[sync] Item ${localId} rejeitado (${err.status}): ${err.message} — removendo da fila`)
-            await removePending(localId).catch(() => {})
+    try {
+      const pending = await getPending()
+      for (const item of pending) {
+        const localId = Number(item.localId)
+        if (sincronizandoItemIdsRef.current.has(localId)) continue
+        sincronizandoItemIdsRef.current.add(localId)
+        const { localId: _li, _savedAt, _offline, _localId, _requestKey, ...data } = item
+        void _li; void _offline; void _localId; void _savedAt; void _requestKey
+        try {
+          await enviarOcorrenciaServidor(data)
+          await removePending(localId)
+          ok++
+        } catch (err) {
+          if (err instanceof ApiError) {
+            if (err.status >= 400 && err.status < 500) {
+              console.error(`[sync] Item ${localId} rejeitado (${err.status}): ${err.message} — removendo da fila`)
+              await removePending(localId).catch(() => {})
+            } else {
+              console.warn(`[sync] Item ${localId} falhou (${err.status}): ${err.message}`)
+              ultimoErro = err.message
+              falhas++
+            }
           } else {
-            console.warn(`[sync] Item ${localId} falhou (${err.status}): ${err.message}`)
-            ultimoErro = err.message
+            const msg = err instanceof Error ? err.message : String(err)
+            console.warn(`[sync] Item ${localId} falhou por erro de rede:`, err)
+            ultimoErro = msg
             falhas++
           }
-        } else {
-          const msg = err instanceof Error ? err.message : String(err)
-          console.warn(`[sync] Item ${localId} falhou por erro de rede:`, err)
-          ultimoErro = msg
-          falhas++
+        } finally {
+          sincronizandoItemIdsRef.current.delete(localId)
         }
       }
-    }
-    setSincronizando(false)
-    await atualizarPendingCount()
-    if (ok > 0) {
-      await carregar()
-      // Sucesso só aparece quando o agente clicou manualmente — na auto-sync fica silencioso
-      if (!silencioso) {
-        showToast(falhas > 0
-          ? `✅ ${ok} sincronizada(s). ⚠️ ${falhas} pendente(s) — ${ultimoErro || 'verifique a conexão'}.`
-          : `✅ ${ok} ocorrência(s) sincronizadas com sucesso!`
-        )
+      await atualizarPendingCount()
+      if (ok > 0) {
+        await carregar()
+        // Sucesso só aparece quando o agente clicou manualmente — na auto-sync fica silencioso
+        if (!silencioso) {
+          showToast(falhas > 0
+            ? `✅ ${ok} sincronizada(s). ⚠️ ${falhas} pendente(s) — ${ultimoErro || 'verifique a conexão'}.`
+            : `✅ ${ok} ocorrência(s) sincronizadas com sucesso!`
+          )
+        }
+      } else if (falhas > 0) {
+        // Falha sempre aparece para o agente poder tomar ação, mesmo na auto-sync
+        showToast(`⚠️ Falha ao sincronizar: ${ultimoErro || 'verifique a conexão e tente novamente'}.`, 8000)
       }
-    } else if (falhas > 0) {
-      // Falha sempre aparece para o agente poder tomar ação, mesmo na auto-sync
-      showToast(`⚠️ Falha ao sincronizar: ${ultimoErro || 'verifique a conexão e tente novamente'}.`, 8000)
+    } finally {
+      sincronizandoRef.current = false
+      setSincronizando(false)
     }
-  }, [sincronizando, carregar, atualizarPendingCount])
+  }, [carregar, atualizarPendingCount])
 
   const sincronizarItem = useCallback(async (localId: number) => {
+    if (sincronizandoItemIdsRef.current.has(localId)) return
+    sincronizandoItemIdsRef.current.add(localId)
     setSincronizandoIds(prev => new Set([...prev, localId]))
     try {
       // Lê os dados BRUTOS do IndexedDB — mesma origem que criarOcorrencia usa online.
@@ -701,8 +714,8 @@ export default function App() {
       if (!item) throw new Error('Ocorrência não encontrada na fila de pendentes')
 
       // Remove campos exclusivos do IDB; mantém exatamente o que o formulário salvou.
-      const { localId: _li, _savedAt: _sa, _offline: _off, _localId: _lid, id: _id, created_at: _ca, ...dados } = item as Record<string, unknown>
-      void _li; void _sa; void _off; void _lid; void _id; void _ca
+      const { localId: _li, _savedAt: _sa, _offline: _off, _localId: _lid, _requestKey: _rk, id: _id, created_at: _ca, ...dados } = item as Record<string, unknown>
+      void _li; void _sa; void _off; void _lid; void _rk; void _id; void _ca
 
       // enviarOcorrenciaServidor comprime as fotos automaticamente antes de enviar
       // ao Supabase, evitando o limite de 10 MB do PostgREST (causa do timeout).
@@ -718,6 +731,7 @@ export default function App() {
       // Duração maior (8s) para que o agente leia o motivo do erro no celular
       showToast(`⚠️ Falha ao sincronizar: ${msg}`, 8000)
     } finally {
+      sincronizandoItemIdsRef.current.delete(localId)
       setSincronizandoIds(prev => {
         const next = new Set(prev)
         next.delete(localId)

@@ -198,18 +198,25 @@ export function ChartaChuva({
   mostrarControles = false,
   margemEixoEsquerdo = 56,
   mostrarTitulo = true,
+  mostrarNotaLegenda = true,
 }: {
   pontos: PontoSerie[]
   estacao?: { nome: string; codigo?: string } | null
   mostrarControles?: boolean
   margemEixoEsquerdo?: number
   mostrarTitulo?: boolean
+  mostrarNotaLegenda?: boolean
 }) {
   const [periodo, setPeriodo] = useState<6 | 12 | 24>(24)
   const pontosVisiveis = pontos.slice(-periodo)
   const largura = 900
   const altura = 330
-  const margem = { topo: mostrarTitulo ? 42 : 24, direita: 20, baixo: 58, esquerda: margemEixoEsquerdo }
+  const margem = {
+    topo: mostrarTitulo ? 42 : 20,
+    direita: 20,
+    baixo: mostrarTitulo ? 58 : 46,
+    esquerda: margemEixoEsquerdo,
+  }
   const acumulados = pontosVisiveis.reduce<number[]>((totais, ponto) => {
     totais.push((totais.at(-1) || 0) + ponto.valor)
     return totais
@@ -301,7 +308,7 @@ export function ChartaChuva({
       <div className="cnl-chuva-legenda">
         <span><i className="cnl-chuva-legenda-bar" /> Chuva por hora</span>
         <span><i className="cnl-chuva-legenda-linha" /> Acumulado</span>
-        <small>Valores em milímetros · horário informado pelo CEMADEN</small>
+        {mostrarNotaLegenda && <small>Valores em milímetros · horário informado pelo CEMADEN</small>}
       </div>
     </div>
   )

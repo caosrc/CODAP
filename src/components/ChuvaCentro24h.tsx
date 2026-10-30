@@ -119,7 +119,12 @@ export function ChuvaCentro24h({ estacao, pontos }: Props) {
             <div className="chuva-centro-grafico-cabecalho">
               <strong><IconeIndicador /> Acumulado de precipitação</strong>
             </div>
-            <ChartaChuva pontos={pontos} estacao={estacao} mostrarTitulo={false} />
+            <ChartaChuva
+              pontos={pontos}
+              estacao={estacao}
+              mostrarTitulo={false}
+              mostrarNotaLegenda={false}
+            />
           </div>
         ) : (
           <div className="chuva-centro-sem-acumulado">

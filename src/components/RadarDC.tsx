@@ -188,9 +188,9 @@ const ICONES_OCORRENCIA_RADAR = new Map<string, L.DivIcon>()
 function lerAlertaSonoroAreasRiscoAtivo(): boolean {
   if (typeof window === 'undefined') return false
   try {
-    return window.localStorage.getItem(ALERTA_SONORO_AREAS_RISCO_STORAGE_KEY) === 'true'
+    return window.localStorage.getItem(ALERTA_SONORO_AREAS_RISCO_STORAGE_KEY) !== 'false'
   } catch {
-    return false
+    return true
   }
 }
 

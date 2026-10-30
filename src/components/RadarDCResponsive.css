@@ -1905,6 +1905,10 @@ body.radar-tv-active .radar-page {
   color: #687d84;
 }
 
+.radar-tv-hydro-rain .chuva-centro-grafico-wrap .cnl-chuva-legenda {
+  color: #000;
+}
+
 @media (max-width: 700px) {
   .radar-cnl-card {
     border-radius: 12px;

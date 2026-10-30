@@ -182,7 +182,17 @@ const CONSELHEIRO_LAFAIETE = { latitude: -20.6604, longitude: -43.7863 }
 const RADAR_MAP_CENTER: [number, number] = [CONSELHEIRO_LAFAIETE.latitude, CONSELHEIRO_LAFAIETE.longitude]
 const RADAR_MAP_ZOOM = 12
 const ESTACOES_CEMADEN_VAZIAS_RADAR: EstacaoCemadenMg[] = []
+const ALERTA_SONORO_AREAS_RISCO_STORAGE_KEY = 'radar-dc-alerta-sonoro-areas-risco-v1'
 const ICONES_OCORRENCIA_RADAR = new Map<string, L.DivIcon>()
+
+function lerAlertaSonoroAreasRiscoAtivo(): boolean {
+  if (typeof window === 'undefined') return false
+  try {
+    return window.localStorage.getItem(ALERTA_SONORO_AREAS_RISCO_STORAGE_KEY) === 'true'
+  } catch {
+    return false
+  }
+}
 
 function iconeOcorrenciaRadar(natureza: string): L.DivIcon {
   const existente = ICONES_OCORRENCIA_RADAR.get(natureza)
@@ -356,8 +366,8 @@ function dataHoraTrovoadaRadar(valor?: string | null) {
 
 let contextoAudioAlertaRadar: AudioContext | null = null
 
-function prepararAudioAlertaRadar() {
-  if (typeof window === 'undefined' || typeof window.AudioContext === 'undefined') return
+function prepararAudioAlertaRadar(): AudioContext | null {
+  if (typeof window === 'undefined' || typeof window.AudioContext === 'undefined') return null
   try {
     if (!contextoAudioAlertaRadar || contextoAudioAlertaRadar.state === 'closed') {
       contextoAudioAlertaRadar = new window.AudioContext()
@@ -367,8 +377,10 @@ function prepararAudioAlertaRadar() {
         console.warn('[Radar DC] O navegador bloqueou a preparação do sinal sonoro.', erro)
       })
     }
+    return contextoAudioAlertaRadar
   } catch (erro) {
     console.warn('[Radar DC] Não foi possível preparar o sinal sonoro.', erro)
+    return null
   }
 }
 
@@ -378,16 +390,16 @@ function emitirSinalSonoroAlertaRadar() {
 
   void contexto.resume().then(() => {
     if (contexto.state !== 'running') return
-    const notas = [880, 660, 880]
+    const notas = [1040, 760, 1040]
     notas.forEach((frequencia, indice) => {
-      const inicio = contexto.currentTime + 0.04 + indice * 0.24
+      const inicio = contexto.currentTime + 0.04 + indice * 0.5
       const oscilador = contexto.createOscillator()
       const volume = contexto.createGain()
-      oscilador.type = 'sine'
+      oscilador.type = 'triangle'
       oscilador.frequency.setValueAtTime(frequencia, inicio)
       volume.gain.setValueAtTime(0.0001, inicio)
-      volume.gain.exponentialRampToValueAtTime(0.18, inicio + 0.02)
-      volume.gain.exponentialRampToValueAtTime(0.0001, inicio + 0.17)
+      volume.gain.exponentialRampToValueAtTime(0.42, inicio + 0.025)
+      volume.gain.exponentialRampToValueAtTime(0.0001, inicio + 0.38)
       oscilador.connect(volume)
       volume.connect(contexto.destination)
       oscilador.onended = () => {
@@ -395,7 +407,7 @@ function emitirSinalSonoroAlertaRadar() {
         volume.disconnect()
       }
       oscilador.start(inicio)
-      oscilador.stop(inicio + 0.18)
+      oscilador.stop(inicio + 0.4)
     })
   }).catch(erro => {
     console.warn('[Radar DC] O navegador não permitiu emitir o sinal sonoro.', erro)
@@ -437,7 +449,8 @@ function RadarMapaTempoReal({ tv, dataOcorrencias }: { tv: boolean; dataOcorrenc
   const [areasRiscoErro, setAreasRiscoErro] = useState<string | null>(null)
   const [previsaoAreasRisco, setPrevisaoAreasRisco] = useState<Record<string, number | null>>({})
   const [previsaoAreasRiscoErro, setPrevisaoAreasRiscoErro] = useState<string | null>(null)
-  const [paginaVisivel, setPaginaVisivel] = useState(true)
+  const [alertaSonoroAtivo, setAlertaSonoroAtivo] = useState(lerAlertaSonoroAreasRiscoAtivo)
+  const alertaSonoroAtivoRef = useRef(alertaSonoroAtivo)
   const idsAreasEmAlerta = useMemo(
     () => areasRisco
       .filter(area => {
@@ -449,8 +462,17 @@ function RadarMapaTempoReal({ tv, dataOcorrencias }: { tv: boolean; dataOcorrenc
       .sort(),
     [areasRisco, previsaoAreasRisco],
   )
-  const alertasConhecidosRef = useRef<Set<string>>(new Set())
-  const alertasPendentesSomRef = useRef<Set<string>>(new Set())
+  const alternarAlertaSonoro = useCallback(() => {
+    const ativado = !alertaSonoroAtivoRef.current
+    alertaSonoroAtivoRef.current = ativado
+    if (ativado) prepararAudioAlertaRadar()
+    setAlertaSonoroAtivo(ativado)
+    try {
+      window.localStorage.setItem(ALERTA_SONORO_AREAS_RISCO_STORAGE_KEY, String(ativado))
+    } catch {
+      // A configuração continua ativa nesta visita se o armazenamento estiver bloqueado.
+    }
+  }, [])
   const agenteLogado = getAgenteLogado()
   const cemadenMg = useEstacoesCemadenMg(true)
   const estacoes = cemadenMg.dados?.estacoes ?? ESTACOES_CEMADEN_VAZIAS_RADAR
@@ -477,33 +499,22 @@ function RadarMapaTempoReal({ tv, dataOcorrencias }: { tv: boolean; dataOcorrenc
   )
 
   useEffect(() => {
-    const sincronizarVisibilidade = () => setPaginaVisivel(document.visibilityState === 'visible')
-    sincronizarVisibilidade()
-    document.addEventListener('visibilitychange', sincronizarVisibilidade)
-    return () => document.removeEventListener('visibilitychange', sincronizarVisibilidade)
-  }, [])
+    if (!alertaSonoroAtivo || idsAreasEmAlerta.length === 0) return
+    emitirSinalSonoroAlertaRadar()
+    const timer = window.setInterval(emitirSinalSonoroAlertaRadar, 15_000)
+    return () => window.clearInterval(timer)
+  }, [alertaSonoroAtivo, idsAreasEmAlerta])
 
   useEffect(() => {
-    if (!tv) {
-      alertasConhecidosRef.current.clear()
-      alertasPendentesSomRef.current.clear()
-      return
+    if (!alertaSonoroAtivo || contextoAudioAlertaRadar?.state === 'running') return
+    const prepararAudioNaInteracao = () => { prepararAudioAlertaRadar() }
+    window.addEventListener('pointerdown', prepararAudioNaInteracao, { once: true })
+    window.addEventListener('keydown', prepararAudioNaInteracao, { once: true })
+    return () => {
+      window.removeEventListener('pointerdown', prepararAudioNaInteracao)
+      window.removeEventListener('keydown', prepararAudioNaInteracao)
     }
-
-    const atuais = new Set(idsAreasEmAlerta)
-    const novasAreas = idsAreasEmAlerta.filter(id => !alertasConhecidosRef.current.has(id))
-    if (!paginaVisivel) {
-      novasAreas.forEach(id => alertasPendentesSomRef.current.add(id))
-      alertasConhecidosRef.current = atuais
-      return
-    }
-
-    const alertaNovo = novasAreas.length > 0
-    const alertaPendenteAtivo = [...alertasPendentesSomRef.current].some(id => atuais.has(id))
-    if (alertaNovo || alertaPendenteAtivo) emitirSinalSonoroAlertaRadar()
-    alertasPendentesSomRef.current.clear()
-    alertasConhecidosRef.current = atuais
-  }, [tv, idsAreasEmAlerta, paginaVisivel])
+  }, [alertaSonoroAtivo])
 
   const carregarAreasRisco = useCallback(async () => {
     setAreasRiscoCarregando(true)
@@ -1058,6 +1069,8 @@ function RadarMapaTempoReal({ tv, dataOcorrencias }: { tv: boolean; dataOcorrenc
           painelHost={painelAreasRiscoHost}
           areas={areasRisco}
           previsaoPorArea={previsaoAreasRisco}
+          alertaSonoroAtivo={alertaSonoroAtivo}
+          onAlternarAlertaSonoro={alternarAlertaSonoro}
           carregando={areasRiscoCarregando}
           salvando={areasRiscoSalvando}
           agenteLogado={agenteLogado}

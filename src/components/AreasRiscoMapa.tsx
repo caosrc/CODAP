@@ -11,6 +11,8 @@ export interface AreasRiscoMapaProps {
   modoTv: boolean
   areas: AreaRisco[]
   previsaoPorArea: Record<string, number | null>
+  alertaSonoroAtivo: boolean
+  onAlternarAlertaSonoro: () => void
   carregando: boolean
   salvando: boolean
   agenteLogado: string
@@ -121,6 +123,8 @@ export default function AreasRiscoMapa({
   modoTv,
   areas,
   previsaoPorArea,
+  alertaSonoroAtivo,
+  onAlternarAlertaSonoro,
   carregando,
   salvando,
   agenteLogado,
@@ -435,6 +439,23 @@ export default function AreasRiscoMapa({
           </div>
           <button
             type="button"
+            className={`arm-sound-toggle${alertaSonoroAtivo ? ' arm-sound-toggle-active' : ''}`}
+            aria-label={`${alertaSonoroAtivo ? 'Desativar' : 'Ativar'} alerta sonoro de chuva`}
+            aria-pressed={alertaSonoroAtivo}
+            title={`${alertaSonoroAtivo ? 'Desativar' : 'Ativar'} alerta sonoro de chuva`}
+            data-testid="toggle-alerta-sonoro-areas-risco"
+            onClick={onAlternarAlertaSonoro}
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M11 5 6 9H3v6h3l5 4V5Z" />
+              {alertaSonoroAtivo
+                ? <><path d="M15.5 8.5a5 5 0 0 1 0 7" /><path d="M18.5 5.5a9 9 0 0 1 0 13" /></>
+                : <><path d="m16 9 5 6" /><path d="m21 9-5 6" /></>}
+            </svg>
+            <span>Som {alertaSonoroAtivo ? 'ligado' : 'desligado'}</span>
+          </button>
+          <button
+            type="button"
             className="arm-collapse"
             aria-label={recolhido ? 'Expandir painel' : 'Recolher painel'}
             title={recolhido ? 'Mostrar áreas de risco' : 'Ocultar áreas de risco'}
@@ -468,6 +489,13 @@ export default function AreasRiscoMapa({
             </div>
             <div className="arm-forecast-note" data-testid="text-fonte-previsao">
               Previsão acumulada em 24 h nas áreas de risco · Open-Meteo
+            </div>
+            <div className="arm-sound-note" data-testid="status-alerta-sonoro">
+              {alertaSonoroAtivo
+                ? alertas.length > 0
+                  ? `Alerta ativo em ${alertas.length} área(s) · repetição sonora a cada 15 s`
+                  : 'Som ligado · aguardando previsão acima do limite'
+                : 'Som desligado'}
             </div>
             {alertas.length > 0 && (
               <div className="arm-alert-banner" role="status" data-testid="status-alerta-precipitacao">

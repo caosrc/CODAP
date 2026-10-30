@@ -18,7 +18,7 @@
  *  - LIMPAR_CACHE_MAPA               → apaga todos os tiles cacheados
  */
 
-const VERSION = 'v18-2026-09-excel-export'
+const VERSION = 'v19-2026-10-app-icons'
 const APP_CACHE = `defesacivil-app-${VERSION}`
 const TILES_CACHE = 'defesacivil-tiles-osm'
 const ASSETS_CACHE = `defesacivil-assets-${VERSION}`
@@ -31,8 +31,12 @@ const APP_SHELL = [
   '/index.html',
   '/manifest.json',
   '/defesa-civil-logo.png',
+  '/favicon.png',
   '/icon-192.png',
   '/icon-512.png',
+  '/icon-192-maskable.png',
+  '/icon-512-maskable.png',
+  '/apple-touch-icon.png',
   '/icons.svg',
 ]
 

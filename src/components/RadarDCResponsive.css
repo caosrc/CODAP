@@ -6886,3 +6886,24 @@ body.radar-tv-active .radar-tv .arm-panel-tv .arm-collapse {
     text-align: center;
   }
 }
+
+/* Alertas de chuva em áreas cadastradas continuam visíveis no Modo TV,
+   inclusive em computadores configurados para reduzir movimento. */
+body.radar-tv-active .radar-tv .arm-alert-pulse {
+  animation: arm-pulse 1.35s ease-out infinite !important;
+}
+
+body.radar-tv-active .radar-tv .arm-marker-alerta {
+  animation: arm-marker-alert 1.15s ease-out infinite !important;
+}
+
+body.radar-tv-active .radar-tv .leaflet-overlay-pane .arm-polygon-alerta {
+  fill: #ef4444 !important;
+  stroke: #ef4444 !important;
+  animation: arm-polygon-alert-tv 1.25s ease-in-out infinite !important;
+}
+
+@keyframes arm-polygon-alert-tv {
+  0%, 100% { stroke-opacity: 1; fill-opacity: .34; stroke-width: 5px; }
+  50% { stroke-opacity: .48; fill-opacity: .12; stroke-width: 9px; }
+}

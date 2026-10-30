@@ -354,6 +354,54 @@ function dataHoraTrovoadaRadar(valor?: string | null) {
     : data.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
 }
 
+let contextoAudioAlertaRadar: AudioContext | null = null
+
+function prepararAudioAlertaRadar() {
+  if (typeof window === 'undefined' || typeof window.AudioContext === 'undefined') return
+  try {
+    if (!contextoAudioAlertaRadar || contextoAudioAlertaRadar.state === 'closed') {
+      contextoAudioAlertaRadar = new window.AudioContext()
+    }
+    if (contextoAudioAlertaRadar.state === 'suspended') {
+      void contextoAudioAlertaRadar.resume().catch(erro => {
+        console.warn('[Radar DC] O navegador bloqueou a preparação do sinal sonoro.', erro)
+      })
+    }
+  } catch (erro) {
+    console.warn('[Radar DC] Não foi possível preparar o sinal sonoro.', erro)
+  }
+}
+
+function emitirSinalSonoroAlertaRadar() {
+  const contexto = contextoAudioAlertaRadar
+  if (!contexto || contexto.state === 'closed') return
+
+  void contexto.resume().then(() => {
+    if (contexto.state !== 'running') return
+    const notas = [880, 660, 880]
+    notas.forEach((frequencia, indice) => {
+      const inicio = contexto.currentTime + 0.04 + indice * 0.24
+      const oscilador = contexto.createOscillator()
+      const volume = contexto.createGain()
+      oscilador.type = 'sine'
+      oscilador.frequency.setValueAtTime(frequencia, inicio)
+      volume.gain.setValueAtTime(0.0001, inicio)
+      volume.gain.exponentialRampToValueAtTime(0.18, inicio + 0.02)
+      volume.gain.exponentialRampToValueAtTime(0.0001, inicio + 0.17)
+      oscilador.connect(volume)
+      volume.connect(contexto.destination)
+      oscilador.onended = () => {
+        oscilador.disconnect()
+        volume.disconnect()
+      }
+      oscilador.start(inicio)
+      oscilador.stop(inicio + 0.18)
+    })
+  }).catch(erro => {
+    console.warn('[Radar DC] O navegador não permitiu emitir o sinal sonoro.', erro)
+  })
+}
+
 function RadarMapInvalidateSize({ tv }: { tv: boolean }) {
   const map = useMap()
   useEffect(() => {
@@ -389,6 +437,20 @@ function RadarMapaTempoReal({ tv, dataOcorrencias }: { tv: boolean; dataOcorrenc
   const [areasRiscoErro, setAreasRiscoErro] = useState<string | null>(null)
   const [previsaoAreasRisco, setPrevisaoAreasRisco] = useState<Record<string, number | null>>({})
   const [previsaoAreasRiscoErro, setPrevisaoAreasRiscoErro] = useState<string | null>(null)
+  const [paginaVisivel, setPaginaVisivel] = useState(true)
+  const idsAreasEmAlerta = useMemo(
+    () => areasRisco
+      .filter(area => {
+        if (area.tipo === 'Interdições') return false
+        const previsto = previsaoAreasRisco[area.id]
+        return previsto != null && Number.isFinite(previsto) && previsto > area.limite_precipitacao_mm
+      })
+      .map(area => area.id)
+      .sort(),
+    [areasRisco, previsaoAreasRisco],
+  )
+  const alertasConhecidosRef = useRef<Set<string>>(new Set())
+  const alertasPendentesSomRef = useRef<Set<string>>(new Set())
   const agenteLogado = getAgenteLogado()
   const cemadenMg = useEstacoesCemadenMg(true)
   const estacoes = cemadenMg.dados?.estacoes ?? ESTACOES_CEMADEN_VAZIAS_RADAR
@@ -413,6 +475,35 @@ function RadarMapaTempoReal({ tv, dataOcorrencias }: { tv: boolean; dataOcorrenc
     ),
     [ocorrenciasDoDia],
   )
+
+  useEffect(() => {
+    const sincronizarVisibilidade = () => setPaginaVisivel(document.visibilityState === 'visible')
+    sincronizarVisibilidade()
+    document.addEventListener('visibilitychange', sincronizarVisibilidade)
+    return () => document.removeEventListener('visibilitychange', sincronizarVisibilidade)
+  }, [])
+
+  useEffect(() => {
+    if (!tv) {
+      alertasConhecidosRef.current.clear()
+      alertasPendentesSomRef.current.clear()
+      return
+    }
+
+    const atuais = new Set(idsAreasEmAlerta)
+    const novasAreas = idsAreasEmAlerta.filter(id => !alertasConhecidosRef.current.has(id))
+    if (!paginaVisivel) {
+      novasAreas.forEach(id => alertasPendentesSomRef.current.add(id))
+      alertasConhecidosRef.current = atuais
+      return
+    }
+
+    const alertaNovo = novasAreas.length > 0
+    const alertaPendenteAtivo = [...alertasPendentesSomRef.current].some(id => atuais.has(id))
+    if (alertaNovo || alertaPendenteAtivo) emitirSinalSonoroAlertaRadar()
+    alertasPendentesSomRef.current.clear()
+    alertasConhecidosRef.current = atuais
+  }, [tv, idsAreasEmAlerta, paginaVisivel])
 
   const carregarAreasRisco = useCallback(async () => {
     setAreasRiscoCarregando(true)
@@ -1754,6 +1845,7 @@ export default function RadarDC() {
     const dataAtual = hoje()
     setDataSelecionada(dataAtual)
     setMes(new Date(`${dataAtual}T12:00:00`))
+    prepararAudioAlertaRadar()
     setTv(true)
     if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
       await document.documentElement.requestFullscreen().catch(() => {

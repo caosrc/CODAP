@@ -184,27 +184,37 @@ function rotuloEstado(estado: ReturnType<typeof estadoEstacao>): string {
   return 'Sem dados recentes'
 }
 
+function tetoEscalaChuva(valor: number): number {
+  const alvo = Math.max(valor, 0.1)
+  const expoente = 10 ** Math.floor(Math.log10(alvo))
+  const proporcao = alvo / expoente
+  const passo = [1, 2, 5, 10].find((item) => item >= proporcao) || 10
+  return passo * expoente
+}
+
 export function ChartaChuva({
   pontos,
   estacao,
   mostrarControles = false,
   margemEixoEsquerdo = 56,
+  mostrarTitulo = true,
 }: {
   pontos: PontoSerie[]
   estacao?: { nome: string; codigo?: string } | null
   mostrarControles?: boolean
   margemEixoEsquerdo?: number
+  mostrarTitulo?: boolean
 }) {
   const [periodo, setPeriodo] = useState<6 | 12 | 24>(24)
   const pontosVisiveis = pontos.slice(-periodo)
   const largura = 900
   const altura = 330
-  const margem = { topo: 42, direita: 20, baixo: 58, esquerda: margemEixoEsquerdo }
+  const margem = { topo: mostrarTitulo ? 42 : 24, direita: 20, baixo: 58, esquerda: margemEixoEsquerdo }
   const acumulados = pontosVisiveis.reduce<number[]>((totais, ponto) => {
     totais.push((totais.at(-1) || 0) + ponto.valor)
     return totais
   }, [])
-  const maior = Math.max(...acumulados, 1)
+  const maior = tetoEscalaChuva(Math.max(...acumulados, 0.1))
   const areaLargura = largura - margem.esquerda - margem.direita
   const areaAltura = altura - margem.topo - margem.baixo
   const pontoX = (indice: number) => margem.esquerda + (pontosVisiveis.length <= 1 ? areaLargura / 2 : indice * areaLargura / (pontosVisiveis.length - 1))
@@ -235,9 +245,11 @@ export function ChartaChuva({
         </div>
       )}
         <svg className="cnl-grafico cnl-grafico-chuva" viewBox={`0 0 ${largura} ${altura}`} preserveAspectRatio="none" role="img" aria-label={`Precipitação acumulada em ${periodo} horas${estacao?.nome ? ` na estação ${estacao.nome}` : ''}`}>
-        <text x={largura / 2} y="18" textAnchor="middle" className="cnl-grafico-chuva-titulo">
-          {`Precipitação Acumulada em ${periodo}h${estacao?.nome ? ` | Estação: ${estacao.nome}${estacao.codigo ? ` (${estacao.codigo})` : ''}` : ''}`}
-        </text>
+        {mostrarTitulo && (
+          <text x={largura / 2} y="18" textAnchor="middle" className="cnl-grafico-chuva-titulo">
+            {`Precipitação Acumulada em ${periodo}h${estacao?.nome ? ` | Estação: ${estacao.nome}${estacao.codigo ? ` (${estacao.codigo})` : ''}` : ''}`}
+          </text>
+        )}
         {[0, 0.25, 0.5, 0.75, 1].map((proporcao) => {
           const y = escalaY(maior * proporcao)
           return (

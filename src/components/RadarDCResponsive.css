@@ -6523,6 +6523,112 @@ html:-webkit-full-screen {
   }
 }
 
+@media (min-width: 900px) and (orientation: landscape) {
+  body.radar-tv-active .radar-tv .chuva-centro-topo {
+    gap: clamp(.18rem, .32vw, .36rem);
+    padding: clamp(.18rem, .28vw, .32rem) clamp(.32rem, .5vw, .54rem);
+  }
+
+  body.radar-tv-active .radar-tv .chuva-centro-titulo-grupo h2 {
+    margin-bottom: .1rem;
+    font-size: clamp(.56rem, .72vw, .82rem);
+  }
+
+  body.radar-tv-active .radar-tv .chuva-centro-titulo-grupo p {
+    font-size: clamp(.42rem, .48vw, .52rem);
+  }
+
+  body.radar-tv-active .radar-tv .chuva-centro-total {
+    gap: clamp(.16rem, .26vw, .28rem);
+    max-width: 40%;
+    padding: clamp(.14rem, .22vw, .24rem) clamp(.22rem, .34vw, .36rem);
+  }
+
+  body.radar-tv-active .radar-tv .chuva-centro-total-icone {
+    width: clamp(.88rem, 1.15vw, 1.25rem);
+    height: clamp(.88rem, 1.15vw, 1.25rem);
+  }
+
+  body.radar-tv-active .radar-tv .chuva-centro-total strong {
+    font-size: clamp(.7rem, .94vw, 1rem);
+  }
+
+  body.radar-tv-active .radar-tv .chuva-centro-total small {
+    font-size: clamp(.36rem, .4vw, .44rem);
+    line-height: 1.1;
+  }
+
+  body.radar-tv-active .radar-tv .chuva-centro-total small:last-child {
+    display: block;
+    margin-top: .03rem;
+    font-size: clamp(.32rem, .34vw, .37rem);
+  }
+
+  body.radar-tv-active .radar-tv .chuva-centro-corpo {
+    gap: clamp(.1rem, .18vw, .2rem);
+    padding: clamp(.16rem, .24vw, .26rem) clamp(.24rem, .36vw, .38rem);
+  }
+
+  body.radar-tv-active .radar-tv .chuva-centro-grafico-wrap > .cnl-grafico-wrap {
+    min-height: 0;
+    margin: 0;
+  }
+
+  body.radar-tv-active .radar-tv .chuva-centro-grafico-wrap .cnl-grafico {
+    height: 100%;
+    min-height: 0;
+  }
+
+  body.radar-tv-active .radar-tv .chuva-centro-grafico-wrap .cnl-grafico-label {
+    font-size: 12px;
+  }
+
+  body.radar-tv-active .radar-tv .chuva-centro-grafico-wrap .cnl-grafico-label-chuva,
+  body.radar-tv-active .radar-tv .chuva-centro-grafico-wrap .cnl-grafico-label-data {
+    font-size: 11px;
+  }
+
+  body.radar-tv-active .radar-tv .chuva-centro-grafico-wrap .cnl-grafico-linha-chuva {
+    stroke-width: 4;
+  }
+
+  body.radar-tv-active .radar-tv .chuva-centro-grafico-wrap .cnl-grafico-ponto-chuva {
+    stroke-width: 2;
+  }
+
+  body.radar-tv-active .radar-tv .chuva-centro-grafico-wrap .cnl-chuva-legenda {
+    font-size: clamp(.45rem, .58vw, .65rem);
+  }
+
+  body.radar-tv-active .radar-tv .chuva-centro-indicador {
+    min-height: 2.2rem;
+    padding: .16rem .12rem .14rem 1.05rem;
+  }
+
+  body.radar-tv-active .radar-tv .chuva-centro-indicador > span:not(.chuva-centro-indicador-icone) {
+    font-size: clamp(.42rem, .5vw, .56rem);
+  }
+
+  body.radar-tv-active .radar-tv .chuva-centro-indicador strong {
+    margin-top: .06rem;
+    font-size: clamp(.62rem, .78vw, .82rem);
+  }
+
+  body.radar-tv-active .radar-tv .chuva-centro-indicador small {
+    display: block;
+    margin-top: .04rem;
+    font-size: clamp(.32rem, .34vw, .37rem);
+    line-height: 1.05;
+    overflow-wrap: break-word;
+  }
+
+  body.radar-tv-active .radar-tv .chuva-centro-indicador-icone {
+    left: .16rem;
+    width: .78rem;
+    height: .78rem;
+  }
+}
+
 @media (min-width: 701px) and (max-width: 899px) {
   body.radar-tv-active .radar-tv .radar-live-map-frame {
     height: min(720px, calc(100dvh - 330px));

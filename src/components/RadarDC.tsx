@@ -2019,6 +2019,7 @@ export default function RadarDC() {
                   <section className="radar-tv-hydro-panel radar-tv-hydro-rain">
                     <ChuvaCentro24h
                       estacao={dadosCNL.estacaoChuvaCentro}
+                      pontos={dadosCNL.serieChuvaCentro || []}
                     />
                     <details className="radar-cnl-diaria-detalhe">
                       <summary className="radar-precipitacao-resumo" aria-label="Precipitação atual por estação">

@@ -153,7 +153,8 @@ export default function AreasRiscoMapa({
     if (!painel) return
 
     if (formularioAberto) {
-      painel.scrollTo({ top: painel.scrollHeight, behavior: 'smooth' })
+      const mobile = window.matchMedia('(max-width: 700px)').matches
+      painel.scrollTo({ top: mobile ? 0 : painel.scrollHeight, behavior: 'smooth' })
     } else {
       painel.scrollTo({ top: scrollAntesDoFormularioRef.current, behavior: 'auto' })
     }
@@ -429,7 +430,7 @@ export default function AreasRiscoMapa({
       {painelHost && createPortal(
         <div
           ref={painelRef}
-          className={`arm-panel${recolhido ? ' arm-panel-recolhido' : ''}${formularioAberto ? ' arm-panel-form-active' : ''}${modoTv ? ' arm-panel-tv' : ''}`}
+          className={`arm-panel${recolhido ? ' arm-panel-recolhido' : ''}${formularioAberto ? ' arm-panel-form-active' : ''}${modoMapa ? ' arm-panel-map-mode' : ''}${modoTv ? ' arm-panel-tv' : ''}`}
         >
         <div className="arm-panel-head">
           <div className="arm-head-mark" aria-hidden="true"><span /></div>

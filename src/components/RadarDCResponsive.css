@@ -6907,3 +6907,115 @@ body.radar-tv-active .radar-tv .leaflet-overlay-pane .arm-polygon-alerta {
   0%, 100% { stroke-opacity: 1; fill-opacity: .34; stroke-width: 5px; }
   50% { stroke-opacity: .48; fill-opacity: .12; stroke-width: 9px; }
 }
+
+/* Celular: controles do mapa em uma faixa limpa e painéis com largura previsível. */
+@media (max-width: 700px) {
+  .radar-page:not(.radar-tv) .radar-overview {
+    grid-template-columns: minmax(0, 1fr);
+    gap: .65rem;
+    padding: .55rem .65rem;
+  }
+
+  .radar-page:not(.radar-tv) .radar-layout {
+    grid-template-columns: minmax(0, 1fr);
+    gap: .7rem;
+    padding: .65rem .65rem 1rem;
+  }
+
+  .radar-page:not(.radar-tv) .radar-live-map-card {
+    margin: .7rem 0 0;
+    padding-top: .7rem;
+  }
+
+  .radar-page:not(.radar-tv) .radar-live-map-heading {
+    align-items: center;
+    flex-direction: row;
+    gap: .5rem;
+    margin-bottom: .45rem;
+  }
+
+  .radar-page:not(.radar-tv) .radar-live-map-heading h3 {
+    font-size: .9rem;
+    line-height: 1.25;
+  }
+
+  .radar-page:not(.radar-tv) .radar-live-map-updated {
+    max-width: 42%;
+    font-size: .58rem;
+    line-height: 1.3;
+    text-align: right;
+    white-space: normal;
+  }
+
+  .radar-page:not(.radar-tv) .radar-live-map-toolbar {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: .4rem;
+    margin: 0 -.65rem .4rem;
+    padding: 0 .65rem .25rem;
+    overflow-x: auto;
+    overscroll-behavior-inline: contain;
+    scrollbar-width: thin;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .radar-page:not(.radar-tv) .radar-live-map-toolbar button {
+    min-height: 42px;
+    flex: 0 0 auto;
+    padding: .5rem .7rem;
+    font-size: .7rem;
+    white-space: nowrap;
+    touch-action: manipulation;
+  }
+
+  .radar-page:not(.radar-tv) .radar-live-map-base-buttons {
+    flex: 0 0 auto;
+  }
+
+  .radar-page:not(.radar-tv) .radar-live-map-status {
+    flex-wrap: nowrap;
+    gap: .5rem;
+    min-height: 32px;
+    margin: 0 -.65rem .35rem;
+    padding: 0 .65rem .25rem;
+    overflow-x: auto;
+    overscroll-behavior-inline: contain;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .radar-page:not(.radar-tv) .radar-live-map-status::-webkit-scrollbar {
+    display: none;
+  }
+
+  .radar-page:not(.radar-tv) .radar-live-map-status span,
+  .radar-page:not(.radar-tv) .radar-live-map-status strong {
+    flex: 0 0 auto;
+    font-size: .62rem;
+    white-space: nowrap;
+  }
+
+  .radar-page:not(.radar-tv) .radar-live-map-frame {
+    height: min(68dvh, 560px);
+    min-height: 390px;
+  }
+
+  .radar-page:not(.radar-tv) .radar-live-map-frame > .radar-live-map {
+    height: 100%;
+    min-height: 0;
+  }
+
+  .radar-page:not(.radar-tv) .radar-live-map .leaflet-control-zoom a {
+    width: 38px;
+    height: 38px;
+    font-size: 23px;
+    line-height: 36px;
+  }
+
+  .radar-page:not(.radar-tv) .radar-live-map-footer {
+    gap: .35rem .65rem;
+    padding: .5rem .1rem 0;
+    font-size: .62rem;
+    line-height: 1.4;
+  }
+}

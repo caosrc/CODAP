@@ -831,7 +831,6 @@ function RadarMapaTempoReal({ tv, dataOcorrencias }: { tv: boolean; dataOcorrenc
           {radarCarregando ? 'Atualizando…' : radarChuva?.erroAtualizacao ? 'Último quadro salvo' : 'Atualização automática · 5 min'}
         </span>
       </div>
-       {!tv && <div className="radar-live-map-risk-anchor" ref={setPainelAreasRiscoHost} data-testid="radar-live-map-risk-anchor" />}
       <div className="radar-live-map-toolbar" role="toolbar" aria-label="Controles do mapa meteorológico">
         <div className="radar-live-map-base-buttons">
           <button type="button" className={camadaBase === 'mapa' ? 'ativo' : ''} onClick={() => setCamadaBase('mapa')}>Mapa</button>
@@ -887,6 +886,13 @@ function RadarMapaTempoReal({ tv, dataOcorrencias }: { tv: boolean; dataOcorrenc
         )}
       </div>
       <div className="radar-live-map-frame">
+      {!tv && (
+        <div
+          className="radar-live-map-risk-anchor"
+          ref={setPainelAreasRiscoHost}
+          data-testid="radar-live-map-risk-anchor"
+        />
+      )}
       {tv && (
         <div
           className="radar-live-map-risk-anchor radar-live-map-risk-anchor-tv"

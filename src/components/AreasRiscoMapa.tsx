@@ -537,8 +537,19 @@ export default function AreasRiscoMapa({
         <div className="arm-panel-head">
           <div className="arm-head-mark" aria-hidden="true"><span /></div>
           <div className="arm-head-copy">
-            <div className="arm-eyebrow">DEFESA CIVIL · LAFAIETE</div>
-            <h2>Áreas de risco</h2>
+            <h2>
+              <button
+                type="button"
+                className="arm-head-copy-toggle"
+                aria-label={recolhido ? 'Expandir painel de áreas de risco' : 'Recolher painel de áreas de risco'}
+                aria-expanded={!recolhido}
+                data-testid="button-titulo-painel-riscos"
+                onClick={() => setRecolhido(value => !value)}
+              >
+                <span className="arm-eyebrow">DEFESA CIVIL · LAFAIETE</span>
+                <span>Áreas de risco</span>
+              </button>
+            </h2>
           </div>
           <button
             type="button"

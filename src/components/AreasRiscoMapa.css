@@ -180,6 +180,7 @@
 .arm-sound-toggle:focus-visible,
 .arm-add-tv:focus-visible,
 .arm-collapse:focus-visible { outline: 2px solid #8ce2ff; outline-offset: 2px; }
+.arm-add-mobile { display: none; }
 
 @media (max-width: 850px) {
   .arm-panel {
@@ -785,6 +786,8 @@
 }
 
 @media (max-width: 700px) {
+  .arm-add-mobile { display: grid; }
+
   .arm-panel {
     top: auto;
     bottom: 10px;

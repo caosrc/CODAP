@@ -479,6 +479,19 @@ export default function AreasRiscoMapa({
               <span aria-hidden="true">+</span>
             </button>
           )}
+          {!modoTv && (
+            <button
+              type="button"
+              className="arm-add-tv arm-add-mobile"
+              aria-label="Cadastrar área de risco"
+              title="Cadastrar área de risco"
+              data-testid="button-nova-area-mobile"
+              onClick={iniciarCadastro}
+              disabled={Boolean(rascunho)}
+            >
+              <span aria-hidden="true">+</span>
+            </button>
+          )}
         </div>
         {!recolhido && (
           <>

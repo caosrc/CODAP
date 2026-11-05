@@ -909,6 +909,8 @@
     z-index: 2;
     display: block;
     width: 100%;
+    max-width: 100%;
+    min-width: 0;
     height: auto;
     flex: 0 0 auto;
     margin: 0;
@@ -921,6 +923,7 @@
     bottom: auto;
     left: auto;
     width: 100%;
+    min-width: 0;
     max-width: 100%;
     max-height: min(52dvh, 500px);
     transform: none;
@@ -990,6 +993,7 @@
   }
 
   .radar-page:not(.radar-tv) .radar-live-map-frame .arm-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 7px;
     padding: 8px 10px;
   }

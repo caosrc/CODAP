@@ -1,10 +1,11 @@
-import { Fragment, useEffect, useMemo, useRef, useState, type CSSProperties, type FormEvent } from 'react'
+import { Fragment, useEffect, useMemo, useRef, useState, type ChangeEvent, type CSSProperties, type FormEvent } from 'react'
 import { createPortal } from 'react-dom'
 import { Marker, Polygon, Popup, Tooltip, useMapEvents } from 'react-leaflet'
 import L from 'leaflet'
 import ModalSenha from './ModalSenha'
 import './AreasRiscoMapa.css'
 import { ESTILO_AREA_RISCO, TIPOS_AREAS_RISCO, type AreaRisco, type AreaRiscoInput, type TipoAreaRisco } from '../areasRisco'
+import { exportarPoligonosKmz, importarPoligonosKmz, type PoligonoKmzImportado } from '../areasRiscoKmz'
 
 export interface AreasRiscoMapaProps {
   painelHost: HTMLDivElement | null
@@ -143,7 +144,15 @@ export default function AreasRiscoMapa({
   const [modoMapa, setModoMapa] = useState<'marcador' | 'poligono' | null>(null)
   const [portao, setPortao] = useState<GateAction | null>(null)
   const [localErro, setLocalErro] = useState('')
-  const [recolhido, setRecolhido] = useState(!modoTv)
+  const [poligonosImportados, setPoligonosImportados] = useState<PoligonoKmzImportado[]>([])
+  const [poligonoImportadoSelecionado, setPoligonoImportadoSelecionado] = useState(0)
+  const [processandoKmz, setProcessandoKmz] = useState(false)
+  const [mensagemKmz, setMensagemKmz] = useState('')
+  const arquivoKmzRef = useRef<HTMLInputElement>(null)
+  const [recolhido, setRecolhido] = useState(() => {
+    const celular = typeof window !== 'undefined' && window.matchMedia('(max-width: 700px)').matches
+    return !modoTv && !celular
+  })
   const painelRef = useRef<HTMLDivElement>(null)
   const scrollAntesDoFormularioRef = useRef(0)
   const formularioAberto = rascunho !== null
@@ -184,6 +193,33 @@ export default function AreasRiscoMapa({
   const areasVisiveis = filtro === 'Todas' ? areas : areas.filter(area => area.tipo === filtro)
   const areasNoMapa = areas.filter(area => tiposVisiveisNoMapa.has(area.tipo))
   const todosTiposVisiveisNoMapa = tiposVisiveisNoMapa.size === TIPOS.length
+  const areasParaExportar: AreaRiscoInput[] = areas
+    .filter(area =>
+      area.poligono.length >= 3
+      && !(editandoId === area.id && (rascunho?.poligono.length ?? 0) >= 3),
+    )
+    .map(({ tipo, latitude, longitude, poligono, data_inicio, limite_precipitacao_mm, referencia, observacao }) => ({
+      tipo,
+      latitude,
+      longitude,
+      poligono,
+      data_inicio,
+      limite_precipitacao_mm,
+      referencia,
+      observacao,
+    }))
+  if (rascunho && rascunho.poligono.length >= 3 && rascunho.latitude != null && rascunho.longitude != null) {
+    areasParaExportar.push({
+      tipo: rascunho.tipo,
+      latitude: rascunho.latitude,
+      longitude: rascunho.longitude,
+      poligono: rascunho.poligono,
+      data_inicio: rascunho.data_inicio,
+      limite_precipitacao_mm: rascunho.tipo === 'Interdições' ? 0 : Number(rascunho.limite_precipitacao_mm) || 0,
+      referencia: rascunho.referencia || null,
+      observacao: rascunho.observacao || null,
+    })
+  }
 
   function alternarTipoNoMapa(tipo: TipoAreaRisco) {
     setTiposVisiveisNoMapa(atuais => {
@@ -275,6 +311,71 @@ export default function AreasRiscoMapa({
 
   function atualizarRascunho(partial: Partial<DraftArea>) {
     setRascunho(atual => atual ? { ...atual, ...partial } : atual)
+  }
+
+  async function importarArquivoKmz(event: ChangeEvent<HTMLInputElement>) {
+    const arquivo = event.currentTarget.files?.[0]
+    event.currentTarget.value = ''
+    if (!arquivo) return
+
+    setProcessandoKmz(true)
+    setLocalErro('')
+    setMensagemKmz('')
+    setPoligonosImportados([])
+    try {
+      const poligonos = await importarPoligonosKmz(arquivo)
+      setPoligonosImportados(poligonos)
+      setPoligonoImportadoSelecionado(0)
+      setMensagemKmz(`${poligonos.length} polígono(s) encontrado(s). Escolha um contorno e carregue-o no cadastro.`)
+    } catch (e) {
+      setMensagemKmz(e instanceof Error ? e.message : 'Não foi possível ler o arquivo KMZ/KML.')
+    } finally {
+      setProcessandoKmz(false)
+    }
+  }
+
+  function carregarPoligonoImportado() {
+    const poligonoImportado = poligonosImportados[poligonoImportadoSelecionado]
+    if (!rascunho || !poligonoImportado) return
+
+    const tipo = poligonoImportado.tipo ?? rascunho.tipo
+    atualizarRascunho({
+      tipo,
+      latitude: poligonoImportado.latitude,
+      longitude: poligonoImportado.longitude,
+      poligono: poligonoImportado.poligono,
+      data_inicio: poligonoImportado.data_inicio ?? rascunho.data_inicio,
+      limite_precipitacao_mm: tipo === 'Interdições'
+        ? '0'
+        : poligonoImportado.limite_precipitacao_mm != null
+          ? String(poligonoImportado.limite_precipitacao_mm)
+          : rascunho.limite_precipitacao_mm,
+      referencia: rascunho.referencia.trim() ? rascunho.referencia : poligonoImportado.referencia ?? rascunho.referencia,
+      observacao: rascunho.observacao.trim() ? rascunho.observacao : poligonoImportado.observacao ?? rascunho.observacao,
+    })
+    setModoMapa(null)
+    setLocalErro('')
+    setMensagemKmz(`Contorno “${poligonoImportado.nome}” carregado. Revise o cadastro e toque em “Registrar área” para salvar.`)
+  }
+
+  async function exportarKmz() {
+    if (!areasParaExportar.length) return
+    setProcessandoKmz(true)
+    setMensagemKmz('')
+    try {
+      const { arquivo, quantidade } = await exportarPoligonosKmz(areasParaExportar)
+      const url = URL.createObjectURL(arquivo)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `areas_risco_lafaiete_${dataHoje()}.kmz`
+      link.click()
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000)
+      setMensagemKmz(`${quantidade} polígono(s) exportado(s) em KMZ.`)
+    } catch (e) {
+      setMensagemKmz(e instanceof Error ? e.message : 'Não foi possível gerar o KMZ.')
+    } finally {
+      setProcessandoKmz(false)
+    }
   }
 
   async function salvar(event: FormEvent<HTMLFormElement>) {
@@ -665,6 +766,60 @@ export default function AreasRiscoMapa({
                 <div className="arm-form-heading">
                   <div><span className="arm-eyebrow">{editandoId ? 'ATUALIZAÇÃO DE CADASTRO' : 'NOVO REGISTRO'}</span><h3>{editandoId ? 'Editar área de risco' : rascunho.tipo === 'Interdições' ? 'Cadastrar interdição' : 'Cadastrar área'}</h3></div>
                   <button type="button" aria-label="Fechar formulário" data-testid="button-fechar-formulario-area" onClick={fecharFormulario}>×</button>
+                </div>
+                <div className="arm-kmz-tools" data-testid="area-risco-kmz">
+                  <input
+                    ref={arquivoKmzRef}
+                    className="arm-kmz-file-input"
+                    type="file"
+                    accept=".kmz,.kml,application/vnd.google-earth.kmz,application/vnd.google-earth.kml+xml"
+                    aria-label="Arquivo KMZ ou KML com polígonos"
+                    onChange={event => void importarArquivoKmz(event)}
+                    disabled={processandoKmz || salvando}
+                    data-testid="input-importar-area-kmz"
+                  />
+                  <span className="arm-kmz-copy">Importe um contorno para o cadastro ou exporte as áreas com polígono.</span>
+                  <div className="arm-kmz-actions">
+                    <button
+                      type="button"
+                      onClick={() => arquivoKmzRef.current?.click()}
+                      disabled={processandoKmz || salvando}
+                      data-testid="button-importar-area-kmz"
+                    >
+                      {processandoKmz ? 'Lendo…' : 'Importar KMZ/KML'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void exportarKmz()}
+                      disabled={processandoKmz || salvando || areasParaExportar.length === 0}
+                      data-testid="button-exportar-area-kmz"
+                    >
+                      Exportar KMZ ({areasParaExportar.length})
+                    </button>
+                  </div>
+                  {poligonosImportados.length > 0 && (
+                    <div className="arm-kmz-import-selection">
+                      <label className="arm-field">
+                        <span>Contorno para carregar no formulário</span>
+                        <select
+                          value={poligonoImportadoSelecionado}
+                          onChange={event => setPoligonoImportadoSelecionado(Number(event.target.value))}
+                          data-testid="select-poligono-importado-kmz"
+                        >
+                          {poligonosImportados.map((poligono, indice) => (
+                            <option key={`${indice}-${poligono.nome}`} value={indice}>
+                              {indice + 1}. {poligono.nome} · {poligono.poligono.length} vértices
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <button type="button" onClick={carregarPoligonoImportado} data-testid="button-carregar-poligono-kmz">
+                        Usar contorno no cadastro
+                      </button>
+                      <span>O polígono só é salvo quando você confirmar o cadastro.</span>
+                    </div>
+                  )}
+                  {mensagemKmz && <span className="arm-kmz-status" role="status" data-testid="status-area-kmz">{mensagemKmz}</span>}
                 </div>
                 <form onSubmit={salvar}>
                   <label className="arm-field">

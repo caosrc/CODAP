@@ -613,6 +613,65 @@
   cursor: pointer;
 }
 
+.arm-kmz-tools {
+  display: grid;
+  gap: 7px;
+  margin: 0 0 11px;
+  padding: 9px;
+  border: 1px solid rgba(92, 149, 182, .3);
+  border-radius: 7px;
+  background: rgba(19, 56, 82, .48);
+}
+
+.arm-kmz-file-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  clip-path: inset(50%);
+}
+
+.arm-kmz-copy,
+.arm-kmz-import-selection > span,
+.arm-kmz-status {
+  color: #a8c8da;
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+.arm-kmz-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.arm-kmz-actions button,
+.arm-kmz-import-selection > button {
+  min-height: 36px;
+  padding: 6px 8px;
+  border: 1px solid #357797;
+  border-radius: 5px;
+  color: #e5f5fd;
+  background: #164766;
+  font: inherit;
+  font-size: 10px;
+  font-weight: 750;
+  line-height: 1.25;
+  cursor: pointer;
+}
+
+.arm-kmz-actions button:hover,
+.arm-kmz-import-selection > button:hover { background: #0d7396; }
+.arm-kmz-actions button:disabled { cursor: not-allowed; opacity: .48; }
+.arm-kmz-import-selection { display: grid; gap: 6px; }
+.arm-kmz-import-selection .arm-field { margin: 0; }
+.arm-kmz-import-selection > span { color: #83ae91; }
+.arm-kmz-status { padding-top: 1px; }
+.arm-kmz-actions button:focus-visible,
+.arm-kmz-import-selection > button:focus-visible { outline: 2px solid #8ce2ff; outline-offset: 2px; }
+
 .arm-field { display: grid; gap: 4px; margin-bottom: 9px; }
 .arm-field > span { color: #bcd3e1; font-size: 10px; font-weight: 750; }
 .arm-field small { color: #789db5; font-size: 9px; font-weight: 500; }

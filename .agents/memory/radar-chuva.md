@@ -23,6 +23,12 @@ O mapa usa RainViewer para os quadros observados de radar meteorológico, com at
 
 **How to apply:** Diferencie no mapa o horário de geração do quadro e a frequência de consulta do app. Para reduzir o atraso de origem abaixo de 10 minutos, avalie uma fonte de radar regional com atualização mais frequente.
 
+Desde 1º de janeiro de 2026, a API pública documenta somente o esquema Universal Blue (ID 2), zoom máximo 7 e indisponibilidade de nowcast e imagens infravermelhas via API. A resposta atual de `weather-maps.json` ainda oferece quadros históricos de radar em passos de 10 minutos.
+
+**Why:** A transição do serviço removeu produtos e níveis de detalhe; consultar a API mais frequentemente não cria quadros novos nem melhora a resolução espacial.
+
+**How to apply:** Use o esquema `2`, respeite `maxNativeZoom={7}`, anime apenas quadros históricos retornados e informe a cadência/limites. Para cobrir chuva localizada que o mosaico não detecta, use medições pluviométricas pontuais e só integre radar regional alternativo com API e autorização confirmadas.
+
 Para a camada visual de nuvens no mapa, o app pode usar o serviço público NOAA/NNVL de imagens infravermelhas diárias do GOES como fonte XYZ padrão; isso é separado do produto RRQPE.
 
 **Why:** O serviço NOAA já entrega tiles HTTPS compatíveis com Leaflet, enquanto o RRQPE continua sendo um produto NetCDF que exige processamento próprio.

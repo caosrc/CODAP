@@ -25,6 +25,7 @@ import { statusLeituraCemaden } from '../cemadenLeitura'
 import './MonitoramentoCNL.css'
 import ModalSenha from './ModalSenha'
 import AreasRiscoMapa from './AreasRiscoMapa'
+import RadarChuvaAnimado, { type QuadroRadarChuva } from './RadarChuvaAnimado'
 
 type Prioridade = 'normal' | 'importante' | 'urgente'
 type ConfirmacaoRadar = { agente: string; confirmado: boolean; confirmedAt?: string }
@@ -76,6 +77,8 @@ type DadosRadarChuvaLive = {
   tileUrl?: string
   frameTime: number
   atualizadoEm: string
+  quadros?: QuadroRadarChuva[]
+  quantidadeQuadrosDisponiveis?: number
   erroAtualizacao?: boolean
 }
 
@@ -748,6 +751,8 @@ function RadarMapaTempoReal({ tv, dataOcorrencias }: { tv: boolean; dataOcorrenc
         tileUrl: typeof corpo.tileUrl === 'string' ? corpo.tileUrl : undefined,
         frameTime: Number(corpo.frameTime),
         atualizadoEm: typeof corpo.atualizadoEm === 'string' ? corpo.atualizadoEm : '',
+        quadros: Array.isArray(corpo.quadros) ? corpo.quadros : [],
+        quantidadeQuadrosDisponiveis: Number(corpo.quantidadeQuadrosDisponiveis) || 0,
         erroAtualizacao: corpo.erroAtualizacao === true,
       })
       setRadarErro('')
@@ -786,7 +791,7 @@ function RadarMapaTempoReal({ tv, dataOcorrencias }: { tv: boolean; dataOcorrenc
 
   useEffect(() => {
     carregarRadarChuva()
-    const timer = window.setInterval(carregarRadarChuva, 5 * 60 * 1000)
+    const timer = window.setInterval(carregarRadarChuva, 2 * 60 * 1000)
     const atualizarAoVoltar = () => {
       if (document.visibilityState === 'visible') carregarRadarChuva()
     }
@@ -814,7 +819,6 @@ function RadarMapaTempoReal({ tv, dataOcorrencias }: { tv: boolean; dataOcorrenc
     }
   }, [carregarTempoMapa, carregarPrevisaoTrovoadas])
 
-  const tileRadar = radarChuva?.tileUrl || (radarChuva ? `${radarChuva.host}${radarChuva.path}/256/{z}/{x}/{y}/2/1_0.png` : '')
   const pontosTrovoada = (previsaoTrovoadas?.pontos || []).filter(ponto =>
     Number.isFinite(ponto.latitude) && Number.isFinite(ponto.longitude),
   )
@@ -828,7 +832,7 @@ function RadarMapaTempoReal({ tv, dataOcorrencias }: { tv: boolean; dataOcorrenc
           </h3>
         </div>
         <span className="radar-live-map-updated">
-          {radarCarregando ? 'Atualizando…' : radarChuva?.erroAtualizacao ? 'Último quadro salvo' : 'Atualização automática · 5 min'}
+          {radarCarregando ? 'Atualizando…' : radarChuva?.erroAtualizacao ? 'Último quadro salvo' : 'Verificação automática · 2 min'}
         </span>
       </div>
       <div className="radar-live-map-toolbar" role="toolbar" aria-label="Controles do mapa meteorológico">
@@ -940,16 +944,14 @@ function RadarMapaTempoReal({ tv, dataOcorrencias }: { tv: boolean; dataOcorrenc
             />
           </Pane>
         )}
-        {mostrarChuva && tileRadar && (
+        {mostrarChuva && radarChuva && (
           <Pane name="radarLiveRain" style={{ zIndex: 420 }}>
-            <TileLayer
-              key={`radar-live-rain-${radarChuva?.frameTime || 'none'}`}
-              url={tileRadar}
+            <RadarChuvaAnimado
+              host={radarChuva.host}
+              quadros={radarChuva.quadros || []}
+              quadroReserva={{ time: radarChuva.frameTime, path: radarChuva.path }}
               opacity={0.72}
-              maxNativeZoom={7}
               maxZoom={18}
-              tileSize={256}
-              attribution='Weather data by <a href="https://www.rainviewer.com/" target="_blank" rel="noreferrer">RainViewer</a>'
             />
           </Pane>
         )}
@@ -1099,7 +1101,11 @@ function RadarMapaTempoReal({ tv, dataOcorrencias }: { tv: boolean; dataOcorrenc
         {cemadenMg.dados && estacoesLafaieteSemCoordenadas > 0 && (
           <span>{estacoesLafaieteSemCoordenadas} estação(ões) de Lafaiete sem posição no cadastro geográfico</span>
         )}
-        <span>{radarChuva?.atualizadoEm ? `Radar: ${new Date(radarChuva.atualizadoEm).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}` : 'Radar: —'}</span>
+        <span>
+          {radarChuva?.frameTime
+            ? `Quadro RainViewer gerado às ${new Date(radarChuva.frameTime * 1000).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })} · há ${Math.max(0, Math.floor((Date.now() - radarChuva.frameTime * 1000) / 60000))} min · ${radarChuva.quadros?.length || 1} quadros/10 min · zoom máx. 7`
+            : 'Radar RainViewer: —'}
+        </span>
         <span>{tempoMapa?.atual?.temperatura != null ? `Lafaiete: ${Math.round(Number(tempoMapa.atual.temperatura))} °C` : 'Temperatura local: —'}</span>
         <span>{previsaoTrovoadas ? `${pontosTrovoada.length} ponto(s) previsto(s) perto de Lafaiete` : 'Previsão local de trovoadas: —'}</span>
         {!templateTilesHttpsValido(GOES_CLOUD_TILE_URL) && <span>Nuvens GOES: fonte não configurada</span>}

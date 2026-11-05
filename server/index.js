@@ -4436,22 +4436,29 @@ app.get('/api/radar-chuva', async (_req, res) => {
     const validarQuadro = quadro => (
       Number.isFinite(Number(quadro?.time)) &&
       typeof quadro?.path === 'string' &&
-      quadro.path.startsWith('/v2/')
+      quadro.path.startsWith('/v2/radar/')
     )
     const quadrosObservados = (Array.isArray(dados?.radar?.past) ? dados.radar.past : [])
       .filter(validarQuadro)
+      .sort((a, b) => Number(a.time) - Number(b.time))
     const ultimo = quadrosObservados.reduce((maisRecente, quadro) => (
       !maisRecente || Number(quadro.time) > Number(maisRecente.time) ? quadro : maisRecente
     ), null)
 
     if (!host || !ultimo) throw new Error('RainViewer não retornou quadros de radar')
 
+    const quadrosRecentes = quadrosObservados.slice(-6).map(quadro => ({
+      time: Number(quadro.time),
+      path: quadro.path,
+    }))
     radarChuvaCache = {
       host,
       path: ultimo.path,
       tileUrl: `${host}${ultimo.path}/256/{z}/{x}/{y}/2/1_0.png`,
       frameTime: Number(ultimo.time),
       atualizadoEm: new Date(Number(ultimo.time) * 1000).toISOString(),
+      quadros: quadrosRecentes,
+      quantidadeQuadrosDisponiveis: quadrosObservados.length,
       fonte: 'RainViewer',
       tipoQuadro: 'observado',
     }

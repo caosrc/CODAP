@@ -1735,12 +1735,12 @@ input, select, textarea { font-family: inherit; }
   height: 8px;
   border-radius: 3px;
 }
-.chuva-cor--fraca { background: #67e8f9; }
-.chuva-cor--moderada { background: #22c55e; }
-.chuva-cor--forte { background: #facc15; }
-.chuva-cor--muito-forte { background: #f97316; }
-.chuva-cor--intensa { background: #ef4444; }
-.chuva-cor--extrema { background: #c026d3; }
+.chuva-cor--fraca { background: #cec087; }
+.chuva-cor--moderada { background: #36bae5; }
+.chuva-cor--forte { background: #0070a3; }
+.chuva-cor--muito-forte { background: #ffc500; }
+.chuva-cor--intensa { background: #e62800; }
+.chuva-cor--extrema { background: #ff81ff; }
 .mapa-chuva-ajuda {
   margin: 0.25rem 0.5rem 0.35rem;
   color: #64748b;

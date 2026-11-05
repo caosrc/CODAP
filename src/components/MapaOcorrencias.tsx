@@ -35,6 +35,7 @@ import {
   type EstacaoCemadenMg,
 } from '../meteorologiaMapa'
 import { dataHoraCemadenFormatada, statusLeituraCemaden } from '../cemadenLeitura'
+import RadarChuvaAnimado, { type QuadroRadarChuva } from './RadarChuvaAnimado'
 
 
 interface DadosRadarChuva {
@@ -43,6 +44,8 @@ interface DadosRadarChuva {
   tileUrl?: string
   frameTime: number
   atualizadoEm: string
+  quadros?: QuadroRadarChuva[]
+  quantidadeQuadrosDisponiveis?: number
   fonte: string
   tipoQuadro?: 'observado'
   cache?: boolean
@@ -948,6 +951,8 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
         tileUrl: typeof dadosRadar?.tileUrl === 'string' ? dadosRadar.tileUrl : undefined,
         frameTime: Number(dadosRadar?.frameTime),
         atualizadoEm: typeof dadosRadar?.atualizadoEm === 'string' ? dadosRadar.atualizadoEm : '',
+        quadros: Array.isArray(dadosRadar?.quadros) ? dadosRadar.quadros : [],
+        quantidadeQuadrosDisponiveis: Number(dadosRadar?.quantidadeQuadrosDisponiveis) || 0,
         fonte: typeof dadosRadar?.fonte === 'string' ? dadosRadar.fonte : 'RainViewer',
          tipoQuadro: 'observado',
         cache: dadosRadar?.cache === true,
@@ -964,7 +969,7 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
   useEffect(() => {
     if (!mostrarChuva) return
     buscarRadarChuva()
-    const intervalo = setInterval(buscarRadarChuva, 3 * 60 * 1000)
+    const intervalo = setInterval(buscarRadarChuva, 2 * 60 * 1000)
     const atualizarAoVoltar = () => {
       if (document.visibilityState === 'visible') buscarRadarChuva()
     }
@@ -1742,16 +1747,12 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
         />
         {mostrarChuva && radarChuva && (
           <Pane name="radarRainViewerPane" style={{ zIndex: 420 }}>
-            <TileLayer
-              key={`radar-chuva-${radarChuva.frameTime}`}
-              url={radarChuva.tileUrl || `${radarChuva.host}${radarChuva.path}/256/{z}/{x}/{y}/2/1_0.png`}
+            <RadarChuvaAnimado
+              host={radarChuva.host}
+              quadros={radarChuva.quadros || []}
+              quadroReserva={{ time: radarChuva.frameTime, path: radarChuva.path }}
               opacity={opacidadeRadar}
-              attribution='Weather data by <a href="https://www.rainviewer.com/" target="_blank" rel="noreferrer">RainViewer</a>'
-              maxNativeZoom={7}
               maxZoom={19}
-              tileSize={256}
-              updateWhenZooming={false}
-              updateWhenIdle={true}
             />
           </Pane>
         )}
@@ -2219,7 +2220,7 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
                 >
                   🌧️ Radar RainViewer
                 </button>
-                <span>Precipitação observada · consulta a cada 3 min; quadros da fonte em intervalos de 10 min</span>
+                <span>Imagens animadas dos últimos quadros observados · checagem a cada 2 min; quadros em passos de 10 min</span>
               </div>
               <div className="mapa-chuva-fontes">
                 <button
@@ -2267,8 +2268,15 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
                 <div>
                   <span className="mapa-chuva-resumo-label">Radar</span>
                   <strong>
-                    {radarChuva ? horaChuva(radarChuva.atualizadoEm) : '—'}
-                    <small className="mapa-chuva-quadro-tipo">RainViewer · horário de geração do quadro</small>
+                    {radarChuva
+                      ? `${horaChuva(radarChuva.atualizadoEm)} · há ${Math.max(0, Math.floor((Date.now() - radarChuva.frameTime * 1000) / 60000))} min`
+                      : '—'}
+                    <small className="mapa-chuva-quadro-tipo">
+                      RainViewer · horário de geração do quadro
+                      {radarChuva?.quadros?.length
+                        ? ` · animação de ${radarChuva.quadros.length} quadros (10 min entre gerações)`
+                        : ''}
+                    </small>
                   </strong>
                 </div>
                 <div>
@@ -2294,15 +2302,15 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
                 </div>
               </div>
               <div className="mapa-chuva-legenda">
-                <span><i className="chuva-cor chuva-cor--fraca" /> fraca</span>
-                <span><i className="chuva-cor chuva-cor--moderada" /> moderada</span>
-                <span><i className="chuva-cor chuva-cor--forte" /> forte</span>
-                <span><i className="chuva-cor chuva-cor--muito-forte" /> muito forte</span>
-                <span><i className="chuva-cor chuva-cor--intensa" /> intensa</span>
-                <span><i className="chuva-cor chuva-cor--extrema" /> extrema</span>
+                <span title="Refletividade do radar: 10–14 dBZ"><i className="chuva-cor chuva-cor--fraca" /> fraca</span>
+                <span title="Refletividade do radar: 15–24 dBZ"><i className="chuva-cor chuva-cor--moderada" /> moderada</span>
+                <span title="Refletividade do radar: 25–34 dBZ"><i className="chuva-cor chuva-cor--forte" /> forte</span>
+                <span title="Refletividade do radar: 35–44 dBZ"><i className="chuva-cor chuva-cor--muito-forte" /> muito forte</span>
+                <span title="Refletividade do radar: 45–54 dBZ"><i className="chuva-cor chuva-cor--intensa" /> intensa</span>
+                <span title="Refletividade do radar: 55 dBZ ou mais"><i className="chuva-cor chuva-cor--extrema" /> extrema</span>
               </div>
               <p className="mapa-chuva-ajuda">
-                RainViewer mostra precipitação observada nos tiles da área visível; a imagem GOES mostra nuvens e não confirma chuva no solo. Ao ativar Chuva, o mapa mostra as leituras mais recentes das estações CEMADEN de Conselheiro Lafaiete; a superfície interpolada abaixo continua restrita ao município.
+                RainViewer anima os quadros observados disponíveis (até zoom 7; cerca de 10 min entre quadros). O horário exibido é o de geração do quadro, não o instante exato da medição. A legenda representa refletividade do radar (dBZ), não milímetros de chuva. Radares podem não captar chuva muito localizada ou áreas sem cobertura; as estações CEMADEN mostram medições pontuais de Conselheiro Lafaiete. A imagem GOES mostra nuvens, não confirma chuva no solo.
                 A previsão de trovoadas continua cobrindo localidades de Minas Gerais, mas os valores de precipitação prevista são exibidos somente para Lafaiete. A superfície interpolada permanece limitada a 10 km do centro de Lafaiete e só aparece com pelo menos três leituras válidas da última hora; não equivale a radar nem a uma medição estadual.
               </p>
               {cemadenCarregando && <div className="mapa-chuva-status">⏳ Atualizando estações CEMADEN…</div>}

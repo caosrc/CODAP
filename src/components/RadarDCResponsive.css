@@ -6996,13 +6996,16 @@ body.radar-tv-active .radar-tv .leaflet-overlay-pane .arm-polygon-alerta {
   }
 
   .radar-page:not(.radar-tv) .radar-live-map-frame {
-    height: min(68dvh, 560px);
-    min-height: 390px;
+    height: auto;
+    min-height: 0;
+    flex-direction: column;
+    overflow: hidden;
   }
 
   .radar-page:not(.radar-tv) .radar-live-map-frame > .radar-live-map {
-    height: 100%;
-    min-height: 0;
+    flex: 0 0 min(68dvh, 560px);
+    height: min(68dvh, 560px);
+    min-height: 390px;
   }
 
   .radar-page:not(.radar-tv) .radar-live-map .leaflet-control-zoom a {

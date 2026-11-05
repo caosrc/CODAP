@@ -885,26 +885,23 @@
 /* Celular: manter o mapa livre e transformar os controles em uma folha inferior. */
 @media (max-width: 700px) {
   .radar-page:not(.radar-tv) .radar-live-map-frame .radar-live-map-risk-anchor {
-    position: absolute;
-    z-index: 1202;
-    top: auto;
-    right: 10px;
-    bottom: 10px;
-    left: auto;
+    position: relative;
+    z-index: 2;
     display: block;
-    width: 0;
-    height: 0;
+    width: 100%;
+    height: auto;
+    flex: 0 0 auto;
     margin: 0;
   }
 
   .radar-page:not(.radar-tv) .radar-live-map-frame .arm-panel {
-    position: absolute;
+    position: relative;
     top: auto;
-    right: 0;
-    bottom: 0;
+    right: auto;
+    bottom: auto;
     left: auto;
-    width: min(390px, calc(100vw - 28px));
-    max-width: calc(100vw - 28px);
+    width: 100%;
+    max-width: 100%;
     max-height: min(52dvh, 500px);
     transform: none;
     border-radius: 14px;
@@ -912,7 +909,7 @@
   }
 
   .radar-page:not(.radar-tv) .radar-live-map-frame .arm-panel-recolhido {
-    width: min(260px, calc(100vw - 28px));
+    width: 100%;
     max-height: none;
   }
 
@@ -1019,7 +1016,7 @@
   }
 
   .radar-page:not(.radar-tv) .radar-live-map-frame .arm-panel-form-active {
-    max-height: min(36dvh, 330px);
+    max-height: min(58dvh, 560px);
     overflow-y: auto;
     scroll-padding-block: 8px;
   }
@@ -1117,11 +1114,6 @@
 }
 
 @media (max-width: 390px) {
-  .radar-page:not(.radar-tv) .radar-live-map-frame .arm-panel {
-    width: calc(100vw - 20px);
-    max-width: calc(100vw - 20px);
-  }
-
   .radar-page:not(.radar-tv) .radar-live-map-frame .arm-types {
     gap: 4px;
     padding-right: 8px;

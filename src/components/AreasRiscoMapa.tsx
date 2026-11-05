@@ -408,6 +408,7 @@ export default function AreasRiscoMapa({
       setRascunho(null)
       setEditandoId(null)
       setModoMapa(null)
+      if (window.matchMedia('(max-width: 700px)').matches) setRecolhido(true)
     } catch (e) {
       setLocalErro(e instanceof Error ? e.message : 'Não foi possível salvar a área.')
     }

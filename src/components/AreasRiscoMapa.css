@@ -929,8 +929,38 @@
   }
 
   .radar-page:not(.radar-tv) .radar-live-map-frame .arm-panel-recolhido {
-    width: min(280px, calc(100% - 16px));
+    width: min(140px, calc(100% - 16px));
     max-height: none;
+    margin-right: auto;
+    margin-left: auto;
+  }
+
+  .radar-page:not(.radar-tv) .radar-live-map-frame .arm-panel-recolhido .arm-panel-head {
+    justify-content: center;
+    gap: 0;
+    padding: 8px;
+  }
+
+  .radar-page:not(.radar-tv) .radar-live-map-frame .arm-panel-recolhido .arm-head-mark,
+  .radar-page:not(.radar-tv) .radar-live-map-frame .arm-panel-recolhido .arm-sound-toggle,
+  .radar-page:not(.radar-tv) .radar-live-map-frame .arm-panel-recolhido .arm-add-mobile {
+    display: none;
+  }
+
+  .radar-page:not(.radar-tv) .radar-live-map-frame .arm-panel-recolhido .arm-head-copy,
+  .radar-page:not(.radar-tv) .radar-live-map-frame .arm-panel-recolhido .arm-head-copy h2 {
+    width: 100%;
+    text-align: center;
+  }
+
+  .radar-page:not(.radar-tv) .radar-live-map-frame .arm-panel-recolhido .arm-head-copy-toggle {
+    justify-items: center;
+    text-align: center;
+  }
+
+  .radar-page:not(.radar-tv) .radar-live-map-frame .arm-panel-recolhido .arm-eyebrow {
+    font-size: 7px;
+    letter-spacing: .04em;
   }
 
   .radar-page:not(.radar-tv) .radar-live-map-frame .arm-panel:not(.arm-panel-recolhido) {

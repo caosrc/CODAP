@@ -3,6 +3,7 @@
 - [Banco de horas ocorrências automáticas](banco-horas-ocorrencias.md) — lógica de horas extras automáticas de ocorrências implementada em EscalaAgentes.tsx (Jun 2026).
 - [Google Earth Engine](earth-engine.md) — monitoramento MODIS depende de autenticação da conta no ambiente; FIRMS permanece como fonte complementar.
 - [Radar de chuva](radar-chuva.md) — RainViewer fornece tiles observados; camadas GOES/RRQPE exigem processamento geoespacial separado.
+- [Coordenadas CEMADEN nos mapas](cemaden-coordenadas-mapas.md) — posições das estações vêm do próprio recurso CEMADEN; não bloqueie mapas por um geosserviço externo.
 - [Ordem de callbacks React](ordem-callbacks-react.md) — callbacks com dependências devem ser declarados após as funções referenciadas para evitar acesso em TDZ durante a renderização.
 - [Cota CEMADEN](cota-cemaden.md) — para a estação Rio Bananeiras, a série hidrológica detalhada é a fonte confiável da cota; o catálogo pode retornar zero.
 - [Acumulados CEMADEN por catálogo](cemaden-acumulados-moveis.md) — acumulados móveis da estação Centro vêm do catálogo mesmo quando a série horária falha.

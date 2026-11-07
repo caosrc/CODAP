@@ -83,7 +83,7 @@ export function useEstacoesCemadenMg(habilitado: boolean) {
     void carregar()
     const intervalo = window.setInterval(() => {
       if (document.visibilityState === 'visible') void carregar()
-    }, 5 * 60 * 1000)
+    }, 2 * 60 * 1000)
     return () => window.clearInterval(intervalo)
   }, [habilitado, carregar])
 

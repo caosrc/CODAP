@@ -1,7 +1,6 @@
 const CATALOGO_URL = 'https://resources.cemaden.gov.br/graficos/interativo/getJson2.php?uf=MG'
 const RECURSOS_URL = 'https://mapservices.cemaden.gov.br/MapaInterativoWS/resources'
-const GEOGRAFIA_URL = 'https://observatorio.infraestrutura.mg.gov.br/server/rest/services/00_PUBLICACOES/cemaden_estacoes_pluviometricas/MapServer/1/query?where=uf%3D%27MG%27&outFields=idestacao%2Ccodestacao%2Clatitude%2Clongitude%2Ccidade%2Cnomeestacao&returnGeometry=false&resultRecordCount=2000&f=json'
-const CACHE_TTL_MS = 5 * 60 * 1000
+const CACHE_TTL_MS = 2 * 60 * 1000
 const CACHE_MAX_STALE_MS = 15 * 60 * 1000
 
 let cache = null
@@ -67,37 +66,15 @@ export const handler = async () => {
   }
 
   try {
-    const [catalogoResposta, geografiaResposta] = await Promise.all([
-      fetch(CATALOGO_URL, {
-        headers: { 'User-Agent': 'CODAP/1.0 (Minas Gerais)' },
-        signal: AbortSignal.timeout(10_000),
-      }),
-      fetch(GEOGRAFIA_URL, {
-        headers: {
-          'User-Agent': 'CODAP/1.0 (Minas Gerais)',
-          Accept: 'application/json',
-        },
-        signal: AbortSignal.timeout(10_000),
-      }),
-    ])
+    const catalogoResposta = await fetch(CATALOGO_URL, {
+      headers: { 'User-Agent': 'CODAP/1.0 (Minas Gerais)' },
+      signal: AbortSignal.timeout(10_000),
+    })
 
     if (!catalogoResposta.ok) throw new Error(`Catálogo CEMADEN respondeu ${catalogoResposta.status}`)
-    if (!geografiaResposta.ok) throw new Error(`Localização respondeu ${geografiaResposta.status}`)
 
-    const [catalogo, geografia] = await Promise.all([
-      catalogoResposta.json(),
-      geografiaResposta.json(),
-    ])
-    if (!Array.isArray(catalogo) || !Array.isArray(geografia?.features)) {
-      throw new Error('Formato inesperado nas estações CEMADEN')
-    }
-
-    const coordenadasPorId = new Map(
-      geografia.features
-        .map(feature => feature?.attributes || {})
-        .map(item => [Number(item.idestacao), item])
-        .filter(([id]) => Number.isFinite(id)),
-    )
+    const catalogo = await catalogoResposta.json()
+    if (!Array.isArray(catalogo)) throw new Error('Formato inesperado no catálogo de estações CEMADEN')
     const estacoesLafaiete = catalogo.filter(item =>
       String(item?.uf || '').toUpperCase() === 'MG' &&
       /conselheiro\s+lafaiete/i.test(String(item?.cidade || '')),
@@ -110,26 +87,28 @@ export const handler = async () => {
         signal: AbortSignal.timeout(3500),
       })
       if (!resposta.ok) throw new Error(`Estação ${id} respondeu ${resposta.status}`)
-      return { id, ponto: ultimaLeitura(await resposta.json()) }
+      const payload = await resposta.json()
+      return { id, payload, ponto: ultimaLeitura(payload) }
     }))
     const leituraPorId = new Map()
     leituras.forEach(resultado => {
       if (resultado.status === 'fulfilled') {
-        leituraPorId.set(resultado.value.id, resultado.value.ponto)
+        leituraPorId.set(resultado.value.id, resultado.value)
       }
     })
 
     const estacoes = estacoesLafaiete.map(item => {
-      const localizacao = coordenadasPorId.get(Number(item?.idestacao)) || {}
+      const leitura = leituraPorId.get(Number(item?.idestacao))
+      const dadosEstacao = leitura?.payload?.estacao || {}
       const valorCatalogo = numeroOuNulo(item?.acc1hr)
-      const ultimaChuva = leituraPorId.get(Number(item?.idestacao))
+      const ultimaChuva = leitura?.ponto
       return {
         id: Number(item?.idestacao),
-        nome: String(item?.nomeestacao || localizacao.nomeestacao || ''),
-        municipio: String(item?.cidade || localizacao.cidade || ''),
-        codigo: String(localizacao.codestacao || ''),
-        latitude: numeroOuNulo(localizacao.latitude),
-        longitude: numeroOuNulo(localizacao.longitude),
+        nome: String(item?.nomeestacao || dadosEstacao.nome || ''),
+        municipio: String(item?.cidade || dadosEstacao.idMunicipio?.cidade || ''),
+        codigo: String(dadosEstacao.codEstacao || ''),
+        latitude: numeroOuNulo(dadosEstacao.latitude),
+        longitude: numeroOuNulo(dadosEstacao.longitude),
         precipitacaoAtual: valorCatalogo ?? ultimaChuva?.valor ?? null,
         precipitacaoDataHora: valorCatalogo != null
           ? String(item?.datahoraUltimovalor || '')
@@ -150,7 +129,7 @@ export const handler = async () => {
       estacoesGeorreferenciadas,
       estacoesSemCoordenadas: estacoes.length - estacoesGeorreferenciadas,
       atualizadoEm: new Date().toISOString(),
-      fonte: 'CEMADEN · Conselheiro Lafaiete · posições: Observatório de Infraestrutura de Minas Gerais',
+      fonte: 'CEMADEN · Conselheiro Lafaiete · posições: cadastro das estações CEMADEN',
     }
     cacheAt = agora
     return respostaJson(200, cache)

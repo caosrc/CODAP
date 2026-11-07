@@ -3834,7 +3834,6 @@ const CNL_CATALOGO_URL = 'https://resources.cemaden.gov.br/graficos/interativo/g
 const CNL_RECURSOS_URL = 'https://mapservices.cemaden.gov.br/MapaInterativoWS/resources'
 const CNL_NIVEL_URL = 'https://resources.cemaden.gov.br/graficos/cemaden/hidro/resources/json/MedidaResource.php?est=6622&sen=20&pag=24'
 const CNL_FONTE_URL = `https://resources.cemaden.gov.br/graficos/interativo/grafico_CEMADEN.php?idpcd=${CNL_ESTACAO_ID}&uf=MG`
-const CNL_GEOGRAFIA_MG_URL = 'https://observatorio.infraestrutura.mg.gov.br/server/rest/services/00_PUBLICACOES/cemaden_estacoes_pluviometricas/MapServer/1/query?where=uf%3D%27MG%27&outFields=idestacao%2Ccodestacao%2Clatitude%2Clongitude%2Ccidade%2Cnomeestacao&returnGeometry=false&resultRecordCount=2000&f=json'
 const CNL_FUSO_HORARIO = 'America/Sao_Paulo'
 const CNL_COTAS_CHAVE = 1
 let monitoramentoCnlCache = null
@@ -3842,7 +3841,7 @@ let monitoramentoCnlCacheTs = 0
 const MONITORAMENTO_CNL_TTL_MS = 2 * 60 * 1000
 let monitoramentoMgCache = null
 let monitoramentoMgCacheTs = 0
-const MONITORAMENTO_MG_TTL_MS = 5 * 60 * 1000
+const MONITORAMENTO_MG_TTL_MS = 2 * 60 * 1000
 
 function numeroCemaden(valor) {
   if (valor == null || valor === '') return null
@@ -4309,33 +4308,14 @@ app.get('/api/monitoramento-mg', async (_req, res) => {
   const controlador = new AbortController()
   const timeout = setTimeout(() => controlador.abort(), 15000)
   try {
-    const [catalogoResposta, geografiaResposta] = await Promise.all([
-      fetch(CNL_CATALOGO_URL, {
-        signal: controlador.signal,
-        headers: { 'User-Agent': 'CODAP/1.0 (Minas Gerais)' },
-      }),
-      fetch(CNL_GEOGRAFIA_MG_URL, {
-        signal: controlador.signal,
-        headers: { 'User-Agent': 'CODAP/1.0 (Minas Gerais)', Accept: 'application/json' },
-      }),
-    ])
+    const catalogoResposta = await fetch(CNL_CATALOGO_URL, {
+      signal: controlador.signal,
+      headers: { 'User-Agent': 'CODAP/1.0 (Minas Gerais)' },
+    })
     if (!catalogoResposta.ok) throw new Error(`CEMADEN respondeu ${catalogoResposta.status}`)
-    if (!geografiaResposta.ok) throw new Error(`Localização das estações respondeu ${geografiaResposta.status}`)
 
-    const [catalogo, geografia] = await Promise.all([
-      catalogoResposta.json(),
-      geografiaResposta.json(),
-    ])
-    if (!Array.isArray(catalogo) || !Array.isArray(geografia?.features)) {
-      throw new Error('Formato inesperado no catálogo de estações de Minas Gerais')
-    }
-
-    const coordenadasPorId = new Map(
-      geografia.features.map((feature) => {
-        const item = feature?.attributes || {}
-        return [Number(item.idestacao), item]
-      }).filter(([id]) => Number.isFinite(id)),
-    )
+    const catalogo = await catalogoResposta.json()
+    if (!Array.isArray(catalogo)) throw new Error('Formato inesperado no catálogo de estações CEMADEN')
     const estacoesLafaiete = catalogo.filter((item) =>
       String(item?.uf || '').toUpperCase() === 'MG' &&
       /conselheiro\s+lafaiete/i.test(String(item?.cidade || '')),
@@ -4349,26 +4329,31 @@ app.get('/api/monitoramento-mg', async (_req, res) => {
         })
         if (!resposta.ok) throw new Error(`estação ${id} respondeu ${resposta.status}`)
         const payload = await resposta.json()
-        return { id, ultimaLeitura: extrairPontosChuvaCnl(payload).at(-1) || null }
+        return {
+          id,
+          payload,
+          ultimaLeitura: extrairPontosChuvaCnl(payload).at(-1) || null,
+        }
       }),
     )
     const chuvaPorEstacao = new Map()
     respostasChuva.forEach((resultado) => {
       if (resultado.status === 'fulfilled') {
-        chuvaPorEstacao.set(resultado.value.id, resultado.value.ultimaLeitura)
+        chuvaPorEstacao.set(resultado.value.id, resultado.value)
       }
     })
     const estacoes = estacoesLafaiete.map((item) => {
-      const localizacao = coordenadasPorId.get(Number(item?.idestacao)) || {}
+      const chuva = chuvaPorEstacao.get(Number(item?.idestacao))
+      const dadosEstacao = chuva?.payload?.estacao || {}
       const chuvaCatalogo = numeroCemaden(item?.acc1hr)
-      const ultimaChuva = chuvaPorEstacao.get(Number(item?.idestacao))
+      const ultimaChuva = chuva?.ultimaLeitura
       return {
         id: Number(item?.idestacao),
-        nome: String(item?.nomeestacao || localizacao.nomeestacao || ''),
-        municipio: String(item?.cidade || localizacao.cidade || ''),
-        codigo: String(localizacao.codestacao || ''),
-        latitude: numeroCemaden(localizacao.latitude),
-        longitude: numeroCemaden(localizacao.longitude),
+        nome: String(item?.nomeestacao || dadosEstacao.nome || ''),
+        municipio: String(item?.cidade || dadosEstacao.idMunicipio?.cidade || ''),
+        codigo: String(dadosEstacao.codEstacao || ''),
+        latitude: numeroCemaden(dadosEstacao.latitude),
+        longitude: numeroCemaden(dadosEstacao.longitude),
         precipitacaoAtual: chuvaCatalogo ?? ultimaChuva?.valor ?? null,
         precipitacaoDataHora: chuvaCatalogo != null
           ? String(item?.datahoraUltimovalor || '')
@@ -4389,7 +4374,7 @@ app.get('/api/monitoramento-mg', async (_req, res) => {
       estacoesGeorreferenciadas,
       estacoesSemCoordenadas: estacoes.length - estacoesGeorreferenciadas,
       atualizadoEm: new Date().toISOString(),
-      fonte: 'CEMADEN · Conselheiro Lafaiete · posições: Observatório de Infraestrutura de Minas Gerais',
+      fonte: 'CEMADEN · Conselheiro Lafaiete · posições: cadastro das estações CEMADEN',
     }
     monitoramentoMgCacheTs = agora
     res.set('Cache-Control', 'no-store')

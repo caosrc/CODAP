@@ -740,7 +740,7 @@ function RadarMapaTempoReal({ tv, dataOcorrencias }: { tv: boolean; dataOcorrenc
   const carregarRadarChuva = useCallback(async () => {
     setRadarCarregando(true)
     try {
-      const resposta = await fetch('/api/radar-chuva')
+      const resposta = await fetch('/api/radar-chuva', { cache: 'no-store' })
       const corpo = await resposta.json().catch(() => ({}))
       if (!resposta.ok || typeof corpo?.host !== 'string' || typeof corpo?.path !== 'string') {
         throw new Error('Radar indisponível')
@@ -791,7 +791,7 @@ function RadarMapaTempoReal({ tv, dataOcorrencias }: { tv: boolean; dataOcorrenc
 
   useEffect(() => {
     carregarRadarChuva()
-    const timer = window.setInterval(carregarRadarChuva, 2 * 60 * 1000)
+    const timer = window.setInterval(carregarRadarChuva, 60 * 1000)
     const atualizarAoVoltar = () => {
       if (document.visibilityState === 'visible') carregarRadarChuva()
     }
@@ -832,7 +832,7 @@ function RadarMapaTempoReal({ tv, dataOcorrencias }: { tv: boolean; dataOcorrenc
           </h3>
         </div>
         <span className="radar-live-map-updated">
-          {radarCarregando ? 'Atualizando…' : radarChuva?.erroAtualizacao ? 'Último quadro salvo' : 'Verificação automática · 2 min'}
+          {radarCarregando ? 'Atualizando…' : radarChuva?.erroAtualizacao ? 'Último quadro salvo' : 'Verificação automática · 1 min'}
         </span>
       </div>
       <div className="radar-live-map-toolbar" role="toolbar" aria-label="Controles do mapa meteorológico">
@@ -1103,7 +1103,7 @@ function RadarMapaTempoReal({ tv, dataOcorrencias }: { tv: boolean; dataOcorrenc
         )}
         <span>
           {radarChuva?.frameTime
-            ? `Quadro RainViewer gerado às ${new Date(radarChuva.frameTime * 1000).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })} · há ${Math.max(0, Math.floor((Date.now() - radarChuva.frameTime * 1000) / 60000))} min · ${radarChuva.quadros?.length || 1} quadros/10 min · zoom máx. 7`
+            ? `Quadro mais recente do RainViewer: ${new Date(radarChuva.frameTime * 1000).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })} · há ${Math.max(0, Math.floor((Date.now() - radarChuva.frameTime * 1000) / 60000))} min · fonte atualiza em intervalos de cerca de 10 min · zoom máx. 7`
             : 'Radar RainViewer: —'}
         </span>
         <span>{tempoMapa?.atual?.temperatura != null ? `Lafaiete: ${Math.round(Number(tempoMapa.atual.temperatura))} °C` : 'Temperatura local: —'}</span>

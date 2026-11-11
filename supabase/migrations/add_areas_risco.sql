@@ -25,6 +25,9 @@ CREATE TABLE IF NOT EXISTS public.areas_risco (
 ALTER TABLE public.areas_risco
   ADD COLUMN IF NOT EXISTS poligono JSONB NOT NULL DEFAULT '[]'::jsonb;
 
+COMMENT ON COLUMN public.areas_risco.poligono IS
+  'Geometria multipolígono em JSON: componentes > anéis (externo e internos) > coordenadas [latitude, longitude]. Listas antigas de coordenadas continuam sendo lidas como um único contorno.';
+
 CREATE INDEX IF NOT EXISTS areas_risco_tipo_idx ON public.areas_risco (tipo);
 CREATE INDEX IF NOT EXISTS areas_risco_created_at_idx ON public.areas_risco (created_at DESC);
 

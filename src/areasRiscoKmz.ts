@@ -1,8 +1,15 @@
-import { ESTILO_AREA_RISCO, type AreaRiscoInput, type TipoAreaRisco } from './areasRisco'
+import {
+  areaRiscoTemPoligono,
+  ESTILO_AREA_RISCO,
+  type AnelAreaRisco,
+  type AreaRiscoInput,
+  type GeometriaAreaRisco,
+  type TipoAreaRisco,
+} from './areasRisco'
 
 export interface PoligonoKmzImportado {
   nome: string
-  poligono: Array<[number, number]>
+  poligono: GeometriaAreaRisco
   latitude: number
   longitude: number
   tipo?: TipoAreaRisco
@@ -59,12 +66,22 @@ function escaparXml(valor: string | number | null | undefined) {
     .replaceAll("'", '&apos;')
 }
 
-function coordenadasKml(pontos: Array<[number, number]>) {
+function coordenadasKml(pontos: AnelAreaRisco) {
   const fechados = pontos.length
     && (pontos[0][0] !== pontos[pontos.length - 1][0] || pontos[0][1] !== pontos[pontos.length - 1][1])
     ? [...pontos, pontos[0]]
     : pontos
   return fechados.map(([latitude, longitude]) => `${longitude},${latitude},0`).join(' ')
+}
+
+function poligonoKml(aneis: AnelAreaRisco[]) {
+  const [externo, ...internos] = aneis
+  if (!externo) return ''
+  const limiteExterno = `<outerBoundaryIs><LinearRing><coordinates>${coordenadasKml(externo)}</coordinates></LinearRing></outerBoundaryIs>`
+  const limitesInternos = internos.map(anel =>
+    `<innerBoundaryIs><LinearRing><coordinates>${coordenadasKml(anel)}</coordinates></LinearRing></innerBoundaryIs>`,
+  ).join('')
+  return `<Polygon>${limiteExterno}${limitesInternos}</Polygon>`
 }
 
 function corKml(hex: string, opacidade: string) {
@@ -73,7 +90,7 @@ function corKml(hex: string, opacidade: string) {
 }
 
 export async function exportarPoligonosKmz(areas: AreaRiscoInput[]) {
-  const comPoligono = areas.filter(area => area.poligono.length >= 3)
+  const comPoligono = areas.filter(area => areaRiscoTemPoligono(area.poligono))
   if (!comPoligono.length) {
     throw new Error('Nenhuma área com polígono cadastrado está disponível para exportação.')
   }
@@ -94,7 +111,8 @@ export async function exportarPoligonosKmz(areas: AreaRiscoInput[]) {
       ['data_inicio', area.data_inicio],
       ['limite_precipitacao_mm', area.limite_precipitacao_mm],
     ].map(([chave, valor]) => `<Data name="${chave}"><value>${escaparXml(valor)}</value></Data>`).join('')
-    return `<Placemark><name>${escaparXml(nome)}</name><styleUrl>#${estiloPorTipo.get(area.tipo)}</styleUrl><ExtendedData>${dados}</ExtendedData><MultiGeometry><Polygon><outerBoundaryIs><LinearRing><coordinates>${coordenadasKml(area.poligono)}</coordinates></LinearRing></outerBoundaryIs></Polygon><Point><coordinates>${area.longitude},${area.latitude},0</coordinates></Point></MultiGeometry></Placemark>`
+    const geometrias = area.poligono.map(poligonoKml).join('')
+    return `<Placemark><name>${escaparXml(nome)}</name><styleUrl>#${estiloPorTipo.get(area.tipo)}</styleUrl><ExtendedData>${dados}</ExtendedData><MultiGeometry>${geometrias}<Point><coordinates>${area.longitude},${area.latitude},0</coordinates></Point></MultiGeometry></Placemark>`
   }).join('')
 
   const kml = `<?xml version="1.0" encoding="UTF-8"?><kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>Áreas de risco — Defesa Civil Lafaiete</name>${estilos}${marcacoes}</Document></kml>`

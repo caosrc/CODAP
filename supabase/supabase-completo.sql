@@ -129,6 +129,9 @@ CREATE TABLE IF NOT EXISTS public.areas_risco (
   ocorrencia_id BIGINT REFERENCES public.ocorrencias(id) ON DELETE CASCADE
 );
 
+COMMENT ON COLUMN public.areas_risco.poligono IS
+  'Geometria multipolígono em JSON: componentes > anéis (externo e internos) > coordenadas [latitude, longitude]. Listas antigas de coordenadas continuam sendo lidas como um único contorno.';
+
 -- Mantém o schema completo compatível com bancos que já tinham areas_risco.
 ALTER TABLE public.areas_risco
   ADD COLUMN IF NOT EXISTS ocorrencia_id BIGINT;

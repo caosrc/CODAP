@@ -1,5 +1,11 @@
 import JSZip from 'jszip'
-import { TIPOS_AREAS_RISCO, type TipoAreaRisco } from './areasRisco'
+import {
+  TIPOS_AREAS_RISCO,
+  type AnelAreaRisco,
+  type CoordenadaAreaRisco,
+  type GeometriaAreaRisco,
+  type TipoAreaRisco,
+} from './areasRisco'
 import type { PoligonoKmzImportado } from './areasRiscoKmz'
 
 const TAMANHO_MAXIMO_ARQUIVO = 20 * 1024 * 1024
@@ -47,27 +53,163 @@ function normalizarChave(valor: string) {
     .replace(/^_+|_+$/g, '')
 }
 
-function lerCoordenadas(texto: string): Array<[number, number]> {
+function lerCoordenadas(texto: string, rotulo: string): AnelAreaRisco {
   const pontos: Array<[number, number]> = []
-  for (const tupla of texto.trim().split(/\s+/)) {
-    if (!tupla) continue
-    const [lonTexto, latTexto] = tupla.split(',')
+  const tuplas = texto.trim().split(/\s+/).filter(Boolean)
+  if (tuplas.length === 0) throw new Error(`${rotulo}: o anel não contém coordenadas.`)
+  for (const tupla of tuplas) {
+    const partes = tupla.split(',')
+    if (partes.length < 2 || partes.length > 3 || !partes[0].trim() || !partes[1].trim()) {
+      throw new Error(`${rotulo}: há uma coordenada malformada. Use longitude,latitude[,altitude].`)
+    }
+    const [lonTexto, latTexto, altitudeTexto] = partes
     const longitude = Number(lonTexto)
     const latitude = Number(latTexto)
     if (
       !Number.isFinite(latitude) || latitude < -90 || latitude > 90
       || !Number.isFinite(longitude) || longitude < -180 || longitude > 180
-    ) continue
+      || (altitudeTexto != null && altitudeTexto.trim() !== '' && !Number.isFinite(Number(altitudeTexto)))
+    ) {
+      throw new Error(`${rotulo}: há uma coordenada fora dos limites geográficos ou inválida.`)
+    }
     pontos.push([latitude, longitude])
     if (pontos.length > MAXIMO_VERTICES) {
-      throw new Error(`O contorno ultrapassa o limite de ${MAXIMO_VERTICES.toLocaleString('pt-BR')} vértices.`)
+      throw new Error(`${rotulo}: o anel ultrapassa o limite de ${MAXIMO_VERTICES.toLocaleString('pt-BR')} vértices.`)
     }
   }
 
   const primeiro = pontos[0]
   const ultimo = pontos[pontos.length - 1]
-  if (primeiro && ultimo && primeiro[0] === ultimo[0] && primeiro[1] === ultimo[1]) pontos.pop()
+  if (!primeiro || !ultimo || primeiro[0] !== ultimo[0] || primeiro[1] !== ultimo[1]) {
+    throw new Error(`${rotulo}: anel aberto; o primeiro e o último ponto precisam coincidir.`)
+  }
+  pontos.pop()
+  if (pontos.length < 3) throw new Error(`${rotulo}: o anel precisa ter pelo menos três vértices.`)
+
+  const coordenadasUnicas = new Set(pontos.map(([latitude, longitude]) => `${latitude},${longitude}`))
+  if (coordenadasUnicas.size !== pontos.length) {
+    throw new Error(`${rotulo}: o anel repete vértices e não forma um contorno válido.`)
+  }
+
+  const areaDupla = pontos.reduce((soma, ponto, indice) => {
+    const proximo = pontos[(indice + 1) % pontos.length]
+    return soma + ponto[1] * proximo[0] - proximo[1] * ponto[0]
+  }, 0)
+  if (Math.abs(areaDupla) < 1e-12) throw new Error(`${rotulo}: o anel não delimita uma área.`)
+
+  for (let indice = 0; indice < pontos.length; indice++) {
+    const anterior = pontos[(indice + pontos.length - 1) % pontos.length]
+    const atual = pontos[indice]
+    const seguintePonto = pontos[(indice + 1) % pontos.length]
+    const colinearidade = orientacao(anterior, atual, seguintePonto)
+    const voltaSobreTrecho = (anterior[0] - atual[0]) * (seguintePonto[0] - atual[0])
+      + (anterior[1] - atual[1]) * (seguintePonto[1] - atual[1]) > 1e-10
+    if (Math.abs(colinearidade) <= 1e-10 && voltaSobreTrecho) {
+      throw new Error(`${rotulo}: há trechos sobrepostos no anel; revise a ordem dos vértices.`)
+    }
+
+    const seguinte = (indice + 1) % pontos.length
+    for (let outro = indice + 1; outro < pontos.length; outro++) {
+      const outroSeguinte = (outro + 1) % pontos.length
+      if (seguinte === outro || (indice === 0 && outroSeguinte === 0)) continue
+      if (segmentosSeInterceptam(pontos[indice], pontos[seguinte], pontos[outro], pontos[outroSeguinte])) {
+        throw new Error(`${rotulo}: o anel se cruza; revise a ordem dos vértices.`)
+      }
+    }
+  }
   return pontos
+}
+
+function orientacao(a: CoordenadaAreaRisco, b: CoordenadaAreaRisco, c: CoordenadaAreaRisco) {
+  return (b[1] - a[1]) * (c[0] - a[0]) - (b[0] - a[0]) * (c[1] - a[1])
+}
+
+function pontoNoSegmento(ponto: CoordenadaAreaRisco, inicio: CoordenadaAreaRisco, fim: CoordenadaAreaRisco) {
+  const epsilon = 1e-10
+  return Math.abs(orientacao(inicio, fim, ponto)) <= epsilon
+    && ponto[1] >= Math.min(inicio[1], fim[1]) - epsilon
+    && ponto[1] <= Math.max(inicio[1], fim[1]) + epsilon
+    && ponto[0] >= Math.min(inicio[0], fim[0]) - epsilon
+    && ponto[0] <= Math.max(inicio[0], fim[0]) + epsilon
+}
+
+function segmentosSeInterceptam(
+  a: CoordenadaAreaRisco,
+  b: CoordenadaAreaRisco,
+  c: CoordenadaAreaRisco,
+  d: CoordenadaAreaRisco,
+) {
+  const o1 = orientacao(a, b, c)
+  const o2 = orientacao(a, b, d)
+  const o3 = orientacao(c, d, a)
+  const o4 = orientacao(c, d, b)
+  const epsilon = 1e-10
+  if (((o1 > epsilon && o2 < -epsilon) || (o1 < -epsilon && o2 > epsilon))
+    && ((o3 > epsilon && o4 < -epsilon) || (o3 < -epsilon && o4 > epsilon))) return true
+  return (Math.abs(o1) <= epsilon && pontoNoSegmento(c, a, b))
+    || (Math.abs(o2) <= epsilon && pontoNoSegmento(d, a, b))
+    || (Math.abs(o3) <= epsilon && pontoNoSegmento(a, c, d))
+    || (Math.abs(o4) <= epsilon && pontoNoSegmento(b, c, d))
+}
+
+function aneisSeInterceptam(anelA: AnelAreaRisco, anelB: AnelAreaRisco) {
+  for (let indiceA = 0; indiceA < anelA.length; indiceA++) {
+    const a = anelA[indiceA]
+    const b = anelA[(indiceA + 1) % anelA.length]
+    for (let indiceB = 0; indiceB < anelB.length; indiceB++) {
+      const c = anelB[indiceB]
+      const d = anelB[(indiceB + 1) % anelB.length]
+      if (segmentosSeInterceptam(a, b, c, d)) return true
+    }
+  }
+  return false
+}
+
+function pontoDentroDoAnel(ponto: CoordenadaAreaRisco, anel: AnelAreaRisco) {
+  let dentro = false
+  for (let indice = 0, anterior = anel.length - 1; indice < anel.length; anterior = indice++) {
+    const a = anel[indice]
+    const b = anel[anterior]
+    if (pontoNoSegmento(ponto, a, b)) return false
+    const cruza = (a[0] > ponto[0]) !== (b[0] > ponto[0])
+      && ponto[1] < ((b[1] - a[1]) * (ponto[0] - a[0])) / (b[0] - a[0]) + a[1]
+    if (cruza) dentro = !dentro
+  }
+  return dentro
+}
+
+function validarAnelInterno(anelExterno: AnelAreaRisco, anelInterno: AnelAreaRisco, rotulo: string) {
+  if (aneisSeInterceptam(anelExterno, anelInterno)
+    || !anelInterno.every(ponto => pontoDentroDoAnel(ponto, anelExterno))) {
+    throw new Error(`${rotulo}: o contorno interno precisa ficar totalmente dentro do contorno externo, sem tocá-lo.`)
+  }
+}
+
+function lerPoligonoKml(polygon: Element, rotulo: string): AnelAreaRisco[] {
+  const limitesExternos = descendentesComNome(polygon, 'outerBoundaryIs')
+  if (limitesExternos.length !== 1) {
+    throw new Error(`${rotulo}: cada polígono precisa ter exatamente um contorno externo.`)
+  }
+  const externo = lerCoordenadas(textoKml(limitesExternos[0], 'coordinates'), `${rotulo}, contorno externo`)
+  const internos = descendentesComNome(polygon, 'innerBoundaryIs').map((limite, indice) =>
+    lerCoordenadas(textoKml(limite, 'coordinates'), `${rotulo}, contorno interno ${indice + 1}`),
+  )
+
+  for (let indice = 0; indice < internos.length; indice++) {
+    const anel = internos[indice]
+    validarAnelInterno(externo, anel, `${rotulo}, contorno interno ${indice + 1}`)
+    for (let anterior = 0; anterior < indice; anterior++) {
+      const outro = internos[anterior]
+      if (
+        aneisSeInterceptam(outro, anel)
+        || pontoDentroDoAnel(anel[0], outro)
+        || pontoDentroDoAnel(outro[0], anel)
+      ) {
+        throw new Error(`${rotulo}: os contornos internos se cruzam ou se sobrepõem.`)
+      }
+    }
+  }
+  return [externo, ...internos]
 }
 
 function metadadosDoPlacemark(placemark: Element) {
@@ -161,36 +303,43 @@ function analisarKml(conteudo: string): PoligonoKmzImportado[] {
     const limite = limiteTexto ? Number(limiteTexto.replace(',', '.')) : undefined
     const referencia = metadado(dados, 'referencia', 'reference', 'local', 'endereco', 'address', 'bairro') || nome
     const observacao = metadado(dados, 'observacao', 'observation', 'notes', 'descricao', 'description')
-    const poligonos = descendentesComNome(placemark, 'Polygon')
-
-    for (const polygon of poligonos) {
-      const limiteExterno = primeiroDescendenteComNome(polygon, 'outerBoundaryIs')
-      const coordenadas = textoKml(limiteExterno ?? polygon, 'coordinates')
-      const poligono = lerCoordenadas(coordenadas)
-      const verticesUnicos = new Set(poligono.map(([lat, lon]) => `${lat},${lon}`))
-      if (poligono.length < 3 || verticesUnicos.size < 3) continue
-      totalVertices += poligono.length
-      if (totalVertices > MAXIMO_VERTICES_IMPORTACAO) {
-        throw new Error(`O arquivo ultrapassa o limite de ${MAXIMO_VERTICES_IMPORTACAO.toLocaleString('pt-BR')} vértices no total.`)
-      }
-      if (resultado.length >= MAXIMO_POLIGONOS) {
-        throw new Error(`O arquivo ultrapassa o limite de ${MAXIMO_POLIGONOS} polígonos por importação.`)
-      }
-
-      const latitude = pontoImportado?.[0] ?? poligono.reduce((soma, ponto) => soma + ponto[0], 0) / poligono.length
-      const longitude = pontoImportado?.[1] ?? poligono.reduce((soma, ponto) => soma + ponto[1], 0) / poligono.length
-      resultado.push({
-        nome,
-        poligono,
-        latitude,
-        longitude,
-        tipo,
-        data_inicio: dataInicio,
-        limite_precipitacao_mm: limite != null && Number.isFinite(limite) && limite >= 0 ? limite : undefined,
-        referencia,
-        observacao: observacao || undefined,
-      })
+    const elementosPoligono = descendentesComNome(placemark, 'Polygon')
+    if (!elementosPoligono.length) continue
+    if (resultado.length >= MAXIMO_POLIGONOS) {
+      throw new Error(`O arquivo ultrapassa o limite de ${MAXIMO_POLIGONOS.toLocaleString('pt-BR')} áreas por importação.`)
     }
+
+    let geometria: GeometriaAreaRisco
+    try {
+      geometria = elementosPoligono.map((polygon, indice) =>
+        lerPoligonoKml(polygon, `“${nome}”, polígono ${indice + 1}`),
+      )
+    } catch (erro) {
+      throw new Error(erro instanceof Error ? erro.message : `O contorno “${nome}” é inválido.`)
+    }
+
+    const pontosExternos = geometria.flatMap(poligono => poligono[0])
+    totalVertices += geometria.reduce(
+      (total, poligono) => total + poligono.reduce((soma, anel) => soma + anel.length, 0),
+      0,
+    )
+    if (totalVertices > MAXIMO_VERTICES_IMPORTACAO) {
+      throw new Error(`O arquivo ultrapassa o limite de ${MAXIMO_VERTICES_IMPORTACAO.toLocaleString('pt-BR')} vértices no total.`)
+    }
+
+    const latitude = pontoImportado?.[0] ?? pontosExternos.reduce((soma, ponto) => soma + ponto[0], 0) / pontosExternos.length
+    const longitude = pontoImportado?.[1] ?? pontosExternos.reduce((soma, ponto) => soma + ponto[1], 0) / pontosExternos.length
+    resultado.push({
+      nome,
+      poligono: geometria,
+      latitude,
+      longitude,
+      tipo,
+      data_inicio: dataInicio,
+      limite_precipitacao_mm: limite != null && Number.isFinite(limite) && limite >= 0 ? limite : undefined,
+      referencia,
+      observacao: observacao || undefined,
+    })
   }
 
   if (!resultado.length) {

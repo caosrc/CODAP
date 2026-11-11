@@ -4,7 +4,18 @@ import { Marker, Pane, Polygon, Popup, Tooltip, useMap, useMapEvents } from 'rea
 import L from 'leaflet'
 import ModalSenha from './ModalSenha'
 import './AreasRiscoMapa.css'
-import { ESTILO_AREA_RISCO, TIPOS_AREAS_RISCO, type AreaRisco, type AreaRiscoInput, type TipoAreaRisco } from '../areasRisco'
+import {
+  areaRiscoTemPoligono,
+  clonarGeometriaAreaRisco,
+  contarVerticesAreaRisco,
+  listarCoordenadasAreaRisco,
+  ESTILO_AREA_RISCO,
+  TIPOS_AREAS_RISCO,
+  type AreaRisco,
+  type AreaRiscoInput,
+  type GeometriaAreaRisco,
+  type TipoAreaRisco,
+} from '../areasRisco'
 import { exportarPoligonosKmz, importarPoligonosKmz, type PoligonoKmzImportado } from '../areasRiscoKmz'
 
 export interface AreasRiscoMapaProps {
@@ -49,7 +60,7 @@ interface DraftArea {
   tipo: TipoAreaRisco
   latitude: number | null
   longitude: number | null
-  poligono: Array<[number, number]>
+  poligono: GeometriaAreaRisco
   data_inicio: string
   limite_precipitacao_mm: string
   referencia: string
@@ -77,6 +88,37 @@ function novaArea(tipo: TipoAreaRisco = 'Encostas'): DraftArea {
   }
 }
 
+function adicionarVertice(geometria: GeometriaAreaRisco, ponto: [number, number]): GeometriaAreaRisco {
+  const copia = clonarGeometriaAreaRisco(geometria)
+  if (!copia[0]) copia.push([[]])
+  if (!copia[0][0]) copia[0].unshift([])
+  copia[0][0].push(ponto)
+  return copia
+}
+
+function desfazerUltimoVertice(geometria: GeometriaAreaRisco): GeometriaAreaRisco {
+  const copia = clonarGeometriaAreaRisco(geometria)
+  if (!copia[0]?.[0]?.length) return copia
+  copia[0][0].pop()
+  if (!copia[0][0].length) copia[0].shift()
+  if (!copia[0].length) copia.shift()
+  return copia
+}
+
+function reposicionarVertice(
+  geometria: GeometriaAreaRisco,
+  indicePoligono: number,
+  indiceAnel: number,
+  indiceVertice: number,
+  ponto: [number, number],
+): GeometriaAreaRisco {
+  const copia = clonarGeometriaAreaRisco(geometria)
+  if (copia[indicePoligono]?.[indiceAnel]?.[indiceVertice]) {
+    copia[indicePoligono][indiceAnel][indiceVertice] = ponto
+  }
+  return copia
+}
+
 function criarRascunhoImportado(poligono: PoligonoKmzImportado, tipoFallback: TipoAreaRisco): DraftArea {
   const tipo = poligono.tipo ?? tipoFallback
   const base = novaArea(tipo)
@@ -84,7 +126,7 @@ function criarRascunhoImportado(poligono: PoligonoKmzImportado, tipoFallback: Ti
     ...base,
     latitude: poligono.latitude,
     longitude: poligono.longitude,
-    poligono: poligono.poligono,
+    poligono: clonarGeometriaAreaRisco(poligono.poligono),
     data_inicio: poligono.data_inicio ?? base.data_inicio,
     limite_precipitacao_mm: tipo === 'Interdições'
       ? '0'
@@ -108,7 +150,7 @@ function EnquadrarPoligonosImportados({
     if (!poligonos.length || versao === 0) return
     const limites = L.latLngBounds([])
     for (const importado of poligonos) {
-      for (const ponto of importado.poligono) limites.extend(ponto)
+      for (const ponto of listarCoordenadasAreaRisco(importado.poligono)) limites.extend(ponto)
     }
     if (!limites.isValid()) return
     const frame = window.requestAnimationFrame(() => {
@@ -249,8 +291,8 @@ export default function AreasRiscoMapa({
   const todosTiposVisiveisNoMapa = tiposVisiveisNoMapa.size === TIPOS.length
   const areasParaExportar: AreaRiscoInput[] = areas
     .filter(area =>
-      area.poligono.length >= 3
-      && !(editandoId === area.id && (rascunho?.poligono.length ?? 0) >= 3),
+      areaRiscoTemPoligono(area.poligono)
+      && editandoId !== area.id,
     )
     .map(({ tipo, latitude, longitude, poligono, data_inicio, limite_precipitacao_mm, referencia, observacao }) => ({
       tipo,
@@ -262,7 +304,7 @@ export default function AreasRiscoMapa({
       referencia,
       observacao,
     }))
-  if (rascunho && rascunho.poligono.length >= 3 && rascunho.latitude != null && rascunho.longitude != null) {
+  if (rascunho && areaRiscoTemPoligono(rascunho.poligono) && rascunho.latitude != null && rascunho.longitude != null) {
     areasParaExportar.push({
       tipo: rascunho.tipo,
       latitude: rascunho.latitude,
@@ -334,7 +376,7 @@ export default function AreasRiscoMapa({
         tipo: area.tipo,
         latitude: area.latitude,
         longitude: area.longitude,
-        poligono: area.poligono.map(ponto => [ponto[0], ponto[1]]),
+        poligono: clonarGeometriaAreaRisco(area.poligono),
         data_inicio: area.data_inicio.slice(0, 10),
         limite_precipitacao_mm: String(area.limite_precipitacao_mm),
         referencia: area.referencia ?? '',
@@ -531,7 +573,7 @@ export default function AreasRiscoMapa({
   const mapModeLabel = modoMapa === 'marcador'
     ? 'Clique no mapa para posicionar o ponto de referência.'
     : modoMapa === 'poligono'
-      ? `Clique no mapa para adicionar vértices (${rascunho?.poligono.length ?? 0}).`
+      ? `Clique no mapa para adicionar vértices (${rascunho ? contarVerticesAreaRisco(rascunho.poligono) : 0}).`
       : ''
 
   return (
@@ -546,7 +588,7 @@ export default function AreasRiscoMapa({
           setLocalErro('')
         }}
         aoAdicionarPonto={ponto => atualizarRascunho({
-          poligono: [...(rascunho?.poligono ?? []), ponto],
+          poligono: adicionarVertice(rascunho?.poligono ?? [], ponto),
         })}
       />
       {camadaKmzVisivel && poligonosDaCamadaKmz.length > 0 && (
@@ -564,7 +606,7 @@ export default function AreasRiscoMapa({
               }}
             >
               <Tooltip sticky>
-                {importado.nome} · camada KMZ temporária · {importado.poligono.length} vértices
+                {importado.nome} · camada KMZ temporária · {contarVerticesAreaRisco(importado.poligono)} vértices
               </Tooltip>
             </Polygon>
           ))}
@@ -595,7 +637,7 @@ export default function AreasRiscoMapa({
         const cor = CORES[area.tipo]
         return (
           <Fragment key={`area-layer-${area.id}`}>
-            {area.poligono.length >= 3 && (
+            {areaRiscoTemPoligono(area.poligono) && (
               <Polygon
                 positions={area.poligono}
                 pathOptions={{
@@ -651,7 +693,7 @@ export default function AreasRiscoMapa({
           </Fragment>
         )
       })}
-      {rascunho && rascunho.poligono.length >= 3 && (
+      {rascunho && areaRiscoTemPoligono(rascunho.poligono) && (
         <Polygon
           positions={rascunho.poligono}
           pathOptions={{ color: CORES[rascunho.tipo], weight: 3, fillColor: CORES[rascunho.tipo], fillOpacity: 0.24, dashArray: '7 5' }}
@@ -662,29 +704,37 @@ export default function AreasRiscoMapa({
           <Tooltip permanent direction="top" offset={[0, -25]}>Ponto de referência</Tooltip>
         </Marker>
       )}
-      {rascunho?.poligono.map((ponto, indice) => (
-        <Marker
-          key={`draft-vertex-${indice}`}
-          position={ponto}
-          draggable
-          icon={L.divIcon({
-            className: 'arm-vertex-shell',
-            html: '<span class="arm-vertex" aria-hidden="true"></span>',
-            iconSize: [18, 18],
-            iconAnchor: [9, 9],
-          })}
-          eventHandlers={{
-            dragend(event) {
-              const novaPosicao = event.target.getLatLng()
-              atualizarRascunho({
-                  poligono: (rascunho?.poligono ?? []).map((item, i) =>
-                  i === indice ? [novaPosicao.lat, novaPosicao.lng] as [number, number] : item,
-                ),
-              })
-            },
-          }}
-        />
-      ))}
+      {rascunho?.poligono.flatMap((poligono, indicePoligono) =>
+        poligono.flatMap((anel, indiceAnel) =>
+          anel.map((ponto, indiceVertice) => (
+            <Marker
+              key={`draft-vertex-${indicePoligono}-${indiceAnel}-${indiceVertice}`}
+              position={ponto}
+              draggable
+              icon={L.divIcon({
+                className: 'arm-vertex-shell',
+                html: '<span class="arm-vertex" aria-hidden="true"></span>',
+                iconSize: [18, 18],
+                iconAnchor: [9, 9],
+              })}
+              eventHandlers={{
+                dragend(event) {
+                  const novaPosicao = event.target.getLatLng()
+                  atualizarRascunho({
+                    poligono: reposicionarVertice(
+                      rascunho?.poligono ?? [],
+                      indicePoligono,
+                      indiceAnel,
+                      indiceVertice,
+                      [novaPosicao.lat, novaPosicao.lng],
+                    ),
+                  })
+                },
+              }}
+            />
+          )),
+        ),
+      )}
       {painelHost && createPortal(
         <div
           ref={painelRef}
@@ -1021,7 +1071,7 @@ export default function AreasRiscoMapa({
                           {poligonosImportados.map((poligono, indice) => (
                             <option key={`${indice}-${poligono.nome}`} value={indice}>
                               {poligonosImportadosConcluidos.has(indice) ? '✓ ' : ''}
-                              {indice + 1}. {poligono.nome} · {poligono.poligono.length} vértices
+                              {indice + 1}. {poligono.nome} · {contarVerticesAreaRisco(poligono.poligono)} vértices
                             </option>
                           ))}
                         </select>
@@ -1063,14 +1113,14 @@ export default function AreasRiscoMapa({
                   <div className="arm-map-instructions">
                     <div className="arm-step-row"><b className={rascunho.latitude != null ? 'arm-step-done' : ''}>01</b><span>{rascunho.latitude == null ? 'Posicione o ponto de referência' : `${rascunho.latitude.toFixed(5)}, ${rascunho.longitude?.toFixed(5)}`}</span></div>
                     <button type="button" className={modoMapa === 'marcador' ? 'arm-map-action arm-map-action-active' : 'arm-map-action'} data-testid="button-marcar-localizacao" onClick={() => setModoMapa('marcador')}>Marcar no mapa</button>
-                    <div className="arm-step-row"><b className={rascunho.poligono.length >= 3 ? 'arm-step-done' : ''}>02</b><span>Perímetro · opcional · {rascunho.poligono.length} vértice(s)</span></div>
+                    <div className="arm-step-row"><b className={areaRiscoTemPoligono(rascunho.poligono) ? 'arm-step-done' : ''}>02</b><span>Perímetro · opcional · {contarVerticesAreaRisco(rascunho.poligono)} vértice(s)</span></div>
                     <div className="arm-draw-actions">
                       <button type="button" className={modoMapa === 'poligono' ? 'arm-map-action arm-map-action-active' : 'arm-map-action'} disabled={rascunho.latitude == null} data-testid="button-desenhar-poligono" onClick={() => setModoMapa('poligono')}>Adicionar vértices</button>
-                      <button type="button" className="arm-quiet-action" disabled={!rascunho.poligono.length} data-testid="button-desfazer-vertice" onClick={() => atualizarRascunho({ poligono: rascunho.poligono.slice(0, -1) })}>Desfazer</button>
-                      <button type="button" className="arm-quiet-action" disabled={!rascunho.poligono.length} data-testid="button-limpar-poligono" onClick={() => atualizarRascunho({ poligono: [] })}>Limpar</button>
+                      <button type="button" className="arm-quiet-action" disabled={!contarVerticesAreaRisco(rascunho.poligono)} data-testid="button-desfazer-vertice" onClick={() => atualizarRascunho({ poligono: desfazerUltimoVertice(rascunho.poligono) })}>Desfazer</button>
+                      <button type="button" className="arm-quiet-action" disabled={!contarVerticesAreaRisco(rascunho.poligono)} data-testid="button-limpar-poligono" onClick={() => atualizarRascunho({ poligono: [] })}>Limpar</button>
                     </div>
                     {modoMapa && <div className="arm-map-mode" role="status" data-testid="status-modo-mapa">{mapModeLabel}</div>}
-                    {rascunho.poligono.length > 0 && <div className="arm-vertex-hint">Arraste os nós no mapa para ajustar o contorno.</div>}
+                    {contarVerticesAreaRisco(rascunho.poligono) > 0 && <div className="arm-vertex-hint">Arraste os nós no mapa para ajustar o contorno.</div>}
                   </div>
                   <div className="arm-field-grid">
                     <label className="arm-field"><span>{rascunho.tipo === 'Interdições' ? 'Início da interdição' : 'Início do risco'}</span><input type="date" value={rascunho.data_inicio} onChange={event => atualizarRascunho({ data_inicio: event.target.value })} required data-testid="input-data-inicio" /></label>

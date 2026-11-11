@@ -10,7 +10,13 @@ import { wsOn, wsSend } from '../wsClient'
 import { supabase, supabaseDisponivel } from '../supabaseClient'
 import { listarOcorrenciasPorData } from '../api'
 import type { Ocorrencia } from '../types'
-import { TIPOS_AREAS_RISCO, type AreaRisco, type AreaRiscoInput, type TipoAreaRisco } from '../areasRisco'
+import {
+  normalizarGeometriaAreaRisco,
+  TIPOS_AREAS_RISCO,
+  type AreaRisco,
+  type AreaRiscoInput,
+  type TipoAreaRisco,
+} from '../areasRisco'
 import { ehFerramentalPorLitro } from '../ferramentalUtils'
 import { GraficoNivel, type EstacaoCNL, type LeituraCNL, type PontoNivel, type PontoSerie } from './MonitoramentoCNL'
 import { ChuvaCentro24h, type EstacaoChuvaCentro } from './ChuvaCentro24h'
@@ -118,18 +124,11 @@ function normalizarAreaRisco(valor: Record<string, unknown>): AreaRisco | null {
   const latitude = Number(valor.latitude)
   const longitude = Number(valor.longitude)
   const limite = Number(valor.limite_precipitacao_mm)
-  const poligono = Array.isArray(valor.poligono)
-    ? valor.poligono
-      .filter((ponto): ponto is [number, number] =>
-        Array.isArray(ponto) && ponto.length >= 2 &&
-        Number.isFinite(Number(ponto[0])) && Number.isFinite(Number(ponto[1])),
-      )
-      .map(ponto => [Number(ponto[0]), Number(ponto[1])] as [number, number])
-    : []
+  const poligono = normalizarGeometriaAreaRisco(valor.poligono ?? [])
   if (
     !String(valor.id || '') ||
     !Number.isFinite(latitude) || !Number.isFinite(longitude) ||
-    !Number.isFinite(limite)
+    !Number.isFinite(limite) || !poligono
   ) return null
 
   return {

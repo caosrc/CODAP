@@ -199,6 +199,48 @@ function formatarPrecipitacao(valor: number | null | undefined) {
     : `${valor.toLocaleString('pt-BR', { maximumFractionDigits: 1 })} mm`
 }
 
+function rotuloAtributoKmz(campo: string) {
+  return campo
+    .split('_')
+    .filter(Boolean)
+    .map(parte => parte.charAt(0).toLocaleUpperCase('pt-BR') + parte.slice(1))
+    .join(' ')
+}
+
+function PopupInformacaoKmz({ importado }: { importado: PoligonoKmzImportado }) {
+  const atributos = importado.atributos?.filter(item => item.valor.trim()) ?? []
+  return (
+    <Popup>
+      <div className="arm-popup">
+        <div className="arm-popup-title" style={{ color: '#8e52c7' }}>{importado.nome}</div>
+        {atributos.length > 0 ? (
+          <>
+            <div className="arm-popup-notes"><strong>Informações do arquivo KMZ</strong></div>
+            <div className="arm-kmz-popup-attrs">
+              {atributos.map(({ campo, valor }, indice) => (
+                <div key={`${campo}-${indice}`}><strong>{rotuloAtributoKmz(campo)}:</strong> {valor}</div>
+              ))}
+            </div>
+          </>
+        ) : (
+          <>
+            {importado.tipo && <div>Tipo: <strong>{importado.tipo}</strong></div>}
+            {importado.data_inicio && <div>Início: <strong>{formatarData(importado.data_inicio)}</strong></div>}
+            {importado.limite_precipitacao_mm != null && (
+              <div>Limite no arquivo: <strong>{formatarPrecipitacao(importado.limite_precipitacao_mm)}</strong></div>
+            )}
+            {importado.referencia && <div>Referência: <strong>{importado.referencia}</strong></div>}
+            {importado.observacao && <div className="arm-popup-notes">{importado.observacao}</div>}
+          </>
+        )}
+        <div className="arm-popup-by">
+          Polígono com {contarVerticesAreaRisco(importado.poligono)} vértices · camada KMZ
+        </div>
+      </div>
+    </Popup>
+  )
+}
+
 export default function AreasRiscoMapa({
   painelHost,
   modoTv,
@@ -454,7 +496,7 @@ export default function AreasRiscoMapa({
       setCamadaKmzVisivel(true)
       setVersaoCamadaKmz(versao => versao + 1)
       setErroCamadaKmz(false)
-      setMensagemCamadaKmz(`${poligonos.length} contorno(s) exibido(s) no mapa. Esta camada é temporária e não altera os cadastros.`)
+      setMensagemCamadaKmz(`${poligonos.length} contorno(s) exibido(s). Clique em um polígono para consultar os dados do KMZ. Para cadastrar, use “Importar para cadastro”.`)
     } catch (e) {
       setErroCamadaKmz(true)
       setMensagemCamadaKmz(e instanceof Error ? e.message : 'Não foi possível ler o arquivo KMZ/KML.')
@@ -603,8 +645,9 @@ export default function AreasRiscoMapa({
               }}
             >
               <Tooltip sticky>
-                {importado.nome} · camada KMZ temporária · {contarVerticesAreaRisco(importado.poligono)} vértices
+                {importado.nome} · clique para ver os dados · {contarVerticesAreaRisco(importado.poligono)} vértices
               </Tooltip>
+              <PopupInformacaoKmz importado={importado} />
             </Polygon>
           ))}
         </Pane>
@@ -625,6 +668,7 @@ export default function AreasRiscoMapa({
             eventHandlers={{ click: () => carregarPoligonoImportado(indice) }}
           >
             <Tooltip sticky>{importado.nome} · importado, ainda não salvo</Tooltip>
+            <PopupInformacaoKmz importado={importado} />
           </Polygon>
         )
       ))}

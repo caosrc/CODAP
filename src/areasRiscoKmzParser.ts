@@ -22,6 +22,7 @@ interface PoligonoKmlCandidato {
 export interface CandidatoPoligonoKmz {
   nome: string
   ponto: [number, number] | null
+  atributos: Array<{ campo: string; valor: string }>
   tipo?: TipoAreaRisco
   data_inicio?: string
   limite_precipitacao_mm?: number
@@ -269,6 +270,11 @@ function metadadosDoPlacemark(placemark: Element) {
       const par = linha.trim().match(/^([^:：]{1,80})\s*[:：]\s*(.+)$/)
       if (par) guardarSeNovo(par[1], par[2])
     }
+
+    if (!valores.size) {
+      const textoSimples = html.body.textContent?.replace(/\s+/g, ' ').trim()
+      if (textoSimples) valores.set('observacao', textoSimples)
+    }
   }
   return valores
 }
@@ -359,6 +365,7 @@ export function extrairCandidatosKml(conteudo: string): CandidatoPoligonoKmz[] {
     resultado.push({
       nome,
       ponto: pontoImportado,
+      atributos: Array.from(dados, ([campo, valor]) => ({ campo, valor })),
       tipo,
       data_inicio: dataInicio,
       limite_precipitacao_mm: limite != null && Number.isFinite(limite) && limite >= 0 ? limite : undefined,
@@ -409,6 +416,7 @@ export function validarCandidatosKml(candidatos: CandidatoPoligonoKmz[]): Poligo
       poligono: geometria,
       latitude,
       longitude,
+      atributos: candidato.atributos,
       tipo: candidato.tipo,
       data_inicio: candidato.data_inicio,
       limite_precipitacao_mm: candidato.limite_precipitacao_mm,

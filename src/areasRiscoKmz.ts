@@ -13,6 +13,7 @@ export interface PoligonoKmzImportado {
   poligono: GeometriaAreaRisco
   latitude: number
   longitude: number
+  atributos?: Array<{ campo: string; valor: string }>
   tipo?: TipoAreaRisco
   data_inicio?: string
   limite_precipitacao_mm?: number

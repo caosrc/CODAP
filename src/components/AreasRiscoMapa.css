@@ -884,6 +884,8 @@
 .arm-popup-title { margin-bottom: 3px; font-size: 14px; font-weight: 850; }
 .arm-popup-alert { margin: 4px 0; color: #ad2630; font-size: 9px; font-weight: 900; letter-spacing: .06em; }
 .arm-popup-notes { margin-top: 4px; padding-top: 4px; border-top: 1px solid #d9e4eb; }
+.arm-kmz-popup-attrs { max-height: 220px; overflow: auto; margin-top: 4px; }
+.arm-kmz-popup-attrs > div { padding: 2px 0; border-top: 1px solid #e5edf2; overflow-wrap: anywhere; }
 .arm-popup-by { margin-top: 4px; color: #70889a; font-size: 10px; }
 .arm-popup-actions { display: flex; gap: 5px; margin-top: 8px; }
 .arm-popup-actions button { min-height: 27px; border-color: #267795; color: #fff; background: #136c8c; font-size: 10px; }

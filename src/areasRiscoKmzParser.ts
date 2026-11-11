@@ -239,6 +239,37 @@ function metadadosDoPlacemark(placemark: Element) {
     const valor = tag.textContent?.trim() ?? ''
     if (chave && valor) valores.set(normalizarChave(chave), valor)
   }
+
+  const descricao = textoKml(placemark, 'description')
+  if (descricao) {
+    const html = new DOMParser().parseFromString(descricao, 'text/html')
+    const guardarSeNovo = (chave: string, valor: string) => {
+      const chaveNormalizada = normalizarChave(chave.replace(/[:：]\s*$/, ''))
+      if (chaveNormalizada && valor && !valores.has(chaveNormalizada)) {
+        valores.set(chaveNormalizada, valor.trim())
+      }
+    }
+
+    for (const linha of Array.from(html.querySelectorAll('tr'))) {
+      const celulas = Array.from(linha.querySelectorAll('th,td'))
+      if (celulas.length >= 2) {
+        guardarSeNovo(celulas[0].textContent ?? '', celulas.slice(1).map(celula => celula.textContent ?? '').join(' ').trim())
+      }
+    }
+
+    const texto = new DOMParser()
+      .parseFromString(
+        descricao
+          .replace(/<br\s*\/?>/gi, '\n')
+          .replace(/<\/(?:p|div|li|h[1-6])\s*>/gi, '\n'),
+        'text/html',
+      )
+      .body.textContent ?? ''
+    for (const linha of texto.split(/\r?\n/)) {
+      const par = linha.trim().match(/^([^:：]{1,80})\s*[:：]\s*(.+)$/)
+      if (par) guardarSeNovo(par[1], par[2])
+    }
+  }
   return valores
 }
 
@@ -304,19 +335,21 @@ export function extrairCandidatosKml(conteudo: string): CandidatoPoligonoKmz[] {
     const dados = metadadosDoPlacemark(placemark)
     const pontoImportado = coordenadaDoPonto(placemark)
     const nome = textoKml(placemark, 'name') || `Polígono ${resultado.length + 1}`
-    const tipo = tipoValido(metadado(dados, 'tipo', 'type', 'categoria', 'category', 'risk_type'))
-    const dataInicio = dataValida(metadado(dados, 'data_inicio', 'inicio', 'start_date', 'data', 'date'))
+    const tipo = tipoValido(metadado(dados, 'tipo', 'tipo_risco', 'tipo_de_risco', 'type', 'categoria', 'categoria_risco', 'category', 'risk_type'))
+    const dataInicio = dataValida(metadado(dados, 'data_inicio', 'data_de_inicio', 'inicio', 'start_date', 'data', 'date'))
     const limiteTexto = metadado(
       dados,
       'limite_precipitacao_mm',
       'limite_precipitacao',
+      'limite_de_precipitacao',
       'limite_chuva',
+      'limite_de_chuva',
       'rain_limit_mm',
       'precipitation_limit',
     )
     const limite = limiteTexto ? Number(limiteTexto.replace(',', '.')) : undefined
-    const referencia = metadado(dados, 'referencia', 'reference', 'local', 'endereco', 'address', 'bairro') || nome
-    const observacao = metadado(dados, 'observacao', 'observation', 'notes', 'descricao', 'description')
+    const referencia = metadado(dados, 'referencia', 'reference', 'local', 'nome_local', 'nome_area', 'endereco', 'address', 'bairro') || nome
+    const observacao = metadado(dados, 'observacao', 'observation', 'notes', 'descricao', 'description', 'detalhe', 'complemento')
     const elementosPoligono = descendentesComNome(placemark, 'Polygon')
     if (!elementosPoligono.length) continue
     if (resultado.length >= MAXIMO_POLIGONOS) {

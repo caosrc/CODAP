@@ -128,11 +128,7 @@ function criarRascunhoImportado(poligono: PoligonoKmzImportado, tipoFallback: Ti
     longitude: poligono.longitude,
     poligono: clonarGeometriaAreaRisco(poligono.poligono),
     data_inicio: poligono.data_inicio ?? base.data_inicio,
-    limite_precipitacao_mm: tipo === 'Interdições'
-      ? '0'
-      : poligono.limite_precipitacao_mm != null
-        ? String(poligono.limite_precipitacao_mm)
-        : base.limite_precipitacao_mm,
+    limite_precipitacao_mm: base.limite_precipitacao_mm,
     referencia: poligono.referencia ?? poligono.nome,
     observacao: poligono.observacao ?? '',
   }
@@ -237,6 +233,7 @@ export default function AreasRiscoMapa({
   const [processandoKmz, setProcessandoKmz] = useState(false)
   const [mensagemKmz, setMensagemKmz] = useState('')
   const arquivoKmzRef = useRef<HTMLInputElement>(null)
+  const arquivoCadastroKmzRef = useRef<HTMLInputElement>(null)
   const [poligonosDaCamadaKmz, setPoligonosDaCamadaKmz] = useState<PoligonoKmzImportado[]>([])
   const [nomeArquivoCamadaKmz, setNomeArquivoCamadaKmz] = useState('')
   const [camadaKmzVisivel, setCamadaKmzVisivel] = useState(true)
@@ -423,7 +420,7 @@ export default function AreasRiscoMapa({
     setMensagemKmz('Preparando a leitura do arquivo…')
     try {
       const poligonos = await importarPoligonosKmz(arquivo, setMensagemKmz)
-      const tipoBase = rascunho?.tipo ?? 'Encostas'
+      const tipoBase = rascunho?.tipo ?? (filtro === 'Todas' ? 'Encostas' : filtro)
       setPoligonosImportados(poligonos)
       setPoligonosImportadosConcluidos(new Set())
       setPoligonoImportadoSelecionado(0)
@@ -839,22 +836,40 @@ export default function AreasRiscoMapa({
             <div className="arm-toolbar">
                 <span>ÁREAS DE RISCO</span>
               <input
+                ref={arquivoCadastroKmzRef}
+                className="arm-kmz-map-input"
+                type="file"
+                accept=".kmz,.kml,application/vnd.google-earth.kmz,application/vnd.google-earth.kml+xml"
+                aria-label="Arquivo KMZ ou KML para cadastrar áreas de risco"
+                onChange={event => void importarArquivoKmz(event)}
+                disabled={processandoKmz || salvando || Boolean(rascunho)}
+                data-testid="input-importar-kmz-para-cadastro"
+              />
+              <input
                 ref={arquivoCamadaKmzRef}
                 className="arm-kmz-map-input"
                 type="file"
                 accept=".kmz,.kml,application/vnd.google-earth.kmz,application/vnd.google-earth.kml+xml"
-                aria-label="Arquivo KMZ ou KML para exibir no mapa"
+                aria-label="Arquivo KMZ ou KML para exibir temporariamente no mapa"
                 onChange={event => void importarCamadaKmz(event)}
                 disabled={processandoCamadaKmz}
                 data-testid="input-importar-kmz-no-mapa"
               />
               <button
                 type="button"
+                onClick={() => arquivoCadastroKmzRef.current?.click()}
+                disabled={processandoKmz || salvando || Boolean(rascunho)}
+                data-testid="button-importar-kmz-para-cadastro"
+              >
+                {processandoKmz ? 'Lendo KMZ…' : 'Importar para cadastro'}
+              </button>
+              <button
+                type="button"
                 onClick={() => arquivoCamadaKmzRef.current?.click()}
                 disabled={processandoCamadaKmz}
                 data-testid="button-importar-kmz-no-mapa"
               >
-                {processandoCamadaKmz ? 'Lendo KMZ…' : 'Importar KMZ'}
+                {processandoCamadaKmz ? 'Lendo KMZ…' : 'Exibir camada KMZ'}
               </button>
               <button type="button" onClick={iniciarCadastro} data-testid="button-nova-area" disabled={Boolean(rascunho)}>
                 <span aria-hidden="true">+</span> {filtro === 'Interdições' ? 'Nova interdição' : 'Nova área'}

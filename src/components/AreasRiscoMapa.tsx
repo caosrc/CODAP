@@ -32,7 +32,6 @@ export interface AreasRiscoMapaProps {
   senhaAgente: string | null
   erro: string | null
   onSalvar: (input: AreaRiscoInput) => Promise<void>
-  onSalvarLote: (inputs: AreaRiscoInput[]) => Promise<void>
   onEditar: (id: string, input: AreaRiscoInput) => Promise<void>
   onExcluir: (id: string) => Promise<void>
   onAbrirOcorrencia?: (id: number) => void
@@ -126,6 +125,15 @@ function reposicionarVertice(
 function criarRascunhoImportado(poligono: PoligonoKmzImportado, tipoFallback: TipoAreaRisco): DraftArea {
   const tipo = poligono.tipo ?? tipoFallback
   const base = novaArea(tipo)
+  const atributos = poligono.atributos?.filter(item => item.valor.trim()) ?? []
+  const observacaoImportada = poligono.observacao?.trim() ?? ''
+  const linhasObservacao = atributos.map(({ campo, valor }) => `${rotuloAtributoKmz(campo)}: ${valor.trim()}`)
+  if (
+    observacaoImportada
+    && !atributos.some(({ valor }) => valor.trim().toLocaleLowerCase('pt-BR') === observacaoImportada.toLocaleLowerCase('pt-BR'))
+  ) {
+    linhasObservacao.push(`Observações: ${observacaoImportada}`)
+  }
   return {
     ...base,
     latitude: poligono.latitude,
@@ -134,7 +142,7 @@ function criarRascunhoImportado(poligono: PoligonoKmzImportado, tipoFallback: Ti
     data_inicio: poligono.data_inicio ?? base.data_inicio,
     limite_precipitacao_mm: base.limite_precipitacao_mm,
     referencia: poligono.referencia ?? poligono.nome,
-    observacao: poligono.observacao ?? '',
+    observacao: linhasObservacao.join('\n') || observacaoImportada,
     atributos_kmz: poligono.atributos ?? [],
   }
 }
@@ -315,7 +323,7 @@ function PopupAreaRisco({
               Abrir ocorrência #{area.ocorrencia_id}
             </button>
           ) : <>
-            <button type="button" data-testid={`button-editar-area-${area.id}`} onClick={onEditar}>Editar</button>
+            <button type="button" data-testid={`button-editar-area-${area.id}`} onClick={onEditar}>Editar contorno e dados</button>
             <button type="button" data-testid={`button-excluir-area-${area.id}`} onClick={onExcluir}>Excluir</button>
           </>}
         </div>
@@ -337,7 +345,6 @@ export default function AreasRiscoMapa({
   senhaAgente,
   erro,
   onSalvar,
-  onSalvarLote,
   onEditar,
   onExcluir,
   onAbrirOcorrencia,
@@ -405,7 +412,6 @@ export default function AreasRiscoMapa({
   const areasVisiveis = filtro === 'Todas' ? areas : areas.filter(area => area.tipo === filtro)
   const areasNoMapa = areas.filter(area => tiposVisiveisNoMapa.has(area.tipo))
   const todosTiposVisiveisNoMapa = tiposVisiveisNoMapa.size === TIPOS.length
-  const quantidadeImportadaPendente = poligonosImportados.length - poligonosImportadosConcluidos.size
   const areasParaExportar: AreaRiscoInput[] = areas
     .filter(area =>
       areaRiscoTemPoligono(area.poligono)
@@ -555,7 +561,7 @@ export default function AreasRiscoMapa({
       setEditandoId(null)
       setModoMapa(null)
       setRecolhido(false)
-      setMensagemKmz(`${poligonos.length} polígono(s) encontrado(s). Revise o tipo de cada área e salve tudo de uma vez ou edite contornos individualmente.`)
+      setMensagemKmz(`${poligonos.length} polígono(s) encontrado(s). Revise cada contorno e registre as áreas individualmente.`)
     } catch (e) {
       setMensagemKmz(e instanceof Error ? e.message : 'Não foi possível ler o arquivo KMZ/KML.')
     } finally {
@@ -579,19 +585,7 @@ export default function AreasRiscoMapa({
     setModoMapa(null)
     setLocalErro('')
     setRecolhido(false)
-    setMensagemKmz(`Contorno “${poligonoImportado.nome}” carregado no formulário. Revise os dados e salve a área.`)
-  }
-
-  function alterarTipoImportado(indice: number, tipo: TipoAreaRisco) {
-    setTiposImportados(atuais => atuais.map((atual, item) => item === indice ? tipo : atual))
-    if (indiceImportacaoNoRascunho === indice && !editandoId) {
-      atualizarRascunho({
-        tipo,
-        limite_precipitacao_mm: tipo === 'Interdições'
-          ? '0'
-          : rascunho?.tipo === 'Interdições' ? '30' : rascunho?.limite_precipitacao_mm ?? '30',
-      })
-    }
+    setMensagemKmz(`Contorno “${poligonoImportado.nome}” carregado no formulário. Revise e clique em Registrar área para salvar no Supabase.`)
   }
 
   function alterarTipoRascunho(tipo: TipoAreaRisco) {
@@ -607,54 +601,6 @@ export default function AreasRiscoMapa({
       setTiposImportados(atuais => atuais.map((atual, indice) =>
         indice === indiceImportacaoNoRascunho ? tipo : atual,
       ))
-    }
-  }
-
-  async function salvarTodosImportados() {
-    if (!poligonosImportados.length) return
-    const entradas: AreaRiscoInput[] = []
-    for (const [indice, importado] of poligonosImportados.entries()) {
-      if (poligonosImportadosConcluidos.has(indice)) continue
-      const usarRascunho = indice === indiceImportacaoNoRascunho && rascunho && !editandoId
-      const tipo = usarRascunho ? rascunho.tipo : tiposImportados[indice] ?? tipoBaseImportacao ?? 'Encostas'
-      const limite = tipo === 'Interdições'
-        ? 0
-        : Number(usarRascunho ? rascunho.limite_precipitacao_mm : '30')
-      if (tipo !== 'Interdições' && (!Number.isFinite(limite) || limite < 0)) {
-        setLocalErro(`Informe um limite de chuva válido para “${importado.nome}”.`)
-        return
-      }
-      entradas.push({
-        tipo,
-        latitude: usarRascunho ? rascunho.latitude ?? importado.latitude : importado.latitude,
-        longitude: usarRascunho ? rascunho.longitude ?? importado.longitude : importado.longitude,
-        poligono: usarRascunho ? rascunho.poligono : importado.poligono,
-        data_inicio: usarRascunho ? rascunho.data_inicio : importado.data_inicio ?? dataHoje(),
-        limite_precipitacao_mm: limite,
-        referencia: (usarRascunho ? rascunho.referencia : importado.referencia ?? importado.nome).trim() || null,
-        observacao: (usarRascunho ? rascunho.observacao : importado.observacao ?? '').trim() || null,
-        atributos_kmz: usarRascunho ? rascunho.atributos_kmz : importado.atributos ?? [],
-      })
-    }
-    if (!entradas.length) return
-
-    try {
-      setLocalErro('')
-      await onSalvarLote(entradas)
-      const quantidade = entradas.length
-      setPoligonosImportados([])
-      setPoligonosImportadosConcluidos(new Set())
-      setTiposImportados([])
-      setPoligonoImportadoSelecionado(0)
-      setIndiceImportacaoNoRascunho(null)
-      setTipoBaseImportacao(null)
-      setRascunho(null)
-      setEditandoId(null)
-      setModoMapa(null)
-      setMensagemKmz(`${quantidade} área(s) foram salvas no Supabase. Você pode clicar em cada polígono para consultar os dados ou editar pelo mapa.`)
-      if (window.matchMedia('(max-width: 700px)').matches) setRecolhido(true)
-    } catch (e) {
-      setLocalErro(e instanceof Error ? e.message : 'Não foi possível salvar as áreas importadas.')
     }
   }
 
@@ -735,7 +681,7 @@ export default function AreasRiscoMapa({
           setRascunho(null)
           setEditandoId(null)
           setModoMapa(null)
-          setMensagemKmz(`${totalImportado} área(s) da importação foram cadastradas.`)
+          setMensagemKmz(`Todas as ${totalImportado} áreas importadas foram registradas no Supabase.`)
           if (window.matchMedia('(max-width: 700px)').matches) setRecolhido(true)
         }
       } else {
@@ -1197,7 +1143,7 @@ export default function AreasRiscoMapa({
                   {poligonosImportados.length > 0 && (
                     <div className="arm-kmz-import-selection">
                       <label className="arm-field">
-                        <span>Contorno para editar · {poligonosImportadosConcluidos.size}/{poligonosImportados.length} cadastrados</span>
+                        <span>Contorno para editar · {poligonosImportadosConcluidos.size}/{poligonosImportados.length} registrados</span>
                         <select
                           value={poligonoImportadoSelecionado}
                           onChange={event => setPoligonoImportadoSelecionado(Number(event.target.value))}
@@ -1220,35 +1166,6 @@ export default function AreasRiscoMapa({
                         Carregar contorno para editar
                       </button>
                       <span>Você também pode tocar em um contorno tracejado no mapa para editar seus dados e vértices.</span>
-                      <details className="arm-kmz-batch" open>
-                        <summary>Revisar tipos e salvar as {quantidadeImportadaPendente} áreas restantes</summary>
-                        <p>Escolha o tipo de risco para cada contorno. Os atributos originais do KMZ também serão guardados.</p>
-                        <div className="arm-kmz-batch-rows">
-                          {poligonosImportados.map((poligono, indice) => (
-                            <label className="arm-kmz-batch-row" key={`${indice}-${poligono.nome}`}>
-                              <span>{poligonosImportadosConcluidos.has(indice) ? '✓ ' : ''}{indice + 1}. {poligono.nome}</span>
-                              <select
-                                value={tiposImportados[indice] ?? tipoBaseImportacao ?? 'Encostas'}
-                                onChange={event => alterarTipoImportado(indice, event.target.value as TipoAreaRisco)}
-                                aria-label={`Tipo de risco para ${poligono.nome}`}
-                                data-testid={`select-tipo-poligono-importado-${indice}`}
-                                disabled={poligonosImportadosConcluidos.has(indice)}
-                              >
-                                {TIPOS.map(tipo => <option key={tipo} value={tipo}>{tipo}</option>)}
-                              </select>
-                            </label>
-                          ))}
-                        </div>
-                        <button
-                          type="button"
-                          className="arm-kmz-save-all"
-                          onClick={() => void salvarTodosImportados()}
-                          disabled={salvando || processandoKmz || quantidadeImportadaPendente === 0}
-                          data-testid="button-salvar-todas-areas-kmz"
-                        >
-                          {salvando ? 'Salvando no Supabase…' : `Salvar restantes no Supabase (${quantidadeImportadaPendente})`}
-                        </button>
-                      </details>
                     </div>
                   )}
                   {mensagemKmz && <span className="arm-kmz-status" role="status" data-testid="status-area-kmz">{mensagemKmz}</span>}
@@ -1283,7 +1200,7 @@ export default function AreasRiscoMapa({
                     )}
                   </div>
                   <label className="arm-field"><span>Referência local <small>opcional</small></span><input type="text" maxLength={120} placeholder="Rua, bairro ou ponto próximo" value={rascunho.referencia} onChange={event => atualizarRascunho({ referencia: event.target.value })} data-testid="input-referencia-local" /></label>
-                  <label className="arm-field"><span>Observações <small>opcional</small></span><textarea rows={2} maxLength={500} placeholder="Condição observada, acesso ou orientação à equipe" value={rascunho.observacao} onChange={event => atualizarRascunho({ observacao: event.target.value })} data-testid="input-observacao-risco" /></label>
+                  <label className="arm-field"><span>Observações <small>dados do KMZ podem ser editados</small></span><textarea rows={5} placeholder="Condição observada, dados do KMZ ou orientação à equipe" value={rascunho.observacao} onChange={event => atualizarRascunho({ observacao: event.target.value })} data-testid="input-observacao-risco" /></label>
                   {(localErro || erro) && <div className="arm-error" role="alert" data-testid="status-erro-formulario">{localErro || erro}</div>}
                   <div className="arm-form-actions">
                     <button type="button" className="arm-cancel" data-testid="button-cancelar-area" disabled={salvando} onClick={fecharFormulario}>Cancelar</button>

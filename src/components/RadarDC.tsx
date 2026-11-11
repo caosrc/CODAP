@@ -608,34 +608,6 @@ function RadarMapaTempoReal({ tv, dataOcorrencias }: { tv: boolean; dataOcorrenc
     }
   }, [agenteLogado])
 
-  const salvarAreasRiscoEmLote = useCallback(async (entradas: AreaRiscoInput[]) => {
-    if (!supabaseDisponivel) throw new Error('Supabase indisponível; as áreas não foram salvas.')
-    if (!agenteLogado) throw new Error('Entre com o agente responsável antes de cadastrar áreas.')
-    if (!entradas.length) return
-    setAreasRiscoSalvando(true)
-    setAreasRiscoErro(null)
-    try {
-      const { data, error } = await supabase
-        .from('areas_risco')
-        .insert(entradas.map(entrada => ({ ...entrada, criado_por: agenteLogado })))
-        .select('*')
-      if (error) throw error
-      const novasAreas = (Array.isArray(data) ? data : [])
-        .map((registro: Record<string, unknown>) => normalizarAreaRisco(registro))
-        .filter((area: AreaRisco | null): area is AreaRisco => area !== null)
-      if (novasAreas.length !== entradas.length) {
-        throw new Error('O Supabase não confirmou todas as áreas importadas.')
-      }
-      setAreasRisco(prev => [...novasAreas, ...prev.filter(area => !novasAreas.some(nova => nova.id === area.id))])
-    } catch (error) {
-      const mensagem = mensagemErroAreaRisco(error, 'Não foi possível salvar as áreas importadas.')
-      setAreasRiscoErro(mensagem)
-      throw new Error(mensagem)
-    } finally {
-      setAreasRiscoSalvando(false)
-    }
-  }, [agenteLogado])
-
   const editarAreaRisco = useCallback(async (id: string, entrada: AreaRiscoInput) => {
     if (!supabaseDisponivel) throw new Error('Supabase indisponível; a alteração não foi salva.')
     setAreasRiscoSalvando(true)
@@ -1124,7 +1096,6 @@ function RadarMapaTempoReal({ tv, dataOcorrencias }: { tv: boolean; dataOcorrenc
           senhaAgente={getSenhaAgente(agenteLogado)}
           erro={[areasRiscoErro, previsaoAreasRiscoErro].filter(Boolean).join(' ') || null}
           onSalvar={salvarAreaRisco}
-          onSalvarLote={salvarAreasRiscoEmLote}
           onEditar={editarAreaRisco}
           onExcluir={excluirAreaRisco}
           onAbrirOcorrencia={id => disparar('dc:abrir-ocorrencia', { id })}

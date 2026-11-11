@@ -17,13 +17,15 @@ CREATE TABLE IF NOT EXISTS public.areas_risco (
   limite_precipitacao_mm NUMERIC(8, 2) NOT NULL CHECK (limite_precipitacao_mm >= 0),
   referencia TEXT,
   observacao TEXT,
+  atributos_kmz JSONB NOT NULL DEFAULT '[]'::jsonb CHECK (jsonb_typeof(atributos_kmz) = 'array'),
   criado_por TEXT NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 ALTER TABLE public.areas_risco
-  ADD COLUMN IF NOT EXISTS poligono JSONB NOT NULL DEFAULT '[]'::jsonb;
+  ADD COLUMN IF NOT EXISTS poligono JSONB NOT NULL DEFAULT '[]'::jsonb,
+  ADD COLUMN IF NOT EXISTS atributos_kmz JSONB NOT NULL DEFAULT '[]'::jsonb;
 
 COMMENT ON COLUMN public.areas_risco.poligono IS
   'Geometria multipolígono em JSON: componentes > anéis (externo e internos) > coordenadas [latitude, longitude]. Listas antigas de coordenadas continuam sendo lidas como um único contorno.';

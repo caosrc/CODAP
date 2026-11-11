@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useMemo, useRef, useState, type ChangeEvent, type CSSProperties, type FormEvent } from 'react'
 import { createPortal } from 'react-dom'
-import { Marker, Pane, Polygon, Popup, Tooltip, useMap, useMapEvents } from 'react-leaflet'
+import { Marker, Polygon, Popup, Tooltip, useMap, useMapEvents } from 'react-leaflet'
 import L from 'leaflet'
 import ModalSenha from './ModalSenha'
 import './AreasRiscoMapa.css'
@@ -13,6 +13,7 @@ import {
   TIPOS_AREAS_RISCO,
   type AreaRisco,
   type AreaRiscoInput,
+  type AtributoKmz,
   type GeometriaAreaRisco,
   type TipoAreaRisco,
 } from '../areasRisco'
@@ -31,6 +32,7 @@ export interface AreasRiscoMapaProps {
   senhaAgente: string | null
   erro: string | null
   onSalvar: (input: AreaRiscoInput) => Promise<void>
+  onSalvarLote: (inputs: AreaRiscoInput[]) => Promise<void>
   onEditar: (id: string, input: AreaRiscoInput) => Promise<void>
   onExcluir: (id: string) => Promise<void>
   onAbrirOcorrencia?: (id: number) => void
@@ -65,6 +67,7 @@ interface DraftArea {
   limite_precipitacao_mm: string
   referencia: string
   observacao: string
+  atributos_kmz: AtributoKmz[]
 }
 
 type GateAction = { tipo: 'editar' | 'excluir'; area: AreaRisco }
@@ -85,6 +88,7 @@ function novaArea(tipo: TipoAreaRisco = 'Encostas'): DraftArea {
     limite_precipitacao_mm: tipo === 'Interdições' ? '0' : '30',
     referencia: '',
     observacao: '',
+    atributos_kmz: [],
   }
 }
 
@@ -131,6 +135,7 @@ function criarRascunhoImportado(poligono: PoligonoKmzImportado, tipoFallback: Ti
     limite_precipitacao_mm: base.limite_precipitacao_mm,
     referencia: poligono.referencia ?? poligono.nome,
     observacao: poligono.observacao ?? '',
+    atributos_kmz: poligono.atributos ?? [],
   }
 }
 
@@ -207,12 +212,21 @@ function rotuloAtributoKmz(campo: string) {
     .join(' ')
 }
 
-function PopupInformacaoKmz({ importado }: { importado: PoligonoKmzImportado }) {
+function PopupInformacaoKmz({
+  importado,
+  tipoSelecionado,
+  onEditar,
+}: {
+  importado: PoligonoKmzImportado
+  tipoSelecionado?: TipoAreaRisco
+  onEditar?: () => void
+}) {
   const atributos = importado.atributos?.filter(item => item.valor.trim()) ?? []
   return (
     <Popup>
       <div className="arm-popup">
         <div className="arm-popup-title" style={{ color: '#8e52c7' }}>{importado.nome}</div>
+        {tipoSelecionado && <div>Tipo para cadastro: <strong>{tipoSelecionado}</strong></div>}
         {atributos.length > 0 ? (
           <>
             <div className="arm-popup-notes"><strong>Informações do arquivo KMZ</strong></div>
@@ -236,6 +250,75 @@ function PopupInformacaoKmz({ importado }: { importado: PoligonoKmzImportado }) 
         <div className="arm-popup-by">
           Polígono com {contarVerticesAreaRisco(importado.poligono)} vértices · camada KMZ
         </div>
+        {onEditar && (
+          <div className="arm-popup-actions">
+            <button type="button" onClick={onEditar}>Editar contorno e dados</button>
+          </div>
+        )}
+      </div>
+    </Popup>
+  )
+}
+
+function PopupAreaRisco({
+  area,
+  cor,
+  emAlerta,
+  previsto,
+  onEditar,
+  onExcluir,
+  onAbrirOcorrencia,
+}: {
+  area: AreaRisco
+  cor: string
+  emAlerta: boolean
+  previsto: number | null | undefined
+  onEditar: () => void
+  onExcluir: () => void
+  onAbrirOcorrencia?: (id: number) => void
+}) {
+  return (
+    <Popup>
+      <div className="arm-popup">
+        <div className="arm-popup-title" style={{ color: cor }}>{area.referencia || area.tipo}</div>
+        <div>Tipo: <strong>{area.tipo}</strong></div>
+        {emAlerta && <div className="arm-popup-alert">PREVISÃO ACIMA DO LIMITE</div>}
+        <div>{area.tipo === 'Interdições' ? 'Interdição desde:' : 'Início:'} <strong>{formatarData(area.data_inicio)}</strong></div>
+        {area.tipo === 'Interdições'
+          ? <div className="arm-popup-interdiction-status">Local de interdição cadastrado</div>
+          : <>
+            <div>Limite: <strong>{area.limite_precipitacao_mm} mm</strong></div>
+            <div>Previsão 24 h: <strong>{formatarPrecipitacao(previsto)}</strong></div>
+          </>}
+        {area.referencia && <div>Referência: {area.referencia}</div>}
+        {area.observacao && <div className="arm-popup-notes">{area.observacao}</div>}
+        {area.atributos_kmz?.length > 0 && (
+          <>
+            <div className="arm-popup-notes"><strong>Informações originais do KMZ</strong></div>
+            <div className="arm-kmz-popup-attrs">
+              {area.atributos_kmz.map(({ campo, valor }, indice) => (
+                <div key={`${campo}-${indice}`}><strong>{rotuloAtributoKmz(campo)}:</strong> {valor}</div>
+              ))}
+            </div>
+          </>
+        )}
+        {area.ocorrencia_id != null && <div className="arm-popup-linked">Vinculada à ocorrência #{area.ocorrencia_id}</div>}
+        <div className="arm-popup-by">Cadastro: {area.criado_por || '—'} · {contarVerticesAreaRisco(area.poligono)} vértice(s)</div>
+        <div className="arm-popup-actions">
+          {area.ocorrencia_id != null ? (
+            <button
+              type="button"
+              className="arm-popup-open-occurrence"
+              data-testid={`button-abrir-ocorrencia-area-${area.id}`}
+              onClick={() => onAbrirOcorrencia?.(area.ocorrencia_id!)}
+            >
+              Abrir ocorrência #{area.ocorrencia_id}
+            </button>
+          ) : <>
+            <button type="button" data-testid={`button-editar-area-${area.id}`} onClick={onEditar}>Editar</button>
+            <button type="button" data-testid={`button-excluir-area-${area.id}`} onClick={onExcluir}>Excluir</button>
+          </>}
+        </div>
       </div>
     </Popup>
   )
@@ -254,6 +337,7 @@ export default function AreasRiscoMapa({
   senhaAgente,
   erro,
   onSalvar,
+  onSalvarLote,
   onEditar,
   onExcluir,
   onAbrirOcorrencia,
@@ -268,6 +352,7 @@ export default function AreasRiscoMapa({
   const [localErro, setLocalErro] = useState('')
   const [poligonosImportados, setPoligonosImportados] = useState<PoligonoKmzImportado[]>([])
   const [poligonosImportadosConcluidos, setPoligonosImportadosConcluidos] = useState<Set<number>>(() => new Set())
+  const [tiposImportados, setTiposImportados] = useState<TipoAreaRisco[]>([])
   const [poligonoImportadoSelecionado, setPoligonoImportadoSelecionado] = useState(0)
   const [indiceImportacaoNoRascunho, setIndiceImportacaoNoRascunho] = useState<number | null>(null)
   const [tipoBaseImportacao, setTipoBaseImportacao] = useState<TipoAreaRisco | null>(null)
@@ -276,14 +361,6 @@ export default function AreasRiscoMapa({
   const [mensagemKmz, setMensagemKmz] = useState('')
   const arquivoKmzRef = useRef<HTMLInputElement>(null)
   const arquivoCadastroKmzRef = useRef<HTMLInputElement>(null)
-  const [poligonosDaCamadaKmz, setPoligonosDaCamadaKmz] = useState<PoligonoKmzImportado[]>([])
-  const [nomeArquivoCamadaKmz, setNomeArquivoCamadaKmz] = useState('')
-  const [camadaKmzVisivel, setCamadaKmzVisivel] = useState(true)
-  const [processandoCamadaKmz, setProcessandoCamadaKmz] = useState(false)
-  const [mensagemCamadaKmz, setMensagemCamadaKmz] = useState('')
-  const [erroCamadaKmz, setErroCamadaKmz] = useState(false)
-  const [versaoCamadaKmz, setVersaoCamadaKmz] = useState(0)
-  const arquivoCamadaKmzRef = useRef<HTMLInputElement>(null)
   const [recolhido, setRecolhido] = useState(() => {
     const celular = typeof window !== 'undefined' && window.matchMedia('(max-width: 700px)').matches
     return !modoTv && !celular
@@ -328,12 +405,13 @@ export default function AreasRiscoMapa({
   const areasVisiveis = filtro === 'Todas' ? areas : areas.filter(area => area.tipo === filtro)
   const areasNoMapa = areas.filter(area => tiposVisiveisNoMapa.has(area.tipo))
   const todosTiposVisiveisNoMapa = tiposVisiveisNoMapa.size === TIPOS.length
+  const quantidadeImportadaPendente = poligonosImportados.length - poligonosImportadosConcluidos.size
   const areasParaExportar: AreaRiscoInput[] = areas
     .filter(area =>
       areaRiscoTemPoligono(area.poligono)
       && editandoId !== area.id,
     )
-    .map(({ tipo, latitude, longitude, poligono, data_inicio, limite_precipitacao_mm, referencia, observacao }) => ({
+    .map(({ tipo, latitude, longitude, poligono, data_inicio, limite_precipitacao_mm, referencia, observacao, atributos_kmz }) => ({
       tipo,
       latitude,
       longitude,
@@ -342,6 +420,7 @@ export default function AreasRiscoMapa({
       limite_precipitacao_mm,
       referencia,
       observacao,
+      atributos_kmz,
     }))
   if (rascunho && areaRiscoTemPoligono(rascunho.poligono) && rascunho.latitude != null && rascunho.longitude != null) {
     areasParaExportar.push({
@@ -353,6 +432,7 @@ export default function AreasRiscoMapa({
       limite_precipitacao_mm: rascunho.tipo === 'Interdições' ? 0 : Number(rascunho.limite_precipitacao_mm) || 0,
       referencia: rascunho.referencia || null,
       observacao: rascunho.observacao || null,
+      atributos_kmz: rascunho.atributos_kmz,
     })
   }
 
@@ -420,6 +500,7 @@ export default function AreasRiscoMapa({
         limite_precipitacao_mm: String(area.limite_precipitacao_mm),
         referencia: area.referencia ?? '',
         observacao: area.observacao ?? '',
+        atributos_kmz: area.atributos_kmz ?? [],
       })
       setEditandoId(area.id)
       setIndiceImportacaoNoRascunho(null)
@@ -465,6 +546,7 @@ export default function AreasRiscoMapa({
       const tipoBase = rascunho?.tipo ?? (filtro === 'Todas' ? 'Encostas' : filtro)
       setPoligonosImportados(poligonos)
       setPoligonosImportadosConcluidos(new Set())
+      setTiposImportados(poligonos.map(poligono => poligono.tipo ?? tipoBase))
       setPoligonoImportadoSelecionado(0)
       setIndiceImportacaoNoRascunho(0)
       setTipoBaseImportacao(tipoBase)
@@ -473,7 +555,7 @@ export default function AreasRiscoMapa({
       setEditandoId(null)
       setModoMapa(null)
       setRecolhido(false)
-      setMensagemKmz(`${poligonos.length} polígono(s) encontrado(s). Os contornos foram exibidos no mapa; revise os dados e salve cada área.`)
+      setMensagemKmz(`${poligonos.length} polígono(s) encontrado(s). Revise o tipo de cada área e salve tudo de uma vez ou edite contornos individualmente.`)
     } catch (e) {
       setMensagemKmz(e instanceof Error ? e.message : 'Não foi possível ler o arquivo KMZ/KML.')
     } finally {
@@ -481,49 +563,99 @@ export default function AreasRiscoMapa({
     }
   }
 
-  async function importarCamadaKmz(event: ChangeEvent<HTMLInputElement>) {
-    const arquivo = event.currentTarget.files?.[0]
-    event.currentTarget.value = ''
-    if (!arquivo) return
-
-    setProcessandoCamadaKmz(true)
-    setErroCamadaKmz(false)
-    setMensagemCamadaKmz('Preparando a leitura do arquivo…')
-    try {
-      const poligonos = await importarPoligonosKmz(arquivo, setMensagemCamadaKmz)
-      setPoligonosDaCamadaKmz(poligonos)
-      setNomeArquivoCamadaKmz(arquivo.name)
-      setCamadaKmzVisivel(true)
-      setVersaoCamadaKmz(versao => versao + 1)
-      setErroCamadaKmz(false)
-      setMensagemCamadaKmz(`${poligonos.length} contorno(s) exibido(s). Clique em um polígono para consultar os dados do KMZ. Para cadastrar, use “Importar para cadastro”.`)
-    } catch (e) {
-      setErroCamadaKmz(true)
-      setMensagemCamadaKmz(e instanceof Error ? e.message : 'Não foi possível ler o arquivo KMZ/KML.')
-    } finally {
-      setProcessandoCamadaKmz(false)
-    }
-  }
-
-  function removerCamadaKmz() {
-    setPoligonosDaCamadaKmz([])
-    setNomeArquivoCamadaKmz('')
-    setCamadaKmzVisivel(true)
-    setMensagemCamadaKmz('')
-    setErroCamadaKmz(false)
-  }
-
   function carregarPoligonoImportado(indice = poligonoImportadoSelecionado) {
     const poligonoImportado = poligonosImportados[indice]
     if (!poligonoImportado || poligonosImportadosConcluidos.has(indice)) return
+    const tipoSelecionado = tiposImportados[indice] ?? tipoBaseImportacao ?? rascunho?.tipo ?? 'Encostas'
     setPoligonoImportadoSelecionado(indice)
     setIndiceImportacaoNoRascunho(indice)
-    setRascunho(criarRascunhoImportado(poligonoImportado, tipoBaseImportacao ?? rascunho?.tipo ?? 'Encostas'))
+    const draft = criarRascunhoImportado(poligonoImportado, tipoSelecionado)
+    setRascunho({
+      ...draft,
+      tipo: tipoSelecionado,
+      limite_precipitacao_mm: tipoSelecionado === 'Interdições' ? '0' : '30',
+    })
     setEditandoId(null)
     setModoMapa(null)
     setLocalErro('')
     setRecolhido(false)
     setMensagemKmz(`Contorno “${poligonoImportado.nome}” carregado no formulário. Revise os dados e salve a área.`)
+  }
+
+  function alterarTipoImportado(indice: number, tipo: TipoAreaRisco) {
+    setTiposImportados(atuais => atuais.map((atual, item) => item === indice ? tipo : atual))
+    if (indiceImportacaoNoRascunho === indice && !editandoId) {
+      atualizarRascunho({
+        tipo,
+        limite_precipitacao_mm: tipo === 'Interdições'
+          ? '0'
+          : rascunho?.tipo === 'Interdições' ? '30' : rascunho?.limite_precipitacao_mm ?? '30',
+      })
+    }
+  }
+
+  function alterarTipoRascunho(tipo: TipoAreaRisco) {
+    atualizarRascunho({
+      tipo,
+      limite_precipitacao_mm: tipo === 'Interdições'
+        ? '0'
+        : rascunho?.tipo === 'Interdições'
+          ? '30'
+          : rascunho?.limite_precipitacao_mm ?? '30',
+    })
+    if (indiceImportacaoNoRascunho != null && !editandoId) {
+      setTiposImportados(atuais => atuais.map((atual, indice) =>
+        indice === indiceImportacaoNoRascunho ? tipo : atual,
+      ))
+    }
+  }
+
+  async function salvarTodosImportados() {
+    if (!poligonosImportados.length) return
+    const entradas: AreaRiscoInput[] = []
+    for (const [indice, importado] of poligonosImportados.entries()) {
+      if (poligonosImportadosConcluidos.has(indice)) continue
+      const usarRascunho = indice === indiceImportacaoNoRascunho && rascunho && !editandoId
+      const tipo = usarRascunho ? rascunho.tipo : tiposImportados[indice] ?? tipoBaseImportacao ?? 'Encostas'
+      const limite = tipo === 'Interdições'
+        ? 0
+        : Number(usarRascunho ? rascunho.limite_precipitacao_mm : '30')
+      if (tipo !== 'Interdições' && (!Number.isFinite(limite) || limite < 0)) {
+        setLocalErro(`Informe um limite de chuva válido para “${importado.nome}”.`)
+        return
+      }
+      entradas.push({
+        tipo,
+        latitude: usarRascunho ? rascunho.latitude ?? importado.latitude : importado.latitude,
+        longitude: usarRascunho ? rascunho.longitude ?? importado.longitude : importado.longitude,
+        poligono: usarRascunho ? rascunho.poligono : importado.poligono,
+        data_inicio: usarRascunho ? rascunho.data_inicio : importado.data_inicio ?? dataHoje(),
+        limite_precipitacao_mm: limite,
+        referencia: (usarRascunho ? rascunho.referencia : importado.referencia ?? importado.nome).trim() || null,
+        observacao: (usarRascunho ? rascunho.observacao : importado.observacao ?? '').trim() || null,
+        atributos_kmz: usarRascunho ? rascunho.atributos_kmz : importado.atributos ?? [],
+      })
+    }
+    if (!entradas.length) return
+
+    try {
+      setLocalErro('')
+      await onSalvarLote(entradas)
+      const quantidade = entradas.length
+      setPoligonosImportados([])
+      setPoligonosImportadosConcluidos(new Set())
+      setTiposImportados([])
+      setPoligonoImportadoSelecionado(0)
+      setIndiceImportacaoNoRascunho(null)
+      setTipoBaseImportacao(null)
+      setRascunho(null)
+      setEditandoId(null)
+      setModoMapa(null)
+      setMensagemKmz(`${quantidade} área(s) foram salvas no Supabase. Você pode clicar em cada polígono para consultar os dados ou editar pelo mapa.`)
+      if (window.matchMedia('(max-width: 700px)').matches) setRecolhido(true)
+    } catch (e) {
+      setLocalErro(e instanceof Error ? e.message : 'Não foi possível salvar as áreas importadas.')
+    }
   }
 
   async function exportarKmz() {
@@ -568,6 +700,7 @@ export default function AreasRiscoMapa({
       limite_precipitacao_mm: limite,
       referencia: rascunho.referencia.trim() || null,
       observacao: rascunho.observacao.trim() || null,
+      atributos_kmz: rascunho.atributos_kmz,
     }
     try {
       setLocalErro('')
@@ -581,7 +714,13 @@ export default function AreasRiscoMapa({
         if (proximoIndice >= 0) {
           setPoligonoImportadoSelecionado(proximoIndice)
           setIndiceImportacaoNoRascunho(proximoIndice)
-          setRascunho(criarRascunhoImportado(poligonosImportados[proximoIndice], tipoBaseImportacao ?? rascunho.tipo))
+          const proximoTipo = tiposImportados[proximoIndice] ?? tipoBaseImportacao ?? rascunho.tipo
+          const proximoRascunho = criarRascunhoImportado(poligonosImportados[proximoIndice], proximoTipo)
+          setRascunho({
+            ...proximoRascunho,
+            tipo: proximoTipo,
+            limite_precipitacao_mm: proximoTipo === 'Interdições' ? '0' : '30',
+          })
           setEditandoId(null)
           setModoMapa(null)
           setMensagemKmz(`Área registrada. O próximo contorno, “${poligonosImportados[proximoIndice].nome}”, foi carregado para revisão.`)
@@ -589,6 +728,7 @@ export default function AreasRiscoMapa({
           const totalImportado = poligonosImportados.length
           setPoligonosImportados([])
           setPoligonosImportadosConcluidos(new Set())
+          setTiposImportados([])
           setPoligonoImportadoSelecionado(0)
           setIndiceImportacaoNoRascunho(null)
           setTipoBaseImportacao(null)
@@ -618,7 +758,6 @@ export default function AreasRiscoMapa({
   return (
     <>
       <EnquadrarPoligonosImportados poligonos={poligonosImportados} versao={versaoImportacao} />
-      <EnquadrarPoligonosImportados poligonos={poligonosDaCamadaKmz} versao={versaoCamadaKmz} />
       <InteracaoMapa
         modo={modoMapa}
         aoMarcar={(latitude, longitude) => {
@@ -630,28 +769,6 @@ export default function AreasRiscoMapa({
           poligono: adicionarVertice(rascunho?.poligono ?? [], ponto),
         })}
       />
-      {camadaKmzVisivel && poligonosDaCamadaKmz.length > 0 && (
-        <Pane name="radarKmzOverlay" style={{ zIndex: 405 }}>
-          {poligonosDaCamadaKmz.map((importado, indice) => (
-            <Polygon
-              key={`kmz-map-layer-${versaoCamadaKmz}-${indice}`}
-              positions={importado.poligono}
-              pathOptions={{
-                color: '#d39bff',
-                weight: 2,
-                fillColor: '#ad63f5',
-                fillOpacity: 0.17,
-                bubblingMouseEvents: false,
-              }}
-            >
-              <Tooltip sticky>
-                {importado.nome} · clique para ver os dados · {contarVerticesAreaRisco(importado.poligono)} vértices
-              </Tooltip>
-              <PopupInformacaoKmz importado={importado} />
-            </Polygon>
-          ))}
-        </Pane>
-      )}
       {poligonosImportados.map((importado, indice) => (
         !poligonosImportadosConcluidos.has(indice) && (
           <Polygon
@@ -668,7 +785,11 @@ export default function AreasRiscoMapa({
             eventHandlers={{ click: () => carregarPoligonoImportado(indice) }}
           >
             <Tooltip sticky>{importado.nome} · importado, ainda não salvo</Tooltip>
-            <PopupInformacaoKmz importado={importado} />
+                      <PopupInformacaoKmz
+                importado={importado}
+                tipoSelecionado={tiposImportados[indice] ?? importado.tipo ?? tipoBaseImportacao ?? undefined}
+                onEditar={() => carregarPoligonoImportado(indice)}
+              />
           </Polygon>
         )
       ))}
@@ -688,7 +809,17 @@ export default function AreasRiscoMapa({
                   fillOpacity: emAlerta ? 0.3 : 0.17,
                   className: emAlerta ? 'arm-polygon-alerta' : undefined,
                 }}
-              />
+              >
+                <PopupAreaRisco
+                  area={area}
+                  cor={cor}
+                  emAlerta={emAlerta}
+                  previsto={previsto}
+                  onEditar={() => abrirEdicao(area)}
+                  onExcluir={() => abrirExclusao(area)}
+                  onAbrirOcorrencia={onAbrirOcorrencia}
+                />
+              </Polygon>
             )}
             <Marker
               position={[area.latitude, area.longitude]}
@@ -698,38 +829,15 @@ export default function AreasRiscoMapa({
               <Tooltip direction="top" offset={[0, -28]} permanent={emAlerta} className={emAlerta ? 'arm-tooltip-alerta' : 'arm-tooltip'}>
                 {emAlerta ? 'ALERTA · ' : ''}{area.tipo}
               </Tooltip>
-              <Popup>
-                <div className="arm-popup">
-                  <div className="arm-popup-title" style={{ color: cor }}>{area.tipo}</div>
-                  {emAlerta && <div className="arm-popup-alert">PREVISÃO ACIMA DO LIMITE</div>}
-                  <div>{area.tipo === 'Interdições' ? 'Interdição desde:' : 'Início:'} <strong>{formatarData(area.data_inicio)}</strong></div>
-                  {area.tipo === 'Interdições'
-                    ? <div className="arm-popup-interdiction-status">Local de interdição cadastrado</div>
-                    : <>
-                      <div>Limite: <strong>{area.limite_precipitacao_mm} mm</strong></div>
-                      <div>Previsão 24 h: <strong>{formatarPrecipitacao(previsto)}</strong></div>
-                    </>}
-                  {area.referencia && <div>Referência: {area.referencia}</div>}
-                  {area.observacao && <div className="arm-popup-notes">{area.observacao}</div>}
-                  {area.ocorrencia_id != null && <div className="arm-popup-linked">Vinculada à ocorrência #{area.ocorrencia_id}</div>}
-                  <div className="arm-popup-by">Cadastro: {area.criado_por || '—'}</div>
-                  <div className="arm-popup-actions">
-                    {area.ocorrencia_id != null ? (
-                      <button
-                        type="button"
-                        className="arm-popup-open-occurrence"
-                        data-testid={`button-abrir-ocorrencia-area-${area.id}`}
-                        onClick={() => onAbrirOcorrencia?.(area.ocorrencia_id!)}
-                      >
-                        Abrir ocorrência #{area.ocorrencia_id}
-                      </button>
-                    ) : <>
-                      <button type="button" data-testid={`button-editar-area-${area.id}`} onClick={() => abrirEdicao(area)}>Editar</button>
-                      <button type="button" data-testid={`button-excluir-area-${area.id}`} onClick={() => abrirExclusao(area)}>Excluir</button>
-                    </>}
-                  </div>
-                </div>
-              </Popup>
+              <PopupAreaRisco
+                area={area}
+                cor={cor}
+                emAlerta={emAlerta}
+                previsto={previsto}
+                onEditar={() => abrirEdicao(area)}
+                onExcluir={() => abrirExclusao(area)}
+                onAbrirOcorrencia={onAbrirOcorrencia}
+              />
             </Marker>
           </Fragment>
         )
@@ -889,16 +997,6 @@ export default function AreasRiscoMapa({
                 disabled={processandoKmz || salvando || Boolean(rascunho)}
                 data-testid="input-importar-kmz-para-cadastro"
               />
-              <input
-                ref={arquivoCamadaKmzRef}
-                className="arm-kmz-map-input"
-                type="file"
-                accept=".kmz,.kml,application/vnd.google-earth.kmz,application/vnd.google-earth.kml+xml"
-                aria-label="Arquivo KMZ ou KML para exibir temporariamente no mapa"
-                onChange={event => void importarCamadaKmz(event)}
-                disabled={processandoCamadaKmz}
-                data-testid="input-importar-kmz-no-mapa"
-              />
               <button
                 type="button"
                 onClick={() => arquivoCadastroKmzRef.current?.click()}
@@ -907,44 +1005,10 @@ export default function AreasRiscoMapa({
               >
                 {processandoKmz ? 'Lendo KMZ…' : 'Importar para cadastro'}
               </button>
-              <button
-                type="button"
-                onClick={() => arquivoCamadaKmzRef.current?.click()}
-                disabled={processandoCamadaKmz}
-                data-testid="button-importar-kmz-no-mapa"
-              >
-                {processandoCamadaKmz ? 'Lendo KMZ…' : 'Exibir camada KMZ'}
-              </button>
               <button type="button" onClick={iniciarCadastro} data-testid="button-nova-area" disabled={Boolean(rascunho)}>
                 <span aria-hidden="true">+</span> {filtro === 'Interdições' ? 'Nova interdição' : 'Nova área'}
               </button>
             </div>
-            {(nomeArquivoCamadaKmz || mensagemCamadaKmz) && (
-              <div className="arm-kmz-map-status" data-testid="status-kmz-no-mapa">
-                {nomeArquivoCamadaKmz && poligonosDaCamadaKmz.length > 0 && (
-                  <>
-                    <span>
-                      <strong>{camadaKmzVisivel ? 'Visível' : 'Oculta'}</strong>
-                      {' · '}{poligonosDaCamadaKmz.length} contorno(s) · {nomeArquivoCamadaKmz}
-                    </span>
-                    <button
-                      type="button"
-                      aria-pressed={camadaKmzVisivel}
-                      onClick={() => setCamadaKmzVisivel(visivel => !visivel)}
-                      data-testid="toggle-camada-kmz-no-mapa"
-                    >
-                      {camadaKmzVisivel ? 'Ocultar' : 'Mostrar'}
-                    </button>
-                    <button type="button" onClick={removerCamadaKmz} data-testid="button-remover-kmz-do-mapa">
-                      Remover
-                    </button>
-                  </>
-                )}
-                <span role={erroCamadaKmz ? 'alert' : 'status'}>
-                  {mensagemCamadaKmz}
-                </span>
-              </div>
-            )}
             {carregando ? (
               <div className="arm-loading" role="status" data-testid="status-carregando-areas">
                 <i /><i /><i /> Atualizando áreas…
@@ -1143,7 +1207,36 @@ export default function AreasRiscoMapa({
                       >
                         Carregar contorno para editar
                       </button>
-                      <span>Salve cada área revisada para avançar ao próximo contorno. Você também pode tocar em uma área tracejada no mapa.</span>
+                      <span>Você também pode tocar em um contorno tracejado no mapa para editar seus dados e vértices.</span>
+                      <details className="arm-kmz-batch" open>
+                        <summary>Revisar tipos e salvar as {quantidadeImportadaPendente} áreas restantes</summary>
+                        <p>Escolha o tipo de risco para cada contorno. Os atributos originais do KMZ também serão guardados.</p>
+                        <div className="arm-kmz-batch-rows">
+                          {poligonosImportados.map((poligono, indice) => (
+                            <label className="arm-kmz-batch-row" key={`${indice}-${poligono.nome}`}>
+                              <span>{poligonosImportadosConcluidos.has(indice) ? '✓ ' : ''}{indice + 1}. {poligono.nome}</span>
+                              <select
+                                value={tiposImportados[indice] ?? tipoBaseImportacao ?? 'Encostas'}
+                                onChange={event => alterarTipoImportado(indice, event.target.value as TipoAreaRisco)}
+                                aria-label={`Tipo de risco para ${poligono.nome}`}
+                                data-testid={`select-tipo-poligono-importado-${indice}`}
+                                disabled={poligonosImportadosConcluidos.has(indice)}
+                              >
+                                {TIPOS.map(tipo => <option key={tipo} value={tipo}>{tipo}</option>)}
+                              </select>
+                            </label>
+                          ))}
+                        </div>
+                        <button
+                          type="button"
+                          className="arm-kmz-save-all"
+                          onClick={() => void salvarTodosImportados()}
+                          disabled={salvando || processandoKmz || quantidadeImportadaPendente === 0}
+                          data-testid="button-salvar-todas-areas-kmz"
+                        >
+                          {salvando ? 'Salvando no Supabase…' : `Salvar restantes no Supabase (${quantidadeImportadaPendente})`}
+                        </button>
+                      </details>
                     </div>
                   )}
                   {mensagemKmz && <span className="arm-kmz-status" role="status" data-testid="status-area-kmz">{mensagemKmz}</span>}
@@ -1153,17 +1246,7 @@ export default function AreasRiscoMapa({
                     <span>Tipo de registro</span>
                     <select
                       value={rascunho.tipo}
-                      onChange={event => {
-                        const tipo = event.target.value as TipoAreaRisco
-                        atualizarRascunho({
-                          tipo,
-                          limite_precipitacao_mm: tipo === 'Interdições'
-                            ? '0'
-                            : rascunho.tipo === 'Interdições'
-                              ? '30'
-                              : rascunho.limite_precipitacao_mm,
-                        })
-                      }}
+                      onChange={event => alterarTipoRascunho(event.target.value as TipoAreaRisco)}
                       data-testid="select-tipo-risco"
                     >
                       {TIPOS.map(tipo => <option key={tipo} value={tipo}>{tipo}</option>)}

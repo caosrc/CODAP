@@ -11,6 +11,7 @@ CREATE TABLE IF NOT EXISTS public.areas_risco (
   limite_precipitacao_mm NUMERIC(8, 2) NOT NULL DEFAULT 0 CHECK (limite_precipitacao_mm >= 0),
   referencia TEXT,
   observacao TEXT,
+  atributos_kmz JSONB NOT NULL DEFAULT '[]'::jsonb CHECK (jsonb_typeof(atributos_kmz) = 'array'),
   criado_por TEXT NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -18,7 +19,8 @@ CREATE TABLE IF NOT EXISTS public.areas_risco (
 );
 
 ALTER TABLE public.areas_risco
-  ADD COLUMN IF NOT EXISTS ocorrencia_id BIGINT;
+  ADD COLUMN IF NOT EXISTS ocorrencia_id BIGINT,
+  ADD COLUMN IF NOT EXISTS atributos_kmz JSONB NOT NULL DEFAULT '[]'::jsonb;
 
 DO $$
 BEGIN

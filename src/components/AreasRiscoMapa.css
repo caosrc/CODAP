@@ -740,6 +740,44 @@
 .arm-kmz-actions button:focus-visible,
 .arm-kmz-import-selection > button:focus-visible { outline: 2px solid #8ce2ff; outline-offset: 2px; }
 
+.arm-kmz-batch {
+  display: grid;
+  gap: 6px;
+  padding-top: 7px;
+  border-top: 1px solid rgba(127, 176, 206, .18);
+}
+.arm-kmz-batch summary { color: #d8edf8; font-size: 10px; font-weight: 800; cursor: pointer; }
+.arm-kmz-batch p { margin: 0; color: #a8c8da; font-size: 9px; line-height: 1.4; }
+.arm-kmz-batch-rows { display: grid; max-height: 210px; gap: 5px; overflow: auto; padding-right: 3px; }
+.arm-kmz-batch-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(105px, .9fr); align-items: center; gap: 6px; }
+.arm-kmz-batch-row > span { overflow: hidden; color: #c8dce8; font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
+.arm-kmz-batch-row select {
+  min-width: 0;
+  min-height: 30px;
+  padding: 4px 6px;
+  border: 1px solid #3a6b86;
+  border-radius: 5px;
+  color: #eaf5fc;
+  background: #102f4b;
+  font: inherit;
+  font-size: 9px;
+}
+.arm-kmz-save-all {
+  min-height: 36px;
+  padding: 7px 9px;
+  border: 1px solid #29986c;
+  border-radius: 5px;
+  color: #effff7;
+  background: #16734f;
+  font: inherit;
+  font-size: 10px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.arm-kmz-save-all:hover { background: #1b8c60; }
+.arm-kmz-save-all:disabled { cursor: not-allowed; opacity: .55; }
+.arm-kmz-save-all:focus-visible { outline: 2px solid #8ce2ff; outline-offset: 2px; }
+
 .arm-field { display: grid; gap: 4px; margin-bottom: 9px; }
 .arm-field > span { color: #bcd3e1; font-size: 10px; font-weight: 750; }
 .arm-field small { color: #789db5; font-size: 9px; font-weight: 500; }

@@ -125,6 +125,14 @@ function normalizarAreaRisco(valor: Record<string, unknown>): AreaRisco | null {
   const longitude = Number(valor.longitude)
   const limite = Number(valor.limite_precipitacao_mm)
   const poligono = normalizarGeometriaAreaRisco(valor.poligono ?? [])
+  const atributosKmz = Array.isArray(valor.atributos_kmz)
+    ? valor.atributos_kmz.flatMap(item => {
+      if (!item || typeof item !== 'object') return []
+      const atributo = item as Record<string, unknown>
+      if (typeof atributo.campo !== 'string' || typeof atributo.valor !== 'string') return []
+      return [{ campo: atributo.campo, valor: atributo.valor }]
+    })
+    : []
   if (
     !String(valor.id || '') ||
     !Number.isFinite(latitude) || !Number.isFinite(longitude) ||
@@ -141,6 +149,7 @@ function normalizarAreaRisco(valor: Record<string, unknown>): AreaRisco | null {
     limite_precipitacao_mm: limite,
     referencia: valor.referencia == null ? null : String(valor.referencia),
     observacao: valor.observacao == null ? null : String(valor.observacao),
+    atributos_kmz: atributosKmz,
     criado_por: String(valor.criado_por || ''),
     created_at: String(valor.created_at || ''),
     ocorrencia_id: valor.ocorrencia_id == null || !Number.isFinite(Number(valor.ocorrencia_id))
@@ -167,6 +176,9 @@ function mensagemErroAreaRisco(erro: unknown, fallback: string): string {
     return 'A tabela de áreas de risco não existe no Supabase. Aplique primeiro supabase/migrations/add_areas_risco.sql e depois supabase/migrations/add_interdicoes.sql.'
   }
   if (codigo === 'PGRST204' || /column .*areas_risco|areas_risco.*column/i.test(mensagem)) {
+    if (/atributos_kmz/i.test(mensagem)) {
+      return 'O Supabase precisa da coluna para guardar os dados do KMZ. Aplique supabase/migrations/add_areas_risco_kmz_atributos.sql.'
+    }
     return 'A tabela de áreas de risco está desatualizada no Supabase. Aplique supabase/migrations/add_interdicoes.sql.'
   }
   if (codigo === '42501' || /row-level security|permission denied/i.test(mensagem)) {
@@ -589,6 +601,34 @@ function RadarMapaTempoReal({ tv, dataOcorrencias }: { tv: boolean; dataOcorrenc
       setAreasRisco(prev => [area, ...prev.filter(item => item.id !== area.id)])
     } catch (error) {
       const mensagem = mensagemErroAreaRisco(error, 'Não foi possível salvar a área.')
+      setAreasRiscoErro(mensagem)
+      throw new Error(mensagem)
+    } finally {
+      setAreasRiscoSalvando(false)
+    }
+  }, [agenteLogado])
+
+  const salvarAreasRiscoEmLote = useCallback(async (entradas: AreaRiscoInput[]) => {
+    if (!supabaseDisponivel) throw new Error('Supabase indisponível; as áreas não foram salvas.')
+    if (!agenteLogado) throw new Error('Entre com o agente responsável antes de cadastrar áreas.')
+    if (!entradas.length) return
+    setAreasRiscoSalvando(true)
+    setAreasRiscoErro(null)
+    try {
+      const { data, error } = await supabase
+        .from('areas_risco')
+        .insert(entradas.map(entrada => ({ ...entrada, criado_por: agenteLogado })))
+        .select('*')
+      if (error) throw error
+      const novasAreas = (Array.isArray(data) ? data : [])
+        .map((registro: Record<string, unknown>) => normalizarAreaRisco(registro))
+        .filter((area: AreaRisco | null): area is AreaRisco => area !== null)
+      if (novasAreas.length !== entradas.length) {
+        throw new Error('O Supabase não confirmou todas as áreas importadas.')
+      }
+      setAreasRisco(prev => [...novasAreas, ...prev.filter(area => !novasAreas.some(nova => nova.id === area.id))])
+    } catch (error) {
+      const mensagem = mensagemErroAreaRisco(error, 'Não foi possível salvar as áreas importadas.')
       setAreasRiscoErro(mensagem)
       throw new Error(mensagem)
     } finally {
@@ -1084,6 +1124,7 @@ function RadarMapaTempoReal({ tv, dataOcorrencias }: { tv: boolean; dataOcorrenc
           senhaAgente={getSenhaAgente(agenteLogado)}
           erro={[areasRiscoErro, previsaoAreasRiscoErro].filter(Boolean).join(' ') || null}
           onSalvar={salvarAreaRisco}
+          onSalvarLote={salvarAreasRiscoEmLote}
           onEditar={editarAreaRisco}
           onExcluir={excluirAreaRisco}
           onAbrirOcorrencia={id => disparar('dc:abrir-ocorrencia', { id })}

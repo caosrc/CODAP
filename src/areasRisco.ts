@@ -14,6 +14,7 @@ export type CoordenadaAreaRisco = [number, number]
 export type AnelAreaRisco = CoordenadaAreaRisco[]
 export type PoligonoAreaRisco = AnelAreaRisco[]
 export type GeometriaAreaRisco = PoligonoAreaRisco[]
+export type AtributoKmz = { campo: string; valor: string }
 
 export interface AreaRisco {
   id: string
@@ -25,6 +26,7 @@ export interface AreaRisco {
   limite_precipitacao_mm: number
   referencia: string | null
   observacao: string | null
+  atributos_kmz: AtributoKmz[]
   criado_por: string
   created_at: string
   ocorrencia_id?: number | null

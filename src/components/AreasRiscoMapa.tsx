@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useMemo, useRef, useState, type ChangeEvent, type CSSProperties, type FormEvent } from 'react'
 import { createPortal } from 'react-dom'
-import { Marker, Polygon, Popup, Tooltip, useMapEvents } from 'react-leaflet'
+import { Marker, Polygon, Popup, Tooltip, useMap, useMapEvents } from 'react-leaflet'
 import L from 'leaflet'
 import ModalSenha from './ModalSenha'
 import './AreasRiscoMapa.css'
@@ -77,6 +77,48 @@ function novaArea(tipo: TipoAreaRisco = 'Encostas'): DraftArea {
   }
 }
 
+function criarRascunhoImportado(poligono: PoligonoKmzImportado, tipoFallback: TipoAreaRisco): DraftArea {
+  const tipo = poligono.tipo ?? tipoFallback
+  const base = novaArea(tipo)
+  return {
+    ...base,
+    latitude: poligono.latitude,
+    longitude: poligono.longitude,
+    poligono: poligono.poligono,
+    data_inicio: poligono.data_inicio ?? base.data_inicio,
+    limite_precipitacao_mm: tipo === 'Interdições'
+      ? '0'
+      : poligono.limite_precipitacao_mm != null
+        ? String(poligono.limite_precipitacao_mm)
+        : base.limite_precipitacao_mm,
+    referencia: poligono.referencia ?? poligono.nome,
+    observacao: poligono.observacao ?? '',
+  }
+}
+
+function EnquadrarPoligonosImportados({
+  poligonos,
+  versao,
+}: {
+  poligonos: PoligonoKmzImportado[]
+  versao: number
+}) {
+  const mapa = useMap()
+  useEffect(() => {
+    if (!poligonos.length || versao === 0) return
+    const limites = L.latLngBounds([])
+    for (const importado of poligonos) {
+      for (const ponto of importado.poligono) limites.extend(ponto)
+    }
+    if (!limites.isValid()) return
+    const frame = window.requestAnimationFrame(() => {
+      mapa.fitBounds(limites, { padding: [48, 48], maxZoom: 16, animate: false })
+    })
+    return () => window.cancelAnimationFrame(frame)
+  }, [mapa, poligonos, versao])
+  return null
+}
+
 function iconeArea(tipo: TipoAreaRisco, alerta = false) {
   const cor = CORES[tipo]
   const html = `<span class="arm-marker${alerta ? ' arm-marker-alerta' : ''}" style="--arm-type-color:${cor}" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${ICONES[tipo]}</svg></span>`
@@ -145,7 +187,11 @@ export default function AreasRiscoMapa({
   const [portao, setPortao] = useState<GateAction | null>(null)
   const [localErro, setLocalErro] = useState('')
   const [poligonosImportados, setPoligonosImportados] = useState<PoligonoKmzImportado[]>([])
+  const [poligonosImportadosConcluidos, setPoligonosImportadosConcluidos] = useState<Set<number>>(() => new Set())
   const [poligonoImportadoSelecionado, setPoligonoImportadoSelecionado] = useState(0)
+  const [indiceImportacaoNoRascunho, setIndiceImportacaoNoRascunho] = useState<number | null>(null)
+  const [tipoBaseImportacao, setTipoBaseImportacao] = useState<TipoAreaRisco | null>(null)
+  const [versaoImportacao, setVersaoImportacao] = useState(0)
   const [processandoKmz, setProcessandoKmz] = useState(false)
   const [mensagemKmz, setMensagemKmz] = useState('')
   const arquivoKmzRef = useRef<HTMLInputElement>(null)
@@ -238,6 +284,7 @@ export default function AreasRiscoMapa({
     scrollAntesDoFormularioRef.current = painelRef.current?.scrollTop ?? 0
     setRascunho(novaArea(filtro === 'Todas' ? 'Encostas' : filtro))
     setEditandoId(null)
+    setIndiceImportacaoNoRascunho(null)
     setModoMapa('marcador')
     setLocalErro('')
     setRecolhido(false)
@@ -253,6 +300,7 @@ export default function AreasRiscoMapa({
       return
     }
     setLocalErro('')
+    setIndiceImportacaoNoRascunho(null)
     setPortao({ tipo: 'editar', area })
   }
 
@@ -285,6 +333,7 @@ export default function AreasRiscoMapa({
         observacao: area.observacao ?? '',
       })
       setEditandoId(area.id)
+      setIndiceImportacaoNoRascunho(null)
       setModoMapa(null)
       setLocalErro('')
       setRecolhido(false)
@@ -297,6 +346,7 @@ export default function AreasRiscoMapa({
   function fecharFormulario() {
     setRascunho(null)
     setEditandoId(null)
+    setIndiceImportacaoNoRascunho(null)
     setModoMapa(null)
   }
 
@@ -320,13 +370,21 @@ export default function AreasRiscoMapa({
 
     setProcessandoKmz(true)
     setLocalErro('')
-    setMensagemKmz('')
-    setPoligonosImportados([])
+    setMensagemKmz('Preparando a leitura do arquivo…')
     try {
-      const poligonos = await importarPoligonosKmz(arquivo)
+      const poligonos = await importarPoligonosKmz(arquivo, setMensagemKmz)
+      const tipoBase = rascunho?.tipo ?? 'Encostas'
       setPoligonosImportados(poligonos)
+      setPoligonosImportadosConcluidos(new Set())
       setPoligonoImportadoSelecionado(0)
-      setMensagemKmz(`${poligonos.length} polígono(s) encontrado(s). Escolha um contorno e carregue-o no cadastro.`)
+      setIndiceImportacaoNoRascunho(0)
+      setTipoBaseImportacao(tipoBase)
+      setVersaoImportacao(versao => versao + 1)
+      setRascunho(criarRascunhoImportado(poligonos[0], tipoBase))
+      setEditandoId(null)
+      setModoMapa(null)
+      setRecolhido(false)
+      setMensagemKmz(`${poligonos.length} polígono(s) encontrado(s). Os contornos foram exibidos no mapa; revise os dados e salve cada área.`)
     } catch (e) {
       setMensagemKmz(e instanceof Error ? e.message : 'Não foi possível ler o arquivo KMZ/KML.')
     } finally {
@@ -334,28 +392,17 @@ export default function AreasRiscoMapa({
     }
   }
 
-  function carregarPoligonoImportado() {
-    const poligonoImportado = poligonosImportados[poligonoImportadoSelecionado]
-    if (!rascunho || !poligonoImportado) return
-
-    const tipo = poligonoImportado.tipo ?? rascunho.tipo
-    atualizarRascunho({
-      tipo,
-      latitude: poligonoImportado.latitude,
-      longitude: poligonoImportado.longitude,
-      poligono: poligonoImportado.poligono,
-      data_inicio: poligonoImportado.data_inicio ?? rascunho.data_inicio,
-      limite_precipitacao_mm: tipo === 'Interdições'
-        ? '0'
-        : poligonoImportado.limite_precipitacao_mm != null
-          ? String(poligonoImportado.limite_precipitacao_mm)
-          : rascunho.limite_precipitacao_mm,
-      referencia: rascunho.referencia.trim() ? rascunho.referencia : poligonoImportado.referencia ?? rascunho.referencia,
-      observacao: rascunho.observacao.trim() ? rascunho.observacao : poligonoImportado.observacao ?? rascunho.observacao,
-    })
+  function carregarPoligonoImportado(indice = poligonoImportadoSelecionado) {
+    const poligonoImportado = poligonosImportados[indice]
+    if (!poligonoImportado || poligonosImportadosConcluidos.has(indice)) return
+    setPoligonoImportadoSelecionado(indice)
+    setIndiceImportacaoNoRascunho(indice)
+    setRascunho(criarRascunhoImportado(poligonoImportado, tipoBaseImportacao ?? rascunho?.tipo ?? 'Encostas'))
+    setEditandoId(null)
     setModoMapa(null)
     setLocalErro('')
-    setMensagemKmz(`Contorno “${poligonoImportado.nome}” carregado. Revise o cadastro e toque em “Registrar área” para salvar.`)
+    setRecolhido(false)
+    setMensagemKmz(`Contorno “${poligonoImportado.nome}” carregado no formulário. Revise os dados e salve a área.`)
   }
 
   async function exportarKmz() {
@@ -405,10 +452,37 @@ export default function AreasRiscoMapa({
       setLocalErro('')
       if (editandoId) await onEditar(editandoId, input)
       else await onSalvar(input)
-      setRascunho(null)
-      setEditandoId(null)
-      setModoMapa(null)
-      if (window.matchMedia('(max-width: 700px)').matches) setRecolhido(true)
+      if (indiceImportacaoNoRascunho != null) {
+        const concluidos = new Set(poligonosImportadosConcluidos)
+        concluidos.add(indiceImportacaoNoRascunho)
+        setPoligonosImportadosConcluidos(concluidos)
+        const proximoIndice = poligonosImportados.findIndex((_, indice) => !concluidos.has(indice))
+        if (proximoIndice >= 0) {
+          setPoligonoImportadoSelecionado(proximoIndice)
+          setIndiceImportacaoNoRascunho(proximoIndice)
+          setRascunho(criarRascunhoImportado(poligonosImportados[proximoIndice], tipoBaseImportacao ?? rascunho.tipo))
+          setEditandoId(null)
+          setModoMapa(null)
+          setMensagemKmz(`Área registrada. O próximo contorno, “${poligonosImportados[proximoIndice].nome}”, foi carregado para revisão.`)
+        } else {
+          const totalImportado = poligonosImportados.length
+          setPoligonosImportados([])
+          setPoligonosImportadosConcluidos(new Set())
+          setPoligonoImportadoSelecionado(0)
+          setIndiceImportacaoNoRascunho(null)
+          setTipoBaseImportacao(null)
+          setRascunho(null)
+          setEditandoId(null)
+          setModoMapa(null)
+          setMensagemKmz(`${totalImportado} área(s) da importação foram cadastradas.`)
+          if (window.matchMedia('(max-width: 700px)').matches) setRecolhido(true)
+        }
+      } else {
+        setRascunho(null)
+        setEditandoId(null)
+        setModoMapa(null)
+        if (window.matchMedia('(max-width: 700px)').matches) setRecolhido(true)
+      }
     } catch (e) {
       setLocalErro(e instanceof Error ? e.message : 'Não foi possível salvar a área.')
     }
@@ -422,6 +496,7 @@ export default function AreasRiscoMapa({
 
   return (
     <>
+      <EnquadrarPoligonosImportados poligonos={poligonosImportados} versao={versaoImportacao} />
       <InteracaoMapa
         modo={modoMapa}
         aoMarcar={(latitude, longitude) => {
@@ -433,6 +508,25 @@ export default function AreasRiscoMapa({
           poligono: [...(rascunho?.poligono ?? []), ponto],
         })}
       />
+      {poligonosImportados.map((importado, indice) => (
+        !poligonosImportadosConcluidos.has(indice) && (
+          <Polygon
+            key={`imported-draft-${versaoImportacao}-${indice}`}
+            positions={importado.poligono}
+            pathOptions={{
+              color: indice === indiceImportacaoNoRascunho ? '#fbbf24' : '#67d8f2',
+              weight: indice === indiceImportacaoNoRascunho ? 3 : 2,
+              fillColor: indice === indiceImportacaoNoRascunho ? '#fbbf24' : '#67d8f2',
+              fillOpacity: indice === indiceImportacaoNoRascunho ? 0.12 : 0.06,
+              dashArray: '6 5',
+              bubblingMouseEvents: false,
+            }}
+            eventHandlers={{ click: () => carregarPoligonoImportado(indice) }}
+          >
+            <Tooltip sticky>{importado.nome} · importado, ainda não salvo</Tooltip>
+          </Polygon>
+        )
+      ))}
       {areasNoMapa.map(area => {
         const previsto = previsaoPorArea[area.id]
         const emAlerta = area.tipo !== 'Interdições' && previsto != null && Number.isFinite(previsto) && previsto > area.limite_precipitacao_mm
@@ -790,7 +884,7 @@ export default function AreasRiscoMapa({
                     disabled={processandoKmz || salvando}
                     data-testid="input-importar-area-kmz"
                   />
-                  <span className="arm-kmz-copy">Importe um contorno para o cadastro ou exporte as áreas com polígono.</span>
+                  <span className="arm-kmz-copy">Importe contornos e confira os dados no mapa antes de cadastrar. Nenhum rascunho é salvo automaticamente.</span>
                   <div className="arm-kmz-actions">
                     <button
                       type="button"
@@ -812,7 +906,7 @@ export default function AreasRiscoMapa({
                   {poligonosImportados.length > 0 && (
                     <div className="arm-kmz-import-selection">
                       <label className="arm-field">
-                        <span>Contorno para carregar no formulário</span>
+                        <span>Contorno para editar · {poligonosImportadosConcluidos.size}/{poligonosImportados.length} cadastrados</span>
                         <select
                           value={poligonoImportadoSelecionado}
                           onChange={event => setPoligonoImportadoSelecionado(Number(event.target.value))}
@@ -820,15 +914,21 @@ export default function AreasRiscoMapa({
                         >
                           {poligonosImportados.map((poligono, indice) => (
                             <option key={`${indice}-${poligono.nome}`} value={indice}>
+                              {poligonosImportadosConcluidos.has(indice) ? '✓ ' : ''}
                               {indice + 1}. {poligono.nome} · {poligono.poligono.length} vértices
                             </option>
                           ))}
                         </select>
                       </label>
-                      <button type="button" onClick={carregarPoligonoImportado} data-testid="button-carregar-poligono-kmz">
-                        Usar contorno no cadastro
+                      <button
+                        type="button"
+                        onClick={() => carregarPoligonoImportado()}
+                        disabled={poligonosImportadosConcluidos.has(poligonoImportadoSelecionado)}
+                        data-testid="button-carregar-poligono-kmz"
+                      >
+                        Carregar contorno para editar
                       </button>
-                      <span>O polígono só é salvo quando você confirmar o cadastro.</span>
+                      <span>Salve cada área revisada para avançar ao próximo contorno. Você também pode tocar em uma área tracejada no mapa.</span>
                     </div>
                   )}
                   {mensagemKmz && <span className="arm-kmz-status" role="status" data-testid="status-area-kmz">{mensagemKmz}</span>}

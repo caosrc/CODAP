@@ -301,11 +301,14 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 5px;
+  flex-wrap: wrap;
   padding: 6px 10px 4px;
   border-top: 1px solid rgba(127, 176, 206, .16);
 }
 
 .arm-toolbar > span {
+  flex: 1 1 auto;
   color: #83a9c1;
   font-size: 8px;
   font-weight: 800;
@@ -335,6 +338,51 @@
 .arm-toolbar button > span { font-size: 16px; line-height: 10px; }
 .arm-toolbar button:disabled { cursor: not-allowed; opacity: .48; }
 .arm-toolbar > button { min-height: 27px; padding: 4px 7px; }
+
+.arm-kmz-map-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  clip-path: inset(50%);
+}
+
+.arm-kmz-map-status {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-wrap: wrap;
+  padding: 3px 10px 7px;
+  color: #c1d9e8;
+  font-size: 9px;
+  line-height: 1.4;
+}
+
+.arm-kmz-map-status > span:first-child {
+  min-width: 0;
+  flex: 1 1 100%;
+  overflow-wrap: anywhere;
+}
+
+.arm-kmz-map-status > span[role="alert"] { color: #ffb7a9; }
+.arm-kmz-map-status > span[role="status"] { color: #a9e7c6; }
+
+.arm-kmz-map-status > button {
+  min-height: 24px;
+  padding: 3px 7px;
+  border: 1px solid #477590;
+  border-radius: 5px;
+  color: #d7f0fb;
+  background: #123d5a;
+  font: inherit;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.arm-kmz-map-status > button:hover { border-color: #65c9eb; background: #1b536f; }
+.arm-kmz-map-status > button:focus-visible { outline: 2px solid #8ce2ff; outline-offset: 2px; }
 
 .arm-map-layer-heading {
   display: flex;

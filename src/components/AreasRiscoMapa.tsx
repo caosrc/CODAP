@@ -195,6 +195,14 @@ export default function AreasRiscoMapa({
   const [processandoKmz, setProcessandoKmz] = useState(false)
   const [mensagemKmz, setMensagemKmz] = useState('')
   const arquivoKmzRef = useRef<HTMLInputElement>(null)
+  const [poligonosDaCamadaKmz, setPoligonosDaCamadaKmz] = useState<PoligonoKmzImportado[]>([])
+  const [nomeArquivoCamadaKmz, setNomeArquivoCamadaKmz] = useState('')
+  const [camadaKmzVisivel, setCamadaKmzVisivel] = useState(true)
+  const [processandoCamadaKmz, setProcessandoCamadaKmz] = useState(false)
+  const [mensagemCamadaKmz, setMensagemCamadaKmz] = useState('')
+  const [erroCamadaKmz, setErroCamadaKmz] = useState(false)
+  const [versaoCamadaKmz, setVersaoCamadaKmz] = useState(0)
+  const arquivoCamadaKmzRef = useRef<HTMLInputElement>(null)
   const [recolhido, setRecolhido] = useState(() => {
     const celular = typeof window !== 'undefined' && window.matchMedia('(max-width: 700px)').matches
     return !modoTv && !celular
@@ -392,6 +400,38 @@ export default function AreasRiscoMapa({
     }
   }
 
+  async function importarCamadaKmz(event: ChangeEvent<HTMLInputElement>) {
+    const arquivo = event.currentTarget.files?.[0]
+    event.currentTarget.value = ''
+    if (!arquivo) return
+
+    setProcessandoCamadaKmz(true)
+    setErroCamadaKmz(false)
+    setMensagemCamadaKmz('Preparando a leitura do arquivo…')
+    try {
+      const poligonos = await importarPoligonosKmz(arquivo, setMensagemCamadaKmz)
+      setPoligonosDaCamadaKmz(poligonos)
+      setNomeArquivoCamadaKmz(arquivo.name)
+      setCamadaKmzVisivel(true)
+      setVersaoCamadaKmz(versao => versao + 1)
+      setErroCamadaKmz(false)
+      setMensagemCamadaKmz(`${poligonos.length} contorno(s) exibido(s) no mapa. Esta camada é temporária e não altera os cadastros.`)
+    } catch (e) {
+      setErroCamadaKmz(true)
+      setMensagemCamadaKmz(e instanceof Error ? e.message : 'Não foi possível ler o arquivo KMZ/KML.')
+    } finally {
+      setProcessandoCamadaKmz(false)
+    }
+  }
+
+  function removerCamadaKmz() {
+    setPoligonosDaCamadaKmz([])
+    setNomeArquivoCamadaKmz('')
+    setCamadaKmzVisivel(true)
+    setMensagemCamadaKmz('')
+    setErroCamadaKmz(false)
+  }
+
   function carregarPoligonoImportado(indice = poligonoImportadoSelecionado) {
     const poligonoImportado = poligonosImportados[indice]
     if (!poligonoImportado || poligonosImportadosConcluidos.has(indice)) return
@@ -497,6 +537,7 @@ export default function AreasRiscoMapa({
   return (
     <>
       <EnquadrarPoligonosImportados poligonos={poligonosImportados} versao={versaoImportacao} />
+      <EnquadrarPoligonosImportados poligonos={poligonosDaCamadaKmz} versao={versaoCamadaKmz} />
       <InteracaoMapa
         modo={modoMapa}
         aoMarcar={(latitude, longitude) => {
@@ -508,6 +549,27 @@ export default function AreasRiscoMapa({
           poligono: [...(rascunho?.poligono ?? []), ponto],
         })}
       />
+      {camadaKmzVisivel && poligonosDaCamadaKmz.length > 0 && (
+        <Pane name="radarKmzOverlay" style={{ zIndex: 405 }}>
+          {poligonosDaCamadaKmz.map((importado, indice) => (
+            <Polygon
+              key={`kmz-map-layer-${versaoCamadaKmz}-${indice}`}
+              positions={importado.poligono}
+              pathOptions={{
+                color: '#d39bff',
+                weight: 2,
+                fillColor: '#ad63f5',
+                fillOpacity: 0.17,
+                bubblingMouseEvents: false,
+              }}
+            >
+              <Tooltip sticky>
+                {importado.nome} · camada KMZ temporária · {importado.poligono.length} vértices
+              </Tooltip>
+            </Polygon>
+          ))}
+        </Pane>
+      )}
       {poligonosImportados.map((importado, indice) => (
         !poligonosImportadosConcluidos.has(indice) && (
           <Polygon
@@ -726,10 +788,54 @@ export default function AreasRiscoMapa({
             )}
             <div className="arm-toolbar">
                 <span>ÁREAS DE RISCO</span>
+              <input
+                ref={arquivoCamadaKmzRef}
+                className="arm-kmz-map-input"
+                type="file"
+                accept=".kmz,.kml,application/vnd.google-earth.kmz,application/vnd.google-earth.kml+xml"
+                aria-label="Arquivo KMZ ou KML para exibir no mapa"
+                onChange={event => void importarCamadaKmz(event)}
+                disabled={processandoCamadaKmz}
+                data-testid="input-importar-kmz-no-mapa"
+              />
+              <button
+                type="button"
+                onClick={() => arquivoCamadaKmzRef.current?.click()}
+                disabled={processandoCamadaKmz}
+                data-testid="button-importar-kmz-no-mapa"
+              >
+                {processandoCamadaKmz ? 'Lendo KMZ…' : 'Importar KMZ'}
+              </button>
               <button type="button" onClick={iniciarCadastro} data-testid="button-nova-area" disabled={Boolean(rascunho)}>
                 <span aria-hidden="true">+</span> {filtro === 'Interdições' ? 'Nova interdição' : 'Nova área'}
               </button>
             </div>
+            {(nomeArquivoCamadaKmz || mensagemCamadaKmz) && (
+              <div className="arm-kmz-map-status" data-testid="status-kmz-no-mapa">
+                {nomeArquivoCamadaKmz && poligonosDaCamadaKmz.length > 0 && (
+                  <>
+                    <span>
+                      <strong>{camadaKmzVisivel ? 'Visível' : 'Oculta'}</strong>
+                      {' · '}{poligonosDaCamadaKmz.length} contorno(s) · {nomeArquivoCamadaKmz}
+                    </span>
+                    <button
+                      type="button"
+                      aria-pressed={camadaKmzVisivel}
+                      onClick={() => setCamadaKmzVisivel(visivel => !visivel)}
+                      data-testid="toggle-camada-kmz-no-mapa"
+                    >
+                      {camadaKmzVisivel ? 'Ocultar' : 'Mostrar'}
+                    </button>
+                    <button type="button" onClick={removerCamadaKmz} data-testid="button-remover-kmz-do-mapa">
+                      Remover
+                    </button>
+                  </>
+                )}
+                <span role={erroCamadaKmz ? 'alert' : 'status'}>
+                  {mensagemCamadaKmz}
+                </span>
+              </div>
+            )}
             {carregando ? (
               <div className="arm-loading" role="status" data-testid="status-carregando-areas">
                 <i /><i /><i /> Atualizando áreas…

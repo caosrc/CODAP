@@ -412,35 +412,7 @@ export default function AreasRiscoMapa({
   const areasVisiveis = filtro === 'Todas' ? areas : areas.filter(area => area.tipo === filtro)
   const areasNoMapa = areas.filter(area => tiposVisiveisNoMapa.has(area.tipo))
   const todosTiposVisiveisNoMapa = tiposVisiveisNoMapa.size === TIPOS.length
-  const areasParaExportar: AreaRiscoInput[] = areas
-    .filter(area =>
-      areaRiscoTemPoligono(area.poligono)
-      && editandoId !== area.id,
-    )
-    .map(({ tipo, latitude, longitude, poligono, data_inicio, limite_precipitacao_mm, referencia, observacao, atributos_kmz }) => ({
-      tipo,
-      latitude,
-      longitude,
-      poligono,
-      data_inicio,
-      limite_precipitacao_mm,
-      referencia,
-      observacao,
-      atributos_kmz,
-    }))
-  if (rascunho && areaRiscoTemPoligono(rascunho.poligono) && rascunho.latitude != null && rascunho.longitude != null) {
-    areasParaExportar.push({
-      tipo: rascunho.tipo,
-      latitude: rascunho.latitude,
-      longitude: rascunho.longitude,
-      poligono: rascunho.poligono,
-      data_inicio: rascunho.data_inicio,
-      limite_precipitacao_mm: rascunho.tipo === 'Interdições' ? 0 : Number(rascunho.limite_precipitacao_mm) || 0,
-      referencia: rascunho.referencia || null,
-      observacao: rascunho.observacao || null,
-      atributos_kmz: rascunho.atributos_kmz,
-    })
-  }
+  const areasParaExportar = areas
 
   function alternarTipoNoMapa(tipo: TipoAreaRisco) {
     setTiposVisiveisNoMapa(atuais => {
@@ -616,7 +588,7 @@ export default function AreasRiscoMapa({
       link.download = `areas_risco_lafaiete_${dataHoje()}.kmz`
       link.click()
       window.setTimeout(() => URL.revokeObjectURL(url), 1000)
-      setMensagemKmz(`${quantidade} polígono(s) exportado(s) em KMZ.`)
+      setMensagemKmz(`${quantidade} área(s) salva(s) exportada(s) em KMZ com seus dados.`)
     } catch (e) {
       setMensagemKmz(e instanceof Error ? e.message : 'Não foi possível gerar o KMZ.')
     } finally {
@@ -963,10 +935,23 @@ export default function AreasRiscoMapa({
               >
                 {processandoKmz ? 'Lendo KMZ…' : 'Importar para cadastro'}
               </button>
+              <button
+                type="button"
+                onClick={() => void exportarKmz()}
+                disabled={processandoKmz || salvando || areasParaExportar.length === 0}
+                data-testid="button-exportar-area-kmz"
+              >
+                {processandoKmz ? 'Gerando KMZ…' : `Exportar KMZ (${areasParaExportar.length})`}
+              </button>
               <button type="button" onClick={iniciarCadastro} data-testid="button-nova-area" disabled={Boolean(rascunho)}>
                 <span aria-hidden="true">+</span> {filtro === 'Interdições' ? 'Nova interdição' : 'Nova área'}
               </button>
             </div>
+            {mensagemKmz && (
+              <div className="arm-kmz-status" role="status" data-testid="status-area-kmz">
+                {mensagemKmz}
+              </div>
+            )}
             {carregando ? (
               <div className="arm-loading" role="status" data-testid="status-carregando-areas">
                 <i /><i /><i /> Atualizando áreas…
@@ -1131,14 +1116,6 @@ export default function AreasRiscoMapa({
                     >
                       {processandoKmz ? 'Lendo…' : 'Importar KMZ/KML'}
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => void exportarKmz()}
-                      disabled={processandoKmz || salvando || areasParaExportar.length === 0}
-                      data-testid="button-exportar-area-kmz"
-                    >
-                      Exportar KMZ ({areasParaExportar.length})
-                    </button>
                   </div>
                   {poligonosImportados.length > 0 && (
                     <div className="arm-kmz-import-selection">
@@ -1168,7 +1145,6 @@ export default function AreasRiscoMapa({
                       <span>Você também pode tocar em um contorno tracejado no mapa para editar seus dados e vértices.</span>
                     </div>
                   )}
-                  {mensagemKmz && <span className="arm-kmz-status" role="status" data-testid="status-area-kmz">{mensagemKmz}</span>}
                 </div>
                 <form onSubmit={salvar}>
                   <label className="arm-field">

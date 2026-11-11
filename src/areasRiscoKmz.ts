@@ -1,8 +1,7 @@
 import {
-  areaRiscoTemPoligono,
   ESTILO_AREA_RISCO,
   type AnelAreaRisco,
-  type AreaRiscoInput,
+  type AreaRisco,
   type GeometriaAreaRisco,
   type TipoAreaRisco,
 } from './areasRisco'
@@ -104,28 +103,39 @@ function corKml(hex: string, opacidade: string) {
   return `${opacidade}${rgb.slice(4, 6)}${rgb.slice(2, 4)}${rgb.slice(0, 2)}`
 }
 
-export async function exportarPoligonosKmz(areas: AreaRiscoInput[]) {
-  const comPoligono = areas.filter(area => areaRiscoTemPoligono(area.poligono))
-  if (!comPoligono.length) {
-    throw new Error('Nenhuma área com polígono cadastrado está disponível para exportação.')
+export async function exportarPoligonosKmz(areas: AreaRisco[]) {
+  if (!areas.length) {
+    throw new Error('Nenhuma área salva está disponível para exportação.')
   }
 
-  const tipos = Array.from(new Set(comPoligono.map(area => area.tipo)))
+  const tipos = Array.from(new Set(areas.map(area => area.tipo)))
   const estiloPorTipo = new Map(tipos.map((tipo, indice) => [tipo, `tipo-${indice}`]))
   const estilos = tipos.map(tipo => {
     const cor = ESTILO_AREA_RISCO[tipo].cor
     return `<Style id="${estiloPorTipo.get(tipo)}"><LineStyle><color>${corKml(cor, 'ff')}</color><width>2</width></LineStyle><PolyStyle><color>${corKml(cor, '55')}</color><fill>1</fill><outline>1</outline></PolyStyle></Style>`
   }).join('')
 
-  const marcacoes = comPoligono.map(area => {
+  const marcacoes = areas.map(area => {
     const nome = area.referencia || area.tipo
-    const dados = [
+    const dadosDaArea: Array<[string, string | number | null | undefined]> = [
+      ['id', area.id],
       ['tipo', area.tipo],
       ['referencia', area.referencia],
       ['observacao', area.observacao],
       ['data_inicio', area.data_inicio],
       ['limite_precipitacao_mm', area.limite_precipitacao_mm],
-    ].map(([chave, valor]) => `<Data name="${chave}"><value>${escaparXml(valor)}</value></Data>`).join('')
+      ['criado_por', area.criado_por],
+      ['created_at', area.created_at],
+      ['ocorrencia_id', area.ocorrencia_id],
+    ]
+    const dados = [
+      ...dadosDaArea.map(([chave, valor]) =>
+        `<Data name="${escaparXml(chave)}"><value>${escaparXml(valor)}</value></Data>`,
+      ),
+      ...(area.atributos_kmz ?? []).map(({ campo, valor }) =>
+        `<Data name="${escaparXml(`kmz_${campo}`)}"><value>${escaparXml(valor)}</value></Data>`,
+      ),
+    ].join('')
     const geometrias = area.poligono.map(poligonoKml).join('')
     return `<Placemark><name>${escaparXml(nome)}</name><styleUrl>#${estiloPorTipo.get(area.tipo)}</styleUrl><ExtendedData>${dados}</ExtendedData><MultiGeometry>${geometrias}<Point><coordinates>${area.longitude},${area.latitude},0</coordinates></Point></MultiGeometry></Placemark>`
   }).join('')
@@ -139,5 +149,5 @@ export async function exportarPoligonosKmz(areas: AreaRiscoInput[]) {
     mimeType: 'application/vnd.google-earth.kmz',
     compression: 'DEFLATE',
   })
-  return { arquivo, quantidade: comPoligono.length }
+  return { arquivo, quantidade: areas.length }
 }

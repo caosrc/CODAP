@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useMemo, useRef, useState, type ChangeEvent, type CSSProperties, type FormEvent } from 'react'
 import { createPortal } from 'react-dom'
-import { Marker, Polygon, Popup, Tooltip, useMap, useMapEvents } from 'react-leaflet'
+import { Marker, Pane, Polygon, Popup, Tooltip, useMap, useMapEvents } from 'react-leaflet'
 import L from 'leaflet'
 import ModalSenha from './ModalSenha'
 import './AreasRiscoMapa.css'
@@ -71,7 +71,7 @@ function novaArea(tipo: TipoAreaRisco = 'Encostas'): DraftArea {
     longitude: null,
     poligono: [],
     data_inicio: dataHoje(),
-    limite_precipitacao_mm: tipo === 'Interdições' ? '0' : '',
+    limite_precipitacao_mm: tipo === 'Interdições' ? '0' : '30',
     referencia: '',
     observacao: '',
   }
@@ -1048,7 +1048,11 @@ export default function AreasRiscoMapa({
                         const tipo = event.target.value as TipoAreaRisco
                         atualizarRascunho({
                           tipo,
-                          limite_precipitacao_mm: tipo === 'Interdições' ? '0' : rascunho.limite_precipitacao_mm === '0' ? '' : rascunho.limite_precipitacao_mm,
+                          limite_precipitacao_mm: tipo === 'Interdições'
+                            ? '0'
+                            : rascunho.tipo === 'Interdições'
+                              ? '30'
+                              : rascunho.limite_precipitacao_mm,
                         })
                       }}
                       data-testid="select-tipo-risco"

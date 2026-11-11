@@ -229,6 +229,7 @@ function PopupInformacaoKmz({
   tipoSelecionado?: TipoAreaRisco
   onEditar?: () => void
 }) {
+  const mapa = useMap()
   const atributos = importado.atributos?.filter(item => item.valor.trim()) ?? []
   return (
     <Popup>
@@ -260,7 +261,18 @@ function PopupInformacaoKmz({
         </div>
         {onEditar && (
           <div className="arm-popup-actions">
-            <button type="button" onClick={onEditar}>Editar contorno e dados</button>
+            <button
+              type="button"
+              data-testid="button-editar-contorno-kmz"
+              onClick={event => {
+                event.preventDefault()
+                event.stopPropagation()
+                mapa.closePopup()
+                onEditar()
+              }}
+            >
+              Editar contorno e dados
+            </button>
           </div>
         )}
       </div>
@@ -1092,7 +1104,22 @@ export default function AreasRiscoMapa({
                 if (node) L.DomEvent.disableClickPropagation(node)
               }}>
                 <div className="arm-form-heading">
-                  <div><span className="arm-eyebrow">{editandoId ? 'ATUALIZAÇÃO DE CADASTRO' : 'NOVO REGISTRO'}</span><h3>{editandoId ? 'Editar área de risco' : rascunho.tipo === 'Interdições' ? 'Cadastrar interdição' : 'Cadastrar área'}</h3></div>
+                  <div>
+                    <span className="arm-eyebrow">
+                      {editandoId
+                        ? 'ATUALIZAÇÃO DE CADASTRO'
+                        : indiceImportacaoNoRascunho != null
+                          ? 'DADOS DO KMZ · REVISE ANTES DE SALVAR'
+                          : 'NOVO REGISTRO'}
+                    </span>
+                    <h3>
+                      {editandoId
+                        ? 'Editar área de risco'
+                        : indiceImportacaoNoRascunho != null
+                          ? 'Editar área importada'
+                          : rascunho.tipo === 'Interdições' ? 'Cadastrar interdição' : 'Cadastrar área'}
+                    </h3>
+                  </div>
                   <button type="button" aria-label="Fechar formulário" data-testid="button-fechar-formulario-area" onClick={fecharFormulario}>×</button>
                 </div>
                 <div className="arm-kmz-tools" data-testid="area-risco-kmz">
@@ -1181,7 +1208,13 @@ export default function AreasRiscoMapa({
                   <div className="arm-form-actions">
                     <button type="button" className="arm-cancel" data-testid="button-cancelar-area" disabled={salvando} onClick={fecharFormulario}>Cancelar</button>
                     <button type="submit" className="arm-submit" data-testid="button-salvar-area" disabled={salvando}>
-                      {salvando ? 'Salvando…' : editandoId ? 'Salvar alterações' : 'Registrar área'}
+                      {salvando
+                        ? 'Salvando…'
+                        : editandoId
+                          ? 'Salvar alterações'
+                          : indiceImportacaoNoRascunho != null
+                            ? 'Salvar área no Supabase'
+                            : 'Registrar área'}
                     </button>
                   </div>
                 </form>

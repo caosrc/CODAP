@@ -14,6 +14,22 @@ const MAXIMO_POLIGONOS = 500
 const MAXIMO_VERTICES = 10_000
 const MAXIMO_VERTICES_IMPORTACAO = 250_000
 
+interface PoligonoKmlCandidato {
+  limitesExternos: string[]
+  limitesInternos: string[]
+}
+
+export interface CandidatoPoligonoKmz {
+  nome: string
+  ponto: [number, number] | null
+  tipo?: TipoAreaRisco
+  data_inicio?: string
+  limite_precipitacao_mm?: number
+  referencia: string
+  observacao?: string
+  poligonos: PoligonoKmlCandidato[]
+}
+
 function descendentesComNome(parent: Document | Element, nome: string): Element[] {
   const resultado: Element[] = []
   const pilha = Array.from(parent.children).reverse()
@@ -185,14 +201,13 @@ function validarAnelInterno(anelExterno: AnelAreaRisco, anelInterno: AnelAreaRis
   }
 }
 
-function lerPoligonoKml(polygon: Element, rotulo: string): AnelAreaRisco[] {
-  const limitesExternos = descendentesComNome(polygon, 'outerBoundaryIs')
-  if (limitesExternos.length !== 1) {
+function lerPoligonoKml(polygon: PoligonoKmlCandidato, rotulo: string): AnelAreaRisco[] {
+  if (polygon.limitesExternos.length !== 1) {
     throw new Error(`${rotulo}: cada polígono precisa ter exatamente um contorno externo.`)
   }
-  const externo = lerCoordenadas(textoKml(limitesExternos[0], 'coordinates'), `${rotulo}, contorno externo`)
-  const internos = descendentesComNome(polygon, 'innerBoundaryIs').map((limite, indice) =>
-    lerCoordenadas(textoKml(limite, 'coordinates'), `${rotulo}, contorno interno ${indice + 1}`),
+  const externo = lerCoordenadas(polygon.limitesExternos[0], `${rotulo}, contorno externo`)
+  const internos = polygon.limitesInternos.map((coordenadas, indice) =>
+    lerCoordenadas(coordenadas, `${rotulo}, contorno interno ${indice + 1}`),
   )
 
   for (let indice = 0; indice < internos.length; indice++) {
@@ -270,7 +285,7 @@ function coordenadaDoPonto(placemark: Element): [number, number] | null {
   return [latitude, longitude]
 }
 
-function analisarKml(conteudo: string): PoligonoKmzImportado[] {
+export function extrairCandidatosKml(conteudo: string): CandidatoPoligonoKmz[] {
   if (conteudo.length > TAMANHO_MAXIMO_KML) {
     throw new Error('O KML dentro do arquivo é maior que o limite permitido.')
   }
@@ -283,8 +298,7 @@ function analisarKml(conteudo: string): PoligonoKmzImportado[] {
     throw new Error('O arquivo não contém um KML válido.')
   }
 
-  const resultado: PoligonoKmzImportado[] = []
-  let totalVertices = 0
+  const resultado: CandidatoPoligonoKmz[] = []
   const placemarks = descendentesComNome(documento, 'Placemark')
   for (const placemark of placemarks) {
     const dados = metadadosDoPlacemark(placemark)
@@ -309,13 +323,41 @@ function analisarKml(conteudo: string): PoligonoKmzImportado[] {
       throw new Error(`O arquivo ultrapassa o limite de ${MAXIMO_POLIGONOS.toLocaleString('pt-BR')} áreas por importação.`)
     }
 
+    resultado.push({
+      nome,
+      ponto: pontoImportado,
+      tipo,
+      data_inicio: dataInicio,
+      limite_precipitacao_mm: limite != null && Number.isFinite(limite) && limite >= 0 ? limite : undefined,
+      referencia,
+      observacao: observacao || undefined,
+      poligonos: elementosPoligono.map(polygon => ({
+        limitesExternos: descendentesComNome(polygon, 'outerBoundaryIs')
+          .map(limite => textoKml(limite, 'coordinates')),
+        limitesInternos: descendentesComNome(polygon, 'innerBoundaryIs')
+          .map(limite => textoKml(limite, 'coordinates')),
+      })),
+    })
+  }
+
+  if (!resultado.length) {
+    throw new Error('Nenhum polígono válido foi encontrado no KMZ/KML.')
+  }
+  return resultado
+}
+
+export function validarCandidatosKml(candidatos: CandidatoPoligonoKmz[]): PoligonoKmzImportado[] {
+  const resultado: PoligonoKmzImportado[] = []
+  let totalVertices = 0
+
+  for (const candidato of candidatos) {
     let geometria: GeometriaAreaRisco
     try {
-      geometria = elementosPoligono.map((polygon, indice) =>
-        lerPoligonoKml(polygon, `“${nome}”, polígono ${indice + 1}`),
+      geometria = candidato.poligonos.map((polygon, indice) =>
+        lerPoligonoKml(polygon, `“${candidato.nome}”, polígono ${indice + 1}`),
       )
     } catch (erro) {
-      throw new Error(erro instanceof Error ? erro.message : `O contorno “${nome}” é inválido.`)
+      throw new Error(erro instanceof Error ? erro.message : `O contorno “${candidato.nome}” é inválido.`)
     }
 
     const pontosExternos = geometria.flatMap(poligono => poligono[0])
@@ -327,18 +369,18 @@ function analisarKml(conteudo: string): PoligonoKmzImportado[] {
       throw new Error(`O arquivo ultrapassa o limite de ${MAXIMO_VERTICES_IMPORTACAO.toLocaleString('pt-BR')} vértices no total.`)
     }
 
-    const latitude = pontoImportado?.[0] ?? pontosExternos.reduce((soma, ponto) => soma + ponto[0], 0) / pontosExternos.length
-    const longitude = pontoImportado?.[1] ?? pontosExternos.reduce((soma, ponto) => soma + ponto[1], 0) / pontosExternos.length
+    const latitude = candidato.ponto?.[0] ?? pontosExternos.reduce((soma, ponto) => soma + ponto[0], 0) / pontosExternos.length
+    const longitude = candidato.ponto?.[1] ?? pontosExternos.reduce((soma, ponto) => soma + ponto[1], 0) / pontosExternos.length
     resultado.push({
-      nome,
+      nome: candidato.nome,
       poligono: geometria,
       latitude,
       longitude,
-      tipo,
-      data_inicio: dataInicio,
-      limite_precipitacao_mm: limite != null && Number.isFinite(limite) && limite >= 0 ? limite : undefined,
-      referencia,
-      observacao: observacao || undefined,
+      tipo: candidato.tipo,
+      data_inicio: candidato.data_inicio,
+      limite_precipitacao_mm: candidato.limite_precipitacao_mm,
+      referencia: candidato.referencia,
+      observacao: candidato.observacao,
     })
   }
 
@@ -348,10 +390,10 @@ function analisarKml(conteudo: string): PoligonoKmzImportado[] {
   return resultado
 }
 
-export async function analisarArquivoKmz(
+export async function extrairKmlDoArquivo(
   arquivo: File,
   atualizarProgresso: (mensagem: string) => void,
-): Promise<PoligonoKmzImportado[]> {
+): Promise<string> {
   if (arquivo.size > TAMANHO_MAXIMO_ARQUIVO) {
     throw new Error('O arquivo excede o limite de 20 MB.')
   }
@@ -363,7 +405,11 @@ export async function analisarArquivoKmz(
     || (assinatura[0] === 0x50 && assinatura[1] === 0x4b)
   if (!arquivoZip) {
     atualizarProgresso('Analisando polígonos…')
-    return analisarKml(new TextDecoder().decode(bytes))
+    const conteudo = new TextDecoder().decode(bytes)
+    if (conteudo.length > TAMANHO_MAXIMO_KML) {
+      throw new Error('O KML dentro do arquivo é maior que o limite permitido.')
+    }
+    return conteudo
   }
 
   let zip: JSZip
@@ -380,6 +426,8 @@ export async function analisarArquivoKmz(
   const conteudo = await selecionado.async('string', progresso => {
     atualizarProgresso(`Descompactando o documento KMZ… ${Math.floor(progresso.percent)}%`)
   })
-  atualizarProgresso('Analisando polígonos…')
-  return analisarKml(conteudo)
+  if (conteudo.length > TAMANHO_MAXIMO_KML) {
+    throw new Error('O KML dentro do arquivo é maior que o limite permitido.')
+  }
+  return conteudo
 }

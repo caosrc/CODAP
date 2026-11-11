@@ -6,6 +6,7 @@ import {
   type GeometriaAreaRisco,
   type TipoAreaRisco,
 } from './areasRisco'
+import type { CandidatoPoligonoKmz } from './areasRiscoKmzParser'
 
 export interface PoligonoKmzImportado {
   nome: string
@@ -21,6 +22,7 @@ export interface PoligonoKmzImportado {
 
 type ImportacaoWorkerMensagem =
   | { tipo: 'progresso'; mensagem: string }
+  | { tipo: 'kml'; conteudo: string }
   | { tipo: 'resultado'; poligonos: PoligonoKmzImportado[] }
   | { tipo: 'erro'; mensagem: string }
 
@@ -41,6 +43,18 @@ export function importarPoligonosKmz(
       const mensagem = event.data
       if (mensagem.tipo === 'progresso') {
         aoAtualizarProgresso?.(mensagem.mensagem)
+      } else if (mensagem.tipo === 'kml') {
+        aoAtualizarProgresso?.('Analisando polígonos…')
+        void import('./areasRiscoKmzParser')
+          .then(({ extrairCandidatosKml }) => {
+            const candidatos: CandidatoPoligonoKmz[] = extrairCandidatosKml(mensagem.conteudo)
+            aoAtualizarProgresso?.('Validando os contornos…')
+            worker.postMessage({ tipo: 'validar', candidatos })
+          })
+          .catch(erro => {
+            worker.terminate()
+            reject(erro instanceof Error ? erro : new Error('Não foi possível analisar o KML do arquivo.'))
+          })
       } else if (mensagem.tipo === 'resultado') {
         worker.terminate()
         resolve(mensagem.poligonos)
@@ -53,7 +67,7 @@ export function importarPoligonosKmz(
       worker.terminate()
       reject(new Error('Ocorreu um erro ao ler o KMZ/KML. Verifique se o arquivo está íntegro e tente novamente.'))
     }
-    worker.postMessage({ arquivo })
+    worker.postMessage({ tipo: 'arquivo', arquivo })
   })
 }
 

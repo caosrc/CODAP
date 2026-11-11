@@ -1,6 +1,6 @@
-import { Fragment, useEffect, useMemo, useRef, useState, type ChangeEvent, type CSSProperties, type FormEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type ChangeEvent, type CSSProperties, type FormEvent } from 'react'
 import { createPortal } from 'react-dom'
-import { Marker, Polygon, Popup, Tooltip, useMap, useMapEvents } from 'react-leaflet'
+import { Marker, Pane, Polygon, Popup, Tooltip, useMap, useMapEvents } from 'react-leaflet'
 import L from 'leaflet'
 import ModalSenha from './ModalSenha'
 import './AreasRiscoMapa.css'
@@ -769,66 +769,52 @@ export default function AreasRiscoMapa({
           poligono: adicionarVertice(rascunho?.poligono ?? [], ponto),
         })}
       />
-      {poligonosImportados.map((importado, indice) => (
-        !poligonosImportadosConcluidos.has(indice) && (
-          <Polygon
-            key={`imported-draft-${versaoImportacao}-${indice}`}
-            positions={importado.poligono}
-            pathOptions={{
-              color: indice === indiceImportacaoNoRascunho ? '#fbbf24' : '#67d8f2',
-              weight: indice === indiceImportacaoNoRascunho ? 3 : 2,
-              fillColor: indice === indiceImportacaoNoRascunho ? '#fbbf24' : '#67d8f2',
-              fillOpacity: indice === indiceImportacaoNoRascunho ? 0.12 : 0.06,
-              dashArray: '6 5',
-              bubblingMouseEvents: false,
-            }}
-            eventHandlers={{ click: () => carregarPoligonoImportado(indice) }}
-          >
-            <Tooltip sticky>{importado.nome} · importado, ainda não salvo</Tooltip>
-                      <PopupInformacaoKmz
+      <Pane name="radarLiveRiskAreas" style={{ zIndex: 475 }}>
+        {poligonosImportados.map((importado, indice) => {
+          if (poligonosImportadosConcluidos.has(indice)) return null
+          const tipo = tiposImportados[indice] ?? importado.tipo ?? tipoBaseImportacao ?? 'Encostas'
+          const selecionado = indice === indiceImportacaoNoRascunho
+          const cor = selecionado ? '#fbbf24' : CORES[tipo]
+          return (
+            <Polygon
+              key={`imported-draft-${versaoImportacao}-${indice}`}
+              positions={importado.poligono}
+              pathOptions={{
+                color: cor,
+                weight: selecionado ? 4 : 3,
+                fillColor: cor,
+                fillOpacity: selecionado ? 0.3 : 0.2,
+                dashArray: '7 4',
+                bubblingMouseEvents: false,
+              }}
+              eventHandlers={{ click: () => carregarPoligonoImportado(indice) }}
+            >
+              <Tooltip sticky>{importado.nome} · importado, ainda não salvo</Tooltip>
+              <PopupInformacaoKmz
                 importado={importado}
-                tipoSelecionado={tiposImportados[indice] ?? importado.tipo ?? tipoBaseImportacao ?? undefined}
+                tipoSelecionado={tipo}
                 onEditar={() => carregarPoligonoImportado(indice)}
               />
-          </Polygon>
-        )
-      ))}
-      {areasNoMapa.map(area => {
-        const previsto = previsaoPorArea[area.id]
-        const emAlerta = area.tipo !== 'Interdições' && previsto != null && Number.isFinite(previsto) && previsto > area.limite_precipitacao_mm
-        const cor = CORES[area.tipo]
-        return (
-          <Fragment key={`area-layer-${area.id}`}>
-            {areaRiscoTemPoligono(area.poligono) && (
-              <Polygon
-                positions={area.poligono}
-                pathOptions={{
-                  color: cor,
-                  weight: emAlerta ? 4 : 2,
-                  fillColor: cor,
-                  fillOpacity: emAlerta ? 0.3 : 0.17,
-                  className: emAlerta ? 'arm-polygon-alerta' : undefined,
-                }}
-              >
-                <PopupAreaRisco
-                  area={area}
-                  cor={cor}
-                  emAlerta={emAlerta}
-                  previsto={previsto}
-                  onEditar={() => abrirEdicao(area)}
-                  onExcluir={() => abrirExclusao(area)}
-                  onAbrirOcorrencia={onAbrirOcorrencia}
-                />
-              </Polygon>
-            )}
-            <Marker
-              position={[area.latitude, area.longitude]}
-              icon={iconeArea(area.tipo, emAlerta)}
-              zIndexOffset={emAlerta ? 900 : 400}
+            </Polygon>
+          )
+        })}
+        {areasNoMapa.map(area => {
+          if (!areaRiscoTemPoligono(area.poligono)) return null
+          const previsto = previsaoPorArea[area.id]
+          const emAlerta = area.tipo !== 'Interdições' && previsto != null && Number.isFinite(previsto) && previsto > area.limite_precipitacao_mm
+          const cor = CORES[area.tipo]
+          return (
+            <Polygon
+              key={`area-polygon-${area.id}`}
+              positions={area.poligono}
+              pathOptions={{
+                color: cor,
+                weight: emAlerta ? 4 : 3,
+                fillColor: cor,
+                fillOpacity: emAlerta ? 0.3 : 0.2,
+                className: emAlerta ? 'arm-polygon-alerta' : undefined,
+              }}
             >
-              <Tooltip direction="top" offset={[0, -28]} permanent={emAlerta} className={emAlerta ? 'arm-tooltip-alerta' : 'arm-tooltip'}>
-                {emAlerta ? 'ALERTA · ' : ''}{area.tipo}
-              </Tooltip>
               <PopupAreaRisco
                 area={area}
                 cor={cor}
@@ -838,16 +824,42 @@ export default function AreasRiscoMapa({
                 onExcluir={() => abrirExclusao(area)}
                 onAbrirOcorrencia={onAbrirOcorrencia}
               />
-            </Marker>
-          </Fragment>
+            </Polygon>
+          )
+        })}
+        {rascunho && areaRiscoTemPoligono(rascunho.poligono) && (
+          <Polygon
+            positions={rascunho.poligono}
+            pathOptions={{ color: CORES[rascunho.tipo], weight: 3, fillColor: CORES[rascunho.tipo], fillOpacity: 0.24, dashArray: '7 5' }}
+          />
+        )}
+      </Pane>
+      {areasNoMapa.map(area => {
+        const previsto = previsaoPorArea[area.id]
+        const emAlerta = area.tipo !== 'Interdições' && previsto != null && Number.isFinite(previsto) && previsto > area.limite_precipitacao_mm
+        const cor = CORES[area.tipo]
+        return (
+          <Marker
+            key={`area-marker-${area.id}`}
+            position={[area.latitude, area.longitude]}
+            icon={iconeArea(area.tipo, emAlerta)}
+            zIndexOffset={emAlerta ? 900 : 400}
+          >
+            <Tooltip direction="top" offset={[0, -28]} permanent={emAlerta} className={emAlerta ? 'arm-tooltip-alerta' : 'arm-tooltip'}>
+              {emAlerta ? 'ALERTA · ' : ''}{area.tipo}
+            </Tooltip>
+            <PopupAreaRisco
+              area={area}
+              cor={cor}
+              emAlerta={emAlerta}
+              previsto={previsto}
+              onEditar={() => abrirEdicao(area)}
+              onExcluir={() => abrirExclusao(area)}
+              onAbrirOcorrencia={onAbrirOcorrencia}
+            />
+          </Marker>
         )
       })}
-      {rascunho && areaRiscoTemPoligono(rascunho.poligono) && (
-        <Polygon
-          positions={rascunho.poligono}
-          pathOptions={{ color: CORES[rascunho.tipo], weight: 3, fillColor: CORES[rascunho.tipo], fillOpacity: 0.24, dashArray: '7 5' }}
-        />
-      )}
       {rascunho && rascunho.latitude != null && rascunho.longitude != null && (
         <Marker position={[rascunho.latitude, rascunho.longitude]} icon={iconeArea(rascunho.tipo)} zIndexOffset={1000}>
           <Tooltip permanent direction="top" offset={[0, -25]}>Ponto de referência</Tooltip>

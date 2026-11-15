@@ -33,7 +33,11 @@ import { statusLeituraCemaden } from '../cemadenLeitura'
 import './MonitoramentoCNL.css'
 import ModalSenha from './ModalSenha'
 import AreasRiscoMapa from './AreasRiscoMapa'
-import RadarChuvaAnimado, { type QuadroRadarChuva } from './RadarChuvaAnimado'
+import RadarChuvaAnimado, {
+  ControleHistoricoRadar,
+} from './RadarChuvaAnimado'
+import { useRadarFrameTimeline, type QuadroRadarChuva } from './radarTimeline'
+import CamadaNuvensGoes from './CamadaNuvensGoes'
 
 type Prioridade = 'normal' | 'importante' | 'urgente'
 type ConfirmacaoRadar = { agente: string; confirmado: boolean; confirmedAt?: string }
@@ -445,6 +449,14 @@ function RadarMapInvalidateSize({ tv }: { tv: boolean }) {
 function RadarMapaTempoReal({ tv, dataOcorrencias }: { tv: boolean; dataOcorrencias: string }) {
   const [camadaBase, setCamadaBase] = useState<'mapa' | 'satelite'>('mapa')
   const [radarChuva, setRadarChuva] = useState<DadosRadarChuvaLive | null>(null)
+  const reservaFrameTime = radarChuva?.frameTime
+  const reservaFramePath = radarChuva?.path
+  const quadroReservaRadar = useMemo(() => (
+    reservaFrameTime != null && reservaFramePath
+      ? { time: reservaFrameTime, path: reservaFramePath }
+      : null
+  ), [reservaFrameTime, reservaFramePath])
+  const linhaTempoRadar = useRadarFrameTimeline(radarChuva?.quadros || [], quadroReservaRadar)
   const [tempoMapa, setTempoMapa] = useState<TempoMapaRadar | null>(null)
   const [previsaoTrovoadas, setPrevisaoTrovoadas] = useState<PrevisaoTrovoadaRadar | null>(null)
   const [radarErro, setRadarErro] = useState('')
@@ -456,6 +468,7 @@ function RadarMapaTempoReal({ tv, dataOcorrencias }: { tv: boolean; dataOcorrenc
   const [mostrarTemperatura, setMostrarTemperatura] = useState(true)
   const [mostrarTrovoadas, setMostrarTrovoadas] = useState(true)
   const [mostrarNuvens, setMostrarNuvens] = useState(false)
+  const visaoChuvaCombinadaAtiva = mostrarChuva && mostrarNuvens && mostrarHidroestimadorCemaden
   const [zoomMapa, setZoomMapa] = useState(RADAR_MAP_ZOOM)
   const [painelAreasRiscoHost, setPainelAreasRiscoHost] = useState<HTMLDivElement | null>(null)
   const mapaLeafletRef = useRef<LeafletMap | null>(null)
@@ -754,7 +767,7 @@ function RadarMapaTempoReal({ tv, dataOcorrencias }: { tv: boolean; dataOcorrenc
   const carregarRadarChuva = useCallback(async () => {
     setRadarCarregando(true)
     try {
-      const resposta = await fetch('/api/radar-chuva', { cache: 'no-store' })
+      const resposta = await fetch('/api/radar-chuva')
       const corpo = await resposta.json().catch(() => ({}))
       if (!resposta.ok || typeof corpo?.host !== 'string' || typeof corpo?.path !== 'string') {
         throw new Error('Radar indisponível')
@@ -856,6 +869,20 @@ function RadarMapaTempoReal({ tv, dataOcorrencias }: { tv: boolean; dataOcorrenc
         </div>
         <button type="button" className={`radar-live-map-layer-button ${mostrarChuva ? 'ativo chuva' : ''}`} onClick={() => setMostrarChuva(prev => !prev)} aria-pressed={mostrarChuva}>
           🌧️ Chuva {mostrarChuva ? 'ativa' : 'desativada'}
+        </button>
+        <button
+          type="button"
+          className={`radar-live-map-layer-button ${mostrarChuva && mostrarNuvens && mostrarHidroestimadorCemaden ? 'ativo' : ''}`}
+          aria-pressed={mostrarChuva && mostrarNuvens && mostrarHidroestimadorCemaden}
+          title="Ligar radar observado, nuvens GOES e estimativa de precipitação do CEMADEN"
+          onClick={() => {
+            const desativar = mostrarChuva && mostrarNuvens && mostrarHidroestimadorCemaden
+            setMostrarChuva(!desativar)
+            setMostrarNuvens(!desativar)
+            setMostrarHidroestimadorCemaden(!desativar)
+          }}
+        >
+          🛰️ Visão combinada
         </button>
         <button type="button" className={`radar-live-map-layer-button ${mostrarTemperatura ? 'ativo temperatura' : ''}`} onClick={() => setMostrarTemperatura(prev => !prev)} aria-pressed={mostrarTemperatura}>
           🌡️ Temperatura {mostrarTemperatura ? 'ativa' : 'desativada'}
@@ -962,24 +989,20 @@ function RadarMapaTempoReal({ tv, dataOcorrencias }: { tv: boolean; dataOcorrenc
             maxZoom={18}
           />
         )}
-        {mostrarNuvens && templateTilesHttpsValido(GOES_CLOUD_TILE_URL) && (
-          <Pane name="radarLiveClouds" style={{ zIndex: 410 }}>
-            <TileLayer
-              key={`radar-live-clouds-${GOES_CLOUD_TILE_URL}`}
-              url={GOES_CLOUD_TILE_URL}
-              opacity={0.55}
-              maxNativeZoom={8}
-              maxZoom={18}
-              attribution='Cloud imagery &copy; <a href="https://gis.nnvl.noaa.gov/arcgis/rest/services/GOES/GOES_current/ImageServer" target="_blank" rel="noreferrer">NOAA GOES</a>'
-            />
-          </Pane>
-        )}
+        <CamadaNuvensGoes
+          ativa={mostrarNuvens && templateTilesHttpsValido(GOES_CLOUD_TILE_URL)}
+          url={GOES_CLOUD_TILE_URL}
+          nomePane="radarLiveClouds"
+          maxZoom={18}
+          opacidade={0.55}
+        />
         {mostrarChuva && radarChuva && (
           <Pane name="radarLiveRain" style={{ zIndex: 420 }}>
             <RadarChuvaAnimado
               host={radarChuva.host}
               quadros={radarChuva.quadros || []}
               quadroReserva={{ time: radarChuva.frameTime, path: radarChuva.path }}
+              quadroSelecionado={linhaTempoRadar.quadroAtual}
               opacity={0.72}
               maxZoom={18}
             />
@@ -1126,6 +1149,7 @@ function RadarMapaTempoReal({ tv, dataOcorrencias }: { tv: boolean; dataOcorrenc
         />
       </MapContainer>
       </div>
+      {mostrarChuva && <ControleHistoricoRadar controle={linhaTempoRadar} temaEscuro />}
       <div className="radar-live-map-footer">
         <span>
           {cemadenMg.dados
@@ -1137,11 +1161,11 @@ function RadarMapaTempoReal({ tv, dataOcorrencias }: { tv: boolean; dataOcorrenc
         )}
         <span>
           {radarChuva?.frameTime
-            ? `Quadro mais recente do RainViewer: ${new Date(radarChuva.frameTime * 1000).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })} · há ${Math.max(0, Math.floor((Date.now() - radarChuva.frameTime * 1000) / 60000))} min · fonte atualiza em intervalos de cerca de 10 min · zoom máx. 7`
+            ? `Quadro ${linhaTempoRadar.aoVivo ? 'mais recente' : 'histórico'} do RainViewer: ${linhaTempoRadar.quadroAtual ? new Date(linhaTempoRadar.quadroAtual.time * 1000).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '—'} · ${linhaTempoRadar.quadros.length} quadros para comparar · zoom máx. 7`
             : 'Radar RainViewer: —'}
         </span>
         {mostrarHidroestimadorCemaden && (
-          <span>GOES Hidroestimador do CEMADEN · estimativa por satélite, não medição local; a fonte pode ter atraso</span>
+          <span>Radar sintético CEMADEN/GOES · estimativa por satélite; o horário da imagem não é informado</span>
         )}
         <span>{tempoMapa?.atual?.temperatura != null ? `Lafaiete: ${Math.round(Number(tempoMapa.atual.temperatura))} °C` : 'Temperatura local: —'}</span>
         <span>{previsaoTrovoadas ? `${pontosTrovoada.length} ponto(s) previsto(s) perto de Lafaiete` : 'Previsão local de trovoadas: —'}</span>

@@ -1608,6 +1608,61 @@ input, select, textarea { font-family: inherit; }
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.mapa-chuva-combinado-btn {
+  border-color: #0e7490;
+  color: #0e7490;
+}
+.mapa-chuva-historico {
+  display: grid;
+  gap: 0.26rem;
+  padding: 0.42rem 0.5rem;
+  border-bottom: 1px solid #e5e7eb;
+  background: #f0f9ff;
+}
+.mapa-chuva-historico-topo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.28rem;
+}
+.mapa-chuva-historico button {
+  border: 1px solid #bae6fd;
+  border-radius: 5px;
+  padding: 0.18rem 0.34rem;
+  color: #075985;
+  background: #fff;
+  font-size: 0.52rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+.mapa-chuva-historico button.ao-vivo {
+  border-color: #059669;
+  color: #047857;
+}
+.mapa-chuva-historico-topo strong {
+  margin-left: auto;
+  color: #0f172a;
+  font-size: 0.56rem;
+}
+.mapa-chuva-historico input[type="range"] {
+  width: 100%;
+  margin: 0;
+  accent-color: #0284c7;
+}
+.mapa-chuva-historico-escala {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.2rem;
+  color: #475569;
+  font-size: 0.47rem;
+}
+.mapa-chuva-historico-escala span:nth-child(2) {
+  text-align: center;
+}
+.mapa-chuva-historico > small {
+  color: #64748b;
+  font-size: 0.47rem;
+}
 .mapa-chuva-opacidades {
   display: grid;
   gap: 0.22rem;

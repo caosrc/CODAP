@@ -4434,7 +4434,7 @@ app.get('/api/radar-chuva', async (_req, res) => {
 
     if (!host || !ultimo) throw new Error('RainViewer não retornou quadros de radar')
 
-    const quadrosRecentes = quadrosObservados.slice(-6).map(quadro => ({
+    const quadrosRecentes = quadrosObservados.slice(-12).map(quadro => ({
       time: Number(quadro.time),
       path: quadro.path,
     }))

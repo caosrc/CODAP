@@ -3,6 +3,7 @@
 - [Banco de horas ocorrências automáticas](banco-horas-ocorrencias.md) — lógica de horas extras automáticas de ocorrências implementada em EscalaAgentes.tsx (Jun 2026).
 - [Google Earth Engine](earth-engine.md) — monitoramento MODIS depende de autenticação da conta no ambiente; FIRMS permanece como fonte complementar.
 - [Radar de chuva](radar-chuva.md) — RainViewer fornece tiles observados; camadas GOES/RRQPE exigem processamento geoespacial separado.
+- [Escopo meteorológico dos mapas](escopo-meteorologico-mapas.md) — estações INMET já existem no app; priorize melhorar chuva ativa sem duplicá-las.
 - [Estimativa de chuva CEMADEN](cemaden-hidroestimador.md) — o GeoServer público expõe GOES Hidroestimador, uma estimativa por satélite sem horário de cena confiável no WMS.
 - [Coordenadas CEMADEN nos mapas](cemaden-coordenadas-mapas.md) — posições das estações vêm do próprio recurso CEMADEN; não bloqueie mapas por um geosserviço externo.
 - [Ordem de callbacks React](ordem-callbacks-react.md) — callbacks com dependências devem ser declarados após as funções referenciadas para evitar acesso em TDZ durante a renderização.

@@ -29,19 +29,26 @@ export const handler = async () => {
     const dados = await response.json()
     const host = typeof dados?.host === 'string' ? dados.host.replace(/\/$/, '') : ''
     const valido = quadro => Number.isFinite(Number(quadro?.time)) &&
-      typeof quadro?.path === 'string' && quadro.path.startsWith('/v2/')
+      typeof quadro?.path === 'string' && quadro.path.startsWith('/v2/radar/')
     const observados = (dados?.radar?.past || []).filter(valido)
+      .sort((a, b) => Number(a.time) - Number(b.time))
     const ultimo = observados.reduce((maisRecente, quadro) => (
       !maisRecente || Number(quadro.time) > Number(maisRecente.time) ? quadro : maisRecente
     ), null)
     if (!host || !ultimo) throw new Error('RainViewer não retornou quadros de radar')
     const tileUrl = `${host}${ultimo.path}/256/{z}/{x}/{y}/2/1_0.png`
+    const quadros = observados.slice(-12).map(quadro => ({
+      time: Number(quadro.time),
+      path: quadro.path,
+    }))
     radarChuvaCache = {
       host,
       path: ultimo.path,
       tileUrl,
       frameTime: Number(ultimo.time),
       atualizadoEm: new Date(Number(ultimo.time) * 1000).toISOString(),
+      quadros,
+      quantidadeQuadrosDisponiveis: observados.length,
       fonte: 'RainViewer',
       tipoQuadro: 'observado',
     }

@@ -64,6 +64,7 @@ interface DraftArea {
   poligono: GeometriaAreaRisco
   data_inicio: string
   limite_precipitacao_mm: string
+  precipitacao_observada_mm: string
   referencia: string
   observacao: string
   atributos_kmz: AtributoKmz[]
@@ -85,10 +86,34 @@ function novaArea(tipo: TipoAreaRisco = 'Encostas'): DraftArea {
     poligono: [],
     data_inicio: dataHoje(),
     limite_precipitacao_mm: tipo === 'Interdições' ? '0' : '30',
+    precipitacao_observada_mm: '',
     referencia: '',
     observacao: '',
     atributos_kmz: [],
   }
+}
+
+const PREFIXO_CHUVA_OBSERVADA = 'Chuva observada informada nesta área:'
+
+function separarObservacaoArea(observacao: string | null | undefined) {
+  let precipitacaoObservada = ''
+  const linhas = String(observacao || '').split(/\r?\n/).filter(linha => {
+    const correspondencia = linha.trim().match(/^Chuva observada informada nesta área:\s*([0-9]+(?:[.,][0-9]+)?)\s*mm$/i)
+    if (!correspondencia) return true
+    precipitacaoObservada = correspondencia[1].replace(',', '.')
+    return false
+  })
+  return { observacao: linhas.join('\n').trim(), precipitacaoObservada }
+}
+
+function comporObservacaoArea(observacao: string, precipitacaoObservada: string) {
+  const observacaoLimpa = separarObservacaoArea(observacao).observacao
+  const valor = precipitacaoObservada.trim() ? Number(precipitacaoObservada) : null
+  const linhas = observacaoLimpa ? [observacaoLimpa] : []
+  if (valor != null && Number.isFinite(valor) && valor >= 0) {
+    linhas.push(`${PREFIXO_CHUVA_OBSERVADA} ${valor.toLocaleString('pt-BR', { maximumFractionDigits: 2 })} mm`)
+  }
+  return linhas.join('\n') || null
 }
 
 function adicionarVertice(geometria: GeometriaAreaRisco, ponto: [number, number]): GeometriaAreaRisco {
@@ -297,6 +322,7 @@ function PopupAreaRisco({
   onExcluir: () => void
   onAbrirOcorrencia?: (id: number) => void
 }) {
+  const dadosObservacao = separarObservacaoArea(area.observacao)
   return (
     <Popup>
       <div className="arm-popup">
@@ -310,8 +336,11 @@ function PopupAreaRisco({
             <div>Limite: <strong>{area.limite_precipitacao_mm} mm</strong></div>
             <div>Previsão 24 h: <strong>{formatarPrecipitacao(previsto)}</strong></div>
           </>}
+        {dadosObservacao.precipitacaoObservada && (
+          <div>Chuva informada na área: <strong>{formatarPrecipitacao(Number(dadosObservacao.precipitacaoObservada))}</strong></div>
+        )}
         {area.referencia && <div>Referência: {area.referencia}</div>}
-        {area.observacao && <div className="arm-popup-notes">{area.observacao}</div>}
+        {dadosObservacao.observacao && <div className="arm-popup-notes">{dadosObservacao.observacao}</div>}
         {area.atributos_kmz?.length > 0 && (
           <>
             <div className="arm-popup-notes"><strong>Informações originais do KMZ</strong></div>
@@ -489,7 +518,8 @@ export default function AreasRiscoMapa({
         data_inicio: area.data_inicio.slice(0, 10),
         limite_precipitacao_mm: String(area.limite_precipitacao_mm),
         referencia: area.referencia ?? '',
-        observacao: area.observacao ?? '',
+        observacao: separarObservacaoArea(area.observacao).observacao,
+        precipitacao_observada_mm: separarObservacaoArea(area.observacao).precipitacaoObservada,
         atributos_kmz: area.atributos_kmz ?? [],
       })
       setEditandoId(area.id)
@@ -569,7 +599,7 @@ export default function AreasRiscoMapa({
     setModoMapa(null)
     setLocalErro('')
     setRecolhido(false)
-    setMensagemKmz(`Contorno “${poligonoImportado.nome}” carregado no formulário. Revise e clique em Registrar área para salvar no Supabase.`)
+    setMensagemKmz(`Contorno “${poligonoImportado.nome}” carregado no formulário. Revise os dados e clique em Registrar área.`)
   }
 
   function alterarTipoRascunho(tipo: TipoAreaRisco) {
@@ -621,6 +651,11 @@ export default function AreasRiscoMapa({
       setLocalErro('Informe um limite de precipitação válido, em milímetros.')
       return
     }
+    const chuvaObservada = rascunho.precipitacao_observada_mm.trim()
+    if (chuvaObservada && (!Number.isFinite(Number(chuvaObservada)) || Number(chuvaObservada) < 0)) {
+      setLocalErro('Informe uma chuva observada válida, em milímetros.')
+      return
+    }
     const input: AreaRiscoInput = {
       tipo: rascunho.tipo,
       latitude: rascunho.latitude,
@@ -629,7 +664,7 @@ export default function AreasRiscoMapa({
       data_inicio: rascunho.data_inicio,
       limite_precipitacao_mm: limite,
       referencia: rascunho.referencia.trim() || null,
-      observacao: rascunho.observacao.trim() || null,
+      observacao: comporObservacaoArea(rascunho.observacao, chuvaObservada),
       atributos_kmz: rascunho.atributos_kmz,
     }
     try {
@@ -665,7 +700,7 @@ export default function AreasRiscoMapa({
           setRascunho(null)
           setEditandoId(null)
           setModoMapa(null)
-          setMensagemKmz(`Todas as ${totalImportado} áreas importadas foram registradas no Supabase.`)
+          setMensagemKmz(`Todas as ${totalImportado} áreas importadas foram registradas.`)
           if (window.matchMedia('(max-width: 700px)').matches) setRecolhido(true)
         }
       } else {
@@ -1202,6 +1237,18 @@ export default function AreasRiscoMapa({
                       <label className="arm-field"><span>Limite de chuva <small>mm</small></span><input type="number" min="0" step="0.1" placeholder="Ex.: 35" value={rascunho.limite_precipitacao_mm} onChange={event => atualizarRascunho({ limite_precipitacao_mm: event.target.value })} required data-testid="input-limite-precipitacao" /></label>
                     )}
                   </div>
+                  <label className="arm-field">
+                    <span>Chuva observada nesta área <small>mm · informada manualmente</small></span>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.1"
+                      placeholder="Opcional"
+                      value={rascunho.precipitacao_observada_mm}
+                      onChange={event => atualizarRascunho({ precipitacao_observada_mm: event.target.value })}
+                      data-testid="input-chuva-observada-area"
+                    />
+                  </label>
                   <label className="arm-field"><span>Referência local <small>opcional</small></span><input type="text" maxLength={120} placeholder="Rua, bairro ou ponto próximo" value={rascunho.referencia} onChange={event => atualizarRascunho({ referencia: event.target.value })} data-testid="input-referencia-local" /></label>
                   <label className="arm-field"><span>Observações <small>dados do KMZ podem ser editados</small></span><textarea rows={5} placeholder="Condição observada, dados do KMZ ou orientação à equipe" value={rascunho.observacao} onChange={event => atualizarRascunho({ observacao: event.target.value })} data-testid="input-observacao-risco" /></label>
                   {(localErro || erro) && <div className="arm-error" role="alert" data-testid="status-erro-formulario">{localErro || erro}</div>}
@@ -1213,7 +1260,7 @@ export default function AreasRiscoMapa({
                         : editandoId
                           ? 'Salvar alterações'
                           : indiceImportacaoNoRascunho != null
-                            ? 'Salvar área no Supabase'
+                            ? 'Registrar área'
                             : 'Registrar área'}
                     </button>
                   </div>

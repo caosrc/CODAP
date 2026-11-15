@@ -29,6 +29,8 @@ import {
   getEstadoGps,
 } from '../gpsService'
 import {
+  CamadaChuvaEstimadaCemaden,
+  CEMADEN_MAPA_OFICIAL_URL,
   CapturaEstadoMapa,
   MINAS_GERAIS_BOUNDS,
   useEstacoesCemadenMg,
@@ -861,6 +863,7 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
   const [camadaMapa, setCamadaMapa] = useState<CamadaMapa>('padrao')
   const [mostrarChuva, setMostrarChuva] = useState(false)
   const [mostrarNuvens, setMostrarNuvens] = useState(false)
+  const [mostrarHidroestimadorCemaden, setMostrarHidroestimadorCemaden] = useState(false)
   const [painelChuvaAberto, setPainelChuvaAberto] = useState(false)
   const [radarChuva, setRadarChuva] = useState<DadosRadarChuva | null>(null)
   const [radarChuvaCarregando, setRadarChuvaCarregando] = useState(false)
@@ -1756,6 +1759,10 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
             />
           </Pane>
         )}
+        <CamadaChuvaEstimadaCemaden
+          ativa={mostrarHidroestimadorCemaden}
+          nomePane="mapaHidroestimadorCemaden"
+        />
         {mostrarIntensidadeCemaden && zoomMapa >= 9 && (
           <CemadenIntensityLayer estacoes={estacoesCemadenLafaiete} opacidade={opacidadeCemaden} />
         )}
@@ -2236,6 +2243,17 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
               </div>
               <div className="mapa-chuva-fontes">
                 <button
+                  className={`mapa-chuva-fonte-btn ${mostrarHidroestimadorCemaden ? 'ativo' : ''}`}
+                  onClick={() => setMostrarHidroestimadorCemaden(v => !v)}
+                  aria-pressed={mostrarHidroestimadorCemaden}
+                  title="Estimativa de precipitação por satélite do CEMADEN; não é medição de pluviômetro"
+                >
+                  🌧️ Estimativa GOES · CEMADEN
+                </button>
+                <span>Hidroestimador por satélite · camada estimada, não observação local; a fonte pode ter atraso</span>
+              </div>
+              <div className="mapa-chuva-fontes">
+                <button
                   className={`mapa-chuva-fonte-btn ${mostrarIntensidadeCemaden ? 'ativo' : ''}`}
                   onClick={() => setMostrarIntensidadeCemaden(v => !v)}
                   aria-pressed={mostrarIntensidadeCemaden}
@@ -2248,6 +2266,14 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
                     : 'Leituras oficiais de Conselheiro Lafaiete · acumulado na última hora (mm)'}
                 </span>
               </div>
+              <a
+                className="mapa-chuva-fonte-btn"
+                href={CEMADEN_MAPA_OFICIAL_URL}
+                target="_blank"
+                rel="noreferrer"
+              >
+                Abrir mapa oficial do CEMADEN ↗
+              </a>
               <div className="mapa-chuva-opacidades">
                 <label>
                   Radar <input type="range" min="0.35" max="0.90" step="0.05" value={opacidadeRadar} onChange={e => setOpacidadeRadar(Number(e.target.value))} />

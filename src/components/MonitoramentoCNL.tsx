@@ -112,7 +112,7 @@ type ControleAlertaSonoro = {
   timer: number | null
 }
 
-const INTERVALO_ATUALIZACAO = 5 * 60 * 1000
+const INTERVALO_ATUALIZACAO = 2 * 60 * 1000
 const FUSO_HORARIO = 'America/Sao_Paulo'
 const DURACAO_ALERTA_SONORO_MS = 5000
 const CHAVE_CACHE_MONITORAMENTO = 'monitoramento-cnl-cache-v1'
@@ -497,8 +497,9 @@ function CartaoMetrica({ rotulo, valor, detalhe, classe = '' }: { rotulo: string
 }
 
 export default function MonitoramentoCNL({ onAbrirMapa }: Props) {
-  const [dados, setDados] = useState<DadosCNL | null>(null)
-  const [carregando, setCarregando] = useState(true)
+  const [cacheInicial] = useState(() => lerCacheMonitoramento())
+  const [dados, setDados] = useState<DadosCNL | null>(cacheInicial)
+  const [carregando, setCarregando] = useState(() => cacheInicial == null)
   const [atualizando, setAtualizando] = useState(false)
   const [erro, setErro] = useState('')
   const [editandoCotas, setEditandoCotas] = useState(false)
@@ -519,27 +520,33 @@ export default function MonitoramentoCNL({ onAbrirMapa }: Props) {
       const resposta = await fetch('/api/monitoramento-cnl', { cache: 'no-store' })
       const corpo = await resposta.json() as DadosCNL & { erro?: string }
       if (!resposta.ok || !corpo.sucesso) throw new Error(corpo.erro || 'O CEMADEN não retornou dados.')
-      let dadosCarregados = corpo
-      if (supabaseDisponivel) {
-        try {
-          const cotasSupabase = await buscarCotasSupabase()
-          if (cotasSupabase) {
-            dadosCarregados = {
-              ...corpo,
-              cotasConfiguradas: true,
-              estacao: { ...corpo.estacao, cotas: cotasSupabase },
-            }
-          }
-        } catch (falhaSupabase) {
-          console.warn('[Monitoramento CNL] Não foi possível ler as cotas do Supabase:', falhaSupabase)
-        }
-      }
-      setDados(dadosCarregados)
+      setDados(corpo)
       setErro('')
       try {
-        window.localStorage.setItem(CHAVE_CACHE_MONITORAMENTO, JSON.stringify(dadosCarregados))
+        window.localStorage.setItem(CHAVE_CACHE_MONITORAMENTO, JSON.stringify(corpo))
       } catch {
         // O cache local é opcional; a consulta ao vivo continua funcionando sem espaço de armazenamento.
+      }
+      if (supabaseDisponivel) {
+        void buscarCotasSupabase().then((cotasSupabase) => {
+          if (!cotasSupabase) return
+          setDados((anterior) => {
+            if (!anterior) return anterior
+            const atualizado = {
+              ...anterior,
+              cotasConfiguradas: true,
+              estacao: { ...anterior.estacao, cotas: cotasSupabase },
+            }
+            try {
+              window.localStorage.setItem(CHAVE_CACHE_MONITORAMENTO, JSON.stringify(atualizado))
+            } catch {
+              // A atualização das cotas não depende do cache local.
+            }
+            return atualizado
+          })
+        }).catch((falhaSupabase) => {
+          console.warn('[Monitoramento CNL] Não foi possível ler as cotas do Supabase:', falhaSupabase)
+        })
       }
     } catch (falha) {
       setErro(falha instanceof Error ? falha.message : 'Não foi possível consultar o CEMADEN.')

@@ -22,6 +22,8 @@ import { GraficoNivel, type EstacaoCNL, type LeituraCNL, type PontoNivel, type P
 import { ChuvaCentro24h, type EstacaoChuvaCentro } from './ChuvaCentro24h'
 import type { Map as LeafletMap } from 'leaflet'
 import {
+  CamadaChuvaEstimadaCemaden,
+  CEMADEN_MAPA_OFICIAL_URL,
   CapturaEstadoMapa,
   MINAS_GERAIS_BOUNDS,
   useEstacoesCemadenMg,
@@ -450,6 +452,7 @@ function RadarMapaTempoReal({ tv, dataOcorrencias }: { tv: boolean; dataOcorrenc
   const [trovoadasErro, setTrovoadasErro] = useState('')
   const [radarCarregando, setRadarCarregando] = useState(false)
   const [mostrarChuva, setMostrarChuva] = useState(true)
+  const [mostrarHidroestimadorCemaden, setMostrarHidroestimadorCemaden] = useState(false)
   const [mostrarTemperatura, setMostrarTemperatura] = useState(true)
   const [mostrarTrovoadas, setMostrarTrovoadas] = useState(true)
   const [mostrarNuvens, setMostrarNuvens] = useState(false)
@@ -871,6 +874,22 @@ function RadarMapaTempoReal({ tv, dataOcorrencias }: { tv: boolean; dataOcorrenc
         </button>
         <button
           type="button"
+          className={`radar-live-map-layer-button ${mostrarHidroestimadorCemaden ? 'ativo chuva' : ''}`}
+          aria-pressed={mostrarHidroestimadorCemaden}
+          title="Estimativa de precipitação por satélite do CEMADEN; não é medição de pluviômetro"
+          onClick={() => setMostrarHidroestimadorCemaden(prev => !prev)}
+        >
+          🌧️ Estimativa GOES · CEMADEN
+        </button>
+        <button
+          type="button"
+          className="radar-live-map-layer-button"
+          onClick={() => window.open(CEMADEN_MAPA_OFICIAL_URL, '_blank', 'noopener,noreferrer')}
+        >
+          Mapa oficial CEMADEN ↗
+        </button>
+        <button
+          type="button"
           className="radar-live-map-layer-button"
           onClick={() => mapaLeafletRef.current?.fitBounds(MINAS_GERAIS_BOUNDS, { padding: [20, 20], maxZoom: 7, animate: true })}
           title="Enquadrar todo o estado; as camadas de chuva e nuvens cobrem a área visível"
@@ -966,6 +985,10 @@ function RadarMapaTempoReal({ tv, dataOcorrencias }: { tv: boolean; dataOcorrenc
             />
           </Pane>
         )}
+        <CamadaChuvaEstimadaCemaden
+          ativa={mostrarHidroestimadorCemaden}
+          nomePane="radarLiveHidroestimadorCemaden"
+        />
         {mostrarChuva && (
           <Pane name="radarLiveCemadenStations" style={{ zIndex: 450 }}>
             {estacoesLafaieteGeorreferenciadas.map(estacao => {
@@ -1117,6 +1140,9 @@ function RadarMapaTempoReal({ tv, dataOcorrencias }: { tv: boolean; dataOcorrenc
             ? `Quadro mais recente do RainViewer: ${new Date(radarChuva.frameTime * 1000).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })} · há ${Math.max(0, Math.floor((Date.now() - radarChuva.frameTime * 1000) / 60000))} min · fonte atualiza em intervalos de cerca de 10 min · zoom máx. 7`
             : 'Radar RainViewer: —'}
         </span>
+        {mostrarHidroestimadorCemaden && (
+          <span>GOES Hidroestimador do CEMADEN · estimativa por satélite, não medição local; a fonte pode ter atraso</span>
+        )}
         <span>{tempoMapa?.atual?.temperatura != null ? `Lafaiete: ${Math.round(Number(tempoMapa.atual.temperatura))} °C` : 'Temperatura local: —'}</span>
         <span>{previsaoTrovoadas ? `${pontosTrovoada.length} ponto(s) previsto(s) perto de Lafaiete` : 'Previsão local de trovoadas: —'}</span>
         {!templateTilesHttpsValido(GOES_CLOUD_TILE_URL) && <span>Nuvens GOES: fonte não configurada</span>}

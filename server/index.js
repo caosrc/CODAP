@@ -3842,6 +3842,7 @@ const MONITORAMENTO_CNL_TTL_MS = 2 * 60 * 1000
 let monitoramentoMgCache = null
 let monitoramentoMgCacheTs = 0
 const MONITORAMENTO_MG_TTL_MS = 2 * 60 * 1000
+const monitoramentoMgMetadadosEstacoes = new Map()
 
 function numeroCemaden(valor) {
   if (valor == null || valor === '') return null
@@ -4098,22 +4099,33 @@ app.get('/api/monitoramento-cnl', async (_req, res) => {
     return res.json({ ...monitoramentoCnlCache, cache: true })
   }
 
-  const controlador = new AbortController()
-  const timeout = setTimeout(() => controlador.abort(), 15000)
   try {
-    const [catalogoResposta, horarioResposta, nivelResposta] = await Promise.all([
+    const leiturasChuvaPromise = Promise.allSettled(
+      [...CNL_ESTACOES_CHUVA_IDS]
+        .filter((id) => id !== CNL_ESTACAO_ID)
+        .map(async (id) => {
+          const resposta = await fetch(`${CNL_RECURSOS_URL}/horario/${id}/96`, {
+            signal: AbortSignal.timeout(2500),
+            headers: { 'User-Agent': 'CODAP/1.0 (Conselheiro Lafaiete, MG)' },
+          })
+          if (!resposta.ok) throw new Error(`estação ${id} respondeu ${resposta.status}`)
+          return { id, payload: await resposta.json() }
+        }),
+    )
+    const [catalogoResposta, horarioResposta, nivelResposta, respostasChuva] = await Promise.all([
       fetch(CNL_CATALOGO_URL, {
-        signal: controlador.signal,
+        signal: AbortSignal.timeout(4500),
         headers: { 'User-Agent': 'CODAP/1.0 (Conselheiro Lafaiete, MG)' },
       }),
       fetch(`${CNL_RECURSOS_URL}/horario/${CNL_ESTACAO_ID}/23`, {
-        signal: controlador.signal,
+        signal: AbortSignal.timeout(2500),
         headers: { 'User-Agent': 'CODAP/1.0 (Conselheiro Lafaiete, MG)' },
       }).catch(() => null),
       fetch(CNL_NIVEL_URL, {
-        signal: controlador.signal,
+        signal: AbortSignal.timeout(2500),
         headers: { 'User-Agent': 'CODAP/1.0 (Conselheiro Lafaiete, MG)' },
       }).catch(() => null),
+      leiturasChuvaPromise,
     ])
     if (!catalogoResposta.ok) throw new Error(`CEMADEN respondeu catálogo ${catalogoResposta.status}`)
     const catalogo = await catalogoResposta.json()
@@ -4150,19 +4162,6 @@ app.get('/api/monitoramento-cnl', async (_req, res) => {
       )
     const chuvaPayloads = new Map([[CNL_ESTACAO_ID, horario]])
     const falhasChuva = []
-    const respostasChuva = await Promise.allSettled(
-      estacoesCatalogo
-        .map((item) => Number(item?.idestacao))
-        .filter((id) => Number.isFinite(id) && id !== CNL_ESTACAO_ID)
-        .map(async (id) => {
-          const resposta = await fetch(`${CNL_RECURSOS_URL}/horario/${id}/96`, {
-            signal: controlador.signal,
-            headers: { 'User-Agent': 'CODAP/1.0 (Conselheiro Lafaiete, MG)' },
-          })
-          if (!resposta.ok) throw new Error(`estação ${id} respondeu ${resposta.status}`)
-          return { id, payload: await resposta.json() }
-        }),
-    )
     respostasChuva.forEach((resultado) => {
       if (resultado.status === 'fulfilled') {
         chuvaPayloads.set(resultado.value.id, resultado.value.payload)
@@ -4294,8 +4293,6 @@ app.get('/api/monitoramento-cnl', async (_req, res) => {
       sucesso: false,
       erro: 'Não foi possível consultar o monitoramento do CEMADEN.',
     })
-  } finally {
-    clearTimeout(timeout)
   }
 })
 
@@ -4305,11 +4302,9 @@ app.get('/api/monitoramento-mg', async (_req, res) => {
     return res.json({ ...monitoramentoMgCache, cache: true })
   }
 
-  const controlador = new AbortController()
-  const timeout = setTimeout(() => controlador.abort(), 15000)
   try {
     const catalogoResposta = await fetch(CNL_CATALOGO_URL, {
-      signal: controlador.signal,
+      signal: AbortSignal.timeout(4500),
       headers: { 'User-Agent': 'CODAP/1.0 (Minas Gerais)' },
     })
     if (!catalogoResposta.ok) throw new Error(`CEMADEN respondeu ${catalogoResposta.status}`)
@@ -4320,11 +4315,17 @@ app.get('/api/monitoramento-mg', async (_req, res) => {
       String(item?.uf || '').toUpperCase() === 'MG' &&
       /conselheiro\s+lafaiete/i.test(String(item?.cidade || '')),
     )
+    const estacoesQuePrecisamDeAtualizacao = estacoesLafaiete.filter((item) => {
+      const id = Number(item?.idestacao)
+      const metadados = monitoramentoMgMetadadosEstacoes.get(id)
+      const temCoordenadas = metadados?.latitude != null && metadados?.longitude != null
+      return !temCoordenadas || numeroCemaden(item?.acc1hr) == null
+    })
     const respostasChuva = await Promise.allSettled(
-      estacoesLafaiete.map(async (item) => {
+      estacoesQuePrecisamDeAtualizacao.map(async (item) => {
         const id = Number(item?.idestacao)
-        const resposta = await fetch(`${CNL_RECURSOS_URL}/horario/${id}/96`, {
-          signal: controlador.signal,
+        const resposta = await fetch(`${CNL_RECURSOS_URL}/horario/${id}/24`, {
+          signal: AbortSignal.timeout(2500),
           headers: { 'User-Agent': 'CODAP/1.0 (Conselheiro Lafaiete, MG)' },
         })
         if (!resposta.ok) throw new Error(`estação ${id} respondeu ${resposta.status}`)
@@ -4344,16 +4345,23 @@ app.get('/api/monitoramento-mg', async (_req, res) => {
     })
     const estacoes = estacoesLafaiete.map((item) => {
       const chuva = chuvaPorEstacao.get(Number(item?.idestacao))
-      const dadosEstacao = chuva?.payload?.estacao || {}
+        const dadosEstacao = chuva?.payload?.estacao || {}
+        const metadadosSalvos = monitoramentoMgMetadadosEstacoes.get(Number(item?.idestacao))
+        const latitude = numeroCemaden(dadosEstacao.latitude) ?? metadadosSalvos?.latitude ?? numeroCemaden(item?.latitude)
+        const longitude = numeroCemaden(dadosEstacao.longitude) ?? metadadosSalvos?.longitude ?? numeroCemaden(item?.longitude)
+        const codigo = String(dadosEstacao.codEstacao || metadadosSalvos?.codigo || item?.codEstacao || '')
+        if (latitude != null && longitude != null) {
+          monitoramentoMgMetadadosEstacoes.set(Number(item?.idestacao), { latitude, longitude, codigo })
+        }
       const chuvaCatalogo = numeroCemaden(item?.acc1hr)
       const ultimaChuva = chuva?.ultimaLeitura
       return {
         id: Number(item?.idestacao),
         nome: String(item?.nomeestacao || dadosEstacao.nome || ''),
         municipio: String(item?.cidade || dadosEstacao.idMunicipio?.cidade || ''),
-        codigo: String(dadosEstacao.codEstacao || ''),
-        latitude: numeroCemaden(dadosEstacao.latitude),
-        longitude: numeroCemaden(dadosEstacao.longitude),
+          codigo,
+          latitude,
+          longitude,
         precipitacaoAtual: chuvaCatalogo ?? ultimaChuva?.valor ?? null,
         precipitacaoDataHora: chuvaCatalogo != null
           ? String(item?.datahoraUltimovalor || '')
@@ -4363,10 +4371,6 @@ app.get('/api/monitoramento-mg', async (_req, res) => {
     const estacoesGeorreferenciadas = estacoes.filter(
       (estacao) => estacao.latitude != null && estacao.longitude != null,
     ).length
-    if (estacoesGeorreferenciadas === 0) {
-      throw new Error('Nenhuma estação do catálogo atual pôde ser posicionada no mapa')
-    }
-
     monitoramentoMgCache = {
       sucesso: true,
       estacoes,
@@ -4388,8 +4392,6 @@ app.get('/api/monitoramento-mg', async (_req, res) => {
       sucesso: false,
       erro: 'Não foi possível consultar as estações CEMADEN de Minas Gerais.',
     })
-  } finally {
-    clearTimeout(timeout)
   }
 })
 

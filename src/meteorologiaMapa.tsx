@@ -1,11 +1,63 @@
-import { useCallback, useEffect, useState } from 'react'
-import { useMap, useMapEvents } from 'react-leaflet'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { Pane, WMSTileLayer, useMap, useMapEvents } from 'react-leaflet'
 import type { Map as LeafletMap } from 'leaflet'
 
 export const MINAS_GERAIS_BOUNDS: [[number, number], [number, number]] = [
   [-22.92, -51.05],
   [-14.22, -39.85],
 ]
+
+export const CEMADEN_MAPA_OFICIAL_URL = 'https://mapainterativo.cemaden.gov.br/'
+export const CEMADEN_HIDROESTIMADOR_WMS_URL = 'https://gsc.cemaden.gov.br/geoserver/cemaden_dev/wms'
+export const CEMADEN_HIDROESTIMADOR_LAYER = 'cemaden_dev:goes_hidroestimador_0'
+
+export function CamadaChuvaEstimadaCemaden({
+  ativa,
+  opacidade = 0.58,
+  nomePane = 'cemadenHidroestimador',
+}: {
+  ativa: boolean
+  opacidade?: number
+  nomePane?: string
+}) {
+  const [versaoAtualizacao, setVersaoAtualizacao] = useState(
+    () => Math.floor(Date.now() / (5 * 60 * 1000)),
+  )
+
+  useEffect(() => {
+    if (!ativa) return
+    const atualizar = () => {
+      if (document.visibilityState === 'visible') {
+        setVersaoAtualizacao(Math.floor(Date.now() / (5 * 60 * 1000)))
+      }
+    }
+    const atualizarAoAtivar = window.setTimeout(atualizar, 0)
+    const intervalo = window.setInterval(atualizar, 5 * 60 * 1000)
+    document.addEventListener('visibilitychange', atualizar)
+    return () => {
+      window.clearTimeout(atualizarAoAtivar)
+      window.clearInterval(intervalo)
+      document.removeEventListener('visibilitychange', atualizar)
+    }
+  }, [ativa])
+
+  if (!ativa) return null
+  return (
+    <Pane name={nomePane} style={{ zIndex: 425 }}>
+      <WMSTileLayer
+        key={versaoAtualizacao}
+        url={`${CEMADEN_HIDROESTIMADOR_WMS_URL}?refresh=${versaoAtualizacao}`}
+        layers={CEMADEN_HIDROESTIMADOR_LAYER}
+        format="image/png"
+        transparent
+        version="1.1.1"
+        opacity={opacidade}
+        maxZoom={18}
+        updateWhenIdle
+      />
+    </Pane>
+  )
+}
 
 export interface EstacaoCemadenMg {
   id: number
@@ -34,13 +86,17 @@ function numeroOuNulo(valor: unknown): number | null {
   return Number.isFinite(numero) ? numero : null
 }
 
+let cacheEstacoesCemadenMg: DadosCemadenMg | null = null
+
 export function useEstacoesCemadenMg(habilitado: boolean) {
-  const [dados, setDados] = useState<DadosCemadenMg | null>(null)
-  const [carregando, setCarregando] = useState(false)
+  const requisicaoAtiva = useRef(false)
+  const [dados, setDados] = useState<DadosCemadenMg | null>(() => cacheEstacoesCemadenMg)
+  const [carregando, setCarregando] = useState(() => cacheEstacoesCemadenMg == null)
   const [erro, setErro] = useState('')
 
   const carregar = useCallback(async () => {
-    if (!habilitado) return
+    if (!habilitado || requisicaoAtiva.current) return
+    requisicaoAtiva.current = true
     setCarregando(true)
     try {
       const resposta = await fetch(`/api/monitoramento-mg?_ts=${Date.now()}`, { cache: 'no-store' })
@@ -59,7 +115,7 @@ export function useEstacoesCemadenMg(habilitado: boolean) {
         precipitacaoDataHora: String(estacao.precipitacaoDataHora || ''),
       })).filter((estacao: EstacaoCemadenMg) => Number.isFinite(estacao.id))
 
-      setDados({
+      const dadosCarregados: DadosCemadenMg = {
         sucesso: true,
         estacoes,
         totalEstacoes: Number(corpo.totalEstacoes) || estacoes.length,
@@ -69,11 +125,14 @@ export function useEstacoesCemadenMg(habilitado: boolean) {
         estacoesSemCoordenadas: Number(corpo.estacoesSemCoordenadas) || 0,
         atualizadoEm: String(corpo.atualizadoEm || ''),
         fonte: String(corpo.fonte || 'CEMADEN'),
-      })
+      }
+      cacheEstacoesCemadenMg = dadosCarregados
+      setDados(dadosCarregados)
       setErro('')
     } catch (falha) {
       setErro(falha instanceof Error ? falha.message : 'Estações CEMADEN de Minas Gerais indisponíveis')
     } finally {
+      requisicaoAtiva.current = false
       setCarregando(false)
     }
   }, [habilitado])
@@ -84,7 +143,14 @@ export function useEstacoesCemadenMg(habilitado: boolean) {
     const intervalo = window.setInterval(() => {
       if (document.visibilityState === 'visible') void carregar()
     }, 2 * 60 * 1000)
-    return () => window.clearInterval(intervalo)
+    const atualizarAoVoltar = () => {
+      if (document.visibilityState === 'visible') void carregar()
+    }
+    document.addEventListener('visibilitychange', atualizarAoVoltar)
+    return () => {
+      window.clearInterval(intervalo)
+      document.removeEventListener('visibilitychange', atualizarAoVoltar)
+    }
   }, [habilitado, carregar])
 
   return { dados, carregando, erro, atualizar: carregar }

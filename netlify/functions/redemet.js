@@ -2,6 +2,8 @@ const REDEMET_API = 'https://api-redemet.decea.mil.br/produtos'
 const REDMET_IMAGE_HOST = 'estatico-redemet.decea.mil.br'
 const CACHE_TTL_MS = 90 * 1000
 const CACHE_CONTROL = 'public, max-age=60, s-maxage=90, stale-while-revalidate=240'
+const STSC_REFERENCIA = { latitude: -20.66, longitude: -43.78 }
+const STSC_RAIO_REFERENCIA_KM = 400
 const cache = new Map()
 
 const TIPOS_RADAR = new Set(['maxcappi', '10km', '07km', '05km', '03km'])
@@ -90,6 +92,14 @@ function normalizarStsc(dados) {
     const longitude = numeroValido(ponto?.lo)
     if (latitude == null || longitude == null || latitude < -90 || latitude > 90 ||
       longitude < -180 || longitude > 180) return []
+    const radianos = Math.PI / 180
+    const deltaLatitude = (latitude - STSC_REFERENCIA.latitude) * radianos
+    const deltaLongitude = (longitude - STSC_REFERENCIA.longitude) * radianos
+    const a = Math.sin(deltaLatitude / 2) ** 2 +
+      Math.cos(STSC_REFERENCIA.latitude * radianos) * Math.cos(latitude * radianos) *
+      Math.sin(deltaLongitude / 2) ** 2
+    const distanciaKm = 6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+    if (distanciaKm > STSC_RAIO_REFERENCIA_KM) return []
     return [{
       id: `${latitude}-${longitude}-${indice}`,
       latitude,
@@ -135,6 +145,8 @@ async function buscarProduto(produto, tipo, apiKey) {
     produto,
     fonte: 'REDEMET · DECEA',
     pontos,
+    raioReferenciaKm: STSC_RAIO_REFERENCIA_KM,
+    referencia: 'Conselheiro Lafaiete',
     horarioQuadro: Array.isArray(body?.data?.anima) ? body.data.anima.at(-1) || null : null,
     consultadoEm: now,
   }

@@ -21,6 +21,8 @@ export interface DadosRedemet {
   fonte?: string
   imagens?: ImagemRedemet[]
   pontos?: Array<{ id: string; latitude: number; longitude: number }>
+  raioReferenciaKm?: number
+  referencia?: string
   horarioQuadro?: string | null
   consultadoEm?: string
   erro?: string

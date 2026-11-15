@@ -893,6 +893,9 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
   const redemetRadar = useProdutoRedemet(mostrarRadarRedemet, 'radar', tipoRadarRedemet)
   const redemetStsc = useProdutoRedemet(mostrarStscRedemet, 'stsc')
   const redemetSatelite = useProdutoRedemet(mostrarSateliteRedemet, 'satelite')
+  const dadosRadarRedemetAtual = redemetRadar.dados?.tipo === tipoRadarRedemet
+    ? redemetRadar.dados
+    : null
   const visaoChuvaCombinadaAtiva = mostrarChuva && mostrarRadarRedemet &&
     mostrarNuvens && mostrarHidroestimadorCemaden
   const [mostrarIntensidadeCemaden, setMostrarIntensidadeCemaden] = useState(false)
@@ -1721,7 +1724,7 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
         />
         <CamadaRadarRedemet
           ativa={mostrarRadarRedemet}
-          dados={redemetRadar.dados}
+          dados={dadosRadarRedemetAtual}
         />
         <CamadaStscRedemet
           ativa={mostrarStscRedemet}
@@ -2302,7 +2305,7 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
                 </label>
                 <span>
                   {redemetRadar.carregando ? 'Consultando REDEMET…'
-                    : redemetRadar.erro || redemetRadar.dados?.imagens?.[0]?.atualizadoEm ||
+                    : redemetRadar.erro || dadosRadarRedemetAtual?.imagens?.[0]?.atualizadoEm ||
                     'Pico do Couto · fonte oficial DECEA'}
                 </span>
               </div>
@@ -2317,7 +2320,7 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
                 </button>
                 <span>
                   {redemetStsc.carregando ? 'Consultando STSC…'
-                    : redemetStsc.erro || `${redemetStsc.dados?.pontos?.length ?? '—'} posições no quadro mais recente`}
+                    : redemetStsc.erro || `${redemetStsc.dados?.pontos?.length ?? '—'} posições em até ${redemetStsc.dados?.raioReferenciaKm ?? 400} km de Lafaiete`}
                 </span>
               </div>
               <div className="mapa-chuva-fontes">

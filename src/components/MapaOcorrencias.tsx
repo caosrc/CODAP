@@ -897,7 +897,7 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
     ? redemetRadar.dados
     : null
   const visaoChuvaCombinadaAtiva = mostrarChuva && mostrarRadarRedemet &&
-    mostrarNuvens && mostrarHidroestimadorCemaden
+    mostrarStscRedemet && mostrarSateliteRedemet && mostrarHidroestimadorCemaden
   const [mostrarIntensidadeCemaden, setMostrarIntensidadeCemaden] = useState(false)
   const [opacidadeRadar, setOpacidadeRadar] = useState(0.72)
   const [opacidadeCemaden, setOpacidadeCemaden] = useState(0.52)
@@ -2271,14 +2271,16 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
                     const ativar = !visaoChuvaCombinadaAtiva
                     setMostrarChuva(ativar)
                     setMostrarRadarRedemet(ativar)
-                    setMostrarNuvens(ativar)
+                    setMostrarStscRedemet(ativar)
+                    setMostrarSateliteRedemet(ativar)
+                    setMostrarNuvens(false)
                     setMostrarHidroestimadorCemaden(ativar)
                   }}
-                  title="Ativar RainViewer, REDEMET, nuvens GOES e radar sintético do CEMADEN"
+                  title="Ativar RainViewer, REDEMET MAXCAPPI, STSC, satélite IR e estimativa CEMADEN"
                 >
                   🛰️ {visaoChuvaCombinadaAtiva ? 'Desativar visão combinada' : 'Visão combinada'}
                 </button>
-                <span>RainViewer + MAXCAPPI REDEMET + GOES + estimativa CEMADEN</span>
+                <span>RainViewer + REDEMET radar/STSC/IR + estimativa CEMADEN</span>
               </div>
               <div className="mapa-chuva-fontes mapa-chuva-fontes--redemet">
                 <button
@@ -2346,9 +2348,9 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
                   rel="noreferrer"
                   title="Abrir o portal oficial Nowcasting do CPTEC/INPE"
                 >
-                  ↗ CPTEC Nowcasting
+                  ↗ CPTEC Nowcasting · 60/120/180 min
                 </a>
-                <span>Previsão de deslocamento no portal oficial · não é uma camada sobreposta neste mapa</span>
+                <span>Previsão oficial de chuva · abre o portal CPTEC; não é uma camada sobreposta</span>
               </div>
               {mostrarChuva && <ControleHistoricoRadar controle={linhaTempoRadar} />}
               <div className="mapa-chuva-fontes">

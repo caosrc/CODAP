@@ -38,6 +38,12 @@ import RadarChuvaAnimado, {
 } from './RadarChuvaAnimado'
 import { useRadarFrameTimeline, type QuadroRadarChuva } from './radarTimeline'
 import CamadaNuvensGoes from './CamadaNuvensGoes'
+import {
+  CamadaRadarRedemet,
+  CamadaSateliteRedemet,
+  CamadaStscRedemet,
+} from './redemetMapa'
+import { useProdutoRedemet, type TipoRadarRedemet } from './redemetApi'
 
 type Prioridade = 'normal' | 'importante' | 'urgente'
 type ConfirmacaoRadar = { agente: string; confirmado: boolean; confirmedAt?: string }
@@ -468,7 +474,23 @@ function RadarMapaTempoReal({ tv, dataOcorrencias }: { tv: boolean; dataOcorrenc
   const [mostrarTemperatura, setMostrarTemperatura] = useState(true)
   const [mostrarTrovoadas, setMostrarTrovoadas] = useState(true)
   const [mostrarNuvens, setMostrarNuvens] = useState(false)
-  const visaoChuvaCombinadaAtiva = mostrarChuva && mostrarNuvens && mostrarHidroestimadorCemaden
+  const [mostrarRadarRedemet, setMostrarRadarRedemet] = useState(false)
+  const [mostrarStscRedemet, setMostrarStscRedemet] = useState(false)
+  const [mostrarSateliteRedemet, setMostrarSateliteRedemet] = useState(false)
+  const [tipoRadarRedemet, setTipoRadarRedemet] = useState<TipoRadarRedemet>('maxcappi')
+  const redemetRadar = useProdutoRedemet(mostrarRadarRedemet, 'radar', tipoRadarRedemet)
+  const redemetStsc = useProdutoRedemet(mostrarStscRedemet, 'stsc')
+  const redemetSatelite = useProdutoRedemet(mostrarSateliteRedemet, 'satelite')
+  const dadosRadarRedemetAtual = redemetRadar.dados?.tipo === tipoRadarRedemet
+    ? redemetRadar.dados
+    : null
+  const visaoChuvaCombinadaAtiva = mostrarChuva && mostrarRadarRedemet &&
+    mostrarStscRedemet && mostrarSateliteRedemet && mostrarHidroestimadorCemaden
+  const erroRedemet = [
+    mostrarRadarRedemet && redemetRadar.erro && `REDEMET radar: ${redemetRadar.erro}`,
+    mostrarStscRedemet && redemetStsc.erro && `STSC: ${redemetStsc.erro}`,
+    mostrarSateliteRedemet && redemetSatelite.erro && `Satélite IR: ${redemetSatelite.erro}`,
+  ].filter(Boolean).join(' · ')
   const [zoomMapa, setZoomMapa] = useState(RADAR_MAP_ZOOM)
   const [painelAreasRiscoHost, setPainelAreasRiscoHost] = useState<HTMLDivElement | null>(null)
   const mapaLeafletRef = useRef<LeafletMap | null>(null)
@@ -872,17 +894,20 @@ function RadarMapaTempoReal({ tv, dataOcorrencias }: { tv: boolean; dataOcorrenc
         </button>
         <button
           type="button"
-          className={`radar-live-map-layer-button ${mostrarChuva && mostrarNuvens && mostrarHidroestimadorCemaden ? 'ativo' : ''}`}
-          aria-pressed={mostrarChuva && mostrarNuvens && mostrarHidroestimadorCemaden}
-          title="Ligar radar observado, nuvens GOES e estimativa de precipitação do CEMADEN"
+          className={`radar-live-map-layer-button ${visaoChuvaCombinadaAtiva ? 'ativo' : ''}`}
+          aria-pressed={visaoChuvaCombinadaAtiva}
+          title="Ligar chuva observada, radar REDEMET, STSC, satélite IR e estimativa CEMADEN"
           onClick={() => {
-            const desativar = mostrarChuva && mostrarNuvens && mostrarHidroestimadorCemaden
-            setMostrarChuva(!desativar)
-            setMostrarNuvens(!desativar)
-            setMostrarHidroestimadorCemaden(!desativar)
+            const ativar = !visaoChuvaCombinadaAtiva
+            setMostrarChuva(ativar)
+            setMostrarRadarRedemet(ativar)
+            setMostrarStscRedemet(ativar)
+            setMostrarSateliteRedemet(ativar)
+            setMostrarHidroestimadorCemaden(ativar)
+            if (ativar) setMostrarNuvens(false)
           }}
         >
-          🛰️ Visão combinada
+          🛰️ {visaoChuvaCombinadaAtiva ? 'Desativar visão combinada' : 'Visão combinada'}
         </button>
         <button type="button" className={`radar-live-map-layer-button ${mostrarTemperatura ? 'ativo temperatura' : ''}`} onClick={() => setMostrarTemperatura(prev => !prev)} aria-pressed={mostrarTemperatura}>
           🌡️ Temperatura {mostrarTemperatura ? 'ativa' : 'desativada'}
@@ -899,6 +924,57 @@ function RadarMapaTempoReal({ tv, dataOcorrencias }: { tv: boolean; dataOcorrenc
         >
           ☁️ Nuvens GOES
         </button>
+        <button
+          type="button"
+          className={`radar-live-map-layer-button ${mostrarRadarRedemet ? 'ativo chuva' : ''}`}
+          onClick={() => setMostrarRadarRedemet(prev => !prev)}
+          aria-pressed={mostrarRadarRedemet}
+          title="Radar REDEMET/DECEA; MAXCAPPI ou cortes CAPPI em altitude"
+        >
+          🌧️ Radar REDEMET
+        </button>
+        <label className="radar-live-map-select-wrap">
+          <span>Produto</span>
+          <select
+            className="radar-live-map-layer-select"
+            value={tipoRadarRedemet}
+            onChange={evento => setTipoRadarRedemet(evento.target.value as TipoRadarRedemet)}
+            aria-label="Selecionar produto do radar REDEMET"
+          >
+            <option value="maxcappi">MAXCAPPI</option>
+            <option value="03km">CAPPI 3 km</option>
+            <option value="05km">CAPPI 5 km</option>
+            <option value="07km">CAPPI 7 km</option>
+            <option value="10km">CAPPI 10 km</option>
+          </select>
+        </label>
+        <button
+          type="button"
+          className={`radar-live-map-layer-button ${mostrarStscRedemet ? 'ativo trovoadas' : ''}`}
+          onClick={() => setMostrarStscRedemet(prev => !prev)}
+          aria-pressed={mostrarStscRedemet}
+          title="Ocorrências de tempo severo observadas pela REDEMET STSC"
+        >
+          ⚡ STSC
+        </button>
+        <button
+          type="button"
+          className={`radar-live-map-layer-button ${mostrarSateliteRedemet ? 'ativo nuvens' : ''}`}
+          onClick={() => setMostrarSateliteRedemet(prev => !prev)}
+          aria-pressed={mostrarSateliteRedemet}
+          title="Imagem infravermelha REDEMET; mostra nuvens, não mede chuva no solo"
+        >
+          ☁️ Satélite IR
+        </button>
+        <a
+          className="radar-live-map-layer-link"
+          href="https://nowcasting.cptec.inpe.br/"
+          target="_blank"
+          rel="noreferrer"
+          title="Previsão de chuva do CPTEC/INPE para 60, 120 e 180 minutos; abre fora do mapa"
+        >
+          ↗ CPTEC · 60/120/180 min
+        </a>
         <button
           type="button"
           className={`radar-live-map-layer-button ${mostrarHidroestimadorCemaden ? 'ativo chuva' : ''}`}
@@ -937,8 +1013,30 @@ function RadarMapaTempoReal({ tv, dataOcorrencias }: { tv: boolean; dataOcorrenc
         <span><i className="radar-live-map-status-dot radar-live-map-status-dot-station" /> CEMADEN · Lafaiete</span>
         {zoomMapa >= 9 && <span><i className="radar-live-map-status-dot radar-live-map-status-dot-temperature" /> Temperatura local</span>}
         {zoomMapa >= 9 && <span><i className="radar-live-map-status-dot radar-live-map-status-dot-lightning" /> Trovoadas previstas localmente · 36 h</span>}
-        {(radarErro || tempoMapaErro || trovoadasErro || cemadenMg.erro) && (
-          <strong>{[radarErro, tempoMapaErro, trovoadasErro, cemadenMg.erro].filter(Boolean).join(' · ')}</strong>
+        {(radarErro || tempoMapaErro || trovoadasErro || cemadenMg.erro || erroRedemet) && (
+          <strong>{[radarErro, tempoMapaErro, trovoadasErro, cemadenMg.erro, erroRedemet].filter(Boolean).join(' · ')}</strong>
+        )}
+        {mostrarRadarRedemet && (
+          <span>
+            <i className="radar-live-map-status-dot radar-live-map-status-dot-redemet" />
+            REDEMET {tipoRadarRedemet === 'maxcappi' ? 'MAXCAPPI' : `CAPPI ${tipoRadarRedemet.slice(0, 2)} km`} ·{' '}
+            {redemetRadar.carregando && !dadosRadarRedemetAtual
+              ? 'consultando'
+              : dadosRadarRedemetAtual?.imagens?.[0]?.atualizadoEm || (redemetRadar.erro ? 'última imagem indisponível' : 'aguardando imagem')}
+          </span>
+        )}
+        {mostrarStscRedemet && (
+          <span>
+            <i className="radar-live-map-status-dot radar-live-map-status-dot-stsc" />
+            STSC · {redemetStsc.dados?.pontos?.length ?? '—'} posições
+            {redemetStsc.dados?.horarioQuadro ? ` · quadro ${redemetStsc.dados.horarioQuadro}` : ''}
+          </span>
+        )}
+        {mostrarSateliteRedemet && (
+          <span>
+            <i className="radar-live-map-status-dot radar-live-map-status-dot-satellite" />
+            Satélite IR · {redemetSatelite.dados?.imagens?.[0]?.atualizadoEm || (redemetSatelite.carregando ? 'consultando' : '—')}
+          </span>
         )}
         {ocorrenciasComGps.length > 0 && (
           <span>
@@ -995,6 +1093,20 @@ function RadarMapaTempoReal({ tv, dataOcorrencias }: { tv: boolean; dataOcorrenc
           nomePane="radarLiveClouds"
           maxZoom={18}
           opacidade={0.55}
+        />
+        <CamadaSateliteRedemet
+          ativa={mostrarSateliteRedemet}
+          dados={redemetSatelite.dados}
+          opacidade={0.34}
+        />
+        <CamadaRadarRedemet
+          ativa={mostrarRadarRedemet}
+          dados={dadosRadarRedemetAtual}
+          opacidade={0.68}
+        />
+        <CamadaStscRedemet
+          ativa={mostrarStscRedemet}
+          dados={redemetStsc.dados}
         />
         {mostrarChuva && radarChuva && (
           <Pane name="radarLiveRain" style={{ zIndex: 420 }}>
@@ -1166,6 +1278,9 @@ function RadarMapaTempoReal({ tv, dataOcorrencias }: { tv: boolean; dataOcorrenc
         </span>
         {mostrarHidroestimadorCemaden && (
           <span>Radar sintético CEMADEN/GOES · estimativa por satélite; o horário da imagem não é informado</span>
+        )}
+        {(mostrarRadarRedemet || mostrarStscRedemet || mostrarSateliteRedemet) && (
+          <span>REDEMET · DECEA · atualização automática a cada 2 min; horários são os informados pela fonte</span>
         )}
         <span>{tempoMapa?.atual?.temperatura != null ? `Lafaiete: ${Math.round(Number(tempoMapa.atual.temperatura))} °C` : 'Temperatura local: —'}</span>
         <span>{previsaoTrovoadas ? `${pontosTrovoada.length} ponto(s) previsto(s) perto de Lafaiete` : 'Previsão local de trovoadas: —'}</span>

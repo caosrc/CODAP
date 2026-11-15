@@ -1216,7 +1216,8 @@ body.radar-tv-active .radar-page {
     margin-bottom: .12rem;
   }
 
-  body.radar-tv-active .radar-tv .radar-live-map-toolbar button {
+  body.radar-tv-active .radar-tv .radar-live-map-toolbar button,
+  body.radar-tv-active .radar-tv .radar-live-map-layer-link {
     padding: .2rem .34rem;
     font-size: clamp(.42rem, .5vw, .56rem);
   }
@@ -1528,8 +1529,13 @@ body.radar-tv-active .radar-page {
     font-size: .46rem;
   }
 
-  body.radar-tv-active .radar-tv .radar-live-map-toolbar button {
+  body.radar-tv-active .radar-tv .radar-live-map-toolbar button,
+  body.radar-tv-active .radar-tv .radar-live-map-layer-link,
+  body.radar-tv-active .radar-tv .radar-live-map-select-wrap {
     padding: .12rem .2rem;
+    font-size: .28rem;
+  }
+  body.radar-tv-active .radar-tv .radar-live-map-layer-select {
     font-size: .28rem;
   }
 
@@ -3880,8 +3886,13 @@ html:-webkit-full-screen {
     margin-bottom: .15rem;
   }
 
-  body.radar-tv-active .radar-tv .radar-live-map-toolbar button {
+  body.radar-tv-active .radar-tv .radar-live-map-toolbar button,
+  body.radar-tv-active .radar-tv .radar-live-map-layer-link,
+  body.radar-tv-active .radar-tv .radar-live-map-select-wrap {
     padding: .18rem .32rem;
+    font-size: .45rem;
+  }
+  body.radar-tv-active .radar-tv .radar-live-map-layer-select {
     font-size: .45rem;
   }
 
@@ -6962,13 +6973,18 @@ body.radar-tv-active .radar-tv .leaflet-overlay-pane .arm-polygon-alerta {
     -webkit-overflow-scrolling: touch;
   }
 
-  .radar-page:not(.radar-tv) .radar-live-map-toolbar button {
+  .radar-page:not(.radar-tv) .radar-live-map-toolbar button,
+  .radar-page:not(.radar-tv) .radar-live-map-layer-link,
+  .radar-page:not(.radar-tv) .radar-live-map-select-wrap {
     min-height: 42px;
     flex: 0 0 auto;
     padding: .5rem .7rem;
     font-size: .7rem;
     white-space: nowrap;
     touch-action: manipulation;
+  }
+  .radar-page:not(.radar-tv) .radar-live-map-layer-select {
+    font-size: .7rem;
   }
 
   .radar-page:not(.radar-tv) .radar-live-map-base-buttons {

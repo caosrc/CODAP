@@ -395,6 +395,45 @@
   font-weight: 800;
   cursor: pointer;
 }
+.radar-live-map-select-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: .25rem;
+  border: 1px solid #39718f;
+  border-radius: 7px;
+  padding: .18rem .38rem;
+  color: #9ebbd0;
+  background: #0b2944;
+  font-size: .56rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+.radar-live-map-layer-select {
+  min-height: 1.35rem;
+  border: 0;
+  color: #e7f2ff;
+  background: #123652;
+  font: inherit;
+  font-size: .62rem;
+  font-weight: 800;
+}
+.radar-live-map-layer-link {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid #39718f;
+  border-radius: 7px;
+  padding: .34rem .55rem;
+  color: #c9e7fa;
+  background: #123652;
+  font-size: .62rem;
+  font-weight: 800;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.radar-live-map-layer-link:hover {
+  color: #fff;
+  background: #087cae;
+}
 .radar-live-map-base-buttons button {
   border: 0;
   border-radius: 0;
@@ -477,6 +516,9 @@
 .radar-live-map-status-dot-station { background: #f97316; }
 .radar-live-map-status-dot-temperature { background: #0ea5e9; }
 .radar-live-map-status-dot-lightning { background: #a78bfa; }
+.radar-live-map-status-dot-redemet { background: #22c55e; }
+.radar-live-map-status-dot-stsc { background: #f97316; }
+.radar-live-map-status-dot-satellite { background: #a78bfa; }
 .radar-live-map {
   z-index: 0;
   width: 100%;

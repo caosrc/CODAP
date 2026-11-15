@@ -84,6 +84,12 @@
   force = true
 
 [[redirects]]
+  from = "/api/redemet"
+  to = "/.netlify/functions/redemet"
+  status = 200
+  force = true
+
+[[redirects]]
   from = "/api/rrqpe"
   to = "/.netlify/functions/rrqpe"
   status = 200

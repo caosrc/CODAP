@@ -42,6 +42,12 @@ import RadarChuvaAnimado, {
 } from './RadarChuvaAnimado'
 import { useRadarFrameTimeline, type QuadroRadarChuva } from './radarTimeline'
 import CamadaNuvensGoes from './CamadaNuvensGoes'
+import {
+  CamadaRadarRedemet,
+  CamadaSateliteRedemet,
+  CamadaStscRedemet,
+} from './redemetMapa'
+import { useProdutoRedemet, type TipoRadarRedemet } from './redemetApi'
 
 
 interface DadosRadarChuva {
@@ -867,6 +873,10 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
   const [camadaMapa, setCamadaMapa] = useState<CamadaMapa>('padrao')
   const [mostrarChuva, setMostrarChuva] = useState(false)
   const [mostrarNuvens, setMostrarNuvens] = useState(false)
+  const [mostrarRadarRedemet, setMostrarRadarRedemet] = useState(false)
+  const [mostrarStscRedemet, setMostrarStscRedemet] = useState(false)
+  const [mostrarSateliteRedemet, setMostrarSateliteRedemet] = useState(false)
+  const [tipoRadarRedemet, setTipoRadarRedemet] = useState<TipoRadarRedemet>('maxcappi')
   const [mostrarHidroestimadorCemaden, setMostrarHidroestimadorCemaden] = useState(false)
   const [painelChuvaAberto, setPainelChuvaAberto] = useState(false)
   const [radarChuva, setRadarChuva] = useState<DadosRadarChuva | null>(null)
@@ -880,7 +890,11 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
       : null
   ), [reservaFrameTime, reservaFramePath])
   const linhaTempoRadar = useRadarFrameTimeline(radarChuva?.quadros || [], quadroReservaRadar)
-  const visaoChuvaCombinadaAtiva = mostrarChuva && mostrarNuvens && mostrarHidroestimadorCemaden
+  const redemetRadar = useProdutoRedemet(mostrarRadarRedemet, 'radar', tipoRadarRedemet)
+  const redemetStsc = useProdutoRedemet(mostrarStscRedemet, 'stsc')
+  const redemetSatelite = useProdutoRedemet(mostrarSateliteRedemet, 'satelite')
+  const visaoChuvaCombinadaAtiva = mostrarChuva && mostrarRadarRedemet &&
+    mostrarNuvens && mostrarHidroestimadorCemaden
   const [mostrarIntensidadeCemaden, setMostrarIntensidadeCemaden] = useState(false)
   const [opacidadeRadar, setOpacidadeRadar] = useState(0.72)
   const [opacidadeCemaden, setOpacidadeCemaden] = useState(0.52)
@@ -1701,6 +1715,18 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
           nomePane="mapaGoesNuvens"
           maxZoom={19}
         />
+        <CamadaSateliteRedemet
+          ativa={mostrarSateliteRedemet}
+          dados={redemetSatelite.dados}
+        />
+        <CamadaRadarRedemet
+          ativa={mostrarRadarRedemet}
+          dados={redemetRadar.dados}
+        />
+        <CamadaStscRedemet
+          ativa={mostrarStscRedemet}
+          dados={redemetStsc.dados}
+        />
         {mostrarChuva && zoomMapa >= 9 && tempoMapa?.atual && (
           <Marker
             position={POSICAO_TEMPERATURA_LAFAIETE}
@@ -2241,14 +2267,85 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
                   onClick={() => {
                     const ativar = !visaoChuvaCombinadaAtiva
                     setMostrarChuva(ativar)
+                    setMostrarRadarRedemet(ativar)
                     setMostrarNuvens(ativar)
                     setMostrarHidroestimadorCemaden(ativar)
                   }}
-                  title="Ativar radar observado, nuvens GOES e radar sintético do CEMADEN"
+                  title="Ativar RainViewer, REDEMET, nuvens GOES e radar sintético do CEMADEN"
                 >
                   🛰️ {visaoChuvaCombinadaAtiva ? 'Desativar visão combinada' : 'Visão combinada'}
                 </button>
-                <span>Radar observado + radar sintético GOES + nuvens infravermelhas</span>
+                <span>RainViewer + MAXCAPPI REDEMET + GOES + estimativa CEMADEN</span>
+              </div>
+              <div className="mapa-chuva-fontes mapa-chuva-fontes--redemet">
+                <button
+                  className={`mapa-chuva-fonte-btn ${mostrarRadarRedemet ? 'ativo' : ''}`}
+                  onClick={() => setMostrarRadarRedemet(v => !v)}
+                  aria-pressed={mostrarRadarRedemet}
+                  title="Radar de precipitação REDEMET sobre o mapa"
+                >
+                  🌧️ Radar REDEMET
+                </button>
+                <label className="mapa-redemet-seletor">
+                  <span>Produto</span>
+                  <select
+                    value={tipoRadarRedemet}
+                    onChange={evento => setTipoRadarRedemet(evento.target.value as TipoRadarRedemet)}
+                    aria-label="Selecionar produto do radar REDEMET"
+                  >
+                    <option value="maxcappi">MAXCAPPI · 400 km</option>
+                    <option value="03km">CAPPI · 3 km</option>
+                    <option value="05km">CAPPI · 5 km</option>
+                    <option value="07km">CAPPI · 7 km</option>
+                    <option value="10km">CAPPI · 10 km</option>
+                  </select>
+                </label>
+                <span>
+                  {redemetRadar.carregando ? 'Consultando REDEMET…'
+                    : redemetRadar.erro || redemetRadar.dados?.imagens?.[0]?.atualizadoEm ||
+                    'Pico do Couto · fonte oficial DECEA'}
+                </span>
+              </div>
+              <div className="mapa-chuva-fontes">
+                <button
+                  className={`mapa-chuva-fonte-btn ${mostrarStscRedemet ? 'ativo' : ''}`}
+                  onClick={() => setMostrarStscRedemet(v => !v)}
+                  aria-pressed={mostrarStscRedemet}
+                  title="Exibir posições de ocorrência de trovoada fornecidas pela REDEMET"
+                >
+                  ⚡ REDEMET STSC
+                </button>
+                <span>
+                  {redemetStsc.carregando ? 'Consultando STSC…'
+                    : redemetStsc.erro || `${redemetStsc.dados?.pontos?.length ?? '—'} posições no quadro mais recente`}
+                </span>
+              </div>
+              <div className="mapa-chuva-fontes">
+                <button
+                  className={`mapa-chuva-fonte-btn ${mostrarSateliteRedemet ? 'ativo' : ''}`}
+                  onClick={() => setMostrarSateliteRedemet(v => !v)}
+                  aria-pressed={mostrarSateliteRedemet}
+                  title="Imagem infravermelha do satélite REDEMET; mostra nuvens, não mede chuva no solo"
+                >
+                  ☁️ REDEMET IR
+                </button>
+                <span>
+                  {redemetSatelite.carregando ? 'Consultando imagem…'
+                    : redemetSatelite.erro || redemetSatelite.dados?.imagens?.[0]?.atualizadoEm ||
+                    'Imagem infravermelha · acompanhamento de nuvens'}
+                </span>
+              </div>
+              <div className="mapa-chuva-fontes">
+                <a
+                  className="mapa-chuva-fonte-btn"
+                  href="https://nowcasting.cptec.inpe.br/"
+                  target="_blank"
+                  rel="noreferrer"
+                  title="Abrir o portal oficial Nowcasting do CPTEC/INPE"
+                >
+                  ↗ CPTEC Nowcasting
+                </a>
+                <span>Previsão de deslocamento no portal oficial · não é uma camada sobreposta neste mapa</span>
               </div>
               {mostrarChuva && <ControleHistoricoRadar controle={linhaTempoRadar} />}
               <div className="mapa-chuva-fontes">
@@ -2355,7 +2452,7 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
                 <span title="Refletividade do radar: 55 dBZ ou mais"><i className="chuva-cor chuva-cor--extrema" /> extrema</span>
               </div>
               <p className="mapa-chuva-ajuda">
-                O RainViewer mantém até 12 quadros recentes (zoom máximo 7); use o controle para animar o histórico e acompanhar o deslocamento visual da chuva. Isso não é previsão. A fonte costuma publicar novos quadros em intervalos de cerca de 10 minutos; o horário exibido é de geração do quadro, não o instante exato da chuva. A legenda representa refletividade do radar (dBZ), não milímetros. Radares podem não captar chuva localizada ou áreas sem cobertura; as estações CEMADEN mostram medições pontuais de Conselheiro Lafaiete. A imagem GOES mostra nuvens, não confirma chuva no solo.
+                RainViewer mantém quadros observados para contingência; REDEMET MAXCAPPI/CAPPI mostra ecos do radar Pico do Couto e permite comparar alturas de 3, 5, 7 e 10 km. Os horários são os informados pelas fontes e não indicam o instante exato da chuva. STSC mostra posições de ocorrência de trovoada; a imagem IR mostra nuvens, não confirma chuva no solo. O CPTEC Nowcasting abre em seu portal oficial e não está sobreposto neste mapa. As estações CEMADEN continuam sendo medições pontuais de Conselheiro Lafaiete.
                 A previsão de trovoadas continua cobrindo localidades de Minas Gerais, mas os valores de precipitação prevista são exibidos somente para Lafaiete. A superfície interpolada permanece limitada a 10 km do centro de Lafaiete e só aparece com pelo menos três leituras válidas da última hora; não equivale a radar nem a uma medição estadual.
               </p>
               {cemadenCarregando && <div className="mapa-chuva-status">⏳ Atualizando estações CEMADEN…</div>}

@@ -21,6 +21,7 @@ Required env vars (all set in Replit shared env / secrets):
 - `EARTH_ENGINE_PROJECT` — optional Earth Engine/Google Cloud project ID; when omitted, uses the `project_id` from the JSON key
 - `FIRMS_MAP_KEY` — Secret for NASA FIRMS active-fire data
 - `PLANET_API_KEY` — Secret for Planet satellite imagery queries
+- `REDEMET_API_KEY` — Secret da API REDEMET/DECEA para MAXCAPPI, CAPPI, STSC e imagens IR
 
 ## Stack
 - **Frontend**: React 19 + TypeScript + Vite
@@ -29,7 +30,7 @@ Required env vars (all set in Replit shared env / secrets):
 - **Push Notifications**: Web Push (VAPID) via `web-push` on Express server
 - **Maps**: Leaflet + react-leaflet (tiles proxied via `/api/tiles`)
 - **Incêndios ativos**: NASA FIRMS (VIIRS NOAA-20/S-NPP, MODIS Terra/Aqua) + Google Earth Engine (GOES-19 ABI, MODIS e VIIRS), exibidos como focos e camadas no mapa
-- **Chuva ao vivo**: RainViewer fornece o último quadro de radar meteorológico sobre o Leaflet; o limite oficial de Conselheiro Lafaiete é desenhado sobre a camada via OpenStreetMap/Nominatim
+- **Chuva ao vivo**: REDEMET/DECEA fornece imagens MAXCAPPI/CAPPI, ocorrências STSC e imagens IR por proxy do servidor; RainViewer permanece como contingência
 - **Camadas meteorológicas no mapa**: RainViewer usa metadados públicos observados e tiles dinâmicos; a intensidade CEMADEN é uma superfície IDW estimada entre as sete estações oficiais, sem marcadores; GOES/Nuvens só é ativado com `VITE_GOES_CLOUD_TILES_URL` HTTPS configurada; RRQPE permanece desligado até existir serviço real de rasterização
 - **Imagens Planet**: consulta protegida pelo servidor em `/api/planet-focos`
 
@@ -75,6 +76,8 @@ Required env vars (all set in Replit shared env / secrets):
 - Production on Netlify: `npm run build`, publish `dist`, and load Functions from `netlify/functions`
 - Push notifications require `VAPID_PRIVATE_KEY` secret to be set in Replit secrets
 - Earth Engine requires the service account to have Earth Engine access and the `Service Usage Consumer` role on the Google Cloud project
+- A chave REDEMET deve ser cadastrada como secret `REDEMET_API_KEY` no Replit e, para produção Netlify, também como variável secreta no site Netlify; nunca a inclua no frontend ou em `VITE_*`
+- O CPTEC Nowcasting abre no portal oficial; a antiga página SCOPE retornou HTTP 410 e a previsão ainda não é uma camada integrada ao mapa
 - O botão **Chuva** mostra precipitação observada pelo radar RainViewer, atualizada automaticamente a cada 5 minutos, com legenda e limite municipal tracejado. A leitura em mm do centro é um resumo do Open-Meteo e não substitui pluviômetro local.
 - A superfície **Intensidade CEMADEN** é uma estimativa interpolada (IDW), limitada ao raio visual de 10 km e atualizada junto com o endpoint oficial; dados ausentes não são preenchidos artificialmente.
 - A camada **RRQPE NOAA** permanece indisponível no mapa enquanto não existir um serviço real que rasterize o produto NetCDF para tiles HTTPS; ela não é substituída por GOES, RainViewer ou dados inventados.

@@ -11,6 +11,7 @@
 /api/alertas-tempo  /.netlify/functions/alertas-tempo  200!
 /api/tempo-raios  /.netlify/functions/tempo-raios  200!
 /api/radar-chuva  /.netlify/functions/radar-chuva  200!
+/api/redemet  /.netlify/functions/redemet  200!
 /api/rrqpe  /.netlify/functions/rrqpe  200!
 /api/geocode  /.netlify/functions/geocode  200!
 /api/rota  /.netlify/functions/rota  200!

@@ -1608,6 +1608,26 @@ input, select, textarea { font-family: inherit; }
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.mapa-chuva-fontes--redemet {
+  flex-wrap: wrap;
+}
+.mapa-redemet-seletor {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  color: #475569;
+  font-size: 0.52rem;
+  font-weight: 700;
+}
+.mapa-redemet-seletor select {
+  max-width: 9rem;
+  border: 1px solid #bae6fd;
+  border-radius: 4px;
+  padding: 0.18rem 0.25rem;
+  background: #fff;
+  color: #075985;
+  font: inherit;
+}
 .mapa-chuva-combinado-btn {
   border-color: #0e7490;
   color: #0e7490;

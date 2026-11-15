@@ -12,6 +12,7 @@ import WebSocket, { WebSocketServer } from 'ws'
 import { execFile } from 'child_process'
 import { promisify } from 'util'
 import { handler as planetFocosHandler } from '../netlify/functions/planet-focos.js'
+import { handler as redemetHandler } from '../netlify/functions/redemet.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
@@ -4460,6 +4461,18 @@ app.get('/api/radar-chuva', async (_req, res) => {
     }
     return res.set('Cache-Control', 'no-store')
       .status(503).json({ erro: 'Radar de chuva indisponível' })
+  }
+})
+
+app.get('/api/redemet', async (req, res) => {
+  try {
+    const resultado = await redemetHandler({ queryStringParameters: req.query })
+    res.status(resultado.statusCode)
+    for (const [nome, valor] of Object.entries(resultado.headers || {})) res.set(nome, valor)
+    return res.send(resultado.body)
+  } catch {
+    return res.status(502).set('Cache-Control', 'no-store')
+      .json({ erro: 'A consulta à REDEMET falhou.' })
   }
 })
 

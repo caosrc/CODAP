@@ -1,0 +1,16 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "sKVBcbGSidZzvTIH79hZM"
+uri = "file://generated-artifacts/codigo-mapa-chuva-radar.zip"
+type = "unspecified"
+title = "Código de Mapa Chuva e Radar DC"
+description = "ZIP com telas, estilos, camadas RainViewer/CEMADEN, endpoints e instruções de integração. A chave REDEMET real não está incluída; o pacote orienta configurá-la como segredo."
+logical_id = "0edbb6c0-0878-443f-922f-0b79af5b5c26"
+content_hash = "sha256:0165c0366f1c95f127747221caaed32d500c2f1ab1774404a3433f01917ab4d9"
+size = 142613
+mtime_ms = 1794827300577
+storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:9f0fb690-abb3-40b2-b829-430d5a918185/0edbb6c0-0878-443f-922f-0b79af5b5c26/61e4b5ce-15e1-4114-ad0a-717965ba3916"
+storage_version_token = "1794827319702482"
+content_type = "application/octet-stream"

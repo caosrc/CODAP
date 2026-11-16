@@ -1,6 +1,7 @@
 dist
 node_modules
 package-lock.json
+/generated-artifacts/
 
 # Local Netlify folder
 .netlify

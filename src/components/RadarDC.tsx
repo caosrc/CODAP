@@ -628,9 +628,15 @@ function RadarMapaTempoReal({ tv, dataOcorrencias }: { tv: boolean; dataOcorrenc
     setAreasRiscoSalvando(true)
     setAreasRiscoErro(null)
     try {
+      const { atributos_kmz, ...dadosArea } = entrada
+      const payload = {
+        ...dadosArea,
+        ...(atributos_kmz.length > 0 ? { atributos_kmz } : {}),
+        criado_por: agenteLogado,
+      }
       const { data, error } = await supabase
         .from('areas_risco')
-        .insert({ ...entrada, criado_por: agenteLogado })
+        .insert(payload)
         .select('*')
         .single()
       if (error) throw error
@@ -651,9 +657,15 @@ function RadarMapaTempoReal({ tv, dataOcorrencias }: { tv: boolean; dataOcorrenc
     setAreasRiscoSalvando(true)
     setAreasRiscoErro(null)
     try {
+      const { atributos_kmz, ...dadosArea } = entrada
+      const payload = {
+        ...dadosArea,
+        ...(atributos_kmz.length > 0 ? { atributos_kmz } : {}),
+        updated_at: new Date().toISOString(),
+      }
       const { data, error } = await supabase
         .from('areas_risco')
-        .update({ ...entrada, updated_at: new Date().toISOString() })
+        .update(payload)
         .eq('id', id)
         .select('*')
         .single()

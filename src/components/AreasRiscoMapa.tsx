@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type CSSProperties, type FormEvent } from 'react'
 import { createPortal } from 'react-dom'
-import { Marker, Pane, Polygon, Popup, Tooltip, useMap, useMapEvents } from 'react-leaflet'
+import { Marker, Pane, Polygon, Popup, Tooltip, useMap } from 'react-leaflet'
 import L from 'leaflet'
 import ModalSenha from './ModalSenha'
 import './AreasRiscoMapa.css'
@@ -216,12 +216,28 @@ function InteracaoMapa({
   aoMarcar: (latitude: number, longitude: number) => void
   aoAdicionarPonto: (ponto: [number, number]) => void
 }) {
-  useMapEvents({
-    click(event) {
-      if (modo === 'marcador') aoMarcar(event.latlng.lat, event.latlng.lng)
-      if (modo === 'poligono') aoAdicionarPonto([event.latlng.lat, event.latlng.lng])
-    },
-  })
+  const mapa = useMap()
+
+  useEffect(() => {
+    if (!modo) return
+    const container = mapa.getContainer()
+    const capturarClique = (event: MouseEvent) => {
+      const alvo = event.target
+      if (alvo instanceof Element && alvo.closest('.leaflet-control, .leaflet-popup')) return
+
+      const ponto = mapa.mouseEventToLatLng(event)
+      event.preventDefault()
+      event.stopPropagation()
+      event.stopImmediatePropagation()
+
+      if (modo === 'marcador') aoMarcar(ponto.lat, ponto.lng)
+      else aoAdicionarPonto([ponto.lat, ponto.lng])
+    }
+
+    container.addEventListener('click', capturarClique, true)
+    return () => container.removeEventListener('click', capturarClique, true)
+  }, [mapa, modo, aoMarcar, aoAdicionarPonto])
+
   return null
 }
 
@@ -730,9 +746,12 @@ export default function AreasRiscoMapa({
           setModoMapa('poligono')
           setLocalErro('')
         }}
-        aoAdicionarPonto={ponto => atualizarRascunho({
-          poligono: adicionarVertice(rascunho?.poligono ?? [], ponto),
-        })}
+        aoAdicionarPonto={ponto => {
+          setRascunho(atual => atual
+            ? { ...atual, poligono: adicionarVertice(atual.poligono, ponto) }
+            : atual)
+          setLocalErro('')
+        }}
       />
       <Pane name="radarLiveRiskAreas" style={{ zIndex: 475 }}>
         {poligonosImportados.map((importado, indice) => {

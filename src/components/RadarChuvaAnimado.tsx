@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import { TileLayer } from 'react-leaflet'
-import type { ControleLinhaTempoRadar, QuadroRadarChuva } from './radarTimeline'
+import { validarQuadro, type ControleLinhaTempoRadar, type QuadroRadarChuva } from './radarTimeline'
 
 interface Props {
   host: string

@@ -16,7 +16,7 @@ export interface ControleLinhaTempoRadar {
   irAoVivo: () => void
 }
 
-function validarQuadro(quadro: QuadroRadarChuva): boolean {
+export function validarQuadro(quadro: QuadroRadarChuva): boolean {
   return Number.isFinite(quadro.time) &&
     typeof quadro.path === 'string' &&
     quadro.path.startsWith('/v2/radar/')

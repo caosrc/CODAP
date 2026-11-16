@@ -204,6 +204,13 @@ function mensagemErroAreaRisco(erro: unknown, fallback: string): string {
     : fallback
 }
 
+function colunaAtributosKmzAusente(erro: unknown): boolean {
+  if (!erro || typeof erro !== 'object') return false
+  const detalhe = erro as { code?: unknown; message?: unknown }
+  return String(detalhe.code ?? '') === 'PGRST204'
+    && /atributos_kmz/i.test(String(detalhe.message ?? ''))
+}
+
 const CONSELHEIRO_LAFAIETE = { latitude: -20.6604, longitude: -43.7863 }
 const RADAR_MAP_CENTER: [number, number] = [CONSELHEIRO_LAFAIETE.latitude, CONSELHEIRO_LAFAIETE.longitude]
 const RADAR_MAP_ZOOM = 12
@@ -634,11 +641,19 @@ function RadarMapaTempoReal({ tv, dataOcorrencias }: { tv: boolean; dataOcorrenc
         ...(atributos_kmz.length > 0 ? { atributos_kmz } : {}),
         criado_por: agenteLogado,
       }
-      const { data, error } = await supabase
+      let resultado = await supabase
         .from('areas_risco')
         .insert(payload)
         .select('*')
         .single()
+      if (resultado.error && atributos_kmz.length > 0 && colunaAtributosKmzAusente(resultado.error)) {
+        resultado = await supabase
+          .from('areas_risco')
+          .insert({ ...dadosArea, criado_por: agenteLogado })
+          .select('*')
+          .single()
+      }
+      const { data, error } = resultado
       if (error) throw error
       const area = normalizarAreaRisco(data as Record<string, unknown>)
       if (!area) throw new Error('O Supabase retornou a área em um formato inválido.')
@@ -663,12 +678,21 @@ function RadarMapaTempoReal({ tv, dataOcorrencias }: { tv: boolean; dataOcorrenc
         ...(atributos_kmz.length > 0 ? { atributos_kmz } : {}),
         updated_at: new Date().toISOString(),
       }
-      const { data, error } = await supabase
+      let resultado = await supabase
         .from('areas_risco')
         .update(payload)
         .eq('id', id)
         .select('*')
         .single()
+      if (resultado.error && atributos_kmz.length > 0 && colunaAtributosKmzAusente(resultado.error)) {
+        resultado = await supabase
+          .from('areas_risco')
+          .update({ ...dadosArea, updated_at: new Date().toISOString() })
+          .eq('id', id)
+          .select('*')
+          .single()
+      }
+      const { data, error } = resultado
       if (error) throw error
       const area = normalizarAreaRisco(data as Record<string, unknown>)
       if (!area) throw new Error('O Supabase retornou a área em um formato inválido.')

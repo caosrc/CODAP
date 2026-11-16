@@ -23,12 +23,18 @@ export interface CandidatoPoligonoKmz {
   nome: string
   ponto: [number, number] | null
   atributos: Array<{ campo: string; valor: string }>
+  avisos?: string[]
   tipo?: TipoAreaRisco
   data_inicio?: string
   limite_precipitacao_mm?: number
   referencia: string
   observacao?: string
   poligonos: PoligonoKmlCandidato[]
+}
+
+export interface ResultadoValidacaoKmz {
+  poligonos: PoligonoKmzImportado[]
+  avisos: string[]
 }
 
 function descendentesComNome(parent: Document | Element, nome: string): Element[] {
@@ -381,24 +387,39 @@ export function extrairCandidatosKml(conteudo: string): CandidatoPoligonoKmz[] {
   }
 
   if (!resultado.length) {
+    const totalLinhas = descendentesComNome(documento, 'LineString').length
+    if (totalLinhas > 0) {
+      throw new Error(`O arquivo contém ${totalLinhas} feição(ões) linear(es), mas nenhum polígono de área de risco.`)
+    }
     throw new Error('Nenhum polígono válido foi encontrado no KMZ/KML.')
+  }
+  const totalLinhas = descendentesComNome(documento, 'LineString').length
+  if (totalLinhas > 0) {
+    resultado[0].avisos = [
+      `O arquivo também contém ${totalLinhas} feição(ões) linear(es); elas não são áreas de risco e não foram importadas.`,
+    ]
   }
   return resultado
 }
 
-export function validarCandidatosKml(candidatos: CandidatoPoligonoKmz[]): PoligonoKmzImportado[] {
+export function validarCandidatosKml(candidatos: CandidatoPoligonoKmz[]): ResultadoValidacaoKmz {
   const resultado: PoligonoKmzImportado[] = []
+  const avisos = candidatos.flatMap(candidato => candidato.avisos ?? [])
   let totalVertices = 0
 
   for (const candidato of candidatos) {
-    let geometria: GeometriaAreaRisco
-    try {
-      geometria = candidato.poligonos.map((polygon, indice) =>
-        lerPoligonoKml(polygon, `“${candidato.nome}”, polígono ${indice + 1}`),
-      )
-    } catch (erro) {
-      throw new Error(erro instanceof Error ? erro.message : `O contorno “${candidato.nome}” é inválido.`)
+    const geometria: GeometriaAreaRisco = []
+    for (let indice = 0; indice < candidato.poligonos.length; indice++) {
+      try {
+        geometria.push(
+          lerPoligonoKml(candidato.poligonos[indice], `“${candidato.nome}”, polígono ${indice + 1}`),
+        )
+      } catch (erro) {
+        const motivo = erro instanceof Error ? erro.message : 'contorno inválido.'
+        avisos.push(`${candidato.nome}, polígono ${indice + 1}: ${motivo}`)
+      }
     }
+    if (!geometria.length) continue
 
     const pontosExternos = geometria.flatMap(poligono => poligono[0])
     totalVertices += geometria.reduce(
@@ -426,9 +447,11 @@ export function validarCandidatosKml(candidatos: CandidatoPoligonoKmz[]): Poligo
   }
 
   if (!resultado.length) {
-    throw new Error('Nenhum polígono válido foi encontrado no KMZ/KML.')
+    const detalhes = avisos.slice(0, 4).join(' ')
+    const restante = avisos.length > 4 ? ` Mais ${avisos.length - 4} aviso(s).` : ''
+    throw new Error(`Nenhum polígono válido foi encontrado no KMZ/KML. ${detalhes}${restante}`.trim())
   }
-  return resultado
+  return { poligonos: resultado, avisos }
 }
 
 export async function extrairKmlDoArquivo(

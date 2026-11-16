@@ -9,6 +9,7 @@ import type { CandidatoPoligonoKmz } from './areasRiscoKmzParser'
 
 export interface PoligonoKmzImportado {
   nome: string
+  arquivo?: string
   poligono: GeometriaAreaRisco
   latitude: number
   longitude: number
@@ -23,13 +24,18 @@ export interface PoligonoKmzImportado {
 type ImportacaoWorkerMensagem =
   | { tipo: 'progresso'; mensagem: string }
   | { tipo: 'kml'; conteudo: string }
-  | { tipo: 'resultado'; poligonos: PoligonoKmzImportado[] }
+  | { tipo: 'resultado'; poligonos: PoligonoKmzImportado[]; avisos: string[] }
   | { tipo: 'erro'; mensagem: string }
+
+export interface ResultadoImportacaoPoligonosKmz {
+  poligonos: PoligonoKmzImportado[]
+  avisos: string[]
+}
 
 export function importarPoligonosKmz(
   arquivo: File,
   aoAtualizarProgresso?: (mensagem: string) => void,
-): Promise<PoligonoKmzImportado[]> {
+): Promise<ResultadoImportacaoPoligonosKmz> {
   return new Promise((resolve, reject) => {
     let worker: Worker
     try {
@@ -57,7 +63,7 @@ export function importarPoligonosKmz(
           })
       } else if (mensagem.tipo === 'resultado') {
         worker.terminate()
-        resolve(mensagem.poligonos)
+        resolve({ poligonos: mensagem.poligonos, avisos: mensagem.avisos })
       } else {
         worker.terminate()
         reject(new Error(mensagem.mensagem))

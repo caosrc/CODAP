@@ -280,6 +280,7 @@ function PopupInformacaoKmz({
     <Popup>
       <div className="arm-popup">
         <div className="arm-popup-title" style={{ color: '#8e52c7' }}>{importado.nome}</div>
+        {importado.arquivo && <div>Arquivo: <strong>{importado.arquivo}</strong></div>}
         {tipoSelecionado && <div>Tipo para cadastro: <strong>{tipoSelecionado}</strong></div>}
         {atributos.length > 0 ? (
           <>
@@ -574,15 +575,38 @@ export default function AreasRiscoMapa({
   }
 
   async function importarArquivoKmz(event: ChangeEvent<HTMLInputElement>) {
-    const arquivo = event.currentTarget.files?.[0]
+    const arquivos = Array.from(event.currentTarget.files ?? [])
     event.currentTarget.value = ''
-    if (!arquivo) return
+    if (!arquivos.length) return
 
     setProcessandoKmz(true)
     setLocalErro('')
     setMensagemKmz('Preparando a leitura do arquivo…')
     try {
-      const poligonos = await importarPoligonosKmz(arquivo, setMensagemKmz)
+      const poligonos: PoligonoKmzImportado[] = []
+      const avisos: string[] = []
+      for (let indice = 0; indice < arquivos.length; indice++) {
+        const arquivo = arquivos[indice]
+        setMensagemKmz(`Lendo ${arquivo.name} (${indice + 1}/${arquivos.length})…`)
+        try {
+          const resultado = await importarPoligonosKmz(
+            arquivo,
+            mensagem => setMensagemKmz(`${arquivo.name}: ${mensagem}`),
+          )
+          poligonos.push(...resultado.poligonos.map(poligono => ({
+            ...poligono,
+            arquivo: arquivo.name,
+          })))
+          avisos.push(...resultado.avisos.map(aviso => `${arquivo.name}: ${aviso}`))
+        } catch (erro) {
+          avisos.push(`${arquivo.name}: ${erro instanceof Error ? erro.message : 'Não foi possível ler o arquivo.'}`)
+        }
+      }
+      if (!poligonos.length) {
+        setMensagemKmz(avisos.join(' · ') || 'Nenhum polígono válido foi encontrado nos arquivos.')
+        return
+      }
+
       const tipoBase = rascunho?.tipo ?? (filtro === 'Todas' ? 'Encostas' : filtro)
       setPoligonosImportados(poligonos)
       setPoligonosImportadosConcluidos(new Set())
@@ -595,7 +619,10 @@ export default function AreasRiscoMapa({
       setEditandoId(null)
       setModoMapa(null)
       setRecolhido(false)
-      setMensagemKmz(`${poligonos.length} polígono(s) encontrado(s). Revise cada contorno e registre as áreas individualmente.`)
+      const resumoAvisos = avisos.length
+        ? ` Avisos (${avisos.length}): ${avisos.slice(0, 5).join(' · ')}${avisos.length > 5 ? ` · +${avisos.length - 5} aviso(s)` : ''}`
+        : ''
+      setMensagemKmz(`${poligonos.length} área(s) com polígono carregada(s) no mapa. Revise e registre cada área.${resumoAvisos}`)
     } catch (e) {
       setMensagemKmz(e instanceof Error ? e.message : 'Não foi possível ler o arquivo KMZ/KML.')
     } finally {
@@ -788,7 +815,7 @@ export default function AreasRiscoMapa({
               }}
               eventHandlers={{ click: () => carregarPoligonoImportado(indice) }}
             >
-              <Tooltip sticky>{importado.nome} · importado, ainda não salvo</Tooltip>
+              <Tooltip sticky>{importado.nome}{importado.arquivo ? ` · ${importado.arquivo}` : ''} · importado, ainda não salvo</Tooltip>
               <PopupInformacaoKmz
                 importado={importado}
                 tipoSelecionado={tipo}
@@ -1006,6 +1033,7 @@ export default function AreasRiscoMapa({
                 aria-label="Arquivo KMZ ou KML para cadastrar áreas de risco"
                 onChange={event => void importarArquivoKmz(event)}
                 disabled={processandoKmz || salvando || Boolean(rascunho)}
+                  multiple
                 data-testid="input-importar-kmz-para-cadastro"
               />
               <button
@@ -1200,6 +1228,7 @@ export default function AreasRiscoMapa({
                     aria-label="Arquivo KMZ ou KML com polígonos"
                     onChange={event => void importarArquivoKmz(event)}
                     disabled={processandoKmz || salvando}
+                    multiple
                     data-testid="input-importar-area-kmz"
                   />
                   <span className="arm-kmz-copy">Importe contornos e confira os dados no mapa antes de cadastrar. Nenhum rascunho é salvo automaticamente.</span>
@@ -1225,7 +1254,7 @@ export default function AreasRiscoMapa({
                           {poligonosImportados.map((poligono, indice) => (
                             <option key={`${indice}-${poligono.nome}`} value={indice}>
                               {poligonosImportadosConcluidos.has(indice) ? '✓ ' : ''}
-                              {indice + 1}. {poligono.nome} · {contarVerticesAreaRisco(poligono.poligono)} vértices
+                              {indice + 1}. {poligono.nome} · {contarVerticesAreaRisco(poligono.poligono)} vértices{poligono.arquivo ? ` · ${poligono.arquivo}` : ''}
                             </option>
                           ))}
                         </select>

@@ -14,8 +14,12 @@ worker.onmessage = async (event: MessageEvent<
 >) => {
   if (event.data.tipo === 'validar') {
     try {
-      const poligonos = validarCandidatosKml(event.data.candidatos)
-      worker.postMessage({ tipo: 'resultado', poligonos } satisfies { tipo: 'resultado'; poligonos: PoligonoKmzImportado[] })
+      const resultado = validarCandidatosKml(event.data.candidatos)
+      worker.postMessage({
+        tipo: 'resultado',
+        poligonos: resultado.poligonos,
+        avisos: resultado.avisos,
+      } satisfies { tipo: 'resultado'; poligonos: PoligonoKmzImportado[]; avisos: string[] })
     } catch (erro) {
       worker.postMessage({
         tipo: 'erro',

@@ -9,6 +9,7 @@ import {
   clonarGeometriaAreaRisco,
   contarVerticesAreaRisco,
   listarCoordenadasAreaRisco,
+  normalizarGeometriaAreaRisco,
   ESTILO_AREA_RISCO,
   TIPOS_AREAS_RISCO,
   type AreaRisco,
@@ -223,7 +224,10 @@ function InteracaoMapa({
     const container = mapa.getContainer()
     const capturarClique = (event: MouseEvent) => {
       const alvo = event.target
-      if (alvo instanceof Element && alvo.closest('.leaflet-control, .leaflet-popup')) return
+      if (
+        alvo instanceof Element
+        && alvo.closest('.leaflet-control, .leaflet-popup, .arm-panel, .radar-live-map-risk-anchor')
+      ) return
 
       const ponto = mapa.mouseEventToLatLng(event)
       event.preventDefault()
@@ -661,6 +665,16 @@ export default function AreasRiscoMapa({
       setLocalErro('Marque a localização no mapa antes de salvar.')
       return
     }
+    const poligono = normalizarGeometriaAreaRisco(rascunho.poligono)
+    if (!poligono) {
+      setLocalErro('O contorno não pôde ser validado. Revise os vértices no mapa.')
+      return
+    }
+    const vertices = contarVerticesAreaRisco(poligono)
+    if (vertices > 0 && !areaRiscoTemPoligono(poligono)) {
+      setLocalErro('O contorno precisa de pelo menos 3 vértices. Adicione mais pontos ou limpe o perímetro.')
+      return
+    }
     const isInterdicao = rascunho.tipo === 'Interdições'
     const limite = isInterdicao ? 0 : Number(rascunho.limite_precipitacao_mm)
     if (!isInterdicao && (!Number.isFinite(limite) || limite < 0)) {
@@ -676,7 +690,7 @@ export default function AreasRiscoMapa({
       tipo: rascunho.tipo,
       latitude: rascunho.latitude,
       longitude: rascunho.longitude,
-      poligono: rascunho.poligono,
+      poligono,
       data_inicio: rascunho.data_inicio,
       limite_precipitacao_mm: limite,
       referencia: rascunho.referencia.trim() || null,
@@ -685,6 +699,7 @@ export default function AreasRiscoMapa({
     }
     try {
       setLocalErro('')
+      setModoMapa(null)
       if (editandoId) await onEditar(editandoId, input)
       else await onSalvar(input)
       if (indiceImportacaoNoRascunho != null) {
@@ -1241,7 +1256,7 @@ export default function AreasRiscoMapa({
                   <div className="arm-map-instructions">
                     <div className="arm-step-row"><b className={rascunho.latitude != null ? 'arm-step-done' : ''}>01</b><span>{rascunho.latitude == null ? 'Posicione o ponto de referência' : `${rascunho.latitude.toFixed(5)}, ${rascunho.longitude?.toFixed(5)}`}</span></div>
                     <button type="button" className={modoMapa === 'marcador' ? 'arm-map-action arm-map-action-active' : 'arm-map-action'} data-testid="button-marcar-localizacao" onClick={() => setModoMapa('marcador')}>Marcar no mapa</button>
-                    <div className="arm-step-row"><b className={areaRiscoTemPoligono(rascunho.poligono) ? 'arm-step-done' : ''}>02</b><span>Perímetro · opcional · {contarVerticesAreaRisco(rascunho.poligono)} vértice(s)</span></div>
+                    <div className="arm-step-row"><b className={areaRiscoTemPoligono(rascunho.poligono) ? 'arm-step-done' : ''}>02</b><span>{areaRiscoTemPoligono(rascunho.poligono) ? `Perímetro pronto para salvar · ${contarVerticesAreaRisco(rascunho.poligono)} vértices` : `Perímetro opcional · ${contarVerticesAreaRisco(rascunho.poligono)} vértice(s)`}</span></div>
                     <div className="arm-draw-actions">
                       <button type="button" className={modoMapa === 'poligono' ? 'arm-map-action arm-map-action-active' : 'arm-map-action'} disabled={rascunho.latitude == null} data-testid="button-desenhar-poligono" onClick={() => setModoMapa('poligono')}>Adicionar vértices</button>
                       <button type="button" className="arm-quiet-action" disabled={!contarVerticesAreaRisco(rascunho.poligono)} data-testid="button-desfazer-vertice" onClick={() => atualizarRascunho({ poligono: desfazerUltimoVertice(rascunho.poligono) })}>Desfazer</button>

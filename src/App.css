@@ -569,7 +569,7 @@ input, select, textarea { font-family: inherit; }
   box-shadow: 0 2px 8px rgba(0,0,0,0.3);
 }
 
-.header-logo { display: flex; align-items: center; gap: 0.6rem; }
+.header-logo { display: flex; align-items: center; gap: 0; }
 
 .header-logo-texto {
   width: 44px;
@@ -617,6 +617,21 @@ input, select, textarea { font-family: inherit; }
   font-size: 0.8rem;
   font-weight: 700;
 }
+
+.header-pae-btn {
+  min-height: 38px;
+  border: 1px solid rgba(255,255,255,0.65);
+  border-radius: 7px;
+  padding: 0.35rem 0.72rem;
+  color: #fff;
+  background: rgba(8, 35, 69, 0.4);
+  font-size: 0.78rem;
+  font-weight: 850;
+  letter-spacing: 0.06em;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.16);
+}
+.header-pae-btn:hover { background: rgba(8, 35, 69, 0.65); }
+.header-pae-btn:focus-visible { outline: 3px solid #fde68a; outline-offset: 2px; }
 
 /* ── Resumo strip ─────────────────────────────────────────────── */
 .resumo-strip {

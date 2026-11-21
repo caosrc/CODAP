@@ -24,11 +24,13 @@ export interface PAECommandPanelProps {
   chamadoSelecionadoId: string | null
   ajusteChamadoId: string | null
   agenteAtual: string
+  gpsStatus: 'inativo' | 'aguardando' | 'ativo' | 'erro'
   carregando: boolean
   salvando: boolean
   erro: string | null
   onFechar: () => void
   onSairPae: () => void
+  onAtivarGps: () => void
   onCriarEvento: (input: NovoEventoPaeInput) => Promise<PaeEvento>
   onCriarChamado: (input: NovoChamadoPaeInput) => Promise<PaeChamado>
   onTriarChamado: (chamadoId: string, input: TriarChamadoPaeInput) => Promise<PaeChamado>
@@ -41,12 +43,42 @@ export interface PAECommandPanelProps {
   onValidarChamado: (chamadoId: string) => Promise<PaeChamado>
   onSuspenderCancelarChamado: (chamadoId: string, status: 'suspenso' | 'cancelado', motivo: string) => Promise<PaeChamado>
   onAjustarLocalizacao: (chamadoId: string | null) => void
-  onGeocodificar: (endereco: string) => Promise<{ latitude: number; longitude: number } | null>
+  onGeocodificar: (endereco: string) => Promise<Array<{ display: string; latitude: number; longitude: number }>>
   onSelecionarEvento: (eventoId: string) => void
   onSelecionarChamado: (chamado: PaeChamado | null) => void
 }
 
 type FotoRascunho = { dataUrl: string; legenda: string }
+type ResultadoEndereco = { display: string; latitude: number; longitude: number }
+
+const TIPOS_EVENTO_PAE = [
+  'Chuvas intensas',
+  'Enchente',
+  'Alagamento',
+  'Deslizamento',
+  'Vendaval',
+  'Granizo',
+  'Incêndio',
+  'Seca',
+  'Erosão',
+  'Interdição preventiva',
+  'Outro',
+]
+
+const TIPOS_CHAMADO_PAE = [
+  'Alagamento/inundação',
+  'Deslizamento ou movimentação de massa',
+  'Queda de muro',
+  'Queda de árvore',
+  'Destelhamento',
+  'Risco elétrico',
+  'Dano em via',
+  'Erosão',
+  'Obstrução',
+  'Incêndio',
+  'Risco estrutural',
+  'Outro',
+]
 
 const prioridadeLabel = {
   baixa: 'Baixa',
@@ -134,17 +166,71 @@ function parseMateriais(texto: string): PaeMaterialGasto[] {
     .filter(material => material.nome && Number.isFinite(material.quantidade) && material.quantidade > 0)
 }
 
+function escaparHtml(valor: unknown): string {
+  return String(valor ?? '').replace(/[&<>"']/g, caractere => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+  })[caractere] || caractere)
+}
+
+function imprimirDocumentoPae(titulo: string, conteudo: string): boolean {
+  const janela = window.open('', '_blank')
+  if (!janela) return false
+  janela.document.open()
+  janela.document.write(`<!doctype html>
+    <html lang="pt-BR">
+      <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width,initial-scale=1" />
+        <title>${escaparHtml(titulo)}</title>
+        <style>
+          @page { size: A4; margin: 16mm; }
+          * { box-sizing: border-box; }
+          body { margin: 0; color: #17212b; font: 11pt/1.45 Arial, sans-serif; }
+          header { border-bottom: 2px solid #173f63; margin-bottom: 18px; padding-bottom: 10px; }
+          header small { color: #526575; text-transform: uppercase; letter-spacing: .08em; }
+          h1 { margin: 5px 0; color: #123b5d; font-size: 20pt; }
+          h2 { margin: 18px 0 8px; color: #173f63; font-size: 13pt; }
+          h3 { margin: 0 0 6px; font-size: 11pt; }
+          p { margin: 4px 0; white-space: pre-wrap; }
+          .meta { color: #526575; font-size: 9pt; }
+          .report-call { border-top: 1px solid #b9c7d1; margin-top: 18px; padding-top: 12px; page-break-inside: avoid; }
+          .report-call + .report-call { page-break-before: always; }
+          .report-facts { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 16px; margin: 10px 0; }
+          .report-facts div { border-bottom: 1px solid #dbe3e9; padding: 4px 0; }
+          .report-facts b { display: block; color: #526575; font-size: 8pt; text-transform: uppercase; }
+          .report-photos { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; }
+          figure { width: 46%; margin: 0; page-break-inside: avoid; }
+          figure img { display: block; width: 100%; max-height: 230px; object-fit: contain; }
+          figcaption { color: #526575; font-size: 9pt; }
+          a { color: #165b89; }
+          footer { border-top: 1px solid #b9c7d1; margin-top: 24px; padding-top: 8px; color: #526575; font-size: 8pt; }
+          @media screen { body { max-width: 820px; margin: 30px auto; padding: 24px; } }
+        </style>
+      </head>
+      <body>
+        <header><small>Defesa Civil · Conselheiro Lafaiete — MG · Radar DC</small><h1>${escaparHtml(titulo)}</h1><p class="meta">Gerado em ${escaparHtml(new Date().toLocaleString('pt-BR'))} · Documento operacional interno</p></header>
+        ${conteudo}
+        <footer>Relatório para uso operacional interno. Os registros apresentados dependem dos dados disponíveis no PAE.</footer>
+        <script>window.addEventListener('load', () => setTimeout(() => window.print(), 300))</script>
+      </body>
+    </html>`)
+  janela.document.close()
+  return true
+}
+
 export default function PAECommandPanel({
   aberto,
   eventos,
   chamados,
   eventoSelecionadoId,
   agenteAtual,
+  gpsStatus,
   carregando,
   salvando,
   erro,
   onFechar,
   onSairPae,
+  onAtivarGps,
   onCriarEvento,
   onCriarChamado,
   onTriarChamado,
@@ -172,6 +258,8 @@ export default function PAECommandPanel({
   const [tipoEvento, setTipoEvento] = useState('')
   const [objetivos, setObjetivos] = useState('')
   const [endereco, setEndereco] = useState('')
+  const [numeroEndereco, setNumeroEndereco] = useState('')
+  const [enderecoConfirmado, setEnderecoConfirmado] = useState('')
   const [referencia, setReferencia] = useState('')
   const [bairro, setBairro] = useState('')
   const [municipio, setMunicipio] = useState('Conselheiro Lafaiete')
@@ -192,6 +280,7 @@ export default function PAECommandPanel({
   const [motivoEncerramento, setMotivoEncerramento] = useState('')
   const [acaoEncerramento, setAcaoEncerramento] = useState<'suspenso' | 'cancelado'>('suspenso')
   const [coordenadas, setCoordenadas] = useState<{ latitude: number; longitude: number } | null>(null)
+  const [resultadosEndereco, setResultadosEndereco] = useState<ResultadoEndereco[]>([])
   const [geocodificando, setGeocodificando] = useState(false)
   const [mensagemGeocode, setMensagemGeocode] = useState('')
   const [observacao, setObservacao] = useState('')
@@ -276,6 +365,8 @@ export default function PAECommandPanel({
     setModoFormulario('chamado')
     setErroLocal('')
     setEndereco('')
+    setNumeroEndereco('')
+    setEnderecoConfirmado('')
     setReferencia('')
     setBairro('')
     setMunicipio('Conselheiro Lafaiete')
@@ -285,32 +376,55 @@ export default function PAECommandPanel({
     setDescricaoChamado('')
     setPrioridade('media')
     setCoordenadas(null)
+    setResultadosEndereco([])
     setMensagemGeocode('')
   }
 
   const geocodificar = async () => {
-    if (!endereco.trim()) {
-      setMensagemGeocode('Informe o endereço para localizar o ponto.')
+    if (!endereco.trim() || !numeroEndereco.trim()) {
+      setMensagemGeocode('Informe a rua e o número do imóvel antes de localizar.')
       return null
     }
     setGeocodificando(true)
     setMensagemGeocode('')
     try {
-      const resultado = await onGeocodificar(endereco.trim())
-      if (!resultado) {
+      const resultados = await onGeocodificar([
+        endereco.trim(),
+        numeroEndereco.trim(),
+        bairro.trim(),
+        municipio.trim(),
+        'MG',
+      ].filter(Boolean).join(', '))
+      if (resultados.length === 0) {
         setCoordenadas(null)
-        setMensagemGeocode('Endereço não localizado. Revise o texto e tente novamente.')
+        setResultadosEndereco([])
+        setMensagemGeocode('Nenhum endereço encontrado. Revise a rua, o número e o bairro.')
         return null
       }
-      setCoordenadas(resultado)
-      setMensagemGeocode(`Localização confirmada · ${resultado.latitude.toFixed(5)}, ${resultado.longitude.toFixed(5)}`)
-      return resultado
+      setCoordenadas(null)
+      setResultadosEndereco(resultados)
+      setMensagemGeocode('Selecione o endereço correspondente para confirmar o ponto no mapa.')
+      return resultados
     } catch {
       setMensagemGeocode('Não foi possível localizar o endereço. Tente novamente.')
       return null
     } finally {
       setGeocodificando(false)
     }
+  }
+
+  const invalidarEnderecoEncontrado = () => {
+    setCoordenadas(null)
+    setEnderecoConfirmado('')
+    setResultadosEndereco([])
+    setMensagemGeocode('')
+  }
+
+  const confirmarEnderecoEncontrado = (resultado: ResultadoEndereco) => {
+    setEnderecoConfirmado(resultado.display)
+    setCoordenadas({ latitude: resultado.latitude, longitude: resultado.longitude })
+    setResultadosEndereco([])
+    setMensagemGeocode(`Endereço confirmado · ${resultado.latitude.toFixed(5)}, ${resultado.longitude.toFixed(5)}`)
   }
 
   const criarEvento = async (event: FormEvent<HTMLFormElement>) => {
@@ -347,16 +461,15 @@ export default function PAECommandPanel({
     setErroLocal('')
     setEnviando(true)
     try {
-      const local = coordenadas ?? await onGeocodificar(endereco.trim())
+      const local = coordenadas
       if (!local) {
-        setMensagemGeocode('Localização necessária. Verifique o endereço e tente novamente.')
-        setEnviando(false)
+        setMensagemGeocode('Selecione e confirme um endereço encontrado antes de registrar.')
         return
       }
       const input: NovoChamadoPaeInput = {
         eventoId: eventoSelecionadoId,
         acionadoPor: agenteAtual,
-        endereco: endereco.trim(),
+        endereco: enderecoConfirmado,
         referencia: referencia.trim(),
         bairro: bairro.trim(),
         municipio: municipio.trim(),
@@ -558,6 +671,89 @@ export default function PAECommandPanel({
 
   const salvarBloqueado = salvando || enviando || carregando
 
+  const exportarRelatorioChamado = () => {
+    if (!chamadoAtivo) return
+    const pontoMapa = `https://www.openstreetmap.org/?mlat=${chamadoAtivo.latitude}&mlon=${chamadoAtivo.longitude}#map=17/${chamadoAtivo.latitude}/${chamadoAtivo.longitude}`
+    const fotos = chamadoAtivo.atendimento?.fotos ?? []
+    const corpo = `
+      <h2>Evento</h2>
+      <p><b>${escaparHtml(eventoAtivo?.nome || 'Evento')}</b> · ${escaparHtml(eventoAtivo?.tipoEvento || 'Tipo não informado')}</p>
+      <p>${escaparHtml(eventoAtivo?.descricao || '')}</p>
+      <h2>Chamado ${escaparHtml(chamadoAtivo.id.slice(0, 8).toUpperCase())}</h2>
+      <div class="report-facts">
+        <div><b>Situação</b>${escaparHtml(situacaoChamado(chamadoAtivo))}</div>
+        <div><b>Prioridade</b>${escaparHtml(prioridadeLabel[chamadoAtivo.prioridade])}</div>
+        <div><b>Tipo operacional</b>${escaparHtml(chamadoAtivo.tipoRisco)}</div>
+        <div><b>COBRADE</b>${escaparHtml(chamadoAtivo.cobrade || 'Não informado')}</div>
+        <div><b>Recebido em</b>${escaparHtml(dataHora(chamadoAtivo.criadoEm))}</div>
+        <div><b>Acionado por</b>${escaparHtml(chamadoAtivo.acionadoPor)}</div>
+        <div><b>Endereço</b>${escaparHtml(chamadoAtivo.endereco)}</div>
+        <div><b>Bairro / município</b>${escaparHtml([chamadoAtivo.bairro, chamadoAtivo.municipio].filter(Boolean).join(' · ') || 'Não informado')}</div>
+        <div><b>Coordenadas</b>${chamadoAtivo.latitude.toFixed(6)}, ${chamadoAtivo.longitude.toFixed(6)}</div>
+        <div><b>Equipe</b>${escaparHtml(chamadoAtivo.agentesEnvolvidos.join(', ') || 'Sem equipe designada')}</div>
+      </div>
+      <p><b>Referência:</b> ${escaparHtml(chamadoAtivo.referencia || 'Não informada')}</p>
+      <p><b>Descrição:</b> ${escaparHtml(chamadoAtivo.descricao)}</p>
+      <p><b>Justificativa da triagem:</b> ${escaparHtml(chamadoAtivo.justificativaPrioridade || 'Não informada')}</p>
+      <p><a href="${pontoMapa}">Abrir localização no OpenStreetMap</a></p>
+      ${chamadoAtivo.atendimento ? `<h2>Atendimento em campo</h2>
+        <p><b>Responsável:</b> ${escaparHtml(chamadoAtivo.atendimento.agente)} · ${escaparHtml(dataHora(chamadoAtivo.atendimento.concluidoEm))}</p>
+        <p><b>Observações:</b> ${escaparHtml(chamadoAtivo.atendimento.observacao || 'Sem observações')}</p>
+        <p><b>Relato:</b> ${escaparHtml(chamadoAtivo.atendimento.relato || 'Sem relato')}</p>
+        <p><b>Materiais consumidos:</b> ${escaparHtml(chamadoAtivo.atendimento.materiaisGastos.map(item => `${item.nome} · ${item.quantidade} ${item.unidade}`).join(' / ') || 'Nenhum registrado')}</p>
+        ${fotos.length ? `<h2>Registro fotográfico</h2><div class="report-photos">${fotos.map(foto => `<figure><img src="${escaparHtml(foto.dataUrl)}" alt="${escaparHtml(foto.legenda || 'Foto do atendimento')}" /><figcaption>${escaparHtml(foto.legenda || 'Sem legenda')} · ${escaparHtml(foto.agente)} · ${escaparHtml(dataHora(foto.criadoEm))}</figcaption></figure>`).join('')}</div>` : ''}` : '<h2>Atendimento em campo</h2><p>Ainda não há registro de conclusão em campo.</p>'}
+      <h2>Histórico</h2>
+      ${historico.length ? historico.map(item => `<p><b>${escaparHtml(dataHora(item.criadoEm))} · ${escaparHtml(item.acao)}</b> — ${escaparHtml(item.realizadoPor)}</p>`).join('') : '<p>Sem histórico disponível.</p>'}
+      <p><b>Validação:</b> ${chamadoAtivo.validadoPor ? `${escaparHtml(chamadoAtivo.validadoPor)} · ${escaparHtml(dataHora(chamadoAtivo.validadoEm || ''))}` : 'Pendente'}</p>`
+    if (!imprimirDocumentoPae(`Relatório do chamado ${chamadoAtivo.id.slice(0, 8).toUpperCase()}`, corpo)) {
+      setErroLocal('O navegador bloqueou a janela do relatório. Permita pop-ups para imprimir ou salvar em PDF.')
+    }
+  }
+
+  const exportarRelatorioEvento = () => {
+    if (!eventoAtivo) return
+    const totaisStatus = Object.entries(statusLabel)
+      .map(([status, label]) => {
+        const total = chamadosDoEvento.filter(chamado => chamado.status === status).length
+        return total ? `<li>${escaparHtml(label)}: ${total}</li>` : ''
+      }).filter(Boolean).join('')
+    const totaisTipo = [...new Set(chamadosDoEvento.map(chamado => chamado.tipoRisco))]
+      .map(tipo => `<li>${escaparHtml(tipo)}: ${chamadosDoEvento.filter(chamado => chamado.tipoRisco === tipo).length}</li>`).join('')
+    const chamadas = [...chamadosDoEvento]
+      .sort((a, b) => a.criadoEm.localeCompare(b.criadoEm))
+      .map(chamado => `<section class="report-call">
+        <h2>${escaparHtml(chamado.tipoRisco)} · ${escaparHtml(chamado.id.slice(0, 8).toUpperCase())}</h2>
+        <div class="report-facts">
+          <div><b>Situação</b>${escaparHtml(situacaoChamado(chamado))}</div>
+          <div><b>Prioridade</b>${escaparHtml(prioridadeLabel[chamado.prioridade])}</div>
+          <div><b>Endereço</b>${escaparHtml(chamado.endereco)}</div>
+          <div><b>Bairro</b>${escaparHtml(chamado.bairro || 'Não informado')}</div>
+          <div><b>Recebido</b>${escaparHtml(dataHora(chamado.criadoEm))}</div>
+          <div><b>Equipe</b>${escaparHtml(chamado.agentesEnvolvidos.join(', ') || 'Não designada')}</div>
+        </div>
+        <p>${escaparHtml(chamado.descricao)}</p>
+      </section>`).join('')
+    const linhaTempo = historico.map(item => `<p><b>${escaparHtml(dataHora(item.criadoEm))} · ${escaparHtml(item.acao)}</b> — ${escaparHtml(item.realizadoPor)}</p>`).join('')
+    const corpo = `
+      <h2>Dados da operação</h2>
+      <div class="report-facts">
+        <div><b>Tipo</b>${escaparHtml(eventoAtivo.tipoEvento || 'Não informado')}</div>
+        <div><b>Responsável</b>${escaparHtml(eventoAtivo.responsavel || eventoAtivo.acionadoPor)}</div>
+        <div><b>Abertura</b>${escaparHtml(dataHora(eventoAtivo.inicioEm || eventoAtivo.criadoEm))}</div>
+        <div><b>Situação</b>${escaparHtml(eventoAtivo.status)}</div>
+      </div>
+      <p><b>Descrição:</b> ${escaparHtml(eventoAtivo.descricao || 'Não informada')}</p>
+      <p><b>Objetivos operacionais:</b> ${escaparHtml(eventoAtivo.objetivos || 'Não informados')}</p>
+      <h2>Resumo dos chamados (${chamadosDoEvento.length})</h2>
+      <h3>Por situação</h3><ul>${totaisStatus || '<li>Sem chamados registrados</li>'}</ul>
+      <h3>Por tipo operacional</h3><ul>${totaisTipo || '<li>Sem chamados registrados</li>'}</ul>
+      <h2>Linha do tempo</h2>${linhaTempo || '<p>Sem registros de histórico.</p>'}
+      <h2>Chamados e localizações</h2>${chamadas || '<p>Nenhum chamado registrado.</p>'}`
+    if (!imprimirDocumentoPae(`Relatório consolidado — ${eventoAtivo.nome}`, corpo)) {
+      setErroLocal('O navegador bloqueou a janela do relatório. Permita pop-ups para imprimir ou salvar em PDF.')
+    }
+  }
+
   return (
     <div className="pae-backdrop" onMouseDown={event => { if (event.target === event.currentTarget) onFechar() }}>
       <section className="pae-command" role="dialog" aria-modal="true" aria-labelledby="pae-title" data-testid="panel-pae-command">
@@ -571,6 +767,17 @@ export default function PAECommandPanel({
           </div>
           <div className="pae-topbar-right">
             <span className="pae-operator"><b className="pae-live-dot" /> {agenteAtual || 'Agente não identificado'}</span>
+            <span className={`pae-gps-indicator pae-gps-indicator--${gpsStatus}`} role="status" data-testid="status-pae-gps">
+              <i aria-hidden="true" />
+              {gpsStatus === 'ativo' ? 'GPS ativo' : gpsStatus === 'aguardando' ? 'Localizando GPS' : gpsStatus === 'erro' ? 'GPS indisponível' : 'GPS desligado'}
+            </span>
+            {(gpsStatus === 'inativo' || gpsStatus === 'erro') && (
+              <button className="pae-icon-button pae-gps-retry" type="button" onClick={onAtivarGps} data-testid="button-retry-pae-gps">
+                Ativar GPS
+              </button>
+            )}
+            {eventoAtivo && <button className="pae-icon-button pae-report-button" type="button" onClick={exportarRelatorioEvento} data-testid="button-report-event">PDF evento</button>}
+            {chamadoAtivo && <button className="pae-icon-button pae-report-button" type="button" onClick={exportarRelatorioChamado} data-testid="button-report-call">PDF chamado</button>}
             <button className="pae-icon-button pae-signout-button" type="button" onClick={onSairPae} data-testid="button-signout-pae">Sair</button>
             <button className="pae-icon-button" type="button" onClick={onFechar} aria-label="Fechar painel PAE" data-testid="button-close-pae">Fechar <span aria-hidden="true">×</span></button>
           </div>
@@ -670,7 +877,7 @@ export default function PAECommandPanel({
                 <p className="pae-form-intro">Nomeie a ocorrência que vai concentrar os chamados de risco.</p>
                 <form onSubmit={criarEvento} className="pae-form">
                   <label>Nome do evento<input autoFocus required maxLength={120} value={eventoNome} onChange={event => setEventoNome(event.target.value)} placeholder="Ex.: Alagamento no Centro" data-testid="input-event-name" /></label>
-                  <label>Tipo do evento<input maxLength={120} value={tipoEvento} onChange={event => setTipoEvento(event.target.value)} placeholder="Ex.: Chuvas intensas" data-testid="input-event-type" /></label>
+                  <label>Tipo do evento<input list="pae-event-types" maxLength={120} value={tipoEvento} onChange={event => setTipoEvento(event.target.value)} placeholder="Escolha ou digite o tipo" data-testid="input-event-type" /><datalist id="pae-event-types">{TIPOS_EVENTO_PAE.map(tipo => <option key={tipo} value={tipo} />)}</datalist></label>
                   <label>Descrição<textarea rows={4} value={eventoDescricao} onChange={event => setEventoDescricao(event.target.value)} placeholder="Contexto inicial para as equipes em campo" data-testid="input-event-description" /></label>
                   <label>Objetivos operacionais<textarea rows={3} value={objetivos} onChange={event => setObjetivos(event.target.value)} placeholder="Prioridades e resultados esperados para a operação" data-testid="input-event-objectives" /></label>
                   <div className="pae-form-meta">ACIONADO POR <strong>{agenteAtual}</strong></div>
@@ -684,21 +891,39 @@ export default function PAECommandPanel({
                 <p className="pae-form-intro">Registre a solicitação no evento. A prioridade final e o COBRADE serão confirmados na triagem.</p>
                 <form onSubmit={criarChamado} className="pae-form">
                   <div className="pae-form-grid">
-                    <label className="pae-span-two">Endereço<input required value={endereco} onChange={event => { setEndereco(event.target.value); setCoordenadas(null); setMensagemGeocode('') }} placeholder="Rua, número, bairro e município" data-testid="input-call-address" /></label>
+                    <label className="pae-span-two">Rua ou avenida<input required value={endereco} onChange={event => { setEndereco(event.target.value); invalidarEnderecoEncontrado() }} placeholder="Ex.: Rua Doutor Campolina" data-testid="input-call-address" /></label>
+                    <label>Número do imóvel<input required inputMode="numeric" value={numeroEndereco} onChange={event => { setNumeroEndereco(event.target.value); invalidarEnderecoEncontrado() }} placeholder="Ex.: 123 ou S/N" data-testid="input-call-address-number" /></label>
+                    <label>Bairro<input maxLength={120} value={bairro} onChange={event => { setBairro(event.target.value); invalidarEnderecoEncontrado() }} placeholder="Bairro" data-testid="input-call-neighborhood" /></label>
+                    <label>Município<input maxLength={120} value={municipio} onChange={event => { setMunicipio(event.target.value); invalidarEnderecoEncontrado() }} data-testid="input-call-municipality" /></label>
                     <div className="pae-geocode-row pae-span-two">
-                      <button className="pae-geocode-button" type="button" onClick={() => void geocodificar()} disabled={geocodificando || !endereco.trim()} data-testid="button-geocode-address">{geocodificando ? 'Localizando…' : 'Localizar no mapa'}</button>
+                      <button className="pae-geocode-button" type="button" onClick={() => void geocodificar()} disabled={geocodificando || !endereco.trim() || !numeroEndereco.trim()} data-testid="button-geocode-address">{geocodificando ? 'Localizando…' : 'Buscar endereço'}</button>
                       <span className={coordenadas ? 'pae-geocode-ok' : ''} role="status" data-testid="status-geocode">{mensagemGeocode || 'A localização é necessária para registrar o chamado.'}</span>
                     </div>
-                    <label>Tipo de risco<input required value={tipoRisco} onChange={event => setTipoRisco(event.target.value)} placeholder="Ex.: Deslizamento" data-testid="input-call-risk" /></label>
+                    {resultadosEndereco.length > 0 && (
+                      <div className="pae-geocode-results pae-span-two" role="group" aria-label="Resultados de endereço">
+                        <strong>Confirme o endereço encontrado</strong>
+                        {resultadosEndereco.map((resultado, index) => (
+                          <button
+                            className="pae-geocode-result"
+                            type="button"
+                            key={`${resultado.latitude}-${resultado.longitude}`}
+                            onClick={() => confirmarEnderecoEncontrado(resultado)}
+                            data-testid={`button-confirm-address-${index}`}
+                          >
+                            <span>{resultado.display}</span>
+                            <small>{resultado.latitude.toFixed(5)}, {resultado.longitude.toFixed(5)}</small>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    <label>Tipo operacional<input list="pae-call-types" required value={tipoRisco} onChange={event => setTipoRisco(event.target.value)} placeholder="Escolha ou digite o tipo" data-testid="input-call-risk" /><datalist id="pae-call-types">{TIPOS_CHAMADO_PAE.map(tipo => <option key={tipo} value={tipo} />)}</datalist></label>
                     <label>Prioridade inicial<select value={prioridade} onChange={event => setPrioridade(event.target.value as NovoChamadoPaeInput['prioridade'])} data-testid="select-call-priority"><option value="baixa">Baixa</option><option value="media">Média</option><option value="alta">Alta</option><option value="critica">Crítica</option></select></label>
                     <label>Canal de entrada<select value={canalEntrada} onChange={event => setCanalEntrada(event.target.value)} data-testid="select-call-channel"><option value="interno">Equipe interna</option><option value="telefone">Telefone</option><option value="radio">Rádio</option><option value="orgao_parceiro">Órgão parceiro</option><option value="outro">Outro</option></select></label>
-                    <label>Bairro<input maxLength={120} value={bairro} onChange={event => setBairro(event.target.value)} placeholder="Bairro" data-testid="input-call-neighborhood" /></label>
-                    <label>Município<input maxLength={120} value={municipio} onChange={event => setMunicipio(event.target.value)} data-testid="input-call-municipality" /></label>
                     <label className="pae-span-two">Ponto de referência<input maxLength={250} value={referencia} onChange={event => setReferencia(event.target.value)} placeholder="Referência próxima ao local" data-testid="input-call-reference" /></label>
                     <label className="pae-span-two">Descrição<textarea required rows={3} value={descricaoChamado} onChange={event => setDescricaoChamado(event.target.value)} placeholder="O que foi informado? Inclua sinais de risco e pessoas afetadas." data-testid="input-call-description" /></label>
                   </div>
                   <div className="pae-form-meta">EVENTO <strong>{eventoAtivo?.nome}</strong><span>A equipe será designada após a triagem.</span></div>
-                  <div className="pae-form-actions"><button className="pae-secondary-button" type="button" onClick={() => setModoFormulario(null)} data-testid="button-cancel-call">Cancelar</button><button className="pae-primary-button" type="submit" disabled={salvarBloqueado || !tipoRisco.trim() || !descricaoChamado.trim()} data-testid="button-submit-call">{salvando || enviando ? 'Registrando…' : 'Registrar chamado'}</button></div>
+                  <div className="pae-form-actions"><button className="pae-secondary-button" type="button" onClick={() => setModoFormulario(null)} data-testid="button-cancel-call">Cancelar</button><button className="pae-primary-button" type="submit" disabled={salvarBloqueado || !coordenadas || !enderecoConfirmado || !tipoRisco.trim() || !descricaoChamado.trim()} data-testid="button-submit-call">{salvando || enviando ? 'Registrando…' : 'Registrar chamado'}</button></div>
                 </form>
               </section>
             ) : chamadoAtivo ? (

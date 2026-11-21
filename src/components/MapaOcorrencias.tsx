@@ -823,6 +823,7 @@ interface EquipamentoCampoMapa {
 interface Props {
   ocorrencias: Ocorrencia[]
   onSelecionar: (o: Ocorrencia) => void
+  paeAbrirSignal?: number
   /** Destino vindo de fora (ex: "Traçar rota de resgate" do SOS). Quando definido,
    *  o mapa centraliza no ponto e calcula a rota automaticamente.
    *  Quando soMostrar=true, apenas centraliza no ponto sem traçar rota. */
@@ -902,7 +903,7 @@ function RaiosMapaBounds({
 }
 
 // ── Componente principal ────────────────────────────────────────
-export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExterno, onDestinoExternoConsumido, equipamentosCampo = [], onVerDetalheCampo }: Props) {
+export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExterno, onDestinoExternoConsumido, equipamentosCampo = [], onVerDetalheCampo, paeAbrirSignal = 0 }: Props) {
   const [selecionada, setSelecionada] = useState<Ocorrencia | null>(null)
   const [legendaAberta, setLegendaAberta] = useState(false)
   const [camadaMapa, setCamadaMapa] = useState<CamadaMapa>('padrao')
@@ -969,6 +970,7 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
   const [paeSalvando, setPaeSalvando] = useState(false)
   const [paeErro, setPaeErro] = useState<string | null>(null)
   const [paeLocalizacaoSalvandoId, setPaeLocalizacaoSalvandoId] = useState<string | null>(null)
+  const paeIniciouGpsRef = useRef(false)
   const cemadenMg = useEstacoesCemadenMg(mostrarChuva || mostrarIntensidadeCemaden || painelChuvaAberto)
   const estacoesCemaden = cemadenMg.dados?.estacoes ?? ESTACOES_CEMADEN_VAZIAS
   const estacoesCemadenLafaiete = useMemo(
@@ -1756,10 +1758,27 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
     }
   }, [paeUsuario, paePainelAberto, recarregarPae])
 
+  const ativarGpsNoPae = useCallback(() => {
+    const statusAtual = getEstadoGps().status
+    if (statusAtual === 'ativo' || statusAtual === 'aguardando') {
+      paeIniciouGpsRef.current = false
+      return
+    }
+    paeIniciouGpsRef.current = true
+    ativarGpsGlobal()
+  }, [])
+
+  const encerrarGpsNoPae = useCallback(() => {
+    if (!paeIniciouGpsRef.current) return
+    paeIniciouGpsRef.current = false
+    desativarGpsGlobal()
+  }, [])
+
   useEffect(() => {
     if (!supabaseDisponivel) return
     const { data: { subscription } } = supabase.auth.onAuthStateChange(evento => {
       if (evento !== 'SIGNED_OUT') return
+      encerrarGpsNoPae()
       setPaeUsuario(null)
       setPaeEventos([])
       setPaeChamados([])
@@ -1770,7 +1789,9 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
       setPaeAcessoAberto(false)
     })
     return () => subscription.unsubscribe()
-  }, [])
+  }, [encerrarGpsNoPae])
+
+  useEffect(() => () => encerrarGpsNoPae(), [encerrarGpsNoPae])
 
   useEffect(() => {
     if (!paeUsuario || !paeEventoSelecionadoId) {
@@ -1790,13 +1811,15 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
   }, [paeUsuario, paeEventoSelecionadoId, paeChamadoSelecionadoId])
 
   const autorizarPae = useCallback((usuario: PaeUsuarioAutorizado) => {
+    ativarGpsNoPae()
     setPaeUsuario(usuario)
     setPaeAcessoAberto(false)
     setPaePainelAberto(true)
     setPaeErro(null)
-  }, [])
+  }, [ativarGpsNoPae])
 
   const abrirPae = useCallback(() => {
+    try { window.localStorage.removeItem('defesacivil-pae-abrir') } catch { /* armazenamento pode estar bloqueado */ }
     setPaePainelAberto(true)
     setPaeErro(null)
     if (!paeUsuario) setPaeAcessoAberto(true)
@@ -1805,6 +1828,18 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
   useEffect(() => {
     window.addEventListener('dc:abrir-pae', abrirPae)
     return () => window.removeEventListener('dc:abrir-pae', abrirPae)
+  }, [abrirPae])
+
+  useEffect(() => {
+    if (paeAbrirSignal > 0) abrirPae()
+  }, [abrirPae, paeAbrirSignal])
+
+  useEffect(() => {
+    try {
+      if (window.localStorage.getItem('defesacivil-pae-abrir') === '1') abrirPae()
+    } catch {
+      // A navegação e o evento direto continuam funcionando sem armazenamento local.
+    }
   }, [abrirPae])
 
   const fecharAcessoPae = useCallback(() => {
@@ -1909,11 +1944,15 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
   const onGeocodificarPae = useCallback(async (endereco: string) => {
     const response = await fetch(`/api/geocode?q=${encodeURIComponent(endereco)}`)
     if (!response.ok) throw new Error('Não foi possível localizar o endereço.')
-    const resultados = await response.json() as Array<{ lat?: number; lng?: number }>
-    const ponto = resultados.find(item => Number.isFinite(item.lat) && Number.isFinite(item.lng))
-    return ponto
-      ? { latitude: Number(ponto.lat), longitude: Number(ponto.lng) }
-      : null
+    const resultados = await response.json() as Array<{ display?: string; lat?: number; lng?: number; houseNumber?: string }>
+    return resultados
+      .filter(item => Number.isFinite(item.lat) && Number.isFinite(item.lng))
+      .map(item => ({
+        display: String(item.display || endereco),
+        latitude: Number(item.lat),
+        longitude: Number(item.lng),
+        houseNumber: item.houseNumber,
+      }))
   }, [])
 
   const onSelecionarEventoPae = useCallback((eventoId: string) => {
@@ -1951,6 +1990,7 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
     } catch (error) {
       setPaeErro(error instanceof Error ? error.message : 'Não foi possível sair do PAE.')
     } finally {
+      encerrarGpsNoPae()
       setPaeUsuario(null)
       setPaeEventos([])
       setPaeChamados([])
@@ -1961,7 +2001,7 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
       setPaeAcessoAberto(false)
       setPaeAjusteChamadoId(null)
     }
-  }, [])
+  }, [encerrarGpsNoPae])
 
   const paeChamadosVisiveis = useMemo(
     () => paeUsuario && paeEventoSelecionadoId
@@ -3312,11 +3352,13 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
             chamadoSelecionadoId={paeChamadoSelecionadoId}
             ajusteChamadoId={paeAjusteChamadoId}
             agenteAtual={paeUsuario.agente}
+            gpsStatus={statusGps}
             carregando={paeCarregando}
             salvando={paeSalvando}
             erro={paeErro}
             onFechar={() => setPaePainelAberto(false)}
             onSairPae={sairDoPae}
+            onAtivarGps={ativarGpsNoPae}
             onCriarEvento={onCriarEventoPae}
             onCriarChamado={onCriarChamadoPae}
             onTriarChamado={onTriarChamadoPae}

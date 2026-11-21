@@ -3303,7 +3303,7 @@ app.get('/api/geocode', async (req, res) => {
   if (cached && (agora - cached.ts) < GEOCODE_TTL_MS) return res.json(cached.data)
   try {
     const queryFinal = /conselheiro lafaiete|mg|minas/i.test(q) ? q : `${q}, Conselheiro Lafaiete, MG, Brasil`
-    const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(queryFinal)}&format=json&limit=6&addressdetails=0&countrycodes=br&accept-language=pt-BR`
+    const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(queryFinal)}&format=json&limit=6&addressdetails=1&countrycodes=br&accept-language=pt-BR`
     const resp = await fetch(url, {
       headers: { 'User-Agent': 'CODAP/1.0 (Conselheiro Lafaiete, MG)', 'Accept-Language': 'pt-BR' },
     })
@@ -3314,6 +3314,7 @@ app.get('/api/geocode', async (req, res) => {
       display: d.display_name,
       lat: parseFloat(d.lat),
       lng: parseFloat(d.lon),
+      houseNumber: d.address?.house_number ? String(d.address.house_number) : '',
     })).filter(d => Number.isFinite(d.lat) && Number.isFinite(d.lng))
     geocodeCache.set(chave, { ts: agora, data: simplificado })
     res.json(simplificado)

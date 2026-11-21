@@ -283,6 +283,7 @@ export default function App() {
   const [logado, setLogado] = useState(estaLogado() && agenteEscolhido() && orgaoEscolhido())
   const [orgao, setOrgao] = useState(getOrgaoSelecionado)
   const [aba, setAba] = useState<Aba>('lista')
+  const [paeAbrirSignal, setPaeAbrirSignal] = useState(0)
   const abaAtualRef = useRef<Aba>('lista')
   const [materiaisResetSignal, setMateriaisResetSignal] = useState(0)
   const materiaisNoMenuRef = useRef(true)
@@ -1074,10 +1075,6 @@ export default function App() {
       <header className="header">
         <div className="header-logo">
           <img className="header-logo-imagem" src="/defesa-civil-logo.png" alt="Defesa Civil" />
-          <div className="header-textos">
-            <span className="header-nome">Defesa Civil</span>
-            <span className="header-cidade">Conselheiro Lafaiete — MG · {nomeOrgaoAtual}</span>
-          </div>
         </div>
         <div className="header-direita">
           <AgentesOnline />
@@ -1111,6 +1108,21 @@ export default function App() {
             </button>
           )}
           <BotaoSos modo="botao" />
+          {orgao === 'defesa-civil' && (
+            <button
+              className="header-pae-btn"
+              type="button"
+              onClick={() => {
+                setPaeAbrirSignal(signal => signal + 1)
+                navegarParaAba('mapa')
+              }}
+              aria-label="Abrir Plano de Ação do Evento"
+              title="Abrir Plano de Ação do Evento"
+              data-testid="button-open-pae-header"
+            >
+              PAE
+            </button>
+          )}
         </div>
       </header>
 
@@ -1296,6 +1308,7 @@ export default function App() {
                 onDestinoExternoConsumido={() => { setDestinoSos(null); setDestinoCampo(null) }}
                 equipamentosCampo={equipamentosCampoMapa}
                 onVerDetalheCampo={(id) => { setAbrirCampoId(id); navegarParaAba('materiais') }}
+                paeAbrirSignal={paeAbrirSignal}
               />
             </Suspense>
           </ErrorBoundary>

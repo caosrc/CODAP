@@ -49,7 +49,6 @@ import {
 } from './redemetMapa'
 import { useProdutoRedemet, type TipoRadarRedemet } from './redemetApi'
 import {
-  autenticarPae,
   atualizarLocalizacaoChamadoPae,
   atenderReforcoPae,
   concluirChamadoPae,
@@ -59,7 +58,6 @@ import {
   iniciarChamadoPae,
   listarHistoricoPae,
   listarPae,
-  obterAcessoPaeAtual,
   sairPae,
   suspenderCancelarChamadoPae,
   solicitarReforcoPae,
@@ -971,7 +969,7 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
   const [paeErro, setPaeErro] = useState<string | null>(null)
   const [paeLocalizacaoSalvandoId, setPaeLocalizacaoSalvandoId] = useState<string | null>(null)
   const paeIniciouGpsRef = useRef(false)
-  const cemadenMg = useEstacoesCemadenMg(mostrarChuva || mostrarIntensidadeCemaden || painelChuvaAberto)
+  const cemadenMg = useEstacoesCemadenMg(true)
   const estacoesCemaden = cemadenMg.dados?.estacoes ?? ESTACOES_CEMADEN_VAZIAS
   const estacoesCemadenLafaiete = useMemo(
     () => estacoesCemaden.filter(estacao => /conselheiro\s+lafaiete/i.test(estacao.municipio)),
@@ -1786,7 +1784,6 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
       setPaeEventoSelecionadoId(null)
       setPaeChamadoSelecionadoId(null)
       setPaePainelAberto(false)
-      setPaeAcessoAberto(false)
     })
     return () => subscription.unsubscribe()
   }, [encerrarGpsNoPae])
@@ -1940,20 +1937,6 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
     if (!paeUsuario) throw new Error('Entre com uma conta autorizada para alterar o chamado.')
     return suspenderCancelarChamadoPae(chamadoId, status, motivo, paeUsuario.agente)
   }), [executarPae, paeUsuario])
-
-  const onGeocodificarPae = useCallback(async (endereco: string) => {
-    const response = await fetch(`/api/geocode?q=${encodeURIComponent(endereco)}`)
-    if (!response.ok) throw new Error('Não foi possível localizar o endereço.')
-    const resultados = await response.json() as Array<{ display?: string; lat?: number; lng?: number; houseNumber?: string }>
-    return resultados
-      .filter(item => Number.isFinite(item.lat) && Number.isFinite(item.lng))
-      .map(item => ({
-        display: String(item.display || endereco),
-        latitude: Number(item.lat),
-        longitude: Number(item.lng),
-        houseNumber: item.houseNumber,
-      }))
-  }, [])
 
   const onSelecionarEventoPae = useCallback((eventoId: string) => {
     setPaeEventoSelecionadoId(eventoId)
@@ -2138,71 +2121,69 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
         {mostrarIntensidadeCemaden && zoomMapa >= 9 && (
           <CemadenIntensityLayer estacoes={estacoesCemadenLafaiete} opacidade={opacidadeCemaden} />
         )}
-        {mostrarChuva && (
-          <Pane name="mapaEstacoesCemaden" style={{ zIndex: 450 }}>
-            {estacoesCemadenLafaieteGeorreferenciadas.map(estacao => {
-                const estadoLeitura = statusLeituraCemaden(estacao.precipitacaoDataHora)
-                const cor = estadoLeitura === 'atualizada'
-                  ? intensidadeCemaden(estacao.precipitacaoAtual ?? 0).cor
-                  : '#94a3b8'
-                return (
-                  <CircleMarker
-                    key={`cemaden-estacao-${estacao.id}`}
-                    center={[estacao.latitude!, estacao.longitude!]}
-                    radius={zoomMapa < 8 ? 2.5 : zoomMapa < 11 ? 4 : 8}
-                    pathOptions={{
-                      color: '#ffffff',
-                      weight: 2,
-                      fillColor: cor,
-                      fillOpacity: 0.95,
-                    }}
-                  >
-                    {zoomMapa >= 11 && (
-                      <Tooltip
-                        permanent
-                        direction="top"
-                        offset={[0, -7]}
-                        opacity={0.96}
-                        className="mapa-cemaden-mg-tooltip"
-                      >
-                        {estadoLeitura === 'atualizada' && estacao.precipitacaoAtual != null
-                          ? valorChuvaMarcadorFormatado(estacao.precipitacaoAtual)
-                          : '—'}
-                      </Tooltip>
-                    )}
-                    <Popup>
-                      <div style={{ minWidth: 190, fontFamily: 'inherit' }}>
-                        <strong style={{ display: 'block', marginBottom: 4 }}>
-                          🌧️ {estacao.nome || 'Estação CEMADEN'}
-                        </strong>
-                        {estacao.municipio && (
-                          <div style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: 3 }}>
-                            {estacao.municipio} · Minas Gerais
-                          </div>
-                        )}
-                        <div style={{ fontSize: '0.8rem', color: '#374151', marginBottom: 3 }}>
-                          <strong>Última hora:</strong> {valorChuvaFormatado(estacao.precipitacaoAtual)}
+        <Pane name="mapaEstacoesCemaden" style={{ zIndex: 450 }}>
+          {estacoesCemadenLafaieteGeorreferenciadas.map(estacao => {
+              const estadoLeitura = statusLeituraCemaden(estacao.precipitacaoDataHora)
+              const cor = estadoLeitura === 'atualizada'
+                ? intensidadeCemaden(estacao.precipitacaoAtual ?? 0).cor
+                : '#94a3b8'
+              return (
+                <CircleMarker
+                  key={`cemaden-estacao-${estacao.id}`}
+                  center={[estacao.latitude!, estacao.longitude!]}
+                  radius={zoomMapa < 8 ? 2.5 : zoomMapa < 11 ? 4 : 8}
+                  pathOptions={{
+                    color: '#ffffff',
+                    weight: 2,
+                    fillColor: cor,
+                    fillOpacity: 0.95,
+                  }}
+                >
+                  {zoomMapa >= 11 && (
+                    <Tooltip
+                      permanent
+                      direction="top"
+                      offset={[0, -7]}
+                      opacity={0.96}
+                      className="mapa-cemaden-mg-tooltip"
+                    >
+                      {estadoLeitura === 'atualizada' && estacao.precipitacaoAtual != null
+                        ? valorChuvaMarcadorFormatado(estacao.precipitacaoAtual)
+                        : '—'}
+                    </Tooltip>
+                  )}
+                  <Popup>
+                    <div style={{ minWidth: 190, fontFamily: 'inherit' }}>
+                      <strong style={{ display: 'block', marginBottom: 4 }}>
+                        🌧️ {estacao.nome || 'Estação CEMADEN'}
+                      </strong>
+                      {estacao.municipio && (
+                        <div style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: 3 }}>
+                          {estacao.municipio} · Minas Gerais
                         </div>
-                        <div style={{ fontSize: '0.76rem', color: estadoLeitura === 'atualizada' ? '#166534' : '#b45309', marginBottom: 3 }}>
-                          {estadoLeitura === 'atualizada'
-                            ? situacaoChuva(estacao.precipitacaoAtual)
-                            : estadoLeitura === 'atrasada' ? 'Leitura atrasada' : 'Sem dados recentes'}
-                        </div>
-                        <div style={{ fontSize: '0.72rem', color: '#6b7280' }}>
-                          Leitura: {dataHoraCemadenFormatada(estacao.precipitacaoDataHora)} · CEMADEN
-                        </div>
-                        {estacao.codigo && (
-                          <div style={{ fontSize: '0.7rem', color: '#9ca3af', marginTop: 3 }}>
-                            Estação {estacao.codigo}
-                          </div>
-                        )}
+                      )}
+                      <div style={{ fontSize: '0.8rem', color: '#374151', marginBottom: 3 }}>
+                        <strong>Última hora:</strong> {valorChuvaFormatado(estacao.precipitacaoAtual)}
                       </div>
-                    </Popup>
-                  </CircleMarker>
-                )
-            })}
-          </Pane>
-        )}
+                      <div style={{ fontSize: '0.76rem', color: estadoLeitura === 'atualizada' ? '#166534' : '#b45309', marginBottom: 3 }}>
+                        {estadoLeitura === 'atualizada'
+                          ? situacaoChuva(estacao.precipitacaoAtual)
+                          : estadoLeitura === 'atrasada' ? 'Leitura atrasada' : 'Sem dados recentes'}
+                      </div>
+                      <div style={{ fontSize: '0.72rem', color: '#6b7280' }}>
+                        Leitura: {dataHoraCemadenFormatada(estacao.precipitacaoDataHora)} · CEMADEN
+                      </div>
+                      {estacao.codigo && (
+                        <div style={{ fontSize: '0.7rem', color: '#9ca3af', marginTop: 3 }}>
+                          Estação {estacao.codigo}
+                        </div>
+                      )}
+                    </div>
+                  </Popup>
+                </CircleMarker>
+              )
+          })}
+        </Pane>
         <MapClickHandler onMapClick={() => setSelecionada(null)} />
         <BoundsTracker onChange={setMapaBounds} />
 
@@ -3336,6 +3317,7 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
 
       <PAEAccessDialog
         aberto={paeAcessoAberto}
+        agente={nomeLocal}
         onAutorizado={autorizarPae}
         onFechar={fecharAcessoPae}
       />
@@ -3356,6 +3338,7 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
             carregando={paeCarregando}
             salvando={paeSalvando}
             erro={paeErro}
+            localizacaoMapa={destino}
             onFechar={() => setPaePainelAberto(false)}
             onSairPae={sairDoPae}
             onAtivarGps={ativarGpsNoPae}
@@ -3371,7 +3354,6 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
             onValidarChamado={onValidarChamadoPae}
             onSuspenderCancelarChamado={onSuspenderCancelarChamadoPae}
             onAjustarLocalizacao={setPaeAjusteChamadoId}
-            onGeocodificar={onGeocodificarPae}
             onSelecionarEvento={onSelecionarEventoPae}
             onSelecionarChamado={onSelecionarChamadoPae}
           />

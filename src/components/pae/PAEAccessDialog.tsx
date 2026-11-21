@@ -1,18 +1,19 @@
 import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
-import { autenticarPae, obterAcessoPaeAtual } from '../../paeApi'
+import { autenticarPae, obterAcessoPaeAtual, sairPae } from '../../paeApi'
 import type { PaeUsuarioAutorizado } from '../../paeTypes'
 import { supabaseDisponivel } from '../../supabaseClient'
+import { normalizarNomeAgente } from '../../types'
 import './pae.css'
 
 interface Props {
   aberto: boolean
+  agente: string
   onAutorizado: (usuario: PaeUsuarioAutorizado) => void
   onFechar: () => void
 }
 
-export default function PAEAccessDialog({ aberto, onAutorizado, onFechar }: Props) {
-  const [email, setEmail] = useState('')
+export default function PAEAccessDialog({ aberto, agente, onAutorizado, onFechar }: Props) {
   const [senha, setSenha] = useState('')
   const [carregandoSessao, setCarregandoSessao] = useState(true)
   const [entrando, setEntrando] = useState(false)
@@ -30,7 +31,12 @@ export default function PAEAccessDialog({ aberto, onAutorizado, onFechar }: Prop
     }
     void obterAcessoPaeAtual()
       .then(usuario => {
-        if (ativo && usuario) onAutorizado(usuario)
+        if (!ativo || !usuario) return
+        if (usuario.agente === normalizarNomeAgente(agente)) {
+          onAutorizado(usuario)
+        } else {
+          void sairPae().catch(() => {})
+        }
       })
       .catch(error => {
         if (ativo) setErro(error instanceof Error ? error.message : 'Não foi possível validar o acesso.')
@@ -39,7 +45,7 @@ export default function PAEAccessDialog({ aberto, onAutorizado, onFechar }: Prop
         if (ativo) setCarregandoSessao(false)
       })
     return () => { ativo = false }
-  }, [aberto, onAutorizado])
+  }, [aberto, agente, onAutorizado])
 
   if (!aberto) return null
 
@@ -48,7 +54,7 @@ export default function PAEAccessDialog({ aberto, onAutorizado, onFechar }: Prop
     setErro('')
     setEntrando(true)
     try {
-      const usuario = await autenticarPae(email, senha)
+      const usuario = await autenticarPae(agente, senha)
       setSenha('')
       onAutorizado(usuario)
     } catch (error) {
@@ -64,30 +70,24 @@ export default function PAEAccessDialog({ aberto, onAutorizado, onFechar }: Prop
         <div className="pae-access-mark" aria-hidden="true">PAE</div>
         <div className="pae-detail-kicker">ACESSO INTERNO · DEFESA CIVIL</div>
         <h2 id="pae-access-title">Entrar no PAE</h2>
-        <p>Use sua conta institucional do Supabase Auth. O acesso é liberado somente para usuários cadastrados pela coordenação.</p>
+        <p>Confirme seu acesso com a senha do agente selecionado no aplicativo.</p>
         {carregandoSessao ? (
           <div className="pae-access-status" role="status">Verificando sessão…</div>
         ) : (
           <form className="pae-access-form" onSubmit={entrar}>
+            <div className="pae-access-agent" data-testid="label-pae-agent">
+              <span>Agente selecionado</span>
+              <strong>{normalizarNomeAgente(agente)}</strong>
+            </div>
             <label>
-              E-mail institucional
+              Senha do agente
               <input
-                autoComplete="username"
-                type="email"
-                required
-                value={email}
-                onChange={event => setEmail(event.target.value)}
-                disabled={!supabaseDisponivel || entrando}
-                data-testid="input-pae-email"
-              />
-            </label>
-            <label>
-              Senha
-              <input
-                autoComplete="current-password"
+                autoComplete="off"
                 type="password"
+                inputMode="numeric"
                 required
                 value={senha}
+                maxLength={20}
                 onChange={event => setSenha(event.target.value)}
                 disabled={!supabaseDisponivel || entrando}
                 data-testid="input-pae-password"
@@ -97,14 +97,14 @@ export default function PAEAccessDialog({ aberto, onAutorizado, onFechar }: Prop
             <div className="pae-access-actions">
               <button className="pae-secondary-button" type="button" onClick={onFechar} disabled={entrando}>Voltar</button>
               <button className="pae-primary-button" type="submit" disabled={!supabaseDisponivel || entrando}>
-                {entrando ? 'Validando…' : 'Entrar com segurança'}
+                {entrando ? 'Validando…' : 'Entrar'}
               </button>
             </div>
           </form>
         )}
-        {!carregandoSessao && !erro && <div className="pae-access-hint">Se ainda não tem uma conta autorizada, solicite o convite à coordenação.</div>}
+        {!carregandoSessao && !erro && <div className="pae-access-hint">A senha é validada pelo Supabase e não é salva neste dispositivo.</div>}
         {!supabaseDisponivel && !carregandoSessao && (
-          <div className="pae-access-error" role="alert">O PAE permanece bloqueado até que o Supabase Auth esteja configurado.</div>
+          <div className="pae-access-error" role="alert">Configure o Supabase para validar o acesso do PAE.</div>
         )}
       </section>
     </div>

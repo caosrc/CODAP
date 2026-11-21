@@ -1,5 +1,6 @@
 import { supabase, supabaseDisponivel } from './supabaseClient'
 import { wsSend } from './wsClient'
+import { AGENTES, normalizarNomeAgente } from './types'
 import type {
   ConcluirChamadoPaeInput,
   NovoChamadoPaeInput,
@@ -11,8 +12,8 @@ import type {
   PaeAtribuicaoStatus,
   PaeEvento,
   PaeFoto,
-  PaeMaterialGasto,
   PaePrioridade,
+  PaeReforcoStatus,
   PaeStatus,
   PaeUsuarioAutorizado,
   TriarChamadoPaeInput,
@@ -82,32 +83,68 @@ export async function obterAcessoPaeAtual(): Promise<PaeUsuarioAutorizado | null
   if (!supabaseDisponivel) return null
   const { data, error } = await supabase.auth.getSession()
   if (error) throw new Error('Não foi possível verificar sua sessão do PAE.')
-  const userId = data.session?.user?.id
+  const user = data.session?.user as (typeof data.session.user & { is_anonymous?: boolean }) | undefined
+  const userId = user?.id
   if (!userId) return null
-  try {
-    const perfil = await perfilAutorizadoPae(userId)
-    if (perfil) return perfil
-  } catch (erro) {
+  if (user?.is_anonymous !== true) {
     await supabase.auth.signOut({ scope: 'local' }).catch(() => {})
-    throw erro
+    return null
   }
-  await supabase.auth.signOut({ scope: 'local' }).catch(() => {})
-  return null
+  return perfilAutorizadoPae(userId)
 }
 
-export async function autenticarPae(email: string, password: string): Promise<PaeUsuarioAutorizado> {
+export async function autenticarPae(agenteInformado: string, password: string): Promise<PaeUsuarioAutorizado> {
   if (!supabaseDisponivel) {
     throw new Error('O acesso ao PAE exige Supabase configurado. Contate a coordenação do sistema.')
   }
-  const { data, error } = await supabase.auth.signInWithPassword({ email: email.trim(), password })
-  if (error || !data.user) {
-    throw new Error('Não foi possível entrar. Confira o e-mail e a senha cadastrados no Supabase Auth.')
+  const agente = normalizarNomeAgente(agenteInformado)
+  if (!AGENTES.includes(agente)) {
+    throw new Error('O agente desta sessão não está cadastrado para acessar o PAE.')
   }
+
+  const sessaoAtual = await supabase.auth.getSession()
+  if (sessaoAtual.error) throw new Error('Não foi possível preparar o acesso do agente ao PAE.')
+  let user = sessaoAtual.data.session?.user as
+    | (typeof sessaoAtual.data.session.user & { is_anonymous?: boolean })
+    | undefined
+
+  if (user?.is_anonymous !== true) {
+    if (user) await supabase.auth.signOut({ scope: 'local' })
+    const anonimo = await supabase.auth.signInAnonymously()
+    if (anonimo.error || !anonimo.data.user) {
+      const mensagem = anonimo.error?.message || ''
+      if (/anonymous.*disabled|anonymous.*not enabled/i.test(mensagem)) {
+        throw new Error('Ative o acesso anônimo em Supabase Auth para permitir entrada somente com a senha do agente.')
+      }
+      throw new Error('Não foi possível iniciar a sessão segura do PAE. Confira se o acesso anônimo está ativo no Supabase.')
+    }
+    user = anonimo.data.user as typeof user
+  }
+
+  if (!user?.id) {
+    throw new Error('Não foi possível iniciar a sessão segura do agente.')
+  }
+
+  const autenticacao = await supabase.rpc('pae_autenticar_agente', {
+    p_agente: agente,
+    p_senha: password,
+  })
+  if (autenticacao.error) {
+    const mensagem = autenticacao.error.message || ''
+    if (/pae_autenticar_agente|schema cache/i.test(mensagem)) {
+      throw new Error('A migração de acesso por senha do agente ainda não foi aplicada no Supabase.')
+    }
+    throw new Error('Não foi possível validar a senha do agente no Supabase.')
+  }
+  if (autenticacao.data !== true) {
+    throw new Error('Senha incorreta para o agente selecionado.')
+  }
+
   try {
-    const perfil = await perfilAutorizadoPae(data.user.id)
-    if (!perfil) {
+    const perfil = await perfilAutorizadoPae(user.id)
+    if (!perfil || perfil.agente !== agente) {
       await supabase.auth.signOut({ scope: 'local' })
-      throw new Error('Esta conta não está autorizada para o PAE. Solicite acesso à coordenação.')
+      throw new Error('Não foi possível confirmar o acesso do agente no Supabase.')
     }
     return perfil
   } catch (erro) {
@@ -180,7 +217,9 @@ function normalizarAtribuicao(row: Linha): PaeAtribuicao {
       ? null
       : texto(row.respondido_em ?? row.respondidoEm),
     motivoRecusa: texto(row.motivo_recusa ?? row.motivoRecusa),
-    reforcoStatus: (['solicitado', 'atendido'].includes(reforcoRaw) ? reforcoRaw : 'nenhum'),
+    reforcoStatus: (['solicitado', 'atendido'].includes(reforcoRaw)
+      ? reforcoRaw
+      : 'nenhum') as PaeReforcoStatus,
     reforcoSolicitadoPor: row.reforco_solicitado_por == null && row.reforcoSolicitadoPor == null
       ? null
       : texto(row.reforco_solicitado_por ?? row.reforcoSolicitadoPor),

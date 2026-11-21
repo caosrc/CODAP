@@ -1160,41 +1160,39 @@ function RadarMapaTempoReal({ tv, dataOcorrencias }: { tv: boolean; dataOcorrenc
           ativa={mostrarHidroestimadorCemaden}
           nomePane="radarLiveHidroestimadorCemaden"
         />
-        {mostrarChuva && (
-          <Pane name="radarLiveCemadenStations" style={{ zIndex: 450 }}>
-            {estacoesLafaieteGeorreferenciadas.map(estacao => {
-              const estadoLeitura = statusLeituraCemaden(estacao.precipitacaoDataHora)
-              const intensidade = estadoLeitura === 'atualizada'
-                ? intensidadeCemadenRadar(estacao.precipitacaoAtual)
-                : { cor: '#94a3b8', alpha: 0 }
-              return (
-                <CircleMarker
-                  key={`radar-live-station-${estacao.id}`}
-                  center={[estacao.latitude as number, estacao.longitude as number]}
-                  radius={zoomMapa < 8 ? 2.5 : zoomMapa < 11 ? 4 : 8}
-                  pathOptions={{ color: '#fff', weight: 2, fillColor: intensidade.cor, fillOpacity: 0.95 }}
-                >
-                  <Tooltip permanent={zoomMapa >= 11} direction="top" offset={[0, -7]} opacity={0.96} className="radar-live-map-tooltip">
-                    {estadoLeitura === 'atualizada' && estacao.precipitacaoAtual != null
-                      ? formatarMmMapaRadar(estacao.precipitacaoAtual)
-                      : '—'}
-                  </Tooltip>
-                  <Popup>
-                    <strong>🌧️ {estacao.nome || 'Estação CEMADEN'}</strong>
-                    {estacao.municipio && <><br />{estacao.municipio} · Minas Gerais</>}
-                    <br />
-                    Última hora: <b>{formatarMmMapaRadar(estacao.precipitacaoAtual)}</b>
-                    <br />
-                    {estadoLeitura === 'atualizada' ? 'Leitura atualizada' : estadoLeitura === 'atrasada' ? 'Leitura atrasada' : 'Sem dados recentes'}
-                    <br />
-                    Leitura: {dataHoraRadar(estacao.precipitacaoDataHora)}
-                    {estacao.codigo ? <><br />Estação {estacao.codigo}</> : null}
-                  </Popup>
-                </CircleMarker>
-              )
-            })}
-          </Pane>
-        )}
+        <Pane name="radarLiveCemadenStations" style={{ zIndex: 450 }}>
+          {estacoesLafaieteGeorreferenciadas.map(estacao => {
+            const estadoLeitura = statusLeituraCemaden(estacao.precipitacaoDataHora)
+            const intensidade = estadoLeitura === 'atualizada'
+              ? intensidadeCemadenRadar(estacao.precipitacaoAtual)
+              : { cor: '#94a3b8', alpha: 0 }
+            return (
+              <CircleMarker
+                key={`radar-live-station-${estacao.id}`}
+                center={[estacao.latitude as number, estacao.longitude as number]}
+                radius={zoomMapa < 8 ? 2.5 : zoomMapa < 11 ? 4 : 8}
+                pathOptions={{ color: '#fff', weight: 2, fillColor: intensidade.cor, fillOpacity: 0.95 }}
+              >
+                <Tooltip permanent={zoomMapa >= 11} direction="top" offset={[0, -7]} opacity={0.96} className="radar-live-map-tooltip">
+                  {estadoLeitura === 'atualizada' && estacao.precipitacaoAtual != null
+                    ? formatarMmMapaRadar(estacao.precipitacaoAtual)
+                    : '—'}
+                </Tooltip>
+                <Popup>
+                  <strong>🌧️ {estacao.nome || 'Estação CEMADEN'}</strong>
+                  {estacao.municipio && <><br />{estacao.municipio} · Minas Gerais</>}
+                  <br />
+                  Última hora: <b>{formatarMmMapaRadar(estacao.precipitacaoAtual)}</b>
+                  <br />
+                  {estadoLeitura === 'atualizada' ? 'Leitura atualizada' : estadoLeitura === 'atrasada' ? 'Leitura atrasada' : 'Sem dados recentes'}
+                  <br />
+                  Leitura: {dataHoraRadar(estacao.precipitacaoDataHora)}
+                  {estacao.codigo ? <><br />Estação {estacao.codigo}</> : null}
+                </Popup>
+              </CircleMarker>
+            )
+          })}
+        </Pane>
         {mostrarTemperatura && zoomMapa >= 9 && tempoMapa?.atual && Number.isFinite(Number(tempoMapa.atual.temperatura)) && (
           <CircleMarker
             center={[CONSELHEIRO_LAFAIETE.latitude, CONSELHEIRO_LAFAIETE.longitude]}

@@ -1077,6 +1077,21 @@ export default function App() {
           <img className="header-logo-imagem" src="/defesa-civil-logo.png" alt="Defesa Civil" />
         </div>
         <div className="header-direita">
+          {orgao === 'defesa-civil' && (
+            <button
+              className="header-pae-btn"
+              type="button"
+              onClick={() => {
+                setPaeAbrirSignal(signal => signal + 1)
+                navegarParaAba('mapa')
+              }}
+              aria-label="Abrir Plano de Ação do Evento"
+              title="Abrir Plano de Ação do Evento"
+              data-testid="button-open-pae-header"
+            >
+              PAE
+            </button>
+          )}
           <AgentesOnline />
           {logado && convPendentes > 0 && (
             <button
@@ -1108,21 +1123,6 @@ export default function App() {
             </button>
           )}
           <BotaoSos modo="botao" />
-          {orgao === 'defesa-civil' && (
-            <button
-              className="header-pae-btn"
-              type="button"
-              onClick={() => {
-                setPaeAbrirSignal(signal => signal + 1)
-                navegarParaAba('mapa')
-              }}
-              aria-label="Abrir Plano de Ação do Evento"
-              title="Abrir Plano de Ação do Evento"
-              data-testid="button-open-pae-header"
-            >
-              PAE
-            </button>
-          )}
         </div>
       </header>
 

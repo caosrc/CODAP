@@ -107,8 +107,8 @@ export const handler = async () => {
         nome: String(item?.nomeestacao || dadosEstacao.nome || ''),
         municipio: String(item?.cidade || dadosEstacao.idMunicipio?.cidade || ''),
         codigo: String(dadosEstacao.codEstacao || ''),
-        latitude: numeroOuNulo(dadosEstacao.latitude),
-        longitude: numeroOuNulo(dadosEstacao.longitude),
+        latitude: numeroOuNulo(dadosEstacao.latitude) ?? numeroOuNulo(item?.latitude),
+        longitude: numeroOuNulo(dadosEstacao.longitude) ?? numeroOuNulo(item?.longitude),
         precipitacaoAtual: valorCatalogo ?? ultimaChuva?.valor ?? null,
         precipitacaoDataHora: valorCatalogo != null
           ? String(item?.datahoraUltimovalor || '')

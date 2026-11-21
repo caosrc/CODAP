@@ -28,6 +28,7 @@ export interface PAECommandPanelProps {
   carregando: boolean
   salvando: boolean
   erro: string | null
+  localizacaoMapa: { lat: number; lng: number; nome: string } | null
   onFechar: () => void
   onSairPae: () => void
   onAtivarGps: () => void
@@ -43,14 +44,11 @@ export interface PAECommandPanelProps {
   onValidarChamado: (chamadoId: string) => Promise<PaeChamado>
   onSuspenderCancelarChamado: (chamadoId: string, status: 'suspenso' | 'cancelado', motivo: string) => Promise<PaeChamado>
   onAjustarLocalizacao: (chamadoId: string | null) => void
-  onGeocodificar: (endereco: string) => Promise<Array<{ display: string; latitude: number; longitude: number }>>
   onSelecionarEvento: (eventoId: string) => void
   onSelecionarChamado: (chamado: PaeChamado | null) => void
 }
 
 type FotoRascunho = { dataUrl: string; legenda: string }
-type ResultadoEndereco = { display: string; latitude: number; longitude: number }
-
 const TIPOS_EVENTO_PAE = [
   'Chuvas intensas',
   'Enchente',
@@ -228,6 +226,7 @@ export default function PAECommandPanel({
   carregando,
   salvando,
   erro,
+  localizacaoMapa,
   onFechar,
   onSairPae,
   onAtivarGps,
@@ -243,7 +242,6 @@ export default function PAECommandPanel({
   onValidarChamado,
   onSuspenderCancelarChamado,
   onAjustarLocalizacao,
-  onGeocodificar,
   onSelecionarEvento,
   onSelecionarChamado,
   historico,
@@ -258,7 +256,6 @@ export default function PAECommandPanel({
   const [tipoEvento, setTipoEvento] = useState('')
   const [objetivos, setObjetivos] = useState('')
   const [endereco, setEndereco] = useState('')
-  const [numeroEndereco, setNumeroEndereco] = useState('')
   const [enderecoConfirmado, setEnderecoConfirmado] = useState('')
   const [referencia, setReferencia] = useState('')
   const [bairro, setBairro] = useState('')
@@ -280,8 +277,6 @@ export default function PAECommandPanel({
   const [motivoEncerramento, setMotivoEncerramento] = useState('')
   const [acaoEncerramento, setAcaoEncerramento] = useState<'suspenso' | 'cancelado'>('suspenso')
   const [coordenadas, setCoordenadas] = useState<{ latitude: number; longitude: number } | null>(null)
-  const [resultadosEndereco, setResultadosEndereco] = useState<ResultadoEndereco[]>([])
-  const [geocodificando, setGeocodificando] = useState(false)
   const [mensagemGeocode, setMensagemGeocode] = useState('')
   const [observacao, setObservacao] = useState('')
   const [relato, setRelato] = useState('')
@@ -364,9 +359,8 @@ export default function PAECommandPanel({
   const iniciarChamado = () => {
     setModoFormulario('chamado')
     setErroLocal('')
-    setEndereco('')
-    setNumeroEndereco('')
-    setEnderecoConfirmado('')
+    setEndereco(localizacaoMapa?.nome || '')
+    setEnderecoConfirmado(localizacaoMapa?.nome || '')
     setReferencia('')
     setBairro('')
     setMunicipio('Conselheiro Lafaiete')
@@ -375,56 +369,31 @@ export default function PAECommandPanel({
     setCanalEntrada('interno')
     setDescricaoChamado('')
     setPrioridade('media')
-    setCoordenadas(null)
-    setResultadosEndereco([])
-    setMensagemGeocode('')
-  }
-
-  const geocodificar = async () => {
-    if (!endereco.trim() || !numeroEndereco.trim()) {
-      setMensagemGeocode('Informe a rua e o número do imóvel antes de localizar.')
-      return null
-    }
-    setGeocodificando(true)
-    setMensagemGeocode('')
-    try {
-      const resultados = await onGeocodificar([
-        endereco.trim(),
-        numeroEndereco.trim(),
-        bairro.trim(),
-        municipio.trim(),
-        'MG',
-      ].filter(Boolean).join(', '))
-      if (resultados.length === 0) {
-        setCoordenadas(null)
-        setResultadosEndereco([])
-        setMensagemGeocode('Nenhum endereço encontrado. Revise a rua, o número e o bairro.')
-        return null
-      }
-      setCoordenadas(null)
-      setResultadosEndereco(resultados)
-      setMensagemGeocode('Selecione o endereço correspondente para confirmar o ponto no mapa.')
-      return resultados
-    } catch {
-      setMensagemGeocode('Não foi possível localizar o endereço. Tente novamente.')
-      return null
-    } finally {
-      setGeocodificando(false)
-    }
+    setCoordenadas(localizacaoMapa
+      ? { latitude: localizacaoMapa.lat, longitude: localizacaoMapa.lng }
+      : null)
+    setMensagemGeocode(localizacaoMapa
+      ? `Local do Mapa selecionado · ${localizacaoMapa.lat.toFixed(5)}, ${localizacaoMapa.lng.toFixed(5)}`
+      : 'Pesquise e selecione um endereço na barra de busca do Mapa.')
   }
 
   const invalidarEnderecoEncontrado = () => {
     setCoordenadas(null)
     setEnderecoConfirmado('')
-    setResultadosEndereco([])
     setMensagemGeocode('')
   }
 
-  const confirmarEnderecoEncontrado = (resultado: ResultadoEndereco) => {
-    setEnderecoConfirmado(resultado.display)
-    setCoordenadas({ latitude: resultado.latitude, longitude: resultado.longitude })
-    setResultadosEndereco([])
-    setMensagemGeocode(`Endereço confirmado · ${resultado.latitude.toFixed(5)}, ${resultado.longitude.toFixed(5)}`)
+  const usarLocalizacaoMapa = () => {
+    if (!localizacaoMapa) {
+      setMensagemGeocode('Pesquise e selecione um endereço na barra de busca do Mapa.')
+      return
+    }
+    setEndereco(localizacaoMapa.nome)
+    setEnderecoConfirmado(localizacaoMapa.nome)
+    setCoordenadas({ latitude: localizacaoMapa.lat, longitude: localizacaoMapa.lng })
+    setMensagemGeocode(
+      `Local do Mapa selecionado · ${localizacaoMapa.lat.toFixed(5)}, ${localizacaoMapa.lng.toFixed(5)}`,
+    )
   }
 
   const criarEvento = async (event: FormEvent<HTMLFormElement>) => {
@@ -888,34 +857,17 @@ export default function PAECommandPanel({
               <section className="pae-form-view">
                 <div className="pae-detail-kicker">NOVO REGISTRO / CHAMADO DE RISCO</div>
                 <h2>Registrar chamado</h2>
-                <p className="pae-form-intro">Registre a solicitação no evento. A prioridade final e o COBRADE serão confirmados na triagem.</p>
+                <p className="pae-form-intro">Pesquise o endereço no Mapa e use o ponto selecionado para localizar o chamado. A prioridade final e o COBRADE serão confirmados na triagem.</p>
                 <form onSubmit={criarChamado} className="pae-form">
                   <div className="pae-form-grid">
-                    <label className="pae-span-two">Rua ou avenida<input required value={endereco} onChange={event => { setEndereco(event.target.value); invalidarEnderecoEncontrado() }} placeholder="Ex.: Rua Doutor Campolina" data-testid="input-call-address" /></label>
-                    <label>Número do imóvel<input required inputMode="numeric" value={numeroEndereco} onChange={event => { setNumeroEndereco(event.target.value); invalidarEnderecoEncontrado() }} placeholder="Ex.: 123 ou S/N" data-testid="input-call-address-number" /></label>
+                    <label className="pae-span-two">Rua, número ou local<input required value={endereco} onChange={event => { setEndereco(event.target.value); invalidarEnderecoEncontrado() }} placeholder="Selecione pela busca do Mapa" data-testid="input-call-address" /></label>
                     <label>Bairro<input maxLength={120} value={bairro} onChange={event => { setBairro(event.target.value); invalidarEnderecoEncontrado() }} placeholder="Bairro" data-testid="input-call-neighborhood" /></label>
                     <label>Município<input maxLength={120} value={municipio} onChange={event => { setMunicipio(event.target.value); invalidarEnderecoEncontrado() }} data-testid="input-call-municipality" /></label>
                     <div className="pae-geocode-row pae-span-two">
-                      <button className="pae-geocode-button" type="button" onClick={() => void geocodificar()} disabled={geocodificando || !endereco.trim() || !numeroEndereco.trim()} data-testid="button-geocode-address">{geocodificando ? 'Localizando…' : 'Buscar endereço'}</button>
-                      <span className={coordenadas ? 'pae-geocode-ok' : ''} role="status" data-testid="status-geocode">{mensagemGeocode || 'A localização é necessária para registrar o chamado.'}</span>
+                      <button className="pae-geocode-button" type="button" onClick={usarLocalizacaoMapa} disabled={!localizacaoMapa} data-testid="button-use-map-location">Usar local pesquisado no Mapa</button>
+                      <span className={coordenadas ? 'pae-geocode-ok' : ''} role="status" data-testid="status-geocode">{mensagemGeocode || 'Pesquise o endereço na barra do Mapa e selecione um resultado.'}</span>
+                      {!localizacaoMapa && <button className="pae-geocode-button" type="button" onClick={onFechar} data-testid="button-return-map-search">Voltar ao Mapa para pesquisar</button>}
                     </div>
-                    {resultadosEndereco.length > 0 && (
-                      <div className="pae-geocode-results pae-span-two" role="group" aria-label="Resultados de endereço">
-                        <strong>Confirme o endereço encontrado</strong>
-                        {resultadosEndereco.map((resultado, index) => (
-                          <button
-                            className="pae-geocode-result"
-                            type="button"
-                            key={`${resultado.latitude}-${resultado.longitude}`}
-                            onClick={() => confirmarEnderecoEncontrado(resultado)}
-                            data-testid={`button-confirm-address-${index}`}
-                          >
-                            <span>{resultado.display}</span>
-                            <small>{resultado.latitude.toFixed(5)}, {resultado.longitude.toFixed(5)}</small>
-                          </button>
-                        ))}
-                      </div>
-                    )}
                     <label>Tipo operacional<input list="pae-call-types" required value={tipoRisco} onChange={event => setTipoRisco(event.target.value)} placeholder="Escolha ou digite o tipo" data-testid="input-call-risk" /><datalist id="pae-call-types">{TIPOS_CHAMADO_PAE.map(tipo => <option key={tipo} value={tipo} />)}</datalist></label>
                     <label>Prioridade inicial<select value={prioridade} onChange={event => setPrioridade(event.target.value as NovoChamadoPaeInput['prioridade'])} data-testid="select-call-priority"><option value="baixa">Baixa</option><option value="media">Média</option><option value="alta">Alta</option><option value="critica">Crítica</option></select></label>
                     <label>Canal de entrada<select value={canalEntrada} onChange={event => setCanalEntrada(event.target.value)} data-testid="select-call-channel"><option value="interno">Equipe interna</option><option value="telefone">Telefone</option><option value="radio">Rádio</option><option value="orgao_parceiro">Órgão parceiro</option><option value="outro">Outro</option></select></label>

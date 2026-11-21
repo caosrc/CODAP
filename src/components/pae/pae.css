@@ -329,6 +329,9 @@
 .pae-access-card > p { margin: 0 0 1.2rem; color: #a9c0d1; font-size: .88rem; line-height: 1.55; }
 .pae-access-form { display: grid; gap: .95rem; }
 .pae-access-form label { display: grid; gap: .4rem; color: #c5d7e3; font-size: .76rem; font-weight: 750; }
+.pae-access-agent { display: grid; gap: .25rem; border: 1px solid #294a63; border-radius: 7px; padding: .7rem .75rem; background: rgba(10, 34, 56, .55); }
+.pae-access-agent span { color: #89a7bb; font-size: .68rem; font-weight: 750; text-transform: uppercase; letter-spacing: .06em; }
+.pae-access-agent strong { color: #edf6fb; font-size: .92rem; }
 .pae-access-form input { width: 100%; border: 1px solid #3a5c75; border-radius: 7px; padding: .7rem .75rem; color: #edf6fb; background: #0a2238; font: inherit; }
 .pae-access-form input:focus { outline: 2px solid #62bad4; outline-offset: 1px; }
 .pae-access-form input:disabled { opacity: .55; }

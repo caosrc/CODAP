@@ -4,6 +4,7 @@ type DisabledSupabaseClient = {
   from: (...args: unknown[]) => any
   channel: (...args: unknown[]) => any
   removeChannel: (...args: unknown[]) => any
+  rpc: (...args: unknown[]) => any
   functions: { invoke: (...args: unknown[]) => any }
 }
 
@@ -27,5 +28,6 @@ export const supabase = supabaseDisponivel
       from: supabaseDisabled,
       channel: supabaseDisabled,
       removeChannel: supabaseDisabled,
+      rpc: supabaseDisabled,
       functions: { invoke: supabaseDisabled },
     } as DisabledSupabaseClient)

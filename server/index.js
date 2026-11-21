@@ -11,6 +11,7 @@ import { createServer } from 'http'
 import WebSocket, { WebSocketServer } from 'ws'
 import { execFile } from 'child_process'
 import { promisify } from 'util'
+import { registerPaeRoutes } from './pae.js'
 import { handler as planetFocosHandler } from '../netlify/functions/planet-focos.js'
 import { handler as redemetHandler } from '../netlify/functions/redemet.js'
 
@@ -443,6 +444,9 @@ wss.on('connection', (ws) => {
         })
       }
       if (msg.tipo === 'radar_notificacao_agente') {
+        broadcastParaTodos(msg, ws)
+      }
+      if (typeof msg.tipo === 'string' && msg.tipo.startsWith('pae_')) {
         broadcastParaTodos(msg, ws)
       }
 
@@ -1022,6 +1026,74 @@ async function initDb() {
   `)
 
   await query(`
+    CREATE TABLE IF NOT EXISTS pae_eventos (
+      id TEXT PRIMARY KEY,
+      nome TEXT NOT NULL,
+      acionado_por TEXT NOT NULL,
+      descricao TEXT NOT NULL DEFAULT '',
+      status TEXT NOT NULL DEFAULT 'ativo' CHECK (status IN ('ativo', 'encerrado')),
+      criado_em TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      atualizado_em TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `)
+  await query(`
+    CREATE TABLE IF NOT EXISTS pae_chamados (
+      id TEXT PRIMARY KEY,
+      evento_id TEXT NOT NULL REFERENCES pae_eventos(id),
+      acionado_por TEXT NOT NULL,
+      endereco TEXT NOT NULL,
+      latitude DOUBLE PRECISION NOT NULL CHECK (latitude BETWEEN -90 AND 90),
+      longitude DOUBLE PRECISION NOT NULL CHECK (longitude BETWEEN -180 AND 180),
+      tipo_risco TEXT NOT NULL,
+      descricao TEXT NOT NULL DEFAULT '',
+      prioridade TEXT NOT NULL DEFAULT 'media' CHECK (prioridade IN ('baixa', 'media', 'alta', 'critica')),
+      status TEXT NOT NULL DEFAULT 'novo' CHECK (status IN ('novo', 'em_atendimento', 'concluido', 'cancelado')),
+      agentes_envolvidos TEXT[] NOT NULL DEFAULT '{}',
+      criado_em TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      atualizado_em TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      CHECK (cardinality(agentes_envolvidos) > 0)
+    )
+  `)
+  await query(`
+    CREATE TABLE IF NOT EXISTS pae_atendimentos (
+      id TEXT PRIMARY KEY,
+      chamado_id TEXT NOT NULL UNIQUE REFERENCES pae_chamados(id),
+      agente TEXT NOT NULL,
+      observacao TEXT NOT NULL DEFAULT '',
+      relato TEXT NOT NULL,
+      materiais_gastos JSONB NOT NULL DEFAULT '[]'::jsonb,
+      concluido_em TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `)
+  await query(`
+    CREATE TABLE IF NOT EXISTS pae_fotos (
+      id TEXT PRIMARY KEY,
+      atendimento_id TEXT NOT NULL REFERENCES pae_atendimentos(id),
+      data_url TEXT NOT NULL CHECK (data_url LIKE 'data:image/%'),
+      legenda TEXT NOT NULL DEFAULT '',
+      agente TEXT NOT NULL,
+      latitude DOUBLE PRECISION,
+      longitude DOUBLE PRECISION,
+      criado_em TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `)
+  await query(`
+    CREATE TABLE IF NOT EXISTS pae_historico (
+      id TEXT PRIMARY KEY,
+      evento_id TEXT NOT NULL REFERENCES pae_eventos(id),
+      chamado_id TEXT REFERENCES pae_chamados(id),
+      acao TEXT NOT NULL,
+      detalhes JSONB NOT NULL DEFAULT '{}'::jsonb,
+      realizado_por TEXT NOT NULL,
+      criado_em TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `)
+  await query(`CREATE INDEX IF NOT EXISTS pae_eventos_status_criado_idx ON pae_eventos (status, criado_em DESC)`)
+  await query(`CREATE INDEX IF NOT EXISTS pae_chamados_evento_status_idx ON pae_chamados (evento_id, status, criado_em DESC)`)
+  await query(`CREATE INDEX IF NOT EXISTS pae_fotos_atendimento_idx ON pae_fotos (atendimento_id, criado_em)`)
+  await query(`CREATE INDEX IF NOT EXISTS pae_historico_chamado_idx ON pae_historico (chamado_id, criado_em DESC)`)
+
+  await query(`
     CREATE TABLE IF NOT EXISTS monitoramento_cnl_cotas (
       id INTEGER PRIMARY KEY,
       atencao DOUBLE PRECISION NOT NULL,
@@ -1580,6 +1652,15 @@ app.delete('/api/planejamentos/:id', async (req, res) => {
   } catch (err) {
     res.status(500).json({ error: err.message })
   }
+})
+
+// ── Plano de Ação de Evento (PAE) ──────────────────────────────────────────
+registerPaeRoutes(app, {
+  query,
+  pool,
+  broadcastParaTodos,
+  enviarPushParaAgentes,
+  get vapidConfigured() { return vapidConfigured },
 })
 
 // ── Radar Codap — lembretes e notificações compartilhados entre os agentes ─

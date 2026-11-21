@@ -1031,6 +1031,10 @@ async function initDb() {
       nome TEXT NOT NULL,
       acionado_por TEXT NOT NULL,
       descricao TEXT NOT NULL DEFAULT '',
+      tipo_evento TEXT NOT NULL DEFAULT '',
+      objetivos TEXT NOT NULL DEFAULT '',
+      responsavel TEXT NOT NULL DEFAULT '',
+      inicio_em TIMESTAMPTZ,
       status TEXT NOT NULL DEFAULT 'ativo' CHECK (status IN ('ativo', 'encerrado')),
       criado_em TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       atualizado_em TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -1045,14 +1049,63 @@ async function initDb() {
       latitude DOUBLE PRECISION NOT NULL CHECK (latitude BETWEEN -90 AND 90),
       longitude DOUBLE PRECISION NOT NULL CHECK (longitude BETWEEN -180 AND 180),
       tipo_risco TEXT NOT NULL,
+      cobrade TEXT NOT NULL DEFAULT '',
+      canal_entrada TEXT NOT NULL DEFAULT 'interno',
+      referencia TEXT NOT NULL DEFAULT '',
+      bairro TEXT NOT NULL DEFAULT '',
+      municipio TEXT NOT NULL DEFAULT '',
       descricao TEXT NOT NULL DEFAULT '',
       prioridade TEXT NOT NULL DEFAULT 'media' CHECK (prioridade IN ('baixa', 'media', 'alta', 'critica')),
-      status TEXT NOT NULL DEFAULT 'novo' CHECK (status IN ('novo', 'em_atendimento', 'concluido', 'cancelado')),
+      justificativa_prioridade TEXT NOT NULL DEFAULT '',
+      triado_por TEXT,
+      triado_em TIMESTAMPTZ,
+      validado_por TEXT,
+      validado_em TIMESTAMPTZ,
+      motivo_suspensao_cancelamento TEXT NOT NULL DEFAULT '',
+      status TEXT NOT NULL DEFAULT 'novo' CHECK (status IN ('novo', 'triado', 'em_atendimento', 'concluido_em_campo', 'validado', 'suspenso', 'cancelado')),
       agentes_envolvidos TEXT[] NOT NULL DEFAULT '{}',
       criado_em TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       atualizado_em TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       CHECK (cardinality(agentes_envolvidos) > 0)
     )
+  `)
+  await query(`
+    ALTER TABLE pae_eventos
+      ADD COLUMN IF NOT EXISTS tipo_evento TEXT NOT NULL DEFAULT '',
+      ADD COLUMN IF NOT EXISTS objetivos TEXT NOT NULL DEFAULT '',
+      ADD COLUMN IF NOT EXISTS responsavel TEXT NOT NULL DEFAULT '',
+      ADD COLUMN IF NOT EXISTS inicio_em TIMESTAMPTZ
+  `)
+  await query(`
+    ALTER TABLE pae_chamados
+      ADD COLUMN IF NOT EXISTS cobrade TEXT NOT NULL DEFAULT '',
+      ADD COLUMN IF NOT EXISTS canal_entrada TEXT NOT NULL DEFAULT 'interno',
+      ADD COLUMN IF NOT EXISTS referencia TEXT NOT NULL DEFAULT '',
+      ADD COLUMN IF NOT EXISTS bairro TEXT NOT NULL DEFAULT '',
+      ADD COLUMN IF NOT EXISTS municipio TEXT NOT NULL DEFAULT '',
+      ADD COLUMN IF NOT EXISTS justificativa_prioridade TEXT NOT NULL DEFAULT '',
+      ADD COLUMN IF NOT EXISTS triado_por TEXT,
+      ADD COLUMN IF NOT EXISTS triado_em TIMESTAMPTZ,
+      ADD COLUMN IF NOT EXISTS validado_por TEXT,
+      ADD COLUMN IF NOT EXISTS validado_em TIMESTAMPTZ,
+      ADD COLUMN IF NOT EXISTS motivo_suspensao_cancelamento TEXT NOT NULL DEFAULT ''
+  `)
+  await query(`
+    DO $$
+    BEGIN
+      IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint
+         WHERE conrelid = 'pae_chamados'::regclass
+           AND conname = 'pae_chamados_status_check'
+           AND pg_get_constraintdef(oid) ILIKE '%concluido_em_campo%'
+      ) THEN
+        ALTER TABLE pae_chamados DROP CONSTRAINT IF EXISTS pae_chamados_status_check;
+        UPDATE pae_chamados SET status = 'validado' WHERE status = 'concluido';
+        ALTER TABLE pae_chamados
+          ADD CONSTRAINT pae_chamados_status_check
+          CHECK (status IN ('novo', 'triado', 'em_atendimento', 'concluido_em_campo', 'validado', 'suspenso', 'cancelado'));
+      END IF;
+    END $$;
   `)
   await query(`
     CREATE TABLE IF NOT EXISTS pae_atendimentos (

@@ -48,13 +48,21 @@ function listaFotos(valor) {
 }
 
 export function validarNovoEventoPae(payload) {
+  const inicioEm = payload?.inicio_em ?? payload?.inicioEm ?? null
+  const inicioData = inicioEm ? new Date(inicioEm) : null
   const evento = {
     id: texto(payload?.id, 100),
     nome: texto(payload?.nome, 120),
     acionadoPor: texto(payload?.acionado_por ?? payload?.acionadoPor, 100),
     descricao: texto(payload?.descricao, 2000),
+    tipoEvento: texto(payload?.tipo_evento ?? payload?.tipoEvento, 120),
+    objetivos: texto(payload?.objetivos, 3000),
+    responsavel: texto(payload?.responsavel, 100),
+    inicioEm: inicioData && Number.isFinite(inicioData.getTime()) ? inicioData.toISOString() : null,
   }
   if (!evento.id || !evento.nome || !evento.acionadoPor) return { erro: 'Informe o nome do evento e quem o acionou.' }
+  if (inicioEm && !evento.inicioEm) return { erro: 'Data de início do evento inválida.' }
+  if (!evento.responsavel) evento.responsavel = evento.acionadoPor
   return { evento }
 }
 
@@ -64,11 +72,17 @@ export function validarNovoChamadoPae(payload) {
     eventoId: texto(payload?.evento_id ?? payload?.eventoId, 100),
     acionadoPor: texto(payload?.acionado_por ?? payload?.acionadoPor, 100),
     endereco: texto(payload?.endereco, 500),
+    referencia: texto(payload?.referencia, 250),
+    bairro: texto(payload?.bairro, 120),
+    municipio: texto(payload?.municipio, 120),
     latitude: Number(payload?.latitude),
     longitude: Number(payload?.longitude),
     tipoRisco: texto(payload?.tipo_risco ?? payload?.tipoRisco, 120),
+    cobrade: texto(payload?.cobrade, 120),
+    canalEntrada: texto(payload?.canal_entrada ?? payload?.canalEntrada, 40) || 'interno',
     descricao: texto(payload?.descricao, 3000),
     prioridade: texto(payload?.prioridade, 20),
+    justificativaPrioridade: texto(payload?.justificativa_prioridade ?? payload?.justificativaPrioridade, 1000),
     agentesEnvolvidos: listaAgentes(payload?.agentes_envolvidos ?? payload?.agentesEnvolvidos),
   }
   if (!chamado.id || !chamado.eventoId || !chamado.acionadoPor || !chamado.endereco || !chamado.tipoRisco) {
@@ -81,6 +95,19 @@ export function validarNovoChamadoPae(payload) {
   if (chamado.agentesEnvolvidos.length === 0) return { erro: 'Selecione pelo menos um agente.' }
   if (!PRIORIDADES_PAE.has(chamado.prioridade)) chamado.prioridade = 'media'
   return { chamado }
+}
+
+export function validarTriagemPae(payload) {
+  const triagem = {
+    agente: texto(payload?.agente, 100),
+    prioridade: texto(payload?.prioridade, 20),
+    justificativa: texto(payload?.justificativa, 1000),
+    cobrade: texto(payload?.cobrade, 120),
+  }
+  if (!triagem.agente || !triagem.justificativa || !PRIORIDADES_PAE.has(triagem.prioridade)) {
+    return { erro: 'Informe responsável, prioridade válida e justificativa da triagem.' }
+  }
+  return { triagem }
 }
 
 export function validarConclusaoPae(payload) {
@@ -166,6 +193,22 @@ export function registerPaeRoutes(app, { query, pool, broadcastParaTodos, enviar
     }
   })
 
+  app.get('/api/pae/eventos/:id/historico', async (req, res) => {
+    try {
+      const chamadoId = texto(req.query?.chamado_id, 100) || null
+      const result = await query(
+        `SELECT id, evento_id, chamado_id, acao, detalhes, realizado_por, criado_em
+           FROM pae_historico
+          WHERE evento_id = $1 AND ($2::text IS NULL OR chamado_id = $2)
+          ORDER BY criado_em ASC, id ASC`,
+        [req.params.id, chamadoId],
+      )
+      res.json(result.rows)
+    } catch (err) {
+      res.status(500).json({ error: err.message || 'Não foi possível carregar o histórico do PAE.' })
+    }
+  })
+
   app.post('/api/pae/eventos', async (req, res) => {
     const resultado = validarNovoEventoPae(req.body)
     if (resultado.erro) return erroHttp(res, 400, resultado.erro)
@@ -174,14 +217,20 @@ export function registerPaeRoutes(app, { query, pool, broadcastParaTodos, enviar
     try {
       await client.query('BEGIN')
       const salvo = await client.query(
-        `INSERT INTO pae_eventos (id, nome, acionado_por, descricao)
-         VALUES ($1, $2, $3, $4) RETURNING *`,
-        [evento.id, evento.nome, evento.acionadoPor, evento.descricao],
+        `INSERT INTO pae_eventos (
+           id, nome, acionado_por, descricao, tipo_evento, objetivos, responsavel, inicio_em
+         ) VALUES ($1, $2, $3, $4, $5, $6, $7, COALESCE($8::timestamptz, NOW()))
+         RETURNING *`,
+        [evento.id, evento.nome, evento.acionadoPor, evento.descricao,
+          evento.tipoEvento, evento.objetivos, evento.responsavel, evento.inicioEm],
       )
       await client.query(
         `INSERT INTO pae_historico (id, evento_id, acao, detalhes, realizado_por)
          VALUES ($1, $2, 'evento_criado', $3::jsonb, $4)`,
-        [uuid(), evento.id, JSON.stringify({ nome: evento.nome }), evento.acionadoPor],
+        [uuid(), evento.id, JSON.stringify({
+          nome: evento.nome, tipo_evento: evento.tipoEvento, objetivos: evento.objetivos,
+          responsavel: evento.responsavel, inicio_em: evento.inicioEm,
+        }), evento.acionadoPor],
       )
       await client.query('COMMIT')
       broadcastParaTodos({ tipo: 'pae_atualizado', id: evento.id })
@@ -212,19 +261,25 @@ export function registerPaeRoutes(app, { query, pool, broadcastParaTodos, enviar
       const salvo = await client.query(
         `INSERT INTO pae_chamados (
            id, evento_id, acionado_por, endereco, latitude, longitude,
-           tipo_risco, descricao, prioridade, agentes_envolvidos
-         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+           tipo_risco, cobrade, canal_entrada, referencia, bairro, municipio,
+           descricao, prioridade, justificativa_prioridade, agentes_envolvidos
+         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
          RETURNING *`,
         [chamado.id, chamado.eventoId, chamado.acionadoPor, chamado.endereco,
-          chamado.latitude, chamado.longitude, chamado.tipoRisco, chamado.descricao,
-          chamado.prioridade, chamado.agentesEnvolvidos],
+          chamado.latitude, chamado.longitude, chamado.tipoRisco, chamado.cobrade,
+          chamado.canalEntrada, chamado.referencia, chamado.bairro, chamado.municipio,
+          chamado.descricao, chamado.prioridade, chamado.justificativaPrioridade,
+          chamado.agentesEnvolvidos],
       )
       await client.query(
         `INSERT INTO pae_historico (id, evento_id, chamado_id, acao, detalhes, realizado_por)
          VALUES ($1, $2, $3, 'chamado_criado', $4::jsonb, $5)`,
         [uuid(), chamado.eventoId, chamado.id,
-          JSON.stringify({ tipo_risco: chamado.tipoRisco, endereco: chamado.endereco,
-            agentes_envolvidos: chamado.agentesEnvolvidos }), chamado.acionadoPor],
+          JSON.stringify({
+            tipo_risco: chamado.tipoRisco, cobrade: chamado.cobrade,
+            endereco: chamado.endereco, prioridade: chamado.prioridade,
+            agentes_envolvidos: chamado.agentesEnvolvidos,
+          }), chamado.acionadoPor],
       )
       await client.query('COMMIT')
       broadcastParaTodos({ tipo: 'pae_atualizado', id: chamado.id })
@@ -232,6 +287,188 @@ export function registerPaeRoutes(app, { query, pool, broadcastParaTodos, enviar
     } catch (err) {
       await client.query('ROLLBACK').catch(() => {})
       res.status(500).json({ error: err.message || 'Não foi possível registrar o chamado.' })
+    } finally {
+      client.release()
+    }
+  })
+
+  app.post('/api/pae/chamados/:id/triagem', async (req, res) => {
+    const resultado = validarTriagemPae(req.body)
+    if (resultado.erro) return erroHttp(res, 400, resultado.erro)
+    const { agente, prioridade, justificativa, cobrade } = resultado.triagem
+    const client = await pool.connect()
+    try {
+      await client.query('BEGIN')
+      const encontrado = await client.query(
+        'SELECT * FROM pae_chamados WHERE id = $1 FOR UPDATE',
+        [req.params.id],
+      )
+      const chamado = encontrado.rows[0]
+      if (!chamado) {
+        await client.query('ROLLBACK')
+        return erroHttp(res, 404, 'Chamado não encontrado.')
+      }
+      if (!['novo', 'triado'].includes(chamado.status)) {
+        await client.query('ROLLBACK')
+        return erroHttp(res, 409, 'A triagem não pode ser alterada após o início do atendimento.')
+      }
+      const atualizado = await client.query(
+        `UPDATE pae_chamados
+            SET status = 'triado', prioridade = $2, justificativa_prioridade = $3,
+                cobrade = $4, triado_por = $5, triado_em = NOW(), atualizado_em = NOW()
+          WHERE id = $1 RETURNING *`,
+        [chamado.id, prioridade, justificativa, cobrade, agente],
+      )
+      await client.query(
+        `INSERT INTO pae_historico (id, evento_id, chamado_id, acao, detalhes, realizado_por)
+         VALUES ($1, $2, $3, 'chamado_triado', $4::jsonb, $5)`,
+        [uuid(), chamado.evento_id, chamado.id,
+          JSON.stringify({ prioridade, cobrade, justificativa }), agente],
+      )
+      await client.query('COMMIT')
+      broadcastParaTodos({ tipo: 'pae_atualizado', id: chamado.id })
+      res.json(atualizado.rows[0])
+    } catch (err) {
+      await client.query('ROLLBACK').catch(() => {})
+      res.status(500).json({ error: err.message || 'Não foi possível triar o chamado.' })
+    } finally {
+      client.release()
+    }
+  })
+
+  app.patch('/api/pae/chamados/:id/localizacao', async (req, res) => {
+    const latitude = Number(req.body?.latitude)
+    const longitude = Number(req.body?.longitude)
+    const realizadoPor = texto(req.body?.realizadoPor ?? req.body?.realizado_por, 100) || 'Agente não identificado'
+    if (!Number.isFinite(latitude) || latitude < -90 || latitude > 90
+        || !Number.isFinite(longitude) || longitude < -180 || longitude > 180) {
+      return erroHttp(res, 400, 'Coordenadas inválidas.')
+    }
+    const client = await pool.connect()
+    try {
+      await client.query('BEGIN')
+      const encontrado = await client.query(
+        'SELECT * FROM pae_chamados WHERE id = $1 FOR UPDATE',
+        [req.params.id],
+      )
+      const chamado = encontrado.rows[0]
+      if (!chamado) {
+        await client.query('ROLLBACK')
+        return erroHttp(res, 404, 'Chamado não encontrado.')
+      }
+      const atualizado = await client.query(
+        `UPDATE pae_chamados SET latitude = $2, longitude = $3, atualizado_em = NOW()
+          WHERE id = $1 RETURNING *`,
+        [chamado.id, latitude, longitude],
+      )
+      await client.query(
+        `INSERT INTO pae_historico (id, evento_id, chamado_id, acao, detalhes, realizado_por)
+         VALUES ($1, $2, $3, 'localizacao_atualizada', $4::jsonb, $5)`,
+        [uuid(), chamado.evento_id, chamado.id,
+          JSON.stringify({
+            latitudeAnterior: Number(chamado.latitude), longitudeAnterior: Number(chamado.longitude),
+            latitude, longitude,
+          }), realizadoPor],
+      )
+      await client.query('COMMIT')
+      broadcastParaTodos({ tipo: 'pae_atualizado', id: chamado.id })
+      res.json(atualizado.rows[0])
+    } catch (err) {
+      await client.query('ROLLBACK').catch(() => {})
+      res.status(500).json({ error: err.message || 'Não foi possível atualizar a localização do chamado.' })
+    } finally {
+      client.release()
+    }
+  })
+
+  app.post('/api/pae/chamados/:id/validar', async (req, res) => {
+    const agente = texto(req.body?.agente, 100)
+    if (!agente) return erroHttp(res, 400, 'Responsável pela validação obrigatório.')
+    const client = await pool.connect()
+    try {
+      await client.query('BEGIN')
+      const encontrado = await client.query(
+        `SELECT c.*, COALESCE(NULLIF(e.responsavel, ''), e.acionado_por) AS responsavel_evento
+           FROM pae_chamados c JOIN pae_eventos e ON e.id = c.evento_id
+          WHERE c.id = $1 FOR UPDATE OF c`,
+        [req.params.id],
+      )
+      const chamado = encontrado.rows[0]
+      if (!chamado) {
+        await client.query('ROLLBACK')
+        return erroHttp(res, 404, 'Chamado não encontrado.')
+      }
+      if (agente !== chamado.responsavel_evento) {
+        await client.query('ROLLBACK')
+        return erroHttp(res, 403, 'Somente o responsável pelo evento pode validar a conclusão.')
+      }
+      if (chamado.status !== 'concluido_em_campo') {
+        await client.query('ROLLBACK')
+        return erroHttp(res, 409, 'Somente chamados concluídos em campo podem ser validados.')
+      }
+      const atualizado = await client.query(
+        `UPDATE pae_chamados
+            SET status = 'validado', validado_por = $2, validado_em = NOW(), atualizado_em = NOW()
+          WHERE id = $1 RETURNING *`,
+        [chamado.id, agente],
+      )
+      await client.query(
+        `INSERT INTO pae_historico (id, evento_id, chamado_id, acao, detalhes, realizado_por)
+         VALUES ($1, $2, $3, 'chamado_validado', '{}'::jsonb, $4)`,
+        [uuid(), chamado.evento_id, chamado.id, agente],
+      )
+      await client.query('COMMIT')
+      broadcastParaTodos({ tipo: 'pae_atualizado', id: chamado.id })
+      res.json(atualizado.rows[0])
+    } catch (err) {
+      await client.query('ROLLBACK').catch(() => {})
+      res.status(500).json({ error: err.message || 'Não foi possível validar o chamado.' })
+    } finally {
+      client.release()
+    }
+  })
+
+  app.post('/api/pae/chamados/:id/suspender-cancelar', async (req, res) => {
+    const status = texto(req.body?.status, 20)
+    const motivo = texto(req.body?.motivo, 1000)
+    const agente = texto(req.body?.agente, 100)
+    if (!['suspenso', 'cancelado'].includes(status) || !motivo || !agente) {
+      return erroHttp(res, 400, 'Informe a ação, o motivo e o agente responsável.')
+    }
+    const client = await pool.connect()
+    try {
+      await client.query('BEGIN')
+      const encontrado = await client.query(
+        'SELECT * FROM pae_chamados WHERE id = $1 FOR UPDATE',
+        [req.params.id],
+      )
+      const chamado = encontrado.rows[0]
+      if (!chamado) {
+        await client.query('ROLLBACK')
+        return erroHttp(res, 404, 'Chamado não encontrado.')
+      }
+      if (['validado', 'suspenso', 'cancelado'].includes(chamado.status)) {
+        await client.query('ROLLBACK')
+        return erroHttp(res, 409, 'Este chamado não pode mais ser alterado.')
+      }
+      const atualizado = await client.query(
+        `UPDATE pae_chamados
+            SET status = $2, motivo_suspensao_cancelamento = $3, atualizado_em = NOW()
+          WHERE id = $1 RETURNING *`,
+        [chamado.id, status, motivo],
+      )
+      await client.query(
+        `INSERT INTO pae_historico (id, evento_id, chamado_id, acao, detalhes, realizado_por)
+         VALUES ($1, $2, $3, $4, $5::jsonb, $6)`,
+        [uuid(), chamado.evento_id, chamado.id, `chamado_${status}`,
+          JSON.stringify({ motivo }), agente],
+      )
+      await client.query('COMMIT')
+      broadcastParaTodos({ tipo: 'pae_atualizado', id: chamado.id })
+      res.json(atualizado.rows[0])
+    } catch (err) {
+      await client.query('ROLLBACK').catch(() => {})
+      res.status(500).json({ error: err.message || 'Não foi possível atualizar a situação do chamado.' })
     } finally {
       client.release()
     }
@@ -248,12 +485,12 @@ export function registerPaeRoutes(app, { query, pool, broadcastParaTodos, enviar
         return erroHttp(res, 403, 'Somente agentes selecionados podem iniciar o atendimento.')
       }
       if (chamado.status === 'em_atendimento') return res.json(chamado)
-      if (chamado.status !== 'novo') return erroHttp(res, 409, 'Este chamado não pode mais ser iniciado.')
+      if (chamado.status !== 'triado') return erroHttp(res, 409, 'Faça a triagem do chamado antes de iniciar o atendimento.')
 
       const atualizado = await query(
         `UPDATE pae_chamados
             SET status = 'em_atendimento', atualizado_em = NOW()
-          WHERE id = $1 AND status = 'novo'
+          WHERE id = $1 AND status = 'triado'
           RETURNING *`,
         [req.params.id],
       )
@@ -290,9 +527,9 @@ export function registerPaeRoutes(app, { query, pool, broadcastParaTodos, enviar
         await client.query('ROLLBACK')
         return erroHttp(res, 403, 'Somente agentes selecionados podem concluir este chamado.')
       }
-      if (!['novo', 'em_atendimento'].includes(chamado.status)) {
+      if (chamado.status !== 'em_atendimento') {
         await client.query('ROLLBACK')
-        return erroHttp(res, 409, 'Este chamado já foi encerrado.')
+        return erroHttp(res, 409, 'Inicie o atendimento antes de registrar a conclusão em campo.')
       }
 
       const atendimentoId = uuid()
@@ -312,7 +549,7 @@ export function registerPaeRoutes(app, { query, pool, broadcastParaTodos, enviar
         )
       }
       const atualizado = await client.query(
-        `UPDATE pae_chamados SET status = 'concluido', atualizado_em = NOW()
+        `UPDATE pae_chamados SET status = 'concluido_em_campo', atualizado_em = NOW()
           WHERE id = $1 RETURNING *`,
         [chamado.id],
       )
@@ -322,7 +559,7 @@ export function registerPaeRoutes(app, { query, pool, broadcastParaTodos, enviar
       )
       await client.query(
         `INSERT INTO pae_historico (id, evento_id, chamado_id, acao, detalhes, realizado_por)
-         VALUES ($1, $2, $3, 'atendimento_concluido', $4::jsonb, $5)`,
+         VALUES ($1, $2, $3, 'atendimento_concluido_em_campo', $4::jsonb, $5)`,
         [uuid(), chamado.evento_id, chamado.id,
           JSON.stringify({ fotos: conclusao.fotos.length,
             materiais: conclusao.materiaisGastos.length }), conclusao.agente],

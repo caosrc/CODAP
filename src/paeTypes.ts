@@ -1,4 +1,11 @@
-export type PaeStatus = 'novo' | 'em_atendimento' | 'concluido' | 'cancelado'
+export type PaeStatus =
+  | 'novo'
+  | 'triado'
+  | 'em_atendimento'
+  | 'concluido_em_campo'
+  | 'validado'
+  | 'suspenso'
+  | 'cancelado'
 export type PaePrioridade = 'baixa' | 'media' | 'alta' | 'critica'
 
 export interface PaeEvento {
@@ -6,9 +13,23 @@ export interface PaeEvento {
   nome: string
   acionadoPor: string
   descricao: string
+  tipoEvento?: string
+  objetivos?: string
+  responsavel?: string
+  inicioEm?: string | null
   status: 'ativo' | 'encerrado'
   criadoEm: string
   atualizadoEm: string
+}
+
+export interface PaeHistorico {
+  id: string
+  eventoId: string
+  chamadoId: string | null
+  acao: string
+  detalhes: Record<string, unknown>
+  realizadoPor: string
+  criadoEm: string
 }
 
 export interface PaeMaterialGasto {
@@ -43,11 +64,22 @@ export interface PaeChamado {
   eventoId: string
   acionadoPor: string
   endereco: string
+  referencia?: string
+  bairro?: string
+  municipio?: string
   latitude: number
   longitude: number
   tipoRisco: string
+  cobrade?: string
+  canalEntrada?: string
   descricao: string
   prioridade: PaePrioridade
+  justificativaPrioridade?: string
+  triadoPor?: string | null
+  triadoEm?: string | null
+  validadoPor?: string | null
+  validadoEm?: string | null
+  motivoSuspensaoCancelamento?: string
   status: PaeStatus
   agentesEnvolvidos: string[]
   criadoEm: string
@@ -59,18 +91,35 @@ export interface NovoEventoPaeInput {
   nome: string
   acionadoPor: string
   descricao: string
+  tipoEvento?: string
+  objetivos?: string
+  responsavel?: string
+  inicioEm?: string | null
 }
 
 export interface NovoChamadoPaeInput {
   eventoId: string
   acionadoPor: string
   endereco: string
+  referencia?: string
+  bairro?: string
+  municipio?: string
   latitude: number
   longitude: number
   tipoRisco: string
+  cobrade?: string
+  canalEntrada?: string
   descricao: string
   prioridade: PaePrioridade
+  justificativaPrioridade?: string
   agentesEnvolvidos: string[]
+}
+
+export interface TriarChamadoPaeInput {
+  agente: string
+  prioridade: PaePrioridade
+  justificativa: string
+  cobrade?: string
 }
 
 export interface ConcluirChamadoPaeInput {

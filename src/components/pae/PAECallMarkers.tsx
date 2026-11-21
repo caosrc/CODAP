@@ -7,6 +7,9 @@ import './pae.css'
 export interface PAECallMarkersProps {
   chamados: PaeChamado[]
   onSelecionarChamado: (chamado: PaeChamado) => void
+  ajusteChamadoId?: string | null
+  salvandoLocalizacaoId?: string | null
+  onAtualizarLocalizacao?: (chamadoId: string, latitude: number, longitude: number) => void
 }
 
 const prioridadeLabel: Record<PaeChamado['prioridade'], string> = {
@@ -18,15 +21,19 @@ const prioridadeLabel: Record<PaeChamado['prioridade'], string> = {
 
 const statusLabel: Record<PaeChamado['status'], string> = {
   novo: 'Novo',
+  triado: 'Triado',
   em_atendimento: 'Em atendimento',
-  concluido: 'Concluído',
+  concluido_em_campo: 'Concluído em campo',
+  validado: 'Validado',
+  suspenso: 'Suspenso',
   cancelado: 'Cancelado',
 }
 
 function criarIcone(chamado: PaeChamado) {
   const cor = chamado.status === 'novo' ? '#df514c'
-    : chamado.status === 'em_atendimento' ? '#318fca'
-      : chamado.status === 'concluido' ? '#4da98b' : '#8696a4'
+    : chamado.status === 'triado' ? '#e68a3c'
+      : chamado.status === 'em_atendimento' || chamado.status === 'concluido_em_campo' ? '#318fca'
+        : chamado.status === 'validado' ? '#4da98b' : '#8696a4'
   const html = `<span style="--marker-color:${cor}" class="pae-map-marker pae-map-marker--${chamado.prioridade}" aria-hidden="true"><i></i></span>`
   return L.divIcon({
     className: 'pae-map-marker-shell',
@@ -37,7 +44,13 @@ function criarIcone(chamado: PaeChamado) {
   })
 }
 
-export default function PAECallMarkers({ chamados, onSelecionarChamado }: PAECallMarkersProps) {
+export default function PAECallMarkers({
+  chamados,
+  onSelecionarChamado,
+  ajusteChamadoId = null,
+  salvandoLocalizacaoId = null,
+  onAtualizarLocalizacao,
+}: PAECallMarkersProps) {
   const markers = useMemo(
     () => chamados.filter(chamado => Number.isFinite(chamado.latitude) && Number.isFinite(chamado.longitude)),
     [chamados],
@@ -50,7 +63,15 @@ export default function PAECallMarkers({ chamados, onSelecionarChamado }: PAECal
           key={chamado.id}
           position={[chamado.latitude, chamado.longitude]}
           icon={criarIcone(chamado)}
-          eventHandlers={{ click: () => onSelecionarChamado(chamado) }}
+          draggable={ajusteChamadoId === chamado.id && Boolean(onAtualizarLocalizacao)}
+          eventHandlers={{
+            click: () => onSelecionarChamado(chamado),
+            dragend: event => {
+              if (!onAtualizarLocalizacao) return
+              const point = (event.target as L.Marker).getLatLng()
+              onAtualizarLocalizacao(chamado.id, point.lat, point.lng)
+            },
+          }}
           alt={`Chamado ${chamado.tipoRisco}, prioridade ${prioridadeLabel[chamado.prioridade]}`}
           riseOnHover
         >
@@ -61,6 +82,7 @@ export default function PAECallMarkers({ chamados, onSelecionarChamado }: PAECal
               <p>{chamado.descricao}</p>
               <div className="pae-popup-meta"><span>{statusLabel[chamado.status]}</span><span>{chamado.agentesEnvolvidos.length} agente(s)</span></div>
               {chamado.atendimento?.fotos[0] && <img className="pae-popup-photo" src={chamado.atendimento.fotos[0].dataUrl} alt={chamado.atendimento.fotos[0].legenda || 'Foto do atendimento'} />}
+              {salvandoLocalizacaoId === chamado.id && <small role="status">Salvando novo ponto…</small>}
               <button type="button" onClick={() => onSelecionarChamado(chamado)} data-testid={`button-open-map-call-${chamado.id}`}>Abrir chamado <span aria-hidden="true">→</span></button>
             </article>
           </Popup>

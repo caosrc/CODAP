@@ -6,7 +6,9 @@ import type {
   NovoEventoPaeInput,
   PaeChamado,
   PaeEvento,
+  PaeHistorico,
   PaeMaterialGasto,
+  TriarChamadoPaeInput,
 } from '../../paeTypes'
 import { AGENTES } from '../../types'
 import './pae.css'
@@ -15,7 +17,11 @@ export interface PAECommandPanelProps {
   aberto: boolean
   eventos: PaeEvento[]
   chamados: PaeChamado[]
+  historico: PaeHistorico[]
+  historicoCarregando: boolean
   eventoSelecionadoId: string | null
+  chamadoSelecionadoId: string | null
+  ajusteChamadoId: string | null
   agenteAtual: string
   carregando: boolean
   salvando: boolean
@@ -23,11 +29,15 @@ export interface PAECommandPanelProps {
   onFechar: () => void
   onCriarEvento: (input: NovoEventoPaeInput) => Promise<PaeEvento>
   onCriarChamado: (input: NovoChamadoPaeInput) => Promise<PaeChamado>
+  onTriarChamado: (chamadoId: string, input: TriarChamadoPaeInput) => Promise<PaeChamado>
   onIniciarChamado: (chamadoId: string, agente: string) => Promise<PaeChamado>
   onConcluirChamado: (chamadoId: string, input: ConcluirChamadoPaeInput) => Promise<PaeChamado>
+  onValidarChamado: (chamadoId: string) => Promise<PaeChamado>
+  onSuspenderCancelarChamado: (chamadoId: string, status: 'suspenso' | 'cancelado', motivo: string) => Promise<PaeChamado>
+  onAjustarLocalizacao: (chamadoId: string | null) => void
   onGeocodificar: (endereco: string) => Promise<{ latitude: number; longitude: number } | null>
   onSelecionarEvento: (eventoId: string) => void
-  onSelecionarChamado: (chamado: PaeChamado) => void
+  onSelecionarChamado: (chamado: PaeChamado | null) => void
 }
 
 type FotoRascunho = { dataUrl: string; legenda: string }
@@ -41,8 +51,11 @@ const prioridadeLabel = {
 
 const statusLabel = {
   novo: 'Novo',
+  triado: 'Triado',
   em_atendimento: 'Em atendimento',
-  concluido: 'Concluído',
+  concluido_em_campo: 'Concluído em campo',
+  validado: 'Validado',
+  suspenso: 'Suspenso',
   cancelado: 'Cancelado',
 } as const
 
@@ -114,21 +127,42 @@ export default function PAECommandPanel({
   onFechar,
   onCriarEvento,
   onCriarChamado,
+  onTriarChamado,
   onIniciarChamado,
   onConcluirChamado,
+  onValidarChamado,
+  onSuspenderCancelarChamado,
+  onAjustarLocalizacao,
   onGeocodificar,
   onSelecionarEvento,
   onSelecionarChamado,
+  historico,
+  historicoCarregando,
+  chamadoSelecionadoId,
+  ajusteChamadoId,
 }: PAECommandPanelProps) {
   const [modoFormulario, setModoFormulario] = useState<'evento' | 'chamado' | null>(null)
-  const [chamadoAtivoId, setChamadoAtivoId] = useState<string | null>(null)
   const [chamadoEmAtendimento, setChamadoEmAtendimento] = useState<PaeChamado | null>(null)
   const [eventoNome, setEventoNome] = useState('')
   const [eventoDescricao, setEventoDescricao] = useState('')
+  const [tipoEvento, setTipoEvento] = useState('')
+  const [objetivos, setObjetivos] = useState('')
   const [endereco, setEndereco] = useState('')
+  const [referencia, setReferencia] = useState('')
+  const [bairro, setBairro] = useState('')
+  const [municipio, setMunicipio] = useState('Conselheiro Lafaiete')
   const [tipoRisco, setTipoRisco] = useState('')
+  const [cobrade, setCobrade] = useState('')
+  const [canalEntrada, setCanalEntrada] = useState('interno')
   const [descricaoChamado, setDescricaoChamado] = useState('')
   const [prioridade, setPrioridade] = useState<NovoChamadoPaeInput['prioridade']>('media')
+  const [prioridadeTriagem, setPrioridadeTriagem] = useState<NovoChamadoPaeInput['prioridade']>('media')
+  const [justificativaTriagem, setJustificativaTriagem] = useState('')
+  const [filtroTexto, setFiltroTexto] = useState('')
+  const [filtroStatus, setFiltroStatus] = useState('')
+  const [filtroPrioridade, setFiltroPrioridade] = useState('')
+  const [motivoEncerramento, setMotivoEncerramento] = useState('')
+  const [acaoEncerramento, setAcaoEncerramento] = useState<'suspenso' | 'cancelado'>('suspenso')
   const [agentesSelecionados, setAgentesSelecionados] = useState<string[]>(() => (
     AGENTES.includes(agenteAtual) ? [agenteAtual] : []
   ))
@@ -147,11 +181,26 @@ export default function PAECommandPanel({
     () => eventoSelecionadoId ? chamados.filter(chamado => chamado.eventoId === eventoSelecionadoId) : [],
     [chamados, eventoSelecionadoId],
   )
-  const chamadoAtivoOriginal = chamadosDoEvento.find(chamado => chamado.id === chamadoAtivoId) ?? null
+  const chamadosFiltrados = useMemo(() => {
+    const pesoPrioridade: Record<PaeChamado['prioridade'], number> = {
+      critica: 0, alta: 1, media: 2, baixa: 3,
+    }
+    const busca = filtroTexto.trim().toLocaleLowerCase('pt-BR')
+    return chamadosDoEvento
+      .filter(chamado => !filtroStatus || chamado.status === filtroStatus)
+      .filter(chamado => !filtroPrioridade || chamado.prioridade === filtroPrioridade)
+      .filter(chamado => !busca || [
+        chamado.tipoRisco, chamado.endereco, chamado.bairro, chamado.cobrade,
+      ].some(valor => valor?.toLocaleLowerCase('pt-BR').includes(busca)))
+      .sort((a, b) => pesoPrioridade[a.prioridade] - pesoPrioridade[b.prioridade]
+        || a.criadoEm.localeCompare(b.criadoEm))
+  }, [chamadosDoEvento, filtroTexto, filtroStatus, filtroPrioridade])
+  const chamadoAtivoOriginal = chamadosDoEvento.find(chamado => chamado.id === chamadoSelecionadoId) ?? null
   const chamadoAtivo = chamadoEmAtendimento?.id === chamadoAtivoOriginal?.id
     ? chamadoEmAtendimento
     : chamadoAtivoOriginal
   const podeAtender = Boolean(chamadoAtivo?.agentesEnvolvidos.includes(agenteAtual))
+  const podeValidar = Boolean(eventoAtivo && (eventoAtivo.responsavel || eventoAtivo.acionadoPor) === agenteAtual)
 
   useEffect(() => {
     if (!aberto) return
@@ -162,13 +211,28 @@ export default function PAECommandPanel({
     return () => window.removeEventListener('keydown', fecharComEsc)
   }, [aberto, onFechar])
 
+  useEffect(() => {
+    if (!chamadoAtivo) {
+      setJustificativaTriagem('')
+      return
+    }
+    setPrioridadeTriagem(chamadoAtivo.prioridade)
+    setJustificativaTriagem(chamadoAtivo.justificativaPrioridade || '')
+    setCobrade(chamadoAtivo.cobrade || '')
+  }, [chamadoAtivo?.id, chamadoAtivo?.prioridade, chamadoAtivo?.justificativaPrioridade, chamadoAtivo?.cobrade])
+
   if (!aberto) return null
 
   const iniciarChamado = () => {
     setModoFormulario('chamado')
     setErroLocal('')
     setEndereco('')
+    setReferencia('')
+    setBairro('')
+    setMunicipio('Conselheiro Lafaiete')
     setTipoRisco('')
+    setCobrade('')
+    setCanalEntrada('interno')
     setDescricaoChamado('')
     setPrioridade('media')
     setAgentesSelecionados(AGENTES.includes(agenteAtual) ? [agenteAtual] : [])
@@ -210,11 +274,17 @@ export default function PAECommandPanel({
         nome: eventoNome.trim(),
         acionadoPor: agenteAtual,
         descricao: eventoDescricao.trim(),
+        tipoEvento: tipoEvento.trim(),
+        objetivos: objetivos.trim(),
+        responsavel: agenteAtual,
+        inicioEm: new Date().toISOString(),
       }
       const criado = await onCriarEvento(input)
       onSelecionarEvento(criado.id)
       setEventoNome('')
       setEventoDescricao('')
+      setTipoEvento('')
+      setObjetivos('')
       setModoFormulario(null)
     } catch (error) {
       setErroLocal(error instanceof Error ? error.message : 'Não foi possível abrir o evento.')
@@ -239,19 +309,75 @@ export default function PAECommandPanel({
         eventoId: eventoSelecionadoId,
         acionadoPor: agenteAtual,
         endereco: endereco.trim(),
+        referencia: referencia.trim(),
+        bairro: bairro.trim(),
+        municipio: municipio.trim(),
         latitude: local.latitude,
         longitude: local.longitude,
         tipoRisco: tipoRisco.trim(),
+        cobrade: '',
+        canalEntrada,
         descricao: descricaoChamado.trim(),
         prioridade,
+        justificativaPrioridade: '',
         agentesEnvolvidos: AGENTES.filter(agente => agentesSelecionados.includes(agente)),
       }
       const criado = await onCriarChamado(input)
       onSelecionarChamado(criado)
-      setChamadoAtivoId(criado.id)
       setModoFormulario(null)
     } catch (error) {
       setErroLocal(error instanceof Error ? error.message : 'Não foi possível registrar o chamado.')
+    } finally {
+      setEnviando(false)
+    }
+  }
+
+  const triarChamado = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    if (!chamadoAtivo) return
+    setErroLocal('')
+    setEnviando(true)
+    try {
+      const atualizado = await onTriarChamado(chamadoAtivo.id, {
+        agente: agenteAtual,
+        prioridade: prioridadeTriagem,
+        justificativa: justificativaTriagem.trim(),
+        cobrade: cobrade.trim(),
+      })
+      setChamadoEmAtendimento(atualizado)
+    } catch (error) {
+      setErroLocal(error instanceof Error ? error.message : 'Não foi possível registrar a triagem.')
+    } finally {
+      setEnviando(false)
+    }
+  }
+
+  const validarChamado = async () => {
+    if (!chamadoAtivo) return
+    setErroLocal('')
+    setEnviando(true)
+    try {
+      const atualizado = await onValidarChamado(chamadoAtivo.id)
+      setChamadoEmAtendimento(atualizado)
+    } catch (error) {
+      setErroLocal(error instanceof Error ? error.message : 'Não foi possível validar o chamado.')
+    } finally {
+      setEnviando(false)
+    }
+  }
+
+  const atualizarEncerramento = async () => {
+    if (!chamadoAtivo || !motivoEncerramento.trim()) return
+    setErroLocal('')
+    setEnviando(true)
+    try {
+      const atualizado = await onSuspenderCancelarChamado(
+        chamadoAtivo.id, acaoEncerramento, motivoEncerramento.trim(),
+      )
+      setChamadoEmAtendimento(atualizado)
+      setMotivoEncerramento('')
+    } catch (error) {
+      setErroLocal(error instanceof Error ? error.message : 'Não foi possível atualizar a situação do chamado.')
     } finally {
       setEnviando(false)
     }
@@ -289,7 +415,7 @@ export default function PAECommandPanel({
   }
 
   const iniciarAtendimento = async () => {
-    if (!chamadoAtivo || chamadoAtivo.status !== 'novo') return
+    if (!chamadoAtivo || chamadoAtivo.status !== 'triado') return
     setErroLocal('')
     setEnviando(true)
     try {
@@ -360,7 +486,7 @@ export default function PAECommandPanel({
                     key={evento.id}
                     className={`pae-event-row ${eventoSelecionadoId === evento.id ? 'is-selected' : ''}`}
                     type="button"
-                    onClick={() => { onSelecionarEvento(evento.id); setChamadoAtivoId(null); setModoFormulario(null) }}
+                    onClick={() => { onSelecionarEvento(evento.id); onSelecionarChamado(null); setModoFormulario(null) }}
                     data-testid={`button-select-event-${evento.id}`}
                     aria-current={eventoSelecionadoId === evento.id ? 'true' : undefined}
                   >
@@ -379,23 +505,44 @@ export default function PAECommandPanel({
             <p className="pae-rail-caption">{eventoAtivo ? eventoAtivo.nome : 'Selecione um evento para ver os chamados.'}</p>
             {eventoAtivo && (
               carregando ? <div className="pae-skeleton-list pae-skeleton-short" aria-label="Carregando chamados"><i /><i /></div> :
-                chamadosDoEvento.length === 0 ? <div className="pae-empty-calls" data-testid="empty-calls">Sem chamados neste evento.</div> :
-                  <div className="pae-call-list" data-testid="list-calls">
-                    {chamadosDoEvento.map(chamado => (
+                    chamadosDoEvento.length === 0 ? <div className="pae-empty-calls" data-testid="empty-calls">Sem chamados neste evento.</div> :
+                  <>
+                    <div className="pae-call-filters">
+                      <input
+                        aria-label="Buscar chamados"
+                        placeholder="Buscar tipo, endereço ou COBRADE"
+                        value={filtroTexto}
+                        onChange={event => setFiltroTexto(event.target.value)}
+                        data-testid="input-filter-calls"
+                      />
+                      <select aria-label="Filtrar por situação" value={filtroStatus} onChange={event => setFiltroStatus(event.target.value)} data-testid="select-filter-call-status">
+                        <option value="">Todas as situações</option>
+                        {Object.entries(statusLabel).map(([status, label]) => <option key={status} value={status}>{label}</option>)}
+                      </select>
+                      <select aria-label="Filtrar por prioridade" value={filtroPrioridade} onChange={event => setFiltroPrioridade(event.target.value)} data-testid="select-filter-call-priority">
+                        <option value="">Todas as prioridades</option>
+                        {Object.entries(prioridadeLabel).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                      </select>
+                    </div>
+                    {chamadosFiltrados.length === 0
+                      ? <div className="pae-empty-calls" data-testid="empty-filtered-calls">Nenhum chamado corresponde aos filtros.</div>
+                      : <div className="pae-call-list" data-testid="list-calls">
+                    {chamadosFiltrados.map(chamado => (
                       <button
                         key={chamado.id}
-                        className={`pae-call-row ${chamadoAtivoId === chamado.id ? 'is-selected' : ''}`}
+                        className={`pae-call-row ${chamadoSelecionadoId === chamado.id ? 'is-selected' : ''}`}
                         type="button"
-                        onClick={() => { setChamadoAtivoId(chamado.id); setModoFormulario(null); onSelecionarChamado(chamado) }}
+                        onClick={() => { setModoFormulario(null); onSelecionarChamado(chamado) }}
                         data-testid={`button-select-call-${chamado.id}`}
-                        aria-current={chamadoAtivoId === chamado.id ? 'true' : undefined}
+                        aria-current={chamadoSelecionadoId === chamado.id ? 'true' : undefined}
                       >
                         <span className={`pae-priority-line priority-${chamado.prioridade}`} />
                         <span className="pae-call-copy"><strong>{chamado.tipoRisco}</strong><small>{chamado.endereco}</small><em>{statusLabel[chamado.status]}</em></span>
                         <span className={`pae-priority-tag priority-${chamado.prioridade}`}>{prioridadeLabel[chamado.prioridade]}</span>
                       </button>
                     ))}
-                  </div>
+                      </div>}
+                  </>
             )}
           </aside>
 
@@ -408,7 +555,9 @@ export default function PAECommandPanel({
                 <p className="pae-form-intro">Nomeie a ocorrência que vai concentrar os chamados de risco.</p>
                 <form onSubmit={criarEvento} className="pae-form">
                   <label>Nome do evento<input autoFocus required maxLength={120} value={eventoNome} onChange={event => setEventoNome(event.target.value)} placeholder="Ex.: Alagamento no Centro" data-testid="input-event-name" /></label>
+                  <label>Tipo do evento<input maxLength={120} value={tipoEvento} onChange={event => setTipoEvento(event.target.value)} placeholder="Ex.: Chuvas intensas" data-testid="input-event-type" /></label>
                   <label>Descrição<textarea rows={4} value={eventoDescricao} onChange={event => setEventoDescricao(event.target.value)} placeholder="Contexto inicial para as equipes em campo" data-testid="input-event-description" /></label>
+                  <label>Objetivos operacionais<textarea rows={3} value={objetivos} onChange={event => setObjetivos(event.target.value)} placeholder="Prioridades e resultados esperados para a operação" data-testid="input-event-objectives" /></label>
                   <div className="pae-form-meta">ACIONADO POR <strong>{agenteAtual}</strong></div>
                   <div className="pae-form-actions"><button className="pae-secondary-button" type="button" onClick={() => setModoFormulario(null)} data-testid="button-cancel-event">Cancelar</button><button className="pae-primary-button" type="submit" disabled={salvarBloqueado || !eventoNome.trim()} data-testid="button-submit-event">{salvando || enviando ? 'Abrindo…' : 'Abrir evento'}</button></div>
                 </form>
@@ -417,7 +566,7 @@ export default function PAECommandPanel({
               <section className="pae-form-view">
                 <div className="pae-detail-kicker">NOVO REGISTRO / CHAMADO DE RISCO</div>
                 <h2>Registrar chamado</h2>
-                <p className="pae-form-intro">Todos os agentes selecionados recebem o alerta e podem assumir o atendimento.</p>
+                <p className="pae-form-intro">Registre a solicitação no evento. A prioridade final e o COBRADE serão confirmados na triagem.</p>
                 <form onSubmit={criarChamado} className="pae-form">
                   <div className="pae-form-grid">
                     <label className="pae-span-two">Endereço<input required value={endereco} onChange={event => { setEndereco(event.target.value); setCoordenadas(null); setMensagemGeocode('') }} placeholder="Rua, número, bairro e município" data-testid="input-call-address" /></label>
@@ -426,7 +575,11 @@ export default function PAECommandPanel({
                       <span className={coordenadas ? 'pae-geocode-ok' : ''} role="status" data-testid="status-geocode">{mensagemGeocode || 'A localização é necessária para registrar o chamado.'}</span>
                     </div>
                     <label>Tipo de risco<input required value={tipoRisco} onChange={event => setTipoRisco(event.target.value)} placeholder="Ex.: Deslizamento" data-testid="input-call-risk" /></label>
-                    <label>Prioridade<select value={prioridade} onChange={event => setPrioridade(event.target.value as NovoChamadoPaeInput['prioridade'])} data-testid="select-call-priority"><option value="baixa">Baixa</option><option value="media">Média</option><option value="alta">Alta</option><option value="critica">Crítica</option></select></label>
+                    <label>Prioridade inicial<select value={prioridade} onChange={event => setPrioridade(event.target.value as NovoChamadoPaeInput['prioridade'])} data-testid="select-call-priority"><option value="baixa">Baixa</option><option value="media">Média</option><option value="alta">Alta</option><option value="critica">Crítica</option></select></label>
+                    <label>Canal de entrada<select value={canalEntrada} onChange={event => setCanalEntrada(event.target.value)} data-testid="select-call-channel"><option value="interno">Equipe interna</option><option value="telefone">Telefone</option><option value="radio">Rádio</option><option value="orgao_parceiro">Órgão parceiro</option><option value="outro">Outro</option></select></label>
+                    <label>Bairro<input maxLength={120} value={bairro} onChange={event => setBairro(event.target.value)} placeholder="Bairro" data-testid="input-call-neighborhood" /></label>
+                    <label>Município<input maxLength={120} value={municipio} onChange={event => setMunicipio(event.target.value)} data-testid="input-call-municipality" /></label>
+                    <label className="pae-span-two">Ponto de referência<input maxLength={250} value={referencia} onChange={event => setReferencia(event.target.value)} placeholder="Referência próxima ao local" data-testid="input-call-reference" /></label>
                     <label className="pae-span-two">Descrição<textarea required rows={3} value={descricaoChamado} onChange={event => setDescricaoChamado(event.target.value)} placeholder="O que foi informado? Inclua sinais de risco e pessoas afetadas." data-testid="input-call-description" /></label>
                     <fieldset className="pae-agent-picker pae-span-two" aria-describedby="pae-agent-picker-hint">
                       <legend>Agentes selecionados</legend>
@@ -465,33 +618,72 @@ export default function PAECommandPanel({
                   </div>
                   <span className={`pae-status-pill status-${chamadoAtivo.status}`}>{statusLabel[chamadoAtivo.status]}</span>
                 </div>
-                <div className="pae-call-address"><span className="pae-pin" aria-hidden="true" /> <div><strong>{chamadoAtivo.endereco}</strong><small>{chamadoAtivo.latitude.toFixed(5)}, {chamadoAtivo.longitude.toFixed(5)}</small></div></div>
+                <div className="pae-call-address">
+                  <span className="pae-pin" aria-hidden="true" />
+                  <div><strong>{chamadoAtivo.endereco}</strong><small>{chamadoAtivo.latitude.toFixed(5)}, {chamadoAtivo.longitude.toFixed(5)}</small></div>
+                  <button
+                    className="pae-geocode-button"
+                    type="button"
+                    aria-pressed={ajusteChamadoId === chamadoAtivo.id}
+                    onClick={() => onAjustarLocalizacao(ajusteChamadoId === chamadoAtivo.id ? null : chamadoAtivo.id)}
+                    data-testid="button-adjust-call-location"
+                  >
+                    {ajusteChamadoId === chamadoAtivo.id ? 'Cancelar ajuste' : 'Ajustar no mapa'}
+                  </button>
+                </div>
                 <div className="pae-facts">
                   <div><span>PRIORIDADE</span><strong className={`pae-fact-priority priority-${chamadoAtivo.prioridade}`}>{prioridadeLabel[chamadoAtivo.prioridade]}</strong></div>
                   <div><span>ACIONADO POR</span><strong>{chamadoAtivo.acionadoPor}</strong></div>
                   <div><span>ABERTO</span><strong>{dataHora(chamadoAtivo.criadoEm)}</strong></div>
                 </div>
-                <div className="pae-description-block"><span className="pae-block-label">DESCRIÇÃO DO RISCO</span><p>{chamadoAtivo.descricao}</p></div>
+                <div className="pae-description-block">
+                  <span className="pae-block-label">CLASSIFICAÇÃO E DESCRIÇÃO</span>
+                  <p><b>Tipo operacional:</b> {chamadoAtivo.tipoRisco}{chamadoAtivo.cobrade ? ` · COBRADE: ${chamadoAtivo.cobrade}` : ''}</p>
+                  {chamadoAtivo.canalEntrada && <p><b>Canal:</b> {chamadoAtivo.canalEntrada}</p>}
+                  {chamadoAtivo.bairro && <p><b>Bairro:</b> {chamadoAtivo.bairro}</p>}
+                  {chamadoAtivo.referencia && <p><b>Referência:</b> {chamadoAtivo.referencia}</p>}
+                  {chamadoAtivo.justificativaPrioridade && <p><b>Justificativa da triagem:</b> {chamadoAtivo.justificativaPrioridade}</p>}
+                  <p>{chamadoAtivo.descricao}</p>
+                </div>
                 <div className="pae-agents-block"><span className="pae-block-label">EQUIPE ACIONADA <b>{chamadoAtivo.agentesEnvolvidos.length}</b></span><div className="pae-agent-chips">{chamadoAtivo.agentesEnvolvidos.map((agente, index) => <span className={agente === agenteAtual ? 'is-current' : ''} key={`${agente}-${index}`} data-testid={`text-agent-${chamadoAtivo.id}-${index}`}><i>{agente.trim().charAt(0).toLocaleUpperCase()}</i>{agente}</span>)}</div></div>
-                {chamadoAtivo.atendimento ? (
+                {chamadoAtivo.atendimento && (
                   <div className="pae-completed-record" data-testid="record-completed-call">
                     <div className="pae-record-heading"><span className="pae-block-label">REGISTRO DE CAMPO</span><strong>Concluído por {chamadoAtivo.atendimento.agente}</strong><small>{dataHora(chamadoAtivo.atendimento.concluidoEm)}</small></div>
                     {chamadoAtivo.atendimento.observacao && <div><b>Observações</b><p>{chamadoAtivo.atendimento.observacao}</p></div>}
                     {chamadoAtivo.atendimento.relato && <div><b>O que aconteceu</b><p>{chamadoAtivo.atendimento.relato}</p></div>}
                     {chamadoAtivo.atendimento.materiaisGastos.length > 0 && <div><b>Materiais consumidos</b><p>{chamadoAtivo.atendimento.materiaisGastos.map(item => `${item.nome} · ${item.quantidade} ${item.unidade}`).join(' / ')}</p></div>}
                     {chamadoAtivo.atendimento.fotos.length > 0 && <div className="pae-photo-grid">{chamadoAtivo.atendimento.fotos.map(foto => <figure key={foto.id}><img src={foto.dataUrl} alt={foto.legenda || 'Registro fotográfico do atendimento'} /><figcaption>{foto.legenda || foto.agente}</figcaption></figure>)}</div>}
-                  </div>
-                ) : chamadoAtivo.status !== 'concluido' && chamadoAtivo.status !== 'cancelado' ? (
-                  podeAtender ? (
-                    <>
-                    {chamadoAtivo.status === 'novo' && (
-                      <div className="pae-start-attendance">
-                        <div><strong>Assumir atendimento</strong><span>Registre o início da ação em campo para a equipe acionada.</span></div>
-                        <button className="pae-secondary-button" type="button" onClick={() => void iniciarAtendimento()} disabled={salvarBloqueado} data-testid="button-start-call">{salvando || enviando ? 'Iniciando…' : 'Iniciar atendimento'}</button>
+                    {chamadoAtivo.status === 'concluido_em_campo' && (
+                      <div className="pae-pending-validation">
+                        <div><strong>Aguardando validação do responsável</strong><span>A conclusão de campo não encerra o chamado automaticamente.</span></div>
+                        {podeValidar
+                          ? <button className="pae-primary-button" type="button" onClick={() => void validarChamado()} disabled={salvarBloqueado} data-testid="button-validate-call">{enviando ? 'Validando…' : 'Validar e encerrar'}</button>
+                          : <small>Validação reservada a {eventoAtivo?.responsavel || eventoAtivo?.acionadoPor}.</small>}
                       </div>
                     )}
+                  </div>
+                )}
+                {chamadoAtivo.status === 'novo' && (
+                  <form className="pae-triage-form" onSubmit={triarChamado} data-testid="form-triage-call">
+                    <div className="pae-completion-title"><div><span className="pae-detail-kicker">TRIAGEM</span><h3>Classificar chamado</h3></div></div>
+                    <p>Registre a avaliação técnica. O tipo operacional permanece separado da classificação COBRADE.</p>
+                    <div className="pae-form-grid">
+                      <label>Prioridade<select value={prioridadeTriagem} onChange={event => setPrioridadeTriagem(event.target.value as NovoChamadoPaeInput['prioridade'])} data-testid="select-triage-priority"><option value="baixa">Baixa</option><option value="media">Média</option><option value="alta">Alta</option><option value="critica">Crítica</option></select></label>
+                      <label>COBRADE <small className="pae-label-hint">Opcional</small><input maxLength={120} value={cobrade} onChange={event => setCobrade(event.target.value)} placeholder="Classificação oficial, se conhecida" data-testid="input-triage-cobrade" /></label>
+                      <label className="pae-span-two">Justificativa da prioridade<textarea required rows={3} value={justificativaTriagem} onChange={event => setJustificativaTriagem(event.target.value)} placeholder="Explique os fatores que justificam a urgência atribuída." data-testid="input-triage-justification" /></label>
+                    </div>
+                    <div className="pae-form-actions"><button className="pae-primary-button" type="submit" disabled={salvarBloqueado || !justificativaTriagem.trim()} data-testid="button-submit-triage">{enviando ? 'Salvando…' : 'Registrar triagem'}</button></div>
+                  </form>
+                )}
+                {chamadoAtivo.status === 'triado' && (
+                  podeAtender
+                    ? <div className="pae-start-attendance"><div><strong>Triagem concluída</strong><span>Confirme o início da ação em campo para a equipe acionada.</span></div><button className="pae-secondary-button" type="button" onClick={() => void iniciarAtendimento()} disabled={salvarBloqueado} data-testid="button-start-call">{enviando ? 'Iniciando…' : 'Iniciar atendimento'}</button></div>
+                    : <div className="pae-permission-note" data-testid="status-agent-not-selected"><strong>Atendimento reservado à equipe acionada</strong><p>Seu nome não está entre os agentes selecionados para este chamado.</p></div>
+                )}
+                {chamadoAtivo.status === 'em_atendimento' && (
+                  podeAtender ? (
                     <form className="pae-completion-form" onSubmit={concluirChamado}>
-                      <div className="pae-completion-title"><div><span className="pae-detail-kicker">AÇÃO DE CAMPO</span><h3>Concluir chamado</h3></div><span>RESPONSÁVEL <b>{agenteAtual}</b></span></div>
+                      <div className="pae-completion-title"><div><span className="pae-detail-kicker">AÇÃO DE CAMPO</span><h3>Concluir em campo</h3></div><span>RESPONSÁVEL <b>{agenteAtual}</b></span></div>
                       <div className="pae-form-grid">
                         <label className="pae-span-two">Observações de campo<textarea rows={2} value={observacao} onChange={event => setObservacao(event.target.value)} placeholder="Condições encontradas, medidas tomadas e situação do local." data-testid="input-completion-observations" /></label>
                         <label className="pae-span-two">Relato do ocorrido<textarea required rows={3} value={relato} onChange={event => setRelato(event.target.value)} placeholder="Registre o que aconteceu e como a ocorrência foi tratada." data-testid="input-completion-account" /></label>
@@ -502,11 +694,35 @@ export default function PAECommandPanel({
                         <label className="pae-upload-button">Adicionar fotos<input type="file" accept="image/*" multiple onChange={event => { void adicionarFotos(event.currentTarget.files); event.currentTarget.value = '' }} data-testid="input-completion-photos" /></label>
                       </div>
                       {fotos.length > 0 && <div className="pae-photo-grid pae-photo-drafts">{fotos.map((foto, index) => <figure key={`${index}-${foto.dataUrl.slice(-16)}`}><img src={foto.dataUrl} alt={foto.legenda || `Foto de campo ${index + 1}`} /><figcaption><input aria-label={`Legenda da foto ${index + 1}`} value={foto.legenda} onChange={event => setFotos(atuais => atuais.map((item, itemIndex) => itemIndex === index ? { ...item, legenda: event.target.value } : item))} data-testid={`input-photo-caption-${index}`} /><button type="button" aria-label={`Remover foto ${index + 1}`} onClick={() => setFotos(atuais => atuais.filter((_, itemIndex) => itemIndex !== index))} data-testid={`button-remove-photo-${index}`}>Remover</button></figcaption></figure>)}</div>}
-                      <div className="pae-completion-footer"><p>Ao concluir, a equipe selecionada será notificada do encerramento.</p><button className="pae-primary-button pae-finish-button" type="submit" disabled={salvarBloqueado || !relato.trim()} data-testid="button-complete-call">{salvando || enviando ? 'Salvando registro…' : 'Concluir atendimento'}</button></div>
+                      <div className="pae-completion-footer"><p>O responsável pelo evento ainda precisará validar o encerramento.</p><button className="pae-primary-button pae-finish-button" type="submit" disabled={salvarBloqueado || !relato.trim()} data-testid="button-complete-call">{enviando ? 'Salvando registro…' : 'Concluir em campo'}</button></div>
                     </form>
-                    </>
-                  ) : <div className="pae-permission-note" data-testid="status-agent-not-selected"><strong>Atendimento reservado à equipe acionada</strong><p>Seu nome não está entre os agentes selecionados para este chamado. A equipe acionada pode registrar a conclusão e notificar os demais.</p></div>
-                ) : <div className="pae-completed-record"><p>Este chamado está encerrado.</p></div>}
+                  ) : <div className="pae-permission-note" data-testid="status-agent-not-selected"><strong>Atendimento reservado à equipe acionada</strong><p>Seu nome não está entre os agentes selecionados para este chamado.</p></div>
+                )}
+                {['validado', 'suspenso', 'cancelado'].includes(chamadoAtivo.status) && !chamadoAtivo.atendimento && (
+                  <div className="pae-completed-record"><p>{chamadoAtivo.status === 'validado' ? 'Este chamado foi validado e encerrado.' : `Chamado ${statusLabel[chamadoAtivo.status].toLocaleLowerCase('pt-BR')}.`}</p>{chamadoAtivo.motivoSuspensaoCancelamento && <p>Motivo: {chamadoAtivo.motivoSuspensaoCancelamento}</p>}</div>
+                )}
+                {!['validado', 'suspenso', 'cancelado'].includes(chamadoAtivo.status) && (
+                  <div className="pae-cancel-form">
+                    <label>Situação de encerramento<select value={acaoEncerramento} onChange={event => setAcaoEncerramento(event.target.value as 'suspenso' | 'cancelado')} data-testid="select-call-close-status"><option value="suspenso">Suspender chamado</option><option value="cancelado">Cancelar chamado</option></select></label>
+                    <label>Motivo<textarea rows={2} value={motivoEncerramento} onChange={event => setMotivoEncerramento(event.target.value)} placeholder="Justifique a suspensão ou o cancelamento." data-testid="input-call-close-reason" /></label>
+                    <button className="pae-secondary-button" type="button" onClick={() => void atualizarEncerramento()} disabled={salvarBloqueado || !motivoEncerramento.trim()} data-testid="button-close-call">{enviando ? 'Salvando…' : acaoEncerramento === 'cancelado' ? 'Cancelar chamado' : 'Suspender chamado'}</button>
+                  </div>
+                )}
+                {ajusteChamadoId === chamadoAtivo.id && <div className="pae-location-hint" role="status">Arraste o marcador do chamado no mapa para corrigir a posição. A alteração ficará registrada no histórico.</div>}
+                <section className="pae-history" aria-label="Histórico do chamado" data-testid="call-history">
+                  <div className="pae-record-heading"><span className="pae-block-label">LINHA DO TEMPO</span>{historicoCarregando && <small>Atualizando…</small>}</div>
+                  {historico.filter(item => item.chamadoId === chamadoAtivo.id).length === 0
+                    ? <p className="pae-history-empty">Nenhum marco registrado.</p>
+                    : <ol>{historico.filter(item => item.chamadoId === chamadoAtivo.id).map(item => {
+                      const detalhes = item.detalhes
+                      const resumo = [
+                        detalhes.prioridade ? `Prioridade ${String(detalhes.prioridade)}` : '',
+                        detalhes.motivo ? String(detalhes.motivo) : '',
+                        detalhes.justificativa ? String(detalhes.justificativa) : '',
+                      ].filter(Boolean).join(' · ')
+                      return <li key={item.id}><div><strong>{item.acao.replaceAll('_', ' ')}</strong><small>{dataHora(item.criadoEm)} · {item.realizadoPor}</small>{resumo && <p>{resumo}</p>}</div></li>
+                    })}</ol>}
+                </section>
               </section>
             ) : eventoAtivo ? (
               <section className="pae-welcome-state" data-testid="empty-call-selection">

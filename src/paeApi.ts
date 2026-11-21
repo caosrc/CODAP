@@ -4,6 +4,7 @@ import type {
   ConcluirChamadoPaeInput,
   NovoChamadoPaeInput,
   NovoEventoPaeInput,
+  PaeHistorico,
   PaeAtendimento,
   PaeChamado,
   PaeEvento,
@@ -11,6 +12,7 @@ import type {
   PaeMaterialGasto,
   PaePrioridade,
   PaeStatus,
+  TriarChamadoPaeInput,
 } from './paeTypes'
 
 type Linha = Record<string, unknown>
@@ -44,9 +46,32 @@ function normalizarEvento(row: Linha): PaeEvento {
     nome: texto(row.nome),
     acionadoPor: texto(row.acionado_por ?? row.acionadoPor),
     descricao: texto(row.descricao),
+    tipoEvento: texto(row.tipo_evento ?? row.tipoEvento),
+    objetivos: texto(row.objetivos),
+    responsavel: texto(row.responsavel) || texto(row.acionado_por ?? row.acionadoPor),
+    inicioEm: row.inicio_em == null && row.inicioEm == null
+      ? null
+      : texto(row.inicio_em ?? row.inicioEm),
     status: status === 'encerrado' ? 'encerrado' : 'ativo',
     criadoEm: texto(row.criado_em ?? row.criadoEm),
     atualizadoEm: texto(row.atualizado_em ?? row.atualizadoEm ?? row.criado_em),
+  }
+}
+
+function normalizarHistorico(row: Linha): PaeHistorico {
+  const detalhes = row.detalhes && typeof row.detalhes === 'object' && !Array.isArray(row.detalhes)
+    ? row.detalhes as Record<string, unknown>
+    : {}
+  return {
+    id: texto(row.id),
+    eventoId: texto(row.evento_id ?? row.eventoId),
+    chamadoId: row.chamado_id == null && row.chamadoId == null
+      ? null
+      : texto(row.chamado_id ?? row.chamadoId),
+    acao: texto(row.acao),
+    detalhes,
+    realizadoPor: texto(row.realizado_por ?? row.realizadoPor),
+    criadoEm: texto(row.criado_em ?? row.criadoEm),
   }
 }
 
@@ -92,21 +117,36 @@ function normalizarChamado(row: Linha): PaeChamado {
     : row.atendimento_id
       ? row
       : null
+  const statusBruto = texto(row.status)
+  const status = statusBruto === 'concluido'
+    ? 'validado'
+    : ['novo', 'triado', 'em_atendimento', 'concluido_em_campo', 'validado', 'suspenso', 'cancelado'].includes(statusBruto)
+      ? statusBruto
+      : 'novo'
   return {
     id: texto(row.id),
     eventoId: texto(row.evento_id ?? row.eventoId),
     acionadoPor: texto(row.acionado_por ?? row.acionadoPor),
     endereco: texto(row.endereco),
+    referencia: texto(row.referencia),
+    bairro: texto(row.bairro),
+    municipio: texto(row.municipio),
     latitude: numero(row.latitude),
     longitude: numero(row.longitude),
     tipoRisco: texto(row.tipo_risco ?? row.tipoRisco),
+    cobrade: texto(row.cobrade),
+    canalEntrada: texto(row.canal_entrada ?? row.canalEntrada) || 'interno',
     descricao: texto(row.descricao),
     prioridade: (['baixa', 'media', 'alta', 'critica'].includes(texto(row.prioridade))
       ? texto(row.prioridade)
       : 'media') as PaePrioridade,
-    status: (['novo', 'em_atendimento', 'concluido', 'cancelado'].includes(texto(row.status))
-      ? texto(row.status)
-      : 'novo') as PaeStatus,
+    justificativaPrioridade: texto(row.justificativa_prioridade ?? row.justificativaPrioridade),
+    triadoPor: row.triado_por == null ? null : texto(row.triado_por),
+    triadoEm: row.triado_em == null ? null : texto(row.triado_em),
+    validadoPor: row.validado_por == null ? null : texto(row.validado_por),
+    validadoEm: row.validado_em == null ? null : texto(row.validado_em),
+    motivoSuspensaoCancelamento: texto(row.motivo_suspensao_cancelamento),
+    status: status as PaeStatus,
     agentesEnvolvidos: lista<unknown>(row.agentes_envolvidos ?? row.agentesEnvolvidos).map(String),
     criadoEm: texto(row.criado_em ?? row.criadoEm),
     atualizadoEm: texto(row.atualizado_em ?? row.atualizadoEm ?? row.criado_em),
@@ -258,15 +298,41 @@ export async function listarPae(): Promise<{ eventos: PaeEvento[]; chamados: Pae
   }
 }
 
+export async function listarHistoricoPae(eventoId: string, chamadoId?: string): Promise<PaeHistorico[]> {
+  if (!supabaseDisponivel) {
+    const params = new URLSearchParams()
+    if (chamadoId) params.set('chamado_id', chamadoId)
+    const queryString = params.toString()
+    const response = await fetch(
+      `/api/pae/eventos/${encodeURIComponent(eventoId)}/historico${queryString ? `?${queryString}` : ''}`,
+    )
+    const rows = await respostaJson<Linha[]>(response)
+    return rows.map(normalizarHistorico)
+  }
+
+  let query = supabase.from('pae_historico')
+    .select('*')
+    .eq('evento_id', eventoId)
+    .order('criado_em', { ascending: true })
+  if (chamadoId) query = query.eq('chamado_id', chamadoId)
+  const result = await query
+  if (result.error) throw new Error(result.error.message)
+  return ((result.data || []) as Linha[]).map(normalizarHistorico)
+}
+
 export async function criarEventoPae(input: NovoEventoPaeInput): Promise<PaeEvento> {
   const id = crypto.randomUUID()
   let row: Linha
   if (supabaseDisponivel) {
-    row = await rpc<Linha>('pae_criar_evento', {
+    row = await rpc<Linha>('pae_criar_evento_detalhado', {
       p_id: id,
       p_nome: input.nome,
       p_acionado_por: input.acionadoPor,
       p_descricao: input.descricao,
+      p_tipo_evento: input.tipoEvento || '',
+      p_objetivos: input.objetivos || '',
+      p_responsavel: input.responsavel || input.acionadoPor,
+      p_inicio_em: input.inicioEm || new Date().toISOString(),
     })
   } else {
     const response = await fetch('/api/pae/eventos', {
@@ -274,6 +340,9 @@ export async function criarEventoPae(input: NovoEventoPaeInput): Promise<PaeEven
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         id, nome: input.nome, acionado_por: input.acionadoPor, descricao: input.descricao,
+        tipo_evento: input.tipoEvento || '', objetivos: input.objetivos || '',
+        responsavel: input.responsavel || input.acionadoPor,
+        inicio_em: input.inicioEm || new Date().toISOString(),
       }),
     })
     row = await respostaJson<Linha>(response)
@@ -287,7 +356,7 @@ export async function criarChamadoPae(input: NovoChamadoPaeInput): Promise<PaeCh
   const id = crypto.randomUUID()
   let row: Linha
   if (supabaseDisponivel) {
-    row = await rpc<Linha>('pae_criar_chamado', {
+    row = await rpc<Linha>('pae_criar_chamado_detalhado', {
       p_id: id,
       p_evento_id: input.eventoId,
       p_acionado_por: input.acionadoPor,
@@ -295,8 +364,14 @@ export async function criarChamadoPae(input: NovoChamadoPaeInput): Promise<PaeCh
       p_latitude: input.latitude,
       p_longitude: input.longitude,
       p_tipo_risco: input.tipoRisco,
+      p_cobrade: input.cobrade || '',
+      p_canal_entrada: input.canalEntrada || 'interno',
+      p_referencia: input.referencia || '',
+      p_bairro: input.bairro || '',
+      p_municipio: input.municipio || '',
       p_descricao: input.descricao,
       p_prioridade: input.prioridade,
+      p_justificativa_prioridade: input.justificativaPrioridade || '',
       p_agentes_envolvidos: input.agentesEnvolvidos,
     })
   } else {
@@ -311,8 +386,14 @@ export async function criarChamadoPae(input: NovoChamadoPaeInput): Promise<PaeCh
         latitude: input.latitude,
         longitude: input.longitude,
         tipo_risco: input.tipoRisco,
+        cobrade: input.cobrade || '',
+        canal_entrada: input.canalEntrada || 'interno',
+        referencia: input.referencia || '',
+        bairro: input.bairro || '',
+        municipio: input.municipio || '',
         descricao: input.descricao,
         prioridade: input.prioridade,
+        justificativa_prioridade: input.justificativaPrioridade || '',
         agentes_envolvidos: input.agentesEnvolvidos,
       }),
     })
@@ -323,6 +404,103 @@ export async function criarChamadoPae(input: NovoChamadoPaeInput): Promise<PaeCh
   const evento = eventos.find(item => item.id === chamado.eventoId)
   if (evento) notificarNovoChamado(chamado, evento)
   else emitirAtualizacao(chamado.id, chamado.eventoId)
+  return chamado
+}
+
+export async function triarChamadoPae(chamadoId: string, input: TriarChamadoPaeInput): Promise<PaeChamado> {
+  let row: Linha
+  if (supabaseDisponivel) {
+    row = await rpc<Linha>('pae_triar_chamado', {
+      p_chamado_id: chamadoId,
+      p_agente: input.agente,
+      p_prioridade: input.prioridade,
+      p_justificativa: input.justificativa,
+      p_cobrade: input.cobrade || '',
+    })
+  } else {
+    const response = await fetch(`/api/pae/chamados/${encodeURIComponent(chamadoId)}/triagem`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(input),
+    })
+    row = await respostaJson<Linha>(response)
+  }
+  const chamado = normalizarChamado(row)
+  emitirAtualizacao(chamado.id, chamado.eventoId)
+  return chamado
+}
+
+export async function atualizarLocalizacaoChamadoPae(
+  chamadoId: string,
+  latitude: number,
+  longitude: number,
+  realizadoPor: string,
+): Promise<PaeChamado> {
+  let row: Linha
+  if (supabaseDisponivel) {
+    row = await rpc<Linha>('pae_atualizar_localizacao', {
+      p_chamado_id: chamadoId,
+      p_latitude: latitude,
+      p_longitude: longitude,
+      p_realizado_por: realizadoPor,
+    })
+  } else {
+    const response = await fetch(`/api/pae/chamados/${encodeURIComponent(chamadoId)}/localizacao`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ latitude, longitude, realizadoPor }),
+    })
+    row = await respostaJson<Linha>(response)
+  }
+  const chamado = normalizarChamado(row)
+  emitirAtualizacao(chamado.id, chamado.eventoId)
+  return chamado
+}
+
+export async function validarChamadoPae(chamadoId: string, agente: string): Promise<PaeChamado> {
+  let row: Linha
+  if (supabaseDisponivel) {
+    row = await rpc<Linha>('pae_validar_chamado', {
+      p_chamado_id: chamadoId,
+      p_validado_por: agente,
+    })
+  } else {
+    const response = await fetch(`/api/pae/chamados/${encodeURIComponent(chamadoId)}/validar`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ agente }),
+    })
+    row = await respostaJson<Linha>(response)
+  }
+  const chamado = normalizarChamado(row)
+  emitirAtualizacao(chamado.id, chamado.eventoId)
+  return chamado
+}
+
+export async function suspenderCancelarChamadoPae(
+  chamadoId: string,
+  status: 'suspenso' | 'cancelado',
+  motivo: string,
+  agente: string,
+): Promise<PaeChamado> {
+  let row: Linha
+  if (supabaseDisponivel) {
+    row = await rpc<Linha>('pae_suspender_cancelar_chamado', {
+      p_chamado_id: chamadoId,
+      p_status: status,
+      p_motivo: motivo,
+      p_realizado_por: agente,
+    })
+  } else {
+    const response = await fetch(`/api/pae/chamados/${encodeURIComponent(chamadoId)}/suspender-cancelar`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status, motivo, agente }),
+    })
+    row = await respostaJson<Linha>(response)
+  }
+  const chamado = normalizarChamado(row)
+  emitirAtualizacao(chamado.id, chamado.eventoId)
   return chamado
 }
 

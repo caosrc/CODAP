@@ -1,3 +1,5 @@
+import { createClient } from '@supabase/supabase-js'
+
 const PRIORIDADES_PAE = new Set(['baixa', 'media', 'alta', 'critica'])
 const MAX_FOTOS_PAE = 8
 const MAX_FOTO_PAE_BYTES = 3 * 1024 * 1024
@@ -122,6 +124,51 @@ export function validarConclusaoPae(payload) {
   return { conclusao: { agente, observacao, relato, materiaisGastos, fotos } }
 }
 
+async function exigirAcessoPae(req, res, next) {
+  const authorization = req.headers.authorization || ''
+  const token = authorization.match(/^Bearer\s+(.+)$/i)?.[1]?.trim()
+  if (!token) {
+    return res.status(401).json({ error: 'Entre com uma conta autorizada para acessar o PAE.' })
+  }
+
+  const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL
+  const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY
+  if (!supabaseUrl || !supabaseAnonKey) {
+    return res.status(503).json({ error: 'A autenticação interna do PAE não está configurada neste servidor.' })
+  }
+
+  try {
+    const autenticado = createClient(supabaseUrl, supabaseAnonKey, {
+      auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+      global: { headers: { Authorization: `Bearer ${token}` } },
+    })
+    const { data: sessao, error: erroSessao } = await autenticado.auth.getUser(token)
+    if (erroSessao || !sessao.user) {
+      return res.status(401).json({ error: 'A sessão do PAE é inválida ou expirou. Entre novamente.' })
+    }
+
+    const { data: acesso, error: erroAcesso } = await autenticado
+      .from('pae_usuarios_autorizados')
+      .select('agente')
+      .eq('usuario_id', sessao.user.id)
+      .eq('ativo', true)
+      .maybeSingle()
+    if (erroAcesso) {
+      return res.status(503).json({ error: 'Não foi possível validar a autorização interna do PAE.' })
+    }
+
+    const agente = typeof acesso?.agente === 'string' ? acesso.agente.trim() : ''
+    if (!agente) {
+      return res.status(403).json({ error: 'Esta conta não está autorizada para acessar o PAE.' })
+    }
+
+    req.paeIdentity = { userId: sessao.user.id, agente }
+    return next()
+  } catch {
+    return res.status(503).json({ error: 'Não foi possível validar a sessão do PAE.' })
+  }
+}
+
 function erroHttp(res, status, message) {
   return res.status(status).json({ error: message })
 }
@@ -159,6 +206,9 @@ async function carregarChamado(query, id) {
 }
 
 export function registerPaeRoutes(app, { query, pool, broadcastParaTodos, enviarPushParaAgentes, vapidConfigured }) {
+  app.use('/api/pae', exigirAcessoPae)
+  app.use('/api/push/pae', exigirAcessoPae)
+
   app.get('/api/pae', async (_req, res) => {
     try {
       const [eventos, chamados] = await Promise.all([
@@ -210,7 +260,12 @@ export function registerPaeRoutes(app, { query, pool, broadcastParaTodos, enviar
   })
 
   app.post('/api/pae/eventos', async (req, res) => {
-    const resultado = validarNovoEventoPae(req.body)
+    const agente = req.paeIdentity.agente
+    const resultado = validarNovoEventoPae({
+      ...req.body,
+      acionadoPor: agente,
+      responsavel: agente,
+    })
     if (resultado.erro) return erroHttp(res, 400, resultado.erro)
     const evento = resultado.evento
     const client = await pool.connect()
@@ -244,7 +299,10 @@ export function registerPaeRoutes(app, { query, pool, broadcastParaTodos, enviar
   })
 
   app.post('/api/pae/chamados', async (req, res) => {
-    const resultado = validarNovoChamadoPae(req.body)
+    const resultado = validarNovoChamadoPae({
+      ...req.body,
+      acionadoPor: req.paeIdentity.agente,
+    })
     if (resultado.erro) return erroHttp(res, 400, resultado.erro)
     const chamado = resultado.chamado
     const client = await pool.connect()
@@ -293,7 +351,10 @@ export function registerPaeRoutes(app, { query, pool, broadcastParaTodos, enviar
   })
 
   app.post('/api/pae/chamados/:id/triagem', async (req, res) => {
-    const resultado = validarTriagemPae(req.body)
+    const resultado = validarTriagemPae({
+      ...req.body,
+      agente: req.paeIdentity.agente,
+    })
     if (resultado.erro) return erroHttp(res, 400, resultado.erro)
     const { agente, prioridade, justificativa, cobrade } = resultado.triagem
     const client = await pool.connect()
@@ -339,7 +400,7 @@ export function registerPaeRoutes(app, { query, pool, broadcastParaTodos, enviar
   app.patch('/api/pae/chamados/:id/localizacao', async (req, res) => {
     const latitude = Number(req.body?.latitude)
     const longitude = Number(req.body?.longitude)
-    const realizadoPor = texto(req.body?.realizadoPor ?? req.body?.realizado_por, 100) || 'Agente não identificado'
+    const realizadoPor = req.paeIdentity.agente
     if (!Number.isFinite(latitude) || latitude < -90 || latitude > 90
         || !Number.isFinite(longitude) || longitude < -180 || longitude > 180) {
       return erroHttp(res, 400, 'Coordenadas inválidas.')
@@ -382,7 +443,7 @@ export function registerPaeRoutes(app, { query, pool, broadcastParaTodos, enviar
   })
 
   app.post('/api/pae/chamados/:id/validar', async (req, res) => {
-    const agente = texto(req.body?.agente, 100)
+    const agente = req.paeIdentity.agente
     if (!agente) return erroHttp(res, 400, 'Responsável pela validação obrigatório.')
     const client = await pool.connect()
     try {
@@ -431,7 +492,7 @@ export function registerPaeRoutes(app, { query, pool, broadcastParaTodos, enviar
   app.post('/api/pae/chamados/:id/suspender-cancelar', async (req, res) => {
     const status = texto(req.body?.status, 20)
     const motivo = texto(req.body?.motivo, 1000)
-    const agente = texto(req.body?.agente, 100)
+    const agente = req.paeIdentity.agente
     if (!['suspenso', 'cancelado'].includes(status) || !motivo || !agente) {
       return erroHttp(res, 400, 'Informe a ação, o motivo e o agente responsável.')
     }
@@ -475,7 +536,7 @@ export function registerPaeRoutes(app, { query, pool, broadcastParaTodos, enviar
   })
 
   app.post('/api/pae/chamados/:id/iniciar', async (req, res) => {
-    const agente = texto(req.body?.agente, 100)
+    const agente = req.paeIdentity.agente
     if (!agente) return erroHttp(res, 400, 'Agente obrigatório.')
     try {
       const atual = await query('SELECT * FROM pae_chamados WHERE id = $1', [req.params.id])
@@ -508,7 +569,10 @@ export function registerPaeRoutes(app, { query, pool, broadcastParaTodos, enviar
   })
 
   app.post('/api/pae/chamados/:id/concluir', async (req, res) => {
-    const resultado = validarConclusaoPae(req.body)
+    const resultado = validarConclusaoPae({
+      ...req.body,
+      agente: req.paeIdentity.agente,
+    })
     if (resultado.erro) return erroHttp(res, 400, resultado.erro)
     const conclusao = resultado.conclusao
     const client = await pool.connect()
@@ -579,10 +643,10 @@ export function registerPaeRoutes(app, { query, pool, broadcastParaTodos, enviar
   app.post('/api/push/pae', async (req, res) => {
     const agentes = listaAgentes(req.body?.agentes)
     const tipo = texto(req.body?.tipo, 30)
-    const remetente = texto(req.body?.remetente, 100)
+    const remetente = req.paeIdentity.agente
     const tipoRisco = texto(req.body?.tipoRisco, 120)
     const endereco = texto(req.body?.endereco, 300)
-    const agente = texto(req.body?.agente, 100)
+    const agente = req.paeIdentity.agente
     if (!['novo_chamado', 'chamado_concluido'].includes(tipo) || agentes.length === 0) {
       return erroHttp(res, 400, 'Dados da notificação incompletos.')
     }

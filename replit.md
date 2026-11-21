@@ -1,9 +1,9 @@
 # Defesa Civil Conselheiro Lafaiete — App de Gerenciamento de Ocorrências
 
 ## Run & Operate
-- **Development + Production**: `npm install && npm run build && node server/index.js`
-- The Express server builds the Vite frontend and serves everything on **port 5000**
-- `npm run dev` — Vite dev server (port 5000) with proxy to Express on port 3001 (dev only)
+- **Replit preview**: use the `Start application` workflow (`pnpm run build && node server/index.js`); Express serves the app on **port 5000**
+- **Install dependencies**: `pnpm install --frozen-lockfile` (`pnpm-lock.yaml` is the lockfile)
+- `npm run dev` — starts the Express server and Vite development server
 - `npm run build` — build frontend for production only
 
 Required env vars (all set in Replit shared env / secrets):
@@ -55,6 +55,8 @@ Required env vars (all set in Replit shared env / secrets):
 
 ## Product
 - Register and manage civil defense incidents with photos and GPS
+- PAE — Plano de Ação do Evento — is opened from the map after the normal app login; its internal access requires Supabase Auth and an active entry in `pae_usuarios_autorizados`
+- Apply the PAE migrations in `supabase/migrations/` to the configured Supabase project before testing PAE data flows
 - Register risk areas on the Radar DC meteorological map with a marked point, polygon, risk type, start date, rainfall threshold, and agent-password-gated editing/deletion
 - Real-time team tracking via WebSocket
 - SOS alert system with Web Push notifications

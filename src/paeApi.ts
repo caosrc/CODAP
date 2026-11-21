@@ -12,6 +12,7 @@ import type {
   PaeMaterialGasto,
   PaePrioridade,
   PaeStatus,
+  PaeUsuarioAutorizado,
   TriarChamadoPaeInput,
 } from './paeTypes'
 
@@ -37,6 +38,86 @@ function texto(valor: unknown): string {
 function numero(valor: unknown, fallback = 0): number {
   const parsed = Number(valor)
   return Number.isFinite(parsed) ? parsed : fallback
+}
+
+async function tokenPae(): Promise<string> {
+  if (!supabaseDisponivel) {
+    throw new Error('O PAE exige Supabase Auth configurado para validar o acesso interno.')
+  }
+  const { data, error } = await supabase.auth.getSession()
+  if (error) throw new Error('Não foi possível verificar sua sessão do PAE.')
+  const token = data.session?.access_token
+  if (!token) throw new Error('Entre com sua conta Supabase para acessar o PAE.')
+  return token
+}
+
+async function fetchPae(input: RequestInfo | URL, init: RequestInit = {}): Promise<Response> {
+  const token = await tokenPae()
+  return fetch(input, {
+    ...init,
+    headers: {
+      ...Object.fromEntries(new Headers(init.headers).entries()),
+      Authorization: `Bearer ${token}`,
+    },
+  })
+}
+
+async function perfilAutorizadoPae(userId: string): Promise<PaeUsuarioAutorizado | null> {
+  const { data, error } = await supabase
+    .from('pae_usuarios_autorizados')
+    .select('agente')
+    .eq('usuario_id', userId)
+    .eq('ativo', true)
+    .maybeSingle()
+  if (error) {
+    throw new Error('Não foi possível validar o acesso ao PAE. Confirme se a migração de acesso interno foi aplicada.')
+  }
+  const agente = typeof data?.agente === 'string' ? data.agente.trim() : ''
+  return agente ? { userId, agente } : null
+}
+
+export async function obterAcessoPaeAtual(): Promise<PaeUsuarioAutorizado | null> {
+  if (!supabaseDisponivel) return null
+  const { data, error } = await supabase.auth.getSession()
+  if (error) throw new Error('Não foi possível verificar sua sessão do PAE.')
+  const userId = data.session?.user?.id
+  if (!userId) return null
+  try {
+    const perfil = await perfilAutorizadoPae(userId)
+    if (perfil) return perfil
+  } catch (erro) {
+    await supabase.auth.signOut({ scope: 'local' }).catch(() => {})
+    throw erro
+  }
+  await supabase.auth.signOut({ scope: 'local' }).catch(() => {})
+  return null
+}
+
+export async function autenticarPae(email: string, password: string): Promise<PaeUsuarioAutorizado> {
+  if (!supabaseDisponivel) {
+    throw new Error('O acesso ao PAE exige Supabase configurado. Contate a coordenação do sistema.')
+  }
+  const { data, error } = await supabase.auth.signInWithPassword({ email: email.trim(), password })
+  if (error || !data.user) {
+    throw new Error('Não foi possível entrar. Confira o e-mail e a senha cadastrados no Supabase Auth.')
+  }
+  try {
+    const perfil = await perfilAutorizadoPae(data.user.id)
+    if (!perfil) {
+      await supabase.auth.signOut({ scope: 'local' })
+      throw new Error('Esta conta não está autorizada para o PAE. Solicite acesso à coordenação.')
+    }
+    return perfil
+  } catch (erro) {
+    await supabase.auth.signOut({ scope: 'local' }).catch(() => {})
+    throw erro
+  }
+}
+
+export async function sairPae(): Promise<void> {
+  if (!supabaseDisponivel) return
+  const { error } = await supabase.auth.signOut({ scope: 'local' })
+  if (error) throw new Error('Não foi possível encerrar a sessão do PAE.')
 }
 
 function normalizarEvento(row: Linha): PaeEvento {
@@ -170,12 +251,10 @@ async function rpc<T>(funcao: string, parametros: Record<string, unknown>): Prom
   return data as T
 }
 
-function emitirAtualizacao(chamadoId?: string, eventoId?: string) {
+function emitirAtualizacao(_chamadoId?: string, _eventoId?: string) {
   wsSend({
     tipo: 'pae_atualizado',
     id: crypto.randomUUID(),
-    chamadoId: chamadoId || '',
-    eventoId: eventoId || '',
   })
 }
 
@@ -193,7 +272,7 @@ function enviarPushPae(
     endereco: chamado.endereco,
     agente: chamado.atendimento?.agente || '',
   }
-  void fetch('/api/push/pae', {
+  void fetchPae('/api/push/pae', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
@@ -207,41 +286,19 @@ function enviarPushPae(
   })
 }
 
-function notificarNovoChamado(chamado: PaeChamado, evento: PaeEvento) {
-  const mensagem = {
-    tipo: 'pae_novo_chamado',
-    id: crypto.randomUUID(),
-    chamadoId: chamado.id,
-    eventoId: evento.id,
-    eventoNome: evento.nome,
-    tipoRisco: chamado.tipoRisco,
-    endereco: chamado.endereco,
-    acionadoPor: chamado.acionadoPor,
-    agentesEnvolvidos: chamado.agentesEnvolvidos,
-  }
-  wsSend(mensagem)
-  emitirAtualizacao(chamado.id, evento.id)
+function notificarNovoChamado(chamado: PaeChamado, _evento: PaeEvento) {
+  emitirAtualizacao()
   enviarPushPae('novo_chamado', chamado, chamado.acionadoPor)
 }
 
 function notificarConclusao(chamado: PaeChamado, agente: string) {
-  wsSend({
-    tipo: 'pae_chamado_concluido',
-    id: crypto.randomUUID(),
-    chamadoId: chamado.id,
-    eventoId: chamado.eventoId,
-    tipoRisco: chamado.tipoRisco,
-    endereco: chamado.endereco,
-    agente,
-    agentesEnvolvidos: chamado.agentesEnvolvidos,
-  })
-  emitirAtualizacao(chamado.id, chamado.eventoId)
+  emitirAtualizacao()
   enviarPushPae('chamado_concluido', chamado, agente)
 }
 
 export async function listarPae(): Promise<{ eventos: PaeEvento[]; chamados: PaeChamado[] }> {
   if (!supabaseDisponivel) {
-    const response = await fetch('/api/pae')
+    const response = await fetchPae('/api/pae')
     const data = await respostaJson<{ eventos: Linha[]; chamados: Linha[] }>(response)
     return {
       eventos: data.eventos.map(normalizarEvento),
@@ -303,7 +360,7 @@ export async function listarHistoricoPae(eventoId: string, chamadoId?: string): 
     const params = new URLSearchParams()
     if (chamadoId) params.set('chamado_id', chamadoId)
     const queryString = params.toString()
-    const response = await fetch(
+    const response = await fetchPae(
       `/api/pae/eventos/${encodeURIComponent(eventoId)}/historico${queryString ? `?${queryString}` : ''}`,
     )
     const rows = await respostaJson<Linha[]>(response)
@@ -335,7 +392,7 @@ export async function criarEventoPae(input: NovoEventoPaeInput): Promise<PaeEven
       p_inicio_em: input.inicioEm || new Date().toISOString(),
     })
   } else {
-    const response = await fetch('/api/pae/eventos', {
+    const response = await fetchPae('/api/pae/eventos', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -375,7 +432,7 @@ export async function criarChamadoPae(input: NovoChamadoPaeInput): Promise<PaeCh
       p_agentes_envolvidos: input.agentesEnvolvidos,
     })
   } else {
-    const response = await fetch('/api/pae/chamados', {
+    const response = await fetchPae('/api/pae/chamados', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -418,7 +475,7 @@ export async function triarChamadoPae(chamadoId: string, input: TriarChamadoPaeI
       p_cobrade: input.cobrade || '',
     })
   } else {
-    const response = await fetch(`/api/pae/chamados/${encodeURIComponent(chamadoId)}/triagem`, {
+    const response = await fetchPae(`/api/pae/chamados/${encodeURIComponent(chamadoId)}/triagem`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(input),
@@ -445,7 +502,7 @@ export async function atualizarLocalizacaoChamadoPae(
       p_realizado_por: realizadoPor,
     })
   } else {
-    const response = await fetch(`/api/pae/chamados/${encodeURIComponent(chamadoId)}/localizacao`, {
+    const response = await fetchPae(`/api/pae/chamados/${encodeURIComponent(chamadoId)}/localizacao`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ latitude, longitude, realizadoPor }),
@@ -465,7 +522,7 @@ export async function validarChamadoPae(chamadoId: string, agente: string): Prom
       p_validado_por: agente,
     })
   } else {
-    const response = await fetch(`/api/pae/chamados/${encodeURIComponent(chamadoId)}/validar`, {
+    const response = await fetchPae(`/api/pae/chamados/${encodeURIComponent(chamadoId)}/validar`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ agente }),
@@ -492,7 +549,7 @@ export async function suspenderCancelarChamadoPae(
       p_realizado_por: agente,
     })
   } else {
-    const response = await fetch(`/api/pae/chamados/${encodeURIComponent(chamadoId)}/suspender-cancelar`, {
+    const response = await fetchPae(`/api/pae/chamados/${encodeURIComponent(chamadoId)}/suspender-cancelar`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status, motivo, agente }),
@@ -506,7 +563,7 @@ export async function suspenderCancelarChamadoPae(
 
 export async function iniciarChamadoPae(chamadoId: string, agente: string): Promise<PaeChamado> {
   if (!supabaseDisponivel) {
-    const response = await fetch(`/api/pae/chamados/${encodeURIComponent(chamadoId)}/iniciar`, {
+    const response = await fetchPae(`/api/pae/chamados/${encodeURIComponent(chamadoId)}/iniciar`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ agente }),
@@ -546,7 +603,7 @@ export async function concluirChamadoPae(
     return chamado
   }
 
-  const response = await fetch(`/api/pae/chamados/${encodeURIComponent(chamadoId)}/concluir`, {
+  const response = await fetchPae(`/api/pae/chamados/${encodeURIComponent(chamadoId)}/concluir`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({

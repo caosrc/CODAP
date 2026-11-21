@@ -48,6 +48,35 @@ import {
   CamadaStscRedemet,
 } from './redemetMapa'
 import { useProdutoRedemet, type TipoRadarRedemet } from './redemetApi'
+import {
+  autenticarPae,
+  atualizarLocalizacaoChamadoPae,
+  concluirChamadoPae,
+  criarChamadoPae,
+  criarEventoPae,
+  iniciarChamadoPae,
+  listarHistoricoPae,
+  listarPae,
+  obterAcessoPaeAtual,
+  sairPae,
+  suspenderCancelarChamadoPae,
+  triarChamadoPae,
+  validarChamadoPae,
+} from '../paeApi'
+import type {
+  ConcluirChamadoPaeInput,
+  NovoChamadoPaeInput,
+  NovoEventoPaeInput,
+  PaeChamado,
+  PaeEvento,
+  PaeHistorico,
+  PaeUsuarioAutorizado,
+  TriarChamadoPaeInput,
+} from '../paeTypes'
+import { supabase, supabaseDisponivel } from '../supabaseClient'
+import PAEAccessDialog from './pae/PAEAccessDialog'
+import PAECallMarkers from './pae/PAECallMarkers'
+import PAECommandPanel from './pae/PAECommandPanel'
 
 
 interface DadosRadarChuva {
@@ -920,6 +949,20 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
   const [mapaBounds, setMapaBounds] = useState<L.LatLngBounds | null>(null)
   const [zoomMapa, setZoomMapa] = useState(12)
   const mapaLeafletRef = useRef<L.Map | null>(null)
+  const [paeUsuario, setPaeUsuario] = useState<PaeUsuarioAutorizado | null>(null)
+  const [paePainelAberto, setPaePainelAberto] = useState(false)
+  const [paeAcessoAberto, setPaeAcessoAberto] = useState(false)
+  const [paeEventos, setPaeEventos] = useState<PaeEvento[]>([])
+  const [paeChamados, setPaeChamados] = useState<PaeChamado[]>([])
+  const [paeEventoSelecionadoId, setPaeEventoSelecionadoId] = useState<string | null>(null)
+  const [paeChamadoSelecionadoId, setPaeChamadoSelecionadoId] = useState<string | null>(null)
+  const [paeAjusteChamadoId, setPaeAjusteChamadoId] = useState<string | null>(null)
+  const [paeHistorico, setPaeHistorico] = useState<PaeHistorico[]>([])
+  const [paeHistoricoCarregando, setPaeHistoricoCarregando] = useState(false)
+  const [paeCarregando, setPaeCarregando] = useState(false)
+  const [paeSalvando, setPaeSalvando] = useState(false)
+  const [paeErro, setPaeErro] = useState<string | null>(null)
+  const [paeLocalizacaoSalvandoId, setPaeLocalizacaoSalvandoId] = useState<string | null>(null)
   const cemadenMg = useEstacoesCemadenMg(mostrarChuva || mostrarIntensidadeCemaden || painelChuvaAberto)
   const estacoesCemaden = cemadenMg.dados?.estacoes ?? ESTACOES_CEMADEN_VAZIAS
   const estacoesCemadenLafaiete = useMemo(
@@ -1672,6 +1715,215 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
       )
     })
   }, [ocorrencias, naturezasOcultas, mapaBounds])
+
+  const recarregarPae = useCallback(async () => {
+    if (!paeUsuario) return
+    setPaeCarregando(true)
+    try {
+      const dados = await listarPae()
+      setPaeEventos(dados.eventos)
+      setPaeChamados(dados.chamados)
+      setPaeEventoSelecionadoId(atual => (
+        atual && dados.eventos.some(evento => evento.id === atual)
+          ? atual
+          : dados.eventos.find(evento => evento.status === 'ativo')?.id || dados.eventos[0]?.id || null
+      ))
+      setPaeChamadoSelecionadoId(atual => (
+        atual && dados.chamados.some(chamado => chamado.id === atual) ? atual : null
+      ))
+      setPaeErro(null)
+    } catch (error) {
+      setPaeErro(error instanceof Error ? error.message : 'Não foi possível carregar os registros do PAE.')
+    } finally {
+      setPaeCarregando(false)
+    }
+  }, [paeUsuario])
+
+  useEffect(() => {
+    if (!paeUsuario || !paePainelAberto) return
+    void recarregarPae()
+    const removerAtualizacao = wsOn('pae_atualizado', () => { void recarregarPae() })
+    const intervalo = window.setInterval(() => { void recarregarPae() }, 30000)
+    return () => {
+      removerAtualizacao()
+      window.clearInterval(intervalo)
+    }
+  }, [paeUsuario, paePainelAberto, recarregarPae])
+
+  useEffect(() => {
+    if (!supabaseDisponivel) return
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(evento => {
+      if (evento !== 'SIGNED_OUT') return
+      setPaeUsuario(null)
+      setPaeEventos([])
+      setPaeChamados([])
+      setPaeHistorico([])
+      setPaeEventoSelecionadoId(null)
+      setPaeChamadoSelecionadoId(null)
+      setPaePainelAberto(false)
+      setPaeAcessoAberto(false)
+    })
+    return () => subscription.unsubscribe()
+  }, [])
+
+  useEffect(() => {
+    if (!paeUsuario || !paeEventoSelecionadoId) {
+      setPaeHistorico([])
+      setPaeHistoricoCarregando(false)
+      return
+    }
+    let ativo = true
+    setPaeHistoricoCarregando(true)
+    void listarHistoricoPae(paeEventoSelecionadoId, paeChamadoSelecionadoId || undefined)
+      .then(historico => { if (ativo) setPaeHistorico(historico) })
+      .catch(error => {
+        if (ativo) setPaeErro(error instanceof Error ? error.message : 'Não foi possível carregar o histórico do PAE.')
+      })
+      .finally(() => { if (ativo) setPaeHistoricoCarregando(false) })
+    return () => { ativo = false }
+  }, [paeUsuario, paeEventoSelecionadoId, paeChamadoSelecionadoId])
+
+  const autorizarPae = useCallback((usuario: PaeUsuarioAutorizado) => {
+    setPaeUsuario(usuario)
+    setPaeAcessoAberto(false)
+    setPaePainelAberto(true)
+    setPaeErro(null)
+  }, [])
+
+  const abrirPae = useCallback(() => {
+    setPaePainelAberto(true)
+    setPaeErro(null)
+    if (!paeUsuario) setPaeAcessoAberto(true)
+  }, [paeUsuario])
+
+  const fecharAcessoPae = useCallback(() => {
+    setPaeAcessoAberto(false)
+    if (!paeUsuario) setPaePainelAberto(false)
+  }, [paeUsuario])
+
+  const executarPae = useCallback(async <T,>(operacao: () => Promise<T>): Promise<T> => {
+    setPaeSalvando(true)
+    setPaeErro(null)
+    try {
+      const resultado = await operacao()
+      await recarregarPae()
+      return resultado
+    } catch (error) {
+      setPaeErro(error instanceof Error ? error.message : 'Não foi possível concluir a operação do PAE.')
+      throw error
+    } finally {
+      setPaeSalvando(false)
+    }
+  }, [recarregarPae])
+
+  const onCriarEventoPae = useCallback((input: NovoEventoPaeInput) => executarPae(async () => {
+    if (!paeUsuario) throw new Error('Entre com uma conta autorizada para abrir um evento.')
+    const evento = await criarEventoPae({
+      ...input,
+      acionadoPor: paeUsuario.agente,
+      responsavel: paeUsuario.agente,
+    })
+    setPaeEventoSelecionadoId(evento.id)
+    setPaeChamadoSelecionadoId(null)
+    return evento
+  }), [executarPae, paeUsuario])
+
+  const onCriarChamadoPae = useCallback((input: NovoChamadoPaeInput) => executarPae(async () => {
+    if (!paeUsuario) throw new Error('Entre com uma conta autorizada para registrar um chamado.')
+    return criarChamadoPae({ ...input, acionadoPor: paeUsuario.agente })
+  }), [executarPae, paeUsuario])
+
+  const onTriarChamadoPae = useCallback((chamadoId: string, input: TriarChamadoPaeInput) => executarPae(async () => {
+    if (!paeUsuario) throw new Error('Entre com uma conta autorizada para registrar a triagem.')
+    return triarChamadoPae(chamadoId, { ...input, agente: paeUsuario.agente })
+  }), [executarPae, paeUsuario])
+
+  const onIniciarChamadoPae = useCallback((chamadoId: string) => executarPae(async () => {
+    if (!paeUsuario) throw new Error('Entre com uma conta autorizada para iniciar o atendimento.')
+    return iniciarChamadoPae(chamadoId, paeUsuario.agente)
+  }), [executarPae, paeUsuario])
+
+  const onConcluirChamadoPae = useCallback((chamadoId: string, input: ConcluirChamadoPaeInput) => executarPae(async () => {
+    if (!paeUsuario) throw new Error('Entre com uma conta autorizada para concluir o atendimento.')
+    return concluirChamadoPae(chamadoId, { ...input, agente: paeUsuario.agente })
+  }), [executarPae, paeUsuario])
+
+  const onValidarChamadoPae = useCallback((chamadoId: string) => executarPae(async () => {
+    if (!paeUsuario) throw new Error('Entre com uma conta autorizada para validar a conclusão.')
+    return validarChamadoPae(chamadoId, paeUsuario.agente)
+  }), [executarPae, paeUsuario])
+
+  const onSuspenderCancelarChamadoPae = useCallback((
+    chamadoId: string,
+    status: 'suspenso' | 'cancelado',
+    motivo: string,
+  ) => executarPae(async () => {
+    if (!paeUsuario) throw new Error('Entre com uma conta autorizada para alterar o chamado.')
+    return suspenderCancelarChamadoPae(chamadoId, status, motivo, paeUsuario.agente)
+  }), [executarPae, paeUsuario])
+
+  const onGeocodificarPae = useCallback(async (endereco: string) => {
+    const response = await fetch(`/api/geocode?q=${encodeURIComponent(endereco)}`)
+    if (!response.ok) throw new Error('Não foi possível localizar o endereço.')
+    const resultados = await response.json() as Array<{ lat?: number; lng?: number }>
+    const ponto = resultados.find(item => Number.isFinite(item.lat) && Number.isFinite(item.lng))
+    return ponto
+      ? { latitude: Number(ponto.lat), longitude: Number(ponto.lng) }
+      : null
+  }, [])
+
+  const onSelecionarEventoPae = useCallback((eventoId: string) => {
+    setPaeEventoSelecionadoId(eventoId)
+    setPaeChamadoSelecionadoId(null)
+  }, [])
+
+  const onSelecionarChamadoPae = useCallback((chamado: PaeChamado | null) => {
+    setPaeChamadoSelecionadoId(chamado?.id || null)
+    if (chamado) {
+      mapaLeafletRef.current?.setView(
+        [chamado.latitude, chamado.longitude],
+        Math.max(16, mapaLeafletRef.current.getZoom()),
+        { animate: true },
+      )
+    }
+  }, [])
+
+  const onAtualizarLocalizacaoPae = useCallback(async (chamadoId: string, latitude: number, longitude: number) => {
+    if (!paeUsuario) return
+    setPaeLocalizacaoSalvandoId(chamadoId)
+    try {
+      await executarPae(() => atualizarLocalizacaoChamadoPae(
+        chamadoId, latitude, longitude, paeUsuario.agente,
+      ))
+    } finally {
+      setPaeLocalizacaoSalvandoId(null)
+    }
+  }, [executarPae, paeUsuario])
+
+  const sairDoPae = useCallback(async () => {
+    try {
+      await sairPae()
+    } catch (error) {
+      setPaeErro(error instanceof Error ? error.message : 'Não foi possível sair do PAE.')
+    } finally {
+      setPaeUsuario(null)
+      setPaeEventos([])
+      setPaeChamados([])
+      setPaeHistorico([])
+      setPaeEventoSelecionadoId(null)
+      setPaeChamadoSelecionadoId(null)
+      setPaePainelAberto(false)
+      setPaeAcessoAberto(false)
+      setPaeAjusteChamadoId(null)
+    }
+  }, [])
+
+  const paeChamadosVisiveis = useMemo(
+    () => paeUsuario && paeEventoSelecionadoId
+      ? paeChamados.filter(chamado => chamado.eventoId === paeEventoSelecionadoId)
+      : [],
+    [paeUsuario, paeChamados, paeEventoSelecionadoId],
+  )
 
   // ── Render ────────────────────────────────────────────────────
   return (

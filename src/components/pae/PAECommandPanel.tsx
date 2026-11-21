@@ -27,6 +27,7 @@ export interface PAECommandPanelProps {
   salvando: boolean
   erro: string | null
   onFechar: () => void
+  onSairPae: () => void
   onCriarEvento: (input: NovoEventoPaeInput) => Promise<PaeEvento>
   onCriarChamado: (input: NovoChamadoPaeInput) => Promise<PaeChamado>
   onTriarChamado: (chamadoId: string, input: TriarChamadoPaeInput) => Promise<PaeChamado>
@@ -125,6 +126,7 @@ export default function PAECommandPanel({
   salvando,
   erro,
   onFechar,
+  onSairPae,
   onCriarEvento,
   onCriarChamado,
   onTriarChamado,
@@ -457,6 +459,7 @@ export default function PAECommandPanel({
           </div>
           <div className="pae-topbar-right">
             <span className="pae-operator"><b className="pae-live-dot" /> {agenteAtual || 'Agente não identificado'}</span>
+            <button className="pae-icon-button pae-signout-button" type="button" onClick={onSairPae} data-testid="button-signout-pae">Sair</button>
             <button className="pae-icon-button" type="button" onClick={onFechar} aria-label="Fechar painel PAE" data-testid="button-close-pae">Fechar <span aria-hidden="true">×</span></button>
           </div>
         </header>

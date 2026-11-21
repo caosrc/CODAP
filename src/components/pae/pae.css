@@ -272,6 +272,64 @@
 
 .pae-command button:focus-visible, .pae-command input:focus-visible, .pae-command textarea:focus-visible, .pae-command select:focus-visible, .pae-map-popup button:focus-visible { outline: 2px solid #8bd7e8; outline-offset: 2px; }
 
+.pae-access-backdrop {
+  position: fixed;
+  z-index: 1900;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: rgba(4, 16, 28, .72);
+  backdrop-filter: blur(5px);
+  color: #e8f2fa;
+}
+
+.pae-access-card {
+  width: min(100%, 420px);
+  padding: 1.6rem;
+  border: 1px solid #365a74;
+  border-radius: 14px;
+  background: linear-gradient(155deg, #12334f, #091f34 78%);
+  box-shadow: 0 22px 70px rgba(0, 8, 18, .48);
+}
+
+.pae-access-mark {
+  display: grid;
+  width: 48px;
+  height: 48px;
+  place-items: center;
+  margin-bottom: 1.25rem;
+  border: 1px solid #4c88a7;
+  border-radius: 12px;
+  color: #9de5f5;
+  font-size: .84rem;
+  font-weight: 900;
+  letter-spacing: .12em;
+  background: #0b2b45;
+}
+
+.pae-access-card h2 { margin: .45rem 0 .5rem; color: #f0f7fb; font-size: 1.55rem; }
+.pae-access-card > p { margin: 0 0 1.2rem; color: #a9c0d1; font-size: .88rem; line-height: 1.55; }
+.pae-access-form { display: grid; gap: .95rem; }
+.pae-access-form label { display: grid; gap: .4rem; color: #c5d7e3; font-size: .76rem; font-weight: 750; }
+.pae-access-form input { width: 100%; border: 1px solid #3a5c75; border-radius: 7px; padding: .7rem .75rem; color: #edf6fb; background: #0a2238; font: inherit; }
+.pae-access-form input:focus { outline: 2px solid #62bad4; outline-offset: 1px; }
+.pae-access-form input:disabled { opacity: .55; }
+.pae-access-actions { display: flex; justify-content: flex-end; gap: .6rem; margin-top: .2rem; }
+.pae-access-error { margin-top: .4rem; border: 1px solid rgba(239, 117, 111, .45); border-radius: 7px; padding: .65rem .75rem; color: #ffc0ba; background: rgba(133, 43, 44, .23); font-size: .75rem; line-height: 1.45; }
+.pae-access-hint, .pae-access-status { margin-top: .95rem; color: #89a7bb; font-size: .72rem; line-height: 1.45; }
+.pae-access-status { margin: 1rem 0; }
+.pae-signout-button { border-color: #674c56; color: #f2c9c6; }
+.pae-signout-button:hover { border-color: #cb8a88; background: #462e39; }
+
+@media (max-width: 560px) {
+  .pae-access-card { padding: 1.25rem; }
+  .pae-access-actions { flex-direction: column-reverse; }
+  .pae-access-actions button { width: 100%; }
+  .pae-topbar-right { gap: .45rem; }
+  .pae-signout-button { display: none; }
+}
+
 @media (max-width: 760px) {
   .pae-backdrop { align-items: flex-end; justify-content: center; padding: 0; }
   .pae-command { width: 100%; height: 76dvh; max-height: 76dvh; border: 1px solid #365a74; border-bottom: 0; border-radius: 12px 12px 0 0; }

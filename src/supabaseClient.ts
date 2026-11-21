@@ -5,6 +5,12 @@ type DisabledSupabaseClient = {
   channel: (...args: unknown[]) => any
   removeChannel: (...args: unknown[]) => any
   rpc: (...args: unknown[]) => any
+  auth: {
+    getSession: (...args: unknown[]) => any
+    signInWithPassword: (...args: unknown[]) => any
+    signOut: (...args: unknown[]) => any
+    onAuthStateChange: (...args: unknown[]) => any
+  }
   functions: { invoke: (...args: unknown[]) => any }
 }
 
@@ -22,12 +28,18 @@ export const supabaseDisponivel = usarSupabase && Boolean(supabaseUrl && supabas
 
 export const supabase = supabaseDisponivel
   ? createClient(supabaseUrl, supabaseAnonKey, {
-      auth: { persistSession: false, autoRefreshToken: false },
+      auth: { persistSession: true, autoRefreshToken: true },
     })
   : ({
       from: supabaseDisabled,
       channel: supabaseDisabled,
       removeChannel: supabaseDisabled,
       rpc: supabaseDisabled,
+      auth: {
+        getSession: supabaseDisabled,
+        signInWithPassword: supabaseDisabled,
+        signOut: supabaseDisabled,
+        onAuthStateChange: supabaseDisabled,
+      },
       functions: { invoke: supabaseDisabled },
     } as DisabledSupabaseClient)

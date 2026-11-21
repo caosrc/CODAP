@@ -8,6 +8,11 @@ export type PaeStatus =
   | 'cancelado'
 export type PaePrioridade = 'baixa' | 'media' | 'alta' | 'critica'
 
+export interface PaeUsuarioAutorizado {
+  userId: string
+  agente: string
+}
+
 export interface PaeEvento {
   id: string
   nome: string

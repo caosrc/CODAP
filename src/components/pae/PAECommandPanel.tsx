@@ -5,6 +5,7 @@ import type {
   NovoChamadoPaeInput,
   NovoEventoPaeInput,
   PaeChamado,
+  PaeAtribuicao,
   PaeEvento,
   PaeHistorico,
   PaeMaterialGasto,
@@ -31,6 +32,10 @@ export interface PAECommandPanelProps {
   onCriarEvento: (input: NovoEventoPaeInput) => Promise<PaeEvento>
   onCriarChamado: (input: NovoChamadoPaeInput) => Promise<PaeChamado>
   onTriarChamado: (chamadoId: string, input: TriarChamadoPaeInput) => Promise<PaeChamado>
+  onDesignarChamado: (chamado: PaeChamado, agentes: string[]) => Promise<PaeAtribuicao>
+  onResponderAtribuicao: (chamado: PaeChamado, atribuicao: PaeAtribuicao, aceitar: boolean, motivo: string) => Promise<PaeAtribuicao>
+  onSolicitarReforco: (chamado: PaeChamado, atribuicao: PaeAtribuicao, motivo: string) => Promise<PaeAtribuicao>
+  onAtenderReforco: (chamado: PaeChamado, atribuicao: PaeAtribuicao, agentes: string[]) => Promise<PaeAtribuicao>
   onIniciarChamado: (chamadoId: string, agente: string) => Promise<PaeChamado>
   onConcluirChamado: (chamadoId: string, input: ConcluirChamadoPaeInput) => Promise<PaeChamado>
   onValidarChamado: (chamadoId: string) => Promise<PaeChamado>
@@ -65,6 +70,19 @@ function dataHora(valor: string) {
   return Number.isNaN(data.getTime())
     ? valor
     : new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' }).format(data)
+}
+
+function situacaoChamado(chamado: PaeChamado): string {
+  if (chamado.atribuicao?.status === 'designada') return 'Aguardando aceite'
+  if (chamado.atribuicao?.status === 'aceita' && chamado.status === 'triado') return 'Equipe aceitou'
+  if (chamado.atribuicao?.status === 'recusada' && chamado.status === 'triado') return 'Aguardando nova equipe'
+  return statusLabel[chamado.status]
+}
+
+function atualizarSelecaoAgente(atual: string[], agente: string, selecionado: boolean): string[] {
+  return selecionado
+    ? [...new Set([...atual, agente])]
+    : atual.filter(item => item !== agente)
 }
 
 function lerArquivo(file: File): Promise<string> {
@@ -130,6 +148,10 @@ export default function PAECommandPanel({
   onCriarEvento,
   onCriarChamado,
   onTriarChamado,
+  onDesignarChamado,
+  onResponderAtribuicao,
+  onSolicitarReforco,
+  onAtenderReforco,
   onIniciarChamado,
   onConcluirChamado,
   onValidarChamado,
@@ -160,14 +182,15 @@ export default function PAECommandPanel({
   const [prioridade, setPrioridade] = useState<NovoChamadoPaeInput['prioridade']>('media')
   const [prioridadeTriagem, setPrioridadeTriagem] = useState<NovoChamadoPaeInput['prioridade']>('media')
   const [justificativaTriagem, setJustificativaTriagem] = useState('')
+  const [agentesDesignacao, setAgentesDesignacao] = useState<string[]>([])
+  const [agentesReforco, setAgentesReforco] = useState<string[]>([])
+  const [motivoRecusa, setMotivoRecusa] = useState('')
+  const [motivoReforco, setMotivoReforco] = useState('')
   const [filtroTexto, setFiltroTexto] = useState('')
   const [filtroStatus, setFiltroStatus] = useState('')
   const [filtroPrioridade, setFiltroPrioridade] = useState('')
   const [motivoEncerramento, setMotivoEncerramento] = useState('')
   const [acaoEncerramento, setAcaoEncerramento] = useState<'suspenso' | 'cancelado'>('suspenso')
-  const [agentesSelecionados, setAgentesSelecionados] = useState<string[]>(() => (
-    AGENTES.includes(agenteAtual) ? [agenteAtual] : []
-  ))
   const [coordenadas, setCoordenadas] = useState<{ latitude: number; longitude: number } | null>(null)
   const [geocodificando, setGeocodificando] = useState(false)
   const [mensagemGeocode, setMensagemGeocode] = useState('')
@@ -201,8 +224,20 @@ export default function PAECommandPanel({
   const chamadoAtivo = chamadoEmAtendimento?.id === chamadoAtivoOriginal?.id
     ? chamadoEmAtendimento
     : chamadoAtivoOriginal
-  const podeAtender = Boolean(chamadoAtivo?.agentesEnvolvidos.includes(agenteAtual))
+  const podeAtender = Boolean(
+    chamadoAtivo?.agentesEnvolvidos.includes(agenteAtual)
+      && (chamadoAtivo.status === 'em_atendimento' || chamadoAtivo.atribuicao?.status === 'aceita'),
+  )
   const podeValidar = Boolean(eventoAtivo && (eventoAtivo.responsavel || eventoAtivo.acionadoPor) === agenteAtual)
+  const podeDesignar = Boolean(
+    eventoAtivo
+      && chamadoAtivo?.status === 'triado'
+      && (eventoAtivo.responsavel || eventoAtivo.acionadoPor) === agenteAtual,
+  )
+  const podeResponderAtribuicao = Boolean(
+    chamadoAtivo?.atribuicao?.status === 'designada'
+      && chamadoAtivo.atribuicao.agentesDesignados.includes(agenteAtual),
+  )
 
   useEffect(() => {
     if (!aberto) return
@@ -221,7 +256,19 @@ export default function PAECommandPanel({
     setPrioridadeTriagem(chamadoAtivo.prioridade)
     setJustificativaTriagem(chamadoAtivo.justificativaPrioridade || '')
     setCobrade(chamadoAtivo.cobrade || '')
-  }, [chamadoAtivo?.id, chamadoAtivo?.prioridade, chamadoAtivo?.justificativaPrioridade, chamadoAtivo?.cobrade])
+    setAgentesDesignacao(chamadoAtivo.atribuicao?.agentesDesignados || [])
+    setAgentesReforco([])
+    setMotivoRecusa('')
+    setMotivoReforco('')
+  }, [
+    chamadoAtivo?.id,
+    chamadoAtivo?.prioridade,
+    chamadoAtivo?.justificativaPrioridade,
+    chamadoAtivo?.cobrade,
+    chamadoAtivo?.atribuicao?.id,
+    chamadoAtivo?.atribuicao?.status,
+    chamadoAtivo?.atribuicao?.agentesDesignados.join(','),
+  ])
 
   if (!aberto) return null
 
@@ -237,7 +284,6 @@ export default function PAECommandPanel({
     setCanalEntrada('interno')
     setDescricaoChamado('')
     setPrioridade('media')
-    setAgentesSelecionados(AGENTES.includes(agenteAtual) ? [agenteAtual] : [])
     setCoordenadas(null)
     setMensagemGeocode('')
   }
@@ -322,7 +368,7 @@ export default function PAECommandPanel({
         descricao: descricaoChamado.trim(),
         prioridade,
         justificativaPrioridade: '',
-        agentesEnvolvidos: AGENTES.filter(agente => agentesSelecionados.includes(agente)),
+        agentesEnvolvidos: [],
       }
       const criado = await onCriarChamado(input)
       onSelecionarChamado(criado)
@@ -349,6 +395,72 @@ export default function PAECommandPanel({
       setChamadoEmAtendimento(atualizado)
     } catch (error) {
       setErroLocal(error instanceof Error ? error.message : 'Não foi possível registrar a triagem.')
+    } finally {
+      setEnviando(false)
+    }
+  }
+
+  const designarEquipe = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    if (!chamadoAtivo || agentesDesignacao.length === 0) return
+    setErroLocal('')
+    setEnviando(true)
+    try {
+      await onDesignarChamado(chamadoAtivo, agentesDesignacao)
+      setChamadoEmAtendimento(null)
+    } catch (error) {
+      setErroLocal(error instanceof Error ? error.message : 'Não foi possível designar a equipe.')
+    } finally {
+      setEnviando(false)
+    }
+  }
+
+  const responderDesignacao = async (aceitar: boolean) => {
+    if (!chamadoAtivo?.atribuicao) return
+    setErroLocal('')
+    setEnviando(true)
+    try {
+      await onResponderAtribuicao(
+        chamadoAtivo,
+        chamadoAtivo.atribuicao,
+        aceitar,
+        motivoRecusa.trim(),
+      )
+      setMotivoRecusa('')
+      setChamadoEmAtendimento(null)
+    } catch (error) {
+      setErroLocal(error instanceof Error ? error.message : 'Não foi possível responder à designação.')
+    } finally {
+      setEnviando(false)
+    }
+  }
+
+  const solicitarReforco = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    if (!chamadoAtivo?.atribuicao || !motivoReforco.trim()) return
+    setErroLocal('')
+    setEnviando(true)
+    try {
+      await onSolicitarReforco(chamadoAtivo, chamadoAtivo.atribuicao, motivoReforco.trim())
+      setMotivoReforco('')
+      setChamadoEmAtendimento(null)
+    } catch (error) {
+      setErroLocal(error instanceof Error ? error.message : 'Não foi possível solicitar o reforço.')
+    } finally {
+      setEnviando(false)
+    }
+  }
+
+  const atenderPedidoReforco = async () => {
+    if (!chamadoAtivo?.atribuicao || agentesReforco.length === 0) return
+    setErroLocal('')
+    setEnviando(true)
+    try {
+      await onAtenderReforco(chamadoAtivo, chamadoAtivo.atribuicao, agentesReforco)
+      setAgentesReforco([])
+      setChamadoEmAtendimento(null)
+    } catch (error) {
+      setErroLocal(error instanceof Error ? error.message : 'Não foi possível designar o reforço.')
     } finally {
       setEnviando(false)
     }
@@ -540,7 +652,7 @@ export default function PAECommandPanel({
                         aria-current={chamadoSelecionadoId === chamado.id ? 'true' : undefined}
                       >
                         <span className={`pae-priority-line priority-${chamado.prioridade}`} />
-                        <span className="pae-call-copy"><strong>{chamado.tipoRisco}</strong><small>{chamado.endereco}</small><em>{statusLabel[chamado.status]}</em></span>
+                        <span className="pae-call-copy"><strong>{chamado.tipoRisco}</strong><small>{chamado.endereco}</small><em>{situacaoChamado(chamado)}</em></span>
                         <span className={`pae-priority-tag priority-${chamado.prioridade}`}>{prioridadeLabel[chamado.prioridade]}</span>
                       </button>
                     ))}
@@ -584,32 +696,9 @@ export default function PAECommandPanel({
                     <label>Município<input maxLength={120} value={municipio} onChange={event => setMunicipio(event.target.value)} data-testid="input-call-municipality" /></label>
                     <label className="pae-span-two">Ponto de referência<input maxLength={250} value={referencia} onChange={event => setReferencia(event.target.value)} placeholder="Referência próxima ao local" data-testid="input-call-reference" /></label>
                     <label className="pae-span-two">Descrição<textarea required rows={3} value={descricaoChamado} onChange={event => setDescricaoChamado(event.target.value)} placeholder="O que foi informado? Inclua sinais de risco e pessoas afetadas." data-testid="input-call-description" /></label>
-                    <fieldset className="pae-agent-picker pae-span-two" aria-describedby="pae-agent-picker-hint">
-                      <legend>Agentes selecionados</legend>
-                      <span id="pae-agent-picker-hint" className="pae-label-hint">Selecione um ou mais agentes para receber o alerta e atuar no chamado.</span>
-                      <div className="pae-agent-options">
-                        {AGENTES.map(agente => (
-                          <label className={`pae-agent-option ${agentesSelecionados.includes(agente) ? 'is-selected' : ''}`} key={agente}>
-                            <input
-                              type="checkbox"
-                              checked={agentesSelecionados.includes(agente)}
-                              onChange={event => setAgentesSelecionados(atuais => (
-                                event.target.checked
-                                  ? [...atuais, agente]
-                                  : atuais.filter(item => item !== agente)
-                              ))}
-                              aria-label={`Selecionar agente ${agente}`}
-                              data-testid={`checkbox-call-agent-${agente.toLowerCase()}`}
-                            />
-                            <span className="pae-agent-check" aria-hidden="true" />
-                            <span>{agente}{agente === agenteAtual ? <small>Você</small> : null}</span>
-                          </label>
-                        ))}
-                      </div>
-                    </fieldset>
                   </div>
-                  <div className="pae-form-meta">EVENTO <strong>{eventoAtivo?.nome}</strong></div>
-                  <div className="pae-form-actions"><button className="pae-secondary-button" type="button" onClick={() => setModoFormulario(null)} data-testid="button-cancel-call">Cancelar</button><button className="pae-primary-button" type="submit" disabled={salvarBloqueado || !tipoRisco.trim() || !descricaoChamado.trim() || agentesSelecionados.length === 0} data-testid="button-submit-call">{salvando || enviando ? 'Registrando…' : 'Registrar chamado'}</button></div>
+                  <div className="pae-form-meta">EVENTO <strong>{eventoAtivo?.nome}</strong><span>A equipe será designada após a triagem.</span></div>
+                  <div className="pae-form-actions"><button className="pae-secondary-button" type="button" onClick={() => setModoFormulario(null)} data-testid="button-cancel-call">Cancelar</button><button className="pae-primary-button" type="submit" disabled={salvarBloqueado || !tipoRisco.trim() || !descricaoChamado.trim()} data-testid="button-submit-call">{salvando || enviando ? 'Registrando…' : 'Registrar chamado'}</button></div>
                 </form>
               </section>
             ) : chamadoAtivo ? (
@@ -619,7 +708,7 @@ export default function PAECommandPanel({
                     <div className="pae-detail-kicker">CHAMADO / {chamadoAtivo.id.slice(0, 8).toUpperCase()}</div>
                     <h2>{chamadoAtivo.tipoRisco}</h2>
                   </div>
-                  <span className={`pae-status-pill status-${chamadoAtivo.status}`}>{statusLabel[chamadoAtivo.status]}</span>
+                  <span className={`pae-status-pill status-${chamadoAtivo.status}`}>{situacaoChamado(chamadoAtivo)}</span>
                 </div>
                 <div className="pae-call-address">
                   <span className="pae-pin" aria-hidden="true" />
@@ -648,7 +737,7 @@ export default function PAECommandPanel({
                   {chamadoAtivo.justificativaPrioridade && <p><b>Justificativa da triagem:</b> {chamadoAtivo.justificativaPrioridade}</p>}
                   <p>{chamadoAtivo.descricao}</p>
                 </div>
-                <div className="pae-agents-block"><span className="pae-block-label">EQUIPE ACIONADA <b>{chamadoAtivo.agentesEnvolvidos.length}</b></span><div className="pae-agent-chips">{chamadoAtivo.agentesEnvolvidos.map((agente, index) => <span className={agente === agenteAtual ? 'is-current' : ''} key={`${agente}-${index}`} data-testid={`text-agent-${chamadoAtivo.id}-${index}`}><i>{agente.trim().charAt(0).toLocaleUpperCase()}</i>{agente}</span>)}</div></div>
+                <div className="pae-agents-block"><span className="pae-block-label">EQUIPE DESIGNADA <b>{chamadoAtivo.agentesEnvolvidos.length}</b></span>{chamadoAtivo.agentesEnvolvidos.length > 0 ? <div className="pae-agent-chips">{chamadoAtivo.agentesEnvolvidos.map((agente, index) => <span className={agente === agenteAtual ? 'is-current' : ''} key={`${agente}-${index}`} data-testid={`text-agent-${chamadoAtivo.id}-${index}`}><i>{agente.trim().charAt(0).toLocaleUpperCase()}</i>{agente}</span>)}</div> : <p className="pae-history-empty">Aguardando triagem e designação.</p>}</div>
                 {chamadoAtivo.atendimento && (
                   <div className="pae-completed-record" data-testid="record-completed-call">
                     <div className="pae-record-heading"><span className="pae-block-label">REGISTRO DE CAMPO</span><strong>Concluído por {chamadoAtivo.atendimento.agente}</strong><small>{dataHora(chamadoAtivo.atendimento.concluidoEm)}</small></div>
@@ -678,10 +767,111 @@ export default function PAECommandPanel({
                     <div className="pae-form-actions"><button className="pae-primary-button" type="submit" disabled={salvarBloqueado || !justificativaTriagem.trim()} data-testid="button-submit-triage">{enviando ? 'Salvando…' : 'Registrar triagem'}</button></div>
                   </form>
                 )}
+                {podeDesignar && (
+                  <form className="pae-assignment-form" onSubmit={designarEquipe} data-testid="form-pae-assignment">
+                    <div className="pae-completion-title">
+                      <div><span className="pae-detail-kicker">DESPACHO</span><h3>{chamadoAtivo.atribuicao ? 'Designar ou substituir equipe' : 'Designar equipe'}</h3></div>
+                    </div>
+                    <p>O responsável pelo evento designa a equipe. Um dos agentes selecionados precisa aceitar a missão no PAE.</p>
+                    <div className="pae-agent-options">
+                      {AGENTES.map(agente => (
+                        <label className={`pae-agent-option ${agentesDesignacao.includes(agente) ? 'is-selected' : ''}`} key={agente}>
+                          <input
+                            type="checkbox"
+                            checked={agentesDesignacao.includes(agente)}
+                            onChange={event => setAgentesDesignacao(atuais => atualizarSelecaoAgente(atuais, agente, event.target.checked))}
+                            aria-label={`Designar ${agente}`}
+                            data-testid={`checkbox-dispatch-agent-${agente.toLowerCase()}`}
+                          />
+                          <span className="pae-agent-check" aria-hidden="true" />
+                          <span>{agente}{agente === agenteAtual ? <small>Você</small> : null}</span>
+                        </label>
+                      ))}
+                    </div>
+                    <div className="pae-form-actions">
+                      <button className="pae-primary-button" type="submit" disabled={salvarBloqueado || agentesDesignacao.length === 0} data-testid="button-dispatch-assignment">
+                        {enviando ? 'Enviando…' : chamadoAtivo.atribuicao ? 'Salvar nova equipe' : 'Designar equipe'}
+                      </button>
+                    </div>
+                  </form>
+                )}
+                {podeResponderAtribuicao && chamadoAtivo.atribuicao && (
+                  <section className="pae-assignment-response" data-testid="panel-assignment-response">
+                    <div>
+                      <span className="pae-detail-kicker">MISSÃO RECEBIDA</span>
+                      <h3>Aceitar ou recusar</h3>
+                      <p>A designação só fica confirmada depois da resposta de um agente da equipe.</p>
+                    </div>
+                    <label>Motivo da recusa <small className="pae-label-hint">Obrigatório para recusar</small>
+                      <textarea rows={2} value={motivoRecusa} onChange={event => setMotivoRecusa(event.target.value)} placeholder="Explique por que a equipe não pode assumir esta missão." data-testid="input-assignment-refusal-reason" />
+                    </label>
+                    <div className="pae-form-actions">
+                      <button className="pae-secondary-button" type="button" onClick={() => void responderDesignacao(false)} disabled={salvarBloqueado || !motivoRecusa.trim()} data-testid="button-refuse-assignment">{enviando ? 'Salvando…' : 'Recusar missão'}</button>
+                      <button className="pae-primary-button" type="button" onClick={() => void responderDesignacao(true)} disabled={salvarBloqueado} data-testid="button-accept-assignment">{enviando ? 'Salvando…' : 'Aceitar missão'}</button>
+                    </div>
+                  </section>
+                )}
+                {chamadoAtivo.atribuicao?.status === 'aceita' && (
+                  <div className="pae-assignment-status" role="status" data-testid="status-assignment-accepted">
+                    <strong>Missão aceita por {chamadoAtivo.atribuicao.aceitoPor || 'equipe designada'}</strong>
+                    <span>{chamadoAtivo.atribuicao.reforcoStatus === 'atendido'
+                      ? `Reforço confirmado: ${chamadoAtivo.atribuicao.reforcoAgentes.join(', ')}.`
+                      : 'A equipe pode solicitar reforço se precisar de apoio.'}</span>
+                  </div>
+                )}
+                {chamadoAtivo.atribuicao?.status === 'aceita'
+                  && chamadoAtivo.atribuicao.reforcoStatus === 'solicitado'
+                  && podeDesignar && (
+                    <section className="pae-reinforcement-panel" data-testid="panel-pae-reinforcement-request">
+                      <div>
+                        <span className="pae-detail-kicker">PEDIDO DE APOIO</span>
+                        <h3>Reforço solicitado</h3>
+                        <p>{chamadoAtivo.atribuicao.reforcoMotivo}</p>
+                        <small>Solicitado por {chamadoAtivo.atribuicao.reforcoSolicitadoPor || 'equipe'}</small>
+                      </div>
+                      <div className="pae-agent-options">
+                        {AGENTES.filter(agente => !chamadoAtivo.atribuicao?.agentesDesignados.includes(agente)).map(agente => (
+                          <label className={`pae-agent-option ${agentesReforco.includes(agente) ? 'is-selected' : ''}`} key={agente}>
+                            <input
+                              type="checkbox"
+                              checked={agentesReforco.includes(agente)}
+                              onChange={event => setAgentesReforco(atuais => atualizarSelecaoAgente(atuais, agente, event.target.checked))}
+                              aria-label={`Adicionar ${agente} ao reforço`}
+                              data-testid={`checkbox-reinforcement-agent-${agente.toLowerCase()}`}
+                            />
+                            <span className="pae-agent-check" aria-hidden="true" />
+                            <span>{agente}</span>
+                          </label>
+                        ))}
+                      </div>
+                      <button className="pae-primary-button" type="button" onClick={() => void atenderPedidoReforco()} disabled={salvarBloqueado || agentesReforco.length === 0} data-testid="button-approve-reinforcement">
+                        {enviando ? 'Salvando…' : 'Designar reforço'}
+                      </button>
+                    </section>
+                  )}
+                {podeAtender
+                  && chamadoAtivo.atribuicao?.status === 'aceita'
+                  && chamadoAtivo.atribuicao.reforcoStatus !== 'solicitado'
+                  && (
+                    <form className="pae-reinforcement-form" onSubmit={solicitarReforco} data-testid="form-pae-request-reinforcement">
+                      <label>Solicitar reforço <small className="pae-label-hint">Informe o apoio necessário à coordenação.</small>
+                        <textarea rows={2} value={motivoReforco} onChange={event => setMotivoReforco(event.target.value)} placeholder="Ex.: apoio de mais agentes, ferramenta ou órgão parceiro." data-testid="input-reinforcement-reason" />
+                      </label>
+                      <button className="pae-secondary-button" type="submit" disabled={salvarBloqueado || !motivoReforco.trim()} data-testid="button-request-reinforcement">Solicitar apoio</button>
+                    </form>
+                  )}
+                {chamadoAtivo.atribuicao?.reforcoStatus === 'solicitado'
+                  && !podeDesignar
+                  && podeAtender && (
+                    <div className="pae-assignment-status" role="status" data-testid="status-reinforcement-pending">
+                      <strong>Pedido de reforço enviado</strong>
+                      <span>A coordenação do evento ainda precisa responder.</span>
+                    </div>
+                  )}
                 {chamadoAtivo.status === 'triado' && (
                   podeAtender
                     ? <div className="pae-start-attendance"><div><strong>Triagem concluída</strong><span>Confirme o início da ação em campo para a equipe acionada.</span></div><button className="pae-secondary-button" type="button" onClick={() => void iniciarAtendimento()} disabled={salvarBloqueado} data-testid="button-start-call">{enviando ? 'Iniciando…' : 'Iniciar atendimento'}</button></div>
-                    : <div className="pae-permission-note" data-testid="status-agent-not-selected"><strong>Atendimento reservado à equipe acionada</strong><p>Seu nome não está entre os agentes selecionados para este chamado.</p></div>
+                    : !podeResponderAtribuicao && <div className="pae-permission-note" data-testid="status-agent-not-selected"><strong>Atendimento reservado à equipe que aceitar a missão</strong><p>{chamadoAtivo.atribuicao?.status === 'designada' ? 'Aguardando resposta de um agente da equipe designada.' : 'A coordenação ainda precisa designar uma equipe para este chamado.'}</p></div>
                 )}
                 {chamadoAtivo.status === 'em_atendimento' && (
                   podeAtender ? (
@@ -722,6 +912,8 @@ export default function PAECommandPanel({
                         detalhes.prioridade ? `Prioridade ${String(detalhes.prioridade)}` : '',
                         detalhes.motivo ? String(detalhes.motivo) : '',
                         detalhes.justificativa ? String(detalhes.justificativa) : '',
+                        Array.isArray(detalhes.agentes) ? `Agentes: ${(detalhes.agentes as unknown[]).join(', ')}` : '',
+                        Array.isArray(detalhes.agentes_adicionados) ? `Reforço: ${(detalhes.agentes_adicionados as unknown[]).join(', ')}` : '',
                       ].filter(Boolean).join(' · ')
                       return <li key={item.id}><div><strong>{item.acao.replaceAll('_', ' ')}</strong><small>{dataHora(item.criadoEm)} · {item.realizadoPor}</small>{resumo && <p>{resumo}</p>}</div></li>
                     })}</ol>}

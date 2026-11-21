@@ -7,6 +7,14 @@ export type PaeStatus =
   | 'suspenso'
   | 'cancelado'
 export type PaePrioridade = 'baixa' | 'media' | 'alta' | 'critica'
+export type PaeAtribuicaoStatus =
+  | 'designada'
+  | 'aceita'
+  | 'recusada'
+  | 'substituida'
+  | 'cancelada'
+  | 'concluida'
+export type PaeReforcoStatus = 'nenhum' | 'solicitado' | 'atendido'
 
 export interface PaeUsuarioAutorizado {
   userId: string
@@ -64,6 +72,27 @@ export interface PaeAtendimento {
   concluidoEm: string
 }
 
+export interface PaeAtribuicao {
+  id: string
+  chamadoId: string
+  agentesDesignados: string[]
+  designadoPor: string
+  status: PaeAtribuicaoStatus
+  aceitoPor: string | null
+  respondidoPor: string | null
+  respondidoEm: string | null
+  motivoRecusa: string
+  reforcoStatus: PaeReforcoStatus
+  reforcoSolicitadoPor: string | null
+  reforcoMotivo: string
+  reforcoSolicitadoEm: string | null
+  reforcoAgentes: string[]
+  reforcoAtendidoPor: string | null
+  reforcoAtendidoEm: string | null
+  criadoEm: string
+  atualizadoEm: string
+}
+
 export interface PaeChamado {
   id: string
   eventoId: string
@@ -90,6 +119,7 @@ export interface PaeChamado {
   criadoEm: string
   atualizadoEm: string
   atendimento: PaeAtendimento | null
+  atribuicao?: PaeAtribuicao | null
 }
 
 export interface NovoEventoPaeInput {

@@ -7,6 +7,8 @@ import type {
   PaeHistorico,
   PaeAtendimento,
   PaeChamado,
+  PaeAtribuicao,
+  PaeAtribuicaoStatus,
   PaeEvento,
   PaeFoto,
   PaeMaterialGasto,
@@ -156,6 +158,48 @@ function normalizarHistorico(row: Linha): PaeHistorico {
   }
 }
 
+function normalizarAtribuicao(row: Linha): PaeAtribuicao {
+  const statusRaw = texto(row.status)
+  const status = (['designada', 'aceita', 'recusada', 'substituida', 'cancelada', 'concluida'].includes(statusRaw)
+    ? statusRaw
+    : 'designada') as PaeAtribuicaoStatus
+  const reforcoRaw = texto(row.reforco_status)
+  return {
+    id: texto(row.id),
+    chamadoId: texto(row.chamado_id ?? row.chamadoId),
+    agentesDesignados: lista<unknown>(row.agentes_designados ?? row.agentesDesignados).map(String),
+    designadoPor: texto(row.designado_por ?? row.designadoPor),
+    status,
+    aceitoPor: row.aceito_por == null && row.aceitoPor == null
+      ? null
+      : texto(row.aceito_por ?? row.aceitoPor),
+    respondidoPor: row.respondido_por == null && row.respondidoPor == null
+      ? null
+      : texto(row.respondido_por ?? row.respondidoPor),
+    respondidoEm: row.respondido_em == null && row.respondidoEm == null
+      ? null
+      : texto(row.respondido_em ?? row.respondidoEm),
+    motivoRecusa: texto(row.motivo_recusa ?? row.motivoRecusa),
+    reforcoStatus: (['solicitado', 'atendido'].includes(reforcoRaw) ? reforcoRaw : 'nenhum'),
+    reforcoSolicitadoPor: row.reforco_solicitado_por == null && row.reforcoSolicitadoPor == null
+      ? null
+      : texto(row.reforco_solicitado_por ?? row.reforcoSolicitadoPor),
+    reforcoMotivo: texto(row.reforco_motivo ?? row.reforcoMotivo),
+    reforcoSolicitadoEm: row.reforco_solicitado_em == null && row.reforcoSolicitadoEm == null
+      ? null
+      : texto(row.reforco_solicitado_em ?? row.reforcoSolicitadoEm),
+    reforcoAgentes: lista<unknown>(row.reforco_agentes ?? row.reforcoAgentes).map(String),
+    reforcoAtendidoPor: row.reforco_atendido_por == null && row.reforcoAtendidoPor == null
+      ? null
+      : texto(row.reforco_atendido_por ?? row.reforcoAtendidoPor),
+    reforcoAtendidoEm: row.reforco_atendido_em == null && row.reforcoAtendidoEm == null
+      ? null
+      : texto(row.reforco_atendido_em ?? row.reforcoAtendidoEm),
+    criadoEm: texto(row.criado_em ?? row.criadoEm),
+    atualizadoEm: texto(row.atualizado_em ?? row.atualizadoEm ?? row.criado_em),
+  }
+}
+
 function normalizarFoto(row: Linha): PaeFoto {
   return {
     id: texto(row.id),
@@ -229,6 +273,9 @@ function normalizarChamado(row: Linha): PaeChamado {
     motivoSuspensaoCancelamento: texto(row.motivo_suspensao_cancelamento),
     status: status as PaeStatus,
     agentesEnvolvidos: lista<unknown>(row.agentes_envolvidos ?? row.agentesEnvolvidos).map(String),
+    atribuicao: row.atribuicao && typeof row.atribuicao === 'object'
+      ? normalizarAtribuicao(row.atribuicao as Linha)
+      : null,
     criadoEm: texto(row.criado_em ?? row.criadoEm),
     atualizadoEm: texto(row.atualizado_em ?? row.atualizadoEm ?? row.criado_em),
     atendimento: normalizarAtendimento(atendimentoRow, lista(row.atendimento_fotos)),
@@ -255,6 +302,23 @@ function emitirAtualizacao(_chamadoId?: string, _eventoId?: string) {
   wsSend({
     tipo: 'pae_atualizado',
     id: crypto.randomUUID(),
+  })
+}
+
+function emitirAlertaPae(
+  tipo: 'pae_nova_designacao' | 'pae_designacao_respondida' | 'pae_reforco_solicitado' | 'pae_reforco_atendido',
+  destinatarios: string[],
+  chamado: PaeChamado,
+  detalhes: Record<string, unknown> = {},
+) {
+  wsSend({
+    tipo,
+    id: crypto.randomUUID(),
+    chamadoId: chamado.id,
+    agentesEnvolvidos: destinatarios,
+    tipoRisco: chamado.tipoRisco,
+    endereco: chamado.endereco,
+    ...detalhes,
   })
 }
 
@@ -337,6 +401,19 @@ export async function listarPae(): Promise<{ eventos: PaeEvento[]; chamados: Pae
   })
   const atendimentoPorChamado = new Map<string, Linha>()
   atendimentosRaw.forEach(row => atendimentoPorChamado.set(texto(row.chamado_id), row))
+  const atribuicoesResult = await supabase
+    .from('pae_atribuicoes')
+    .select('*')
+    .in('chamado_id', idsChamados)
+    .order('criado_em', { ascending: false })
+  if (atribuicoesResult.error) throw new Error(atribuicoesResult.error.message)
+  const atribuicaoPorChamado = new Map<string, PaeAtribuicao>()
+  ;((atribuicoesResult.data || []) as Linha[]).forEach(row => {
+    const chamadoId = texto(row.chamado_id)
+    if (chamadoId && !atribuicaoPorChamado.has(chamadoId)) {
+      atribuicaoPorChamado.set(chamadoId, normalizarAtribuicao(row))
+    }
+  })
 
   return {
     eventos: (eventosResult.data || []).map(normalizarEvento),
@@ -344,6 +421,7 @@ export async function listarPae(): Promise<{ eventos: PaeEvento[]; chamados: Pae
       const atendimento = atendimentoPorChamado.get(texto(row.id))
       return {
         ...normalizarChamado(row),
+        atribuicao: atribuicaoPorChamado.get(texto(row.id)) || null,
         atendimento: atendimento
           ? normalizarAtendimento({
             ...atendimento,
@@ -485,6 +563,79 @@ export async function triarChamadoPae(chamadoId: string, input: TriarChamadoPaeI
   const chamado = normalizarChamado(row)
   emitirAtualizacao(chamado.id, chamado.eventoId)
   return chamado
+}
+
+export async function designarChamadoPae(
+  chamado: PaeChamado,
+  agentes: string[],
+): Promise<PaeAtribuicao> {
+  const row = await rpc<Linha>('pae_designar_chamado', {
+    p_chamado_id: chamado.id,
+    p_agentes: agentes,
+  })
+  const atribuicao = normalizarAtribuicao(row)
+  emitirAtualizacao(chamado.id, chamado.eventoId)
+  emitirAlertaPae('pae_nova_designacao', atribuicao.agentesDesignados, chamado, {
+    atribuicaoId: atribuicao.id,
+  })
+  return atribuicao
+}
+
+export async function responderAtribuicaoPae(
+  chamado: PaeChamado,
+  atribuicao: PaeAtribuicao,
+  aceitar: boolean,
+  motivo: string,
+): Promise<PaeAtribuicao> {
+  const row = await rpc<Linha>('pae_responder_atribuicao', {
+    p_atribuicao_id: atribuicao.id,
+    p_aceitar: aceitar,
+    p_motivo: motivo,
+  })
+  const atualizada = normalizarAtribuicao(row)
+  emitirAtualizacao(chamado.id, chamado.eventoId)
+  emitirAlertaPae(
+    'pae_designacao_respondida',
+    [atribuicao.designadoPor],
+    chamado,
+    { aceito: aceitar, agente: atualizada.respondidoPor || '' },
+  )
+  return atualizada
+}
+
+export async function solicitarReforcoPae(
+  chamado: PaeChamado,
+  atribuicao: PaeAtribuicao,
+  motivo: string,
+): Promise<PaeAtribuicao> {
+  const row = await rpc<Linha>('pae_solicitar_reforco', {
+    p_atribuicao_id: atribuicao.id,
+    p_motivo: motivo,
+  })
+  const atualizada = normalizarAtribuicao(row)
+  emitirAtualizacao(chamado.id, chamado.eventoId)
+  emitirAlertaPae('pae_reforco_solicitado', [atribuicao.designadoPor], chamado, {
+    motivo,
+    agente: atualizada.reforcoSolicitadoPor || '',
+  })
+  return atualizada
+}
+
+export async function atenderReforcoPae(
+  chamado: PaeChamado,
+  atribuicao: PaeAtribuicao,
+  agentes: string[],
+): Promise<PaeAtribuicao> {
+  const row = await rpc<Linha>('pae_atender_reforco', {
+    p_atribuicao_id: atribuicao.id,
+    p_agentes: agentes,
+  })
+  const atualizada = normalizarAtribuicao(row)
+  emitirAtualizacao(chamado.id, chamado.eventoId)
+  emitirAlertaPae('pae_reforco_atendido', atualizada.agentesDesignados, chamado, {
+    agentesAdicionados: atualizada.reforcoAgentes,
+  })
+  return atualizada
 }
 
 export async function atualizarLocalizacaoChamadoPae(

@@ -31,7 +31,9 @@ const statusLabel: Record<PaeChamado['status'], string> = {
 
 function criarIcone(chamado: PaeChamado) {
   const cor = chamado.status === 'novo' ? '#df514c'
-    : chamado.status === 'triado' ? '#e68a3c'
+    : chamado.atribuicao?.status === 'designada' || chamado.atribuicao?.status === 'aceita'
+      ? '#e68a3c'
+      : chamado.status === 'triado' ? '#e68a3c'
       : chamado.status === 'em_atendimento' || chamado.status === 'concluido_em_campo' ? '#318fca'
         : chamado.status === 'validado' ? '#4da98b' : '#8696a4'
   const html = `<span style="--marker-color:${cor}" class="pae-map-marker pae-map-marker--${chamado.prioridade}" aria-hidden="true"><i></i></span>`
@@ -80,7 +82,14 @@ export default function PAECallMarkers({
               <div className="pae-popup-topline"><span>{chamado.tipoRisco}</span><b className={`priority-${chamado.prioridade}`}>{prioridadeLabel[chamado.prioridade]}</b></div>
               <strong className="pae-popup-address">{chamado.endereco}</strong>
               <p>{chamado.descricao}</p>
-              <div className="pae-popup-meta"><span>{statusLabel[chamado.status]}</span><span>{chamado.agentesEnvolvidos.length} agente(s)</span></div>
+            <div className="pae-popup-meta">
+              <span>{chamado.atribuicao?.status === 'designada'
+                ? 'Aguardando aceite'
+                : chamado.atribuicao?.status === 'aceita'
+                  ? 'Equipe confirmou'
+                  : statusLabel[chamado.status]}</span>
+              <span>{chamado.agentesEnvolvidos.length} agente(s)</span>
+            </div>
               {chamado.atendimento?.fotos[0] && <img className="pae-popup-photo" src={chamado.atendimento.fotos[0].dataUrl} alt={chamado.atendimento.fotos[0].legenda || 'Foto do atendimento'} />}
               {salvandoLocalizacaoId === chamado.id && <small role="status">Salvando novo ponto…</small>}
               <button type="button" onClick={() => onSelecionarChamado(chamado)} data-testid={`button-open-map-call-${chamado.id}`}>Abrir chamado <span aria-hidden="true">→</span></button>

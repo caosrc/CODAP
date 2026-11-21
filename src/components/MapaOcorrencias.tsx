@@ -51,15 +51,19 @@ import { useProdutoRedemet, type TipoRadarRedemet } from './redemetApi'
 import {
   autenticarPae,
   atualizarLocalizacaoChamadoPae,
+  atenderReforcoPae,
   concluirChamadoPae,
   criarChamadoPae,
   criarEventoPae,
+  designarChamadoPae,
   iniciarChamadoPae,
   listarHistoricoPae,
   listarPae,
   obterAcessoPaeAtual,
   sairPae,
   suspenderCancelarChamadoPae,
+  solicitarReforcoPae,
+  responderAtribuicaoPae,
   triarChamadoPae,
   validarChamadoPae,
 } from '../paeApi'
@@ -68,6 +72,7 @@ import type {
   NovoChamadoPaeInput,
   NovoEventoPaeInput,
   PaeChamado,
+  PaeAtribuicao,
   PaeEvento,
   PaeHistorico,
   PaeUsuarioAutorizado,
@@ -77,6 +82,7 @@ import { supabase, supabaseDisponivel } from '../supabaseClient'
 import PAEAccessDialog from './pae/PAEAccessDialog'
 import PAECallMarkers from './pae/PAECallMarkers'
 import PAECommandPanel from './pae/PAECommandPanel'
+import PAEAlertOverlay from './pae/PAEAlertOverlay'
 
 
 interface DadosRadarChuva {
@@ -1796,6 +1802,11 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
     if (!paeUsuario) setPaeAcessoAberto(true)
   }, [paeUsuario])
 
+  useEffect(() => {
+    window.addEventListener('dc:abrir-pae', abrirPae)
+    return () => window.removeEventListener('dc:abrir-pae', abrirPae)
+  }, [abrirPae])
+
   const fecharAcessoPae = useCallback(() => {
     setPaeAcessoAberto(false)
     if (!paeUsuario) setPaePainelAberto(false)
@@ -1836,6 +1847,39 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
   const onTriarChamadoPae = useCallback((chamadoId: string, input: TriarChamadoPaeInput) => executarPae(async () => {
     if (!paeUsuario) throw new Error('Entre com uma conta autorizada para registrar a triagem.')
     return triarChamadoPae(chamadoId, { ...input, agente: paeUsuario.agente })
+  }), [executarPae, paeUsuario])
+
+  const onDesignarChamadoPae = useCallback((chamado: PaeChamado, agentes: string[]) => executarPae(async () => {
+    if (!paeUsuario) throw new Error('Entre com uma conta autorizada para designar a equipe.')
+    return designarChamadoPae(chamado, agentes)
+  }), [executarPae, paeUsuario])
+
+  const onResponderAtribuicaoPae = useCallback((
+    chamado: PaeChamado,
+    atribuicao: PaeAtribuicao,
+    aceitar: boolean,
+    motivo: string,
+  ) => executarPae(async () => {
+    if (!paeUsuario) throw new Error('Entre com uma conta autorizada para responder à missão.')
+    return responderAtribuicaoPae(chamado, atribuicao, aceitar, motivo)
+  }), [executarPae, paeUsuario])
+
+  const onSolicitarReforcoPae = useCallback((
+    chamado: PaeChamado,
+    atribuicao: PaeAtribuicao,
+    motivo: string,
+  ) => executarPae(async () => {
+    if (!paeUsuario) throw new Error('Entre com uma conta autorizada para solicitar reforço.')
+    return solicitarReforcoPae(chamado, atribuicao, motivo)
+  }), [executarPae, paeUsuario])
+
+  const onAtenderReforcoPae = useCallback((
+    chamado: PaeChamado,
+    atribuicao: PaeAtribuicao,
+    agentes: string[],
+  ) => executarPae(async () => {
+    if (!paeUsuario) throw new Error('Entre com uma conta autorizada para designar o reforço.')
+    return atenderReforcoPae(chamado, atribuicao, agentes)
   }), [executarPae, paeUsuario])
 
   const onIniciarChamadoPae = useCallback((chamadoId: string) => executarPae(async () => {
@@ -1880,6 +1924,7 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
   const onSelecionarChamadoPae = useCallback((chamado: PaeChamado | null) => {
     setPaeChamadoSelecionadoId(chamado?.id || null)
     if (chamado) {
+      setPaePainelAberto(true)
       mapaLeafletRef.current?.setView(
         [chamado.latitude, chamado.longitude],
         Math.max(16, mapaLeafletRef.current.getZoom()),
@@ -2279,6 +2324,15 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
             </Popup>
           </Marker>
         ))}
+        {paeUsuario && (
+          <PAECallMarkers
+            chamados={paeChamadosVisiveis}
+            onSelecionarChamado={onSelecionarChamadoPae}
+            ajusteChamadoId={paeAjusteChamadoId}
+            salvandoLocalizacaoId={paeLocalizacaoSalvandoId}
+            onAtualizarLocalizacao={onAtualizarLocalizacaoPae}
+          />
+        )}
       </MapContainer>
 
       {/* Top stats bar */}
@@ -2912,6 +2966,28 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
         )}
       </div>
 
+      <button
+        className="mapa-pae-btn"
+        type="button"
+        onClick={abrirPae}
+        aria-haspopup="dialog"
+        aria-expanded={paePainelAberto || paeAcessoAberto}
+        title="Abrir painel do Plano de Ação do Evento"
+        data-testid="button-open-pae"
+      >
+        <span aria-hidden="true">✚</span>
+        <span>PAE</span>
+        {paeUsuario && paeChamados.filter(chamado => (
+          chamado.status === 'novo' || chamado.atribuicao?.status === 'designada'
+        )).length > 0 && (
+          <b aria-label="Chamados aguardando triagem ou aceite">
+            {paeChamados.filter(chamado => (
+              chamado.status === 'novo' || chamado.atribuicao?.status === 'designada'
+            )).length}
+          </b>
+        )}
+      </button>
+
       {/* Botão GPS */}
       <button
         className={`mapa-gps-btn mapa-gps-btn--${statusGps}`}
@@ -3216,6 +3292,48 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
             )}
           </div>
         </div>
+      )}
+
+      <PAEAccessDialog
+        aberto={paeAcessoAberto}
+        onAutorizado={autorizarPae}
+        onFechar={fecharAcessoPae}
+      />
+      {paeUsuario && (
+        <>
+          <PAEAlertOverlay agente={paeUsuario.agente} />
+          <PAECommandPanel
+            aberto={paePainelAberto}
+            eventos={paeEventos}
+            chamados={paeChamados}
+            historico={paeHistorico}
+            historicoCarregando={paeHistoricoCarregando}
+            eventoSelecionadoId={paeEventoSelecionadoId}
+            chamadoSelecionadoId={paeChamadoSelecionadoId}
+            ajusteChamadoId={paeAjusteChamadoId}
+            agenteAtual={paeUsuario.agente}
+            carregando={paeCarregando}
+            salvando={paeSalvando}
+            erro={paeErro}
+            onFechar={() => setPaePainelAberto(false)}
+            onSairPae={sairDoPae}
+            onCriarEvento={onCriarEventoPae}
+            onCriarChamado={onCriarChamadoPae}
+            onTriarChamado={onTriarChamadoPae}
+            onDesignarChamado={onDesignarChamadoPae}
+            onResponderAtribuicao={onResponderAtribuicaoPae}
+            onSolicitarReforco={onSolicitarReforcoPae}
+            onAtenderReforco={onAtenderReforcoPae}
+            onIniciarChamado={onIniciarChamadoPae}
+            onConcluirChamado={onConcluirChamadoPae}
+            onValidarChamado={onValidarChamadoPae}
+            onSuspenderCancelarChamado={onSuspenderCancelarChamadoPae}
+            onAjustarLocalizacao={setPaeAjusteChamadoId}
+            onGeocodificar={onGeocodificarPae}
+            onSelecionarEvento={onSelecionarEventoPae}
+            onSelecionarChamado={onSelecionarChamadoPae}
+          />
+        </>
       )}
 
     </div>

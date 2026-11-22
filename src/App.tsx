@@ -4,6 +4,8 @@ import './App.css'
 import Login, { estaLogado, agenteEscolhido, orgaoEscolhido, getAgenteLogado, getOrgaoSelecionado } from './components/Login'
 import type { Ocorrencia, NivelRisco } from './types'
 import { NATUREZA_ICONE, normalizarNomeAgente } from './types'
+import type { PaeUsuarioAutorizado } from './paeTypes'
+import { sairPae } from './paeApi'
 import { listarOcorrencias, enviarOcorrenciaServidor, listarRegistrosCurral, ApiError } from './api'
 import { wsOn, wsAnunciarOnline } from './wsClient'
 import { supabase, supabaseDisponivel } from './supabaseClient'
@@ -281,6 +283,9 @@ function BannerInstalar() {
 
 export default function App() {
   const [logado, setLogado] = useState(estaLogado() && agenteEscolhido() && orgaoEscolhido())
+  const [paeSomenteUsuario, setPaeSomenteUsuario] = useState<PaeUsuarioAutorizado | null>(null)
+  const [paeSomenteSaindo, setPaeSomenteSaindo] = useState(false)
+  const [paeSomenteErro, setPaeSomenteErro] = useState('')
   const [orgao, setOrgao] = useState(getOrgaoSelecionado)
   const [aba, setAba] = useState<Aba>('lista')
   const [paeAbrirSignal, setPaeAbrirSignal] = useState(0)
@@ -1002,6 +1007,56 @@ export default function App() {
   const orgaoAtual = orgao ?? 'defesa-civil'
   const nomeOrgaoAtual = NOMES_ORGAOS[orgaoAtual]
 
+  async function sairDoAcessoPae() {
+    setPaeSomenteSaindo(true)
+    setPaeSomenteErro('')
+    try {
+      await sairPae()
+      setPaeSomenteUsuario(null)
+    } catch (error) {
+      setPaeSomenteErro(error instanceof Error ? error.message : 'Não foi possível sair do PAE.')
+    } finally {
+      setPaeSomenteSaindo(false)
+    }
+  }
+
+  if (paeSomenteUsuario) {
+    return (
+      <div className="app app-pae-somente">
+        <header className="header">
+          <div className="header-logo">
+            <img className="header-logo-imagem" src="/defesa-civil-logo.png" alt="Defesa Civil" />
+            <div className="header-textos">
+              <span className="header-nome">PAE</span>
+              <span className="header-cidade">{paeSomenteUsuario.agente}</span>
+            </div>
+          </div>
+          <button
+            className="header-pae-btn"
+            type="button"
+            onClick={() => { void sairDoAcessoPae() }}
+            disabled={paeSomenteSaindo}
+          >
+            {paeSomenteSaindo ? 'Saindo...' : 'Sair do PAE'}
+          </button>
+        </header>
+        {paeSomenteErro && <div className="login-erro" role="alert">{paeSomenteErro}</div>}
+        <div className="conteudo" style={{ paddingBottom: 0 }}>
+          <ErrorBoundary>
+            <Suspense fallback={<LazyFallback />}>
+              <MapaOcorrencias
+                ocorrencias={[]}
+                onSelecionar={() => {}}
+                paeUsuarioInicial={paeSomenteUsuario}
+                onSairPae={() => setPaeSomenteUsuario(null)}
+              />
+            </Suspense>
+          </ErrorBoundary>
+        </div>
+      </div>
+    )
+  }
+
   if (!logado) {
     return (
       <Login
@@ -1009,6 +1064,7 @@ export default function App() {
           setOrgao(getOrgaoSelecionado())
           setLogado(true)
         }}
+        onLoginPae={setPaeSomenteUsuario}
         apenasAgente={estaLogado() && (!agenteEscolhido() || !orgaoEscolhido())}
       />
     )

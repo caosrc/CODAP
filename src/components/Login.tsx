@@ -1,7 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
 import { AGENTES, getSenhaAgente, normalizarNomeAgente } from '../types'
-import { autenticarPae } from '../paeApi'
-import type { PaeUsuarioAutorizado } from '../paeTypes'
 
 function useGeolocalizacao() {
   const [pos, setPos] = useState<{ lat: number; lng: number } | null>(null)
@@ -26,8 +24,6 @@ const LOGIN_KEY = 'defesacivil-logado'
 const AGENTE_SESSION_KEY = 'defesacivil-agente-sessao'
 const AGENTE_NOME_KEY = 'defesacivil-device-nome'
 const ORGAO_SESSION_KEY = 'defesacivil-orgao-sessao'
-const USUARIO_CORRETO = 'lafaiete'
-const SENHA_CORRETA = '1234'
 
 export type Orgao = 'defesa-civil' | 'curral' | 'procon'
 
@@ -65,13 +61,12 @@ export function getAgenteLogado(): string {
 
 interface Props {
   onLogin: () => void
-  onLoginPae: (usuario: PaeUsuarioAutorizado) => void
   apenasAgente?: boolean
 }
 
 type Etapa = 'credenciais' | 'orgao' | 'agente' | 'senha'
 
-export default function Login({ onLogin, onLoginPae, apenasAgente = false }: Props) {
+export default function Login({ onLogin, apenasAgente = false }: Props) {
   const [etapa, setEtapa] = useState<Etapa>(
     apenasAgente ? 'agente' : 'credenciais'
   )
@@ -84,8 +79,6 @@ export default function Login({ onLogin, onLoginPae, apenasAgente = false }: Pro
   const [agenteSelecionado, setAgenteSelecionado] = useState('')
   const [senhaAgente, setSenhaAgente] = useState('')
   const [erroSenhaAgente, setErroSenhaAgente] = useState(false)
-  const [erroAcessoPae, setErroAcessoPae] = useState('')
-  const [modoPae, setModoPae] = useState(false)
   const [mostrarSenhaAgente, setMostrarSenhaAgente] = useState(false)
   const senhaAgenteRef = useRef<HTMLInputElement>(null)
 
@@ -95,54 +88,39 @@ export default function Login({ onLogin, onLoginPae, apenasAgente = false }: Pro
     }
     if (etapa === 'senha') {
       setErroSenhaAgente(false)
-      setErroAcessoPae('')
       setSenhaAgente('')
       setTimeout(() => senhaAgenteRef.current?.focus(), 100)
     }
   }, [etapa])
 
-  function entrar(e: React.FormEvent) {
+  async function entrar(e: React.FormEvent) {
     e.preventDefault()
     setErro('')
     setCarregando(true)
-    setTimeout(() => {
-      if (
-        usuario.trim().toLowerCase() === USUARIO_CORRETO &&
-        senha === SENHA_CORRETA
-      ) {
-        localStorage.setItem(LOGIN_KEY, '1')
-        sessionStorage.removeItem(AGENTE_SESSION_KEY)
-        selecionarOrgao('defesa-civil')
-        setEtapa('agente')
-        setCarregando(false)
-      } else {
-        setErro('Usuário ou senha incorretos.')
-        setSenha('')
-        setCarregando(false)
-      }
-    }, 600)
+    try {
+      const response = await fetch('/api/app/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify({ usuario: usuario.trim(), senha }),
+      })
+      const result = await response.json().catch(() => ({}))
+      if (!response.ok) throw new Error(result.error || 'Usuário ou senha incorretos.')
+
+      localStorage.setItem(LOGIN_KEY, '1')
+      sessionStorage.removeItem(AGENTE_SESSION_KEY)
+      selecionarOrgao('defesa-civil')
+      setEtapa('agente')
+    } catch (error) {
+      setErro(error instanceof Error ? error.message : 'Não foi possível entrar.')
+      setSenha('')
+    } finally {
+      setCarregando(false)
+    }
   }
 
-  async function confirmarSenhaAgente(e: React.FormEvent) {
+  function confirmarSenhaAgente(e: React.FormEvent) {
     e.preventDefault()
-    if (modoPae) {
-      setErroSenhaAgente(false)
-      setErroAcessoPae('')
-      setCarregando(true)
-      try {
-        const usuario = await autenticarPae(agenteSelecionado, senhaAgente)
-        onLoginPae(usuario)
-      } catch (error) {
-        setErroSenhaAgente(true)
-        setErroAcessoPae(error instanceof Error ? error.message : 'Não foi possível entrar no PAE.')
-        setSenhaAgente('')
-        setTimeout(() => senhaAgenteRef.current?.focus(), 50)
-      } finally {
-        setCarregando(false)
-      }
-      return
-    }
-
     const senhaEsperada = getSenhaAgente(agenteSelecionado)
     if (senhaAgente === senhaEsperada) {
       selecionarOrgao('defesa-civil')
@@ -158,7 +136,7 @@ export default function Login({ onLogin, onLoginPae, apenasAgente = false }: Pro
 
   function selecionarAgente(nome: string) {
     const senhaNecessaria = getSenhaAgente(nome)
-    if (modoPae || senhaNecessaria) {
+    if (senhaNecessaria) {
       setAgenteSelecionado(nome)
       setEtapa('senha')
     } else {
@@ -189,13 +167,13 @@ export default function Login({ onLogin, onLoginPae, apenasAgente = false }: Pro
               {agenteSelecionado}
             </div>
             <div style={{ fontSize: '0.82rem', color: '#6b7280', marginTop: '0.2rem' }}>
-              {modoPae ? 'Digite somente a senha do agente para acessar o PAE' : 'Digite sua senha para continuar'}
+              Digite sua senha para continuar
             </div>
           </div>
 
           <form className="login-form" onSubmit={confirmarSenhaAgente} autoComplete="off">
             <div className="login-campo">
-              <label className="login-label">{modoPae ? 'Senha do agente' : 'Senha'}</label>
+              <label className="login-label">Senha</label>
               <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
                 <input
                   ref={senhaAgenteRef}
@@ -225,9 +203,7 @@ export default function Login({ onLogin, onLoginPae, apenasAgente = false }: Pro
             </div>
 
             {erroSenhaAgente && (
-              <div className="login-erro">
-                {modoPae ? erroAcessoPae : 'Senha incorreta. Tente novamente.'}
-              </div>
+              <div className="login-erro">Senha incorreta. Tente novamente.</div>
             )}
 
             <button
@@ -235,12 +211,12 @@ export default function Login({ onLogin, onLoginPae, apenasAgente = false }: Pro
               type="submit"
               disabled={carregando || !senhaAgente.trim()}
             >
-              {carregando ? 'Validando...' : modoPae ? 'Entrar no PAE' : 'Entrar'}
+              Entrar
             </button>
 
             <button
               type="button"
-              onClick={() => { setEtapa('agente'); setErroSenhaAgente(false); setErroAcessoPae(''); setSenhaAgente('') }}
+              onClick={() => { setEtapa('agente'); setErroSenhaAgente(false); setSenhaAgente('') }}
               style={{
                 marginTop: '0.5rem', background: 'none', border: 'none',
                 color: '#6b7280', fontSize: '0.85rem', cursor: 'pointer', textDecoration: 'underline',
@@ -264,9 +240,7 @@ export default function Login({ onLogin, onLoginPae, apenasAgente = false }: Pro
           <div className="login-titulo">Defesa Civil</div>
           <div className="login-subtitulo">Sistema operacional de campo</div>
 
-          <div className="login-agente-titulo">
-            {modoPae ? 'Escolha o agente para acessar o PAE' : 'Quem está acessando?'}
-          </div>
+          <div className="login-agente-titulo">Quem está acessando?</div>
           <div className="login-agente-grid">
             {AGENTES.map((nome) => (
               <button
@@ -281,26 +255,6 @@ export default function Login({ onLogin, onLoginPae, apenasAgente = false }: Pro
               </button>
             ))}
           </div>
-          {modoPae ? (
-            <button
-              className="login-pae-link"
-              type="button"
-              onClick={() => {
-                setModoPae(false)
-                setEtapa(apenasAgente ? 'agente' : 'credenciais')
-              }}
-            >
-              Voltar para o acesso do aplicativo
-            </button>
-          ) : (
-            <button
-              className="login-pae-link"
-              type="button"
-              onClick={() => { setModoPae(true); setEtapa('agente') }}
-            >
-              Acessar PAE com senha do agente
-            </button>
-          )}
         </div>
       </div>
     )
@@ -354,13 +308,6 @@ export default function Login({ onLogin, onLoginPae, apenasAgente = false }: Pro
             {carregando ? '⏳ Entrando...' : 'Entrar'}
           </button>
         </form>
-        <button
-          className="login-pae-link"
-          type="button"
-          onClick={() => { setModoPae(true); setEtapa('agente') }}
-        >
-          Acessar PAE com senha do agente
-        </button>
       </div>
     </div>
   )

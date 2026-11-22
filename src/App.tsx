@@ -1,11 +1,9 @@
 import { useState, useEffect, useCallback, useMemo, lazy, Suspense, useRef, Component } from 'react'
 import type { ErrorInfo, ReactNode } from 'react'
 import './App.css'
-import Login, { estaLogado, agenteEscolhido, orgaoEscolhido, getAgenteLogado, getOrgaoSelecionado } from './components/Login'
+import Login, { estaLogado, agenteEscolhido, orgaoEscolhido, getAgenteLogado, getOrgaoSelecionado, fazerLogout } from './components/Login'
 import type { Ocorrencia, NivelRisco } from './types'
 import { NATUREZA_ICONE, normalizarNomeAgente } from './types'
-import type { PaeUsuarioAutorizado } from './paeTypes'
-import { sairPae } from './paeApi'
 import { listarOcorrencias, enviarOcorrenciaServidor, listarRegistrosCurral, ApiError } from './api'
 import { wsOn, wsAnunciarOnline } from './wsClient'
 import { supabase, supabaseDisponivel } from './supabaseClient'
@@ -283,9 +281,9 @@ function BannerInstalar() {
 
 export default function App() {
   const [logado, setLogado] = useState(estaLogado() && agenteEscolhido() && orgaoEscolhido())
-  const [paeSomenteUsuario, setPaeSomenteUsuario] = useState<PaeUsuarioAutorizado | null>(null)
-  const [paeSomenteSaindo, setPaeSomenteSaindo] = useState(false)
-  const [paeSomenteErro, setPaeSomenteErro] = useState('')
+  const [validandoSessaoApp, setValidandoSessaoApp] = useState(
+    estaLogado() && agenteEscolhido() && orgaoEscolhido(),
+  )
   const [orgao, setOrgao] = useState(getOrgaoSelecionado)
   const [aba, setAba] = useState<Aba>('lista')
   const [paeAbrirSignal, setPaeAbrirSignal] = useState(0)
@@ -331,6 +329,28 @@ export default function App() {
   useEffect(() => {
     selecionadaRef.current = selecionada
   }, [selecionada])
+
+  useEffect(() => {
+    if (!validandoSessaoApp) return
+    let ativo = true
+    void fetch('/api/app/session', { credentials: 'same-origin' })
+      .then(response => {
+        if (response.ok || !ativo) return
+        fazerLogout()
+        setLogado(false)
+        setOrgao(null)
+      })
+      .catch(() => {
+        if (!ativo) return
+        fazerLogout()
+        setLogado(false)
+        setOrgao(null)
+      })
+      .finally(() => {
+        if (ativo) setValidandoSessaoApp(false)
+      })
+    return () => { ativo = false }
+  }, [validandoSessaoApp])
 
   useEffect(() => {
     const estadoInicial = window.history.state as { codapAba?: unknown } | null
@@ -1007,56 +1027,9 @@ export default function App() {
   const orgaoAtual = orgao ?? 'defesa-civil'
   const nomeOrgaoAtual = NOMES_ORGAOS[orgaoAtual]
 
-  async function sairDoAcessoPae() {
-    setPaeSomenteSaindo(true)
-    setPaeSomenteErro('')
-    try {
-      await sairPae()
-      setPaeSomenteUsuario(null)
-    } catch (error) {
-      setPaeSomenteErro(error instanceof Error ? error.message : 'Não foi possível sair do PAE.')
-    } finally {
-      setPaeSomenteSaindo(false)
-    }
+  if (validandoSessaoApp) {
+    return <div className="carregando" role="status">Verificando acesso...</div>
   }
-
-  if (paeSomenteUsuario) {
-    return (
-      <div className="app app-pae-somente">
-        <header className="header">
-          <div className="header-logo">
-            <img className="header-logo-imagem" src="/defesa-civil-logo.png" alt="Defesa Civil" />
-            <div className="header-textos">
-              <span className="header-nome">PAE</span>
-              <span className="header-cidade">{paeSomenteUsuario.agente}</span>
-            </div>
-          </div>
-          <button
-            className="header-pae-btn"
-            type="button"
-            onClick={() => { void sairDoAcessoPae() }}
-            disabled={paeSomenteSaindo}
-          >
-            {paeSomenteSaindo ? 'Saindo...' : 'Sair do PAE'}
-          </button>
-        </header>
-        {paeSomenteErro && <div className="login-erro" role="alert">{paeSomenteErro}</div>}
-        <div className="conteudo" style={{ paddingBottom: 0 }}>
-          <ErrorBoundary>
-            <Suspense fallback={<LazyFallback />}>
-              <MapaOcorrencias
-                ocorrencias={[]}
-                onSelecionar={() => {}}
-                paeUsuarioInicial={paeSomenteUsuario}
-                onSairPae={() => setPaeSomenteUsuario(null)}
-              />
-            </Suspense>
-          </ErrorBoundary>
-        </div>
-      </div>
-    )
-  }
-
   if (!logado) {
     return (
       <Login
@@ -1064,7 +1037,6 @@ export default function App() {
           setOrgao(getOrgaoSelecionado())
           setLogado(true)
         }}
-        onLoginPae={setPaeSomenteUsuario}
         apenasAgente={estaLogado() && (!agenteEscolhido() || !orgaoEscolhido())}
       />
     )

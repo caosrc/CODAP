@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
+import WebSocket from 'ws'
 import { registerPaeAuthRoutes } from './paeAuth.js'
 
 const PRIORIDADES_PAE = new Set(['baixa', 'media', 'alta', 'critica'])
@@ -141,6 +142,7 @@ async function exigirAcessoPae(req, res, next) {
   try {
     const autenticado = createClient(supabaseUrl, supabaseAnonKey, {
       auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+      realtime: { transport: WebSocket },
       global: { headers: { Authorization: `Bearer ${token}` } },
     })
     const { data: sessao, error: erroSessao } = await autenticado.auth.getUser(token)

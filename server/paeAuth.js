@@ -1,5 +1,6 @@
 import { createHash, createHmac, timingSafeEqual } from 'node:crypto'
 import { createClient } from '@supabase/supabase-js'
+import WebSocket from 'ws'
 
 const COOKIE_SESSAO_APP = 'dc-app-session'
 const DURACAO_SESSAO_SEGUNDOS = 30 * 24 * 60 * 60
@@ -86,6 +87,7 @@ function obterClientesSupabase() {
   if (!url || !anonKey || !serviceKey) throw new Error('A autenticação interna do PAE não está configurada no servidor.')
   const options = {
     auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+    realtime: { transport: WebSocket },
   }
   return {
     admin: createClient(url, serviceKey, options),

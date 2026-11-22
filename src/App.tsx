@@ -70,8 +70,8 @@ const MateriaisEmprestimos = lazy(() => carregarChunkComRecuperacao(() => import
 const Planejamento = lazy(() => carregarChunkComRecuperacao(() => import('./components/Planejamento')))
 const MonitoramentoCNL = lazy(() => carregarChunkComRecuperacao(() => import('./components/MonitoramentoCNL')))
 
-type Aba = 'lista' | 'mapa' | 'nova' | 'viatura' | 'escala' | 'materiais' | 'planejamento' | 'monitoramento'
-const ABAS_VALIDAS: Aba[] = ['lista', 'mapa', 'nova', 'viatura', 'escala', 'materiais', 'planejamento', 'monitoramento']
+type Aba = 'lista' | 'mapa' | 'pae' | 'nova' | 'viatura' | 'escala' | 'materiais' | 'planejamento' | 'monitoramento'
+const ABAS_VALIDAS: Aba[] = ['lista', 'mapa', 'pae', 'nova', 'viatura', 'escala', 'materiais', 'planejamento', 'monitoramento']
 const NOMES_ORGAOS = {
   'defesa-civil': 'Defesa Civil',
   curral: 'Curral',
@@ -286,7 +286,6 @@ export default function App() {
   )
   const [orgao, setOrgao] = useState(getOrgaoSelecionado)
   const [aba, setAba] = useState<Aba>('lista')
-  const [paeAbrirSignal, setPaeAbrirSignal] = useState(0)
   const abaAtualRef = useRef<Aba>('lista')
   const [materiaisResetSignal, setMateriaisResetSignal] = useState(0)
   const materiaisNoMenuRef = useRef(true)
@@ -1110,10 +1109,15 @@ export default function App() {
               className="header-pae-btn"
               type="button"
               onClick={() => {
-                setPaeAbrirSignal(signal => signal + 1)
-                navegarParaAba('mapa')
+                setSelecionada(null)
+                if (aba === 'pae') {
+                  window.dispatchEvent(new CustomEvent('dc:abrir-pae'))
+                } else {
+                  navegarParaAba('pae')
+                }
               }}
               aria-label="Abrir Plano de Ação do Evento"
+              aria-current={aba === 'pae' ? 'page' : undefined}
               title="Abrir Plano de Ação do Evento"
               data-testid="button-open-pae-header"
             >
@@ -1330,13 +1334,31 @@ export default function App() {
           <ErrorBoundary>
             <Suspense fallback={<LazyFallback />}>
               <MapaOcorrencias
+                key="mapa-operacional"
                 ocorrencias={ocorrenciasMapa}
                 onSelecionar={(o) => setSelecionada(o)}
                 destinoExterno={destinoSos ?? destinoCampo}
                 onDestinoExternoConsumido={() => { setDestinoSos(null); setDestinoCampo(null) }}
                 equipamentosCampo={equipamentosCampoMapa}
                 onVerDetalheCampo={(id) => { setAbrirCampoId(id); navegarParaAba('materiais') }}
-                paeAbrirSignal={paeAbrirSignal}
+                onAbrirPae={() => { setSelecionada(null); navegarParaAba('pae') }}
+              />
+            </Suspense>
+          </ErrorBoundary>
+        )}
+
+        {aba === 'pae' && (
+          <ErrorBoundary>
+            <Suspense fallback={<LazyFallback />}>
+              <MapaOcorrencias
+                key="mapa-pae"
+                ocorrencias={ocorrenciasMapa}
+                onSelecionar={(o) => setSelecionada(o)}
+                destinoExterno={destinoSos ?? destinoCampo}
+                onDestinoExternoConsumido={() => { setDestinoSos(null); setDestinoCampo(null) }}
+                equipamentosCampo={equipamentosCampoMapa}
+                onVerDetalheCampo={(id) => { setAbrirCampoId(id); navegarParaAba('materiais') }}
+                modoPae
               />
             </Suspense>
           </ErrorBoundary>

@@ -821,7 +821,8 @@ interface EquipamentoCampoMapa {
 interface Props {
   ocorrencias: Ocorrencia[]
   onSelecionar: (o: Ocorrencia) => void
-  paeAbrirSignal?: number
+  modoPae?: boolean
+  onAbrirPae?: () => void
   /** Destino vindo de fora (ex: "Traçar rota de resgate" do SOS). Quando definido,
    *  o mapa centraliza no ponto e calcula a rota automaticamente.
    *  Quando soMostrar=true, apenas centraliza no ponto sem traçar rota. */
@@ -901,7 +902,7 @@ function RaiosMapaBounds({
 }
 
 // ── Componente principal ────────────────────────────────────────
-export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExterno, onDestinoExternoConsumido, equipamentosCampo = [], onVerDetalheCampo, paeAbrirSignal = 0 }: Props) {
+export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExterno, onDestinoExternoConsumido, equipamentosCampo = [], onVerDetalheCampo, modoPae = false, onAbrirPae }: Props) {
   const [selecionada, setSelecionada] = useState<Ocorrencia | null>(null)
   const [legendaAberta, setLegendaAberta] = useState(false)
   const [camadaMapa, setCamadaMapa] = useState<CamadaMapa>('padrao')
@@ -1823,26 +1824,40 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
   }, [paeUsuario])
 
   useEffect(() => {
+    if (!modoPae) return
     window.addEventListener('dc:abrir-pae', abrirPae)
     return () => window.removeEventListener('dc:abrir-pae', abrirPae)
-  }, [abrirPae])
+  }, [abrirPae, modoPae])
 
   useEffect(() => {
-    if (paeAbrirSignal > 0) abrirPae()
-  }, [abrirPae, paeAbrirSignal])
+    if (!modoPae) return
+    abrirPae()
+  }, [abrirPae, modoPae])
 
   useEffect(() => {
+    if (!modoPae) {
+      try { window.localStorage.removeItem('defesacivil-pae-abrir') } catch { /* armazenamento pode estar bloqueado */ }
+      return
+    }
     try {
       if (window.localStorage.getItem('defesacivil-pae-abrir') === '1') abrirPae()
     } catch {
       // A navegação e o evento direto continuam funcionando sem armazenamento local.
     }
-  }, [abrirPae])
+  }, [abrirPae, modoPae])
 
   const fecharAcessoPae = useCallback(() => {
     setPaeAcessoAberto(false)
     if (!paeUsuario) setPaePainelAberto(false)
   }, [paeUsuario])
+
+  const solicitarAberturaPae = useCallback(() => {
+    if (modoPae || !onAbrirPae) {
+      abrirPae()
+      return
+    }
+    onAbrirPae()
+  }, [abrirPae, modoPae, onAbrirPae])
 
   const executarPae = useCallback(async <T,>(operacao: () => Promise<T>): Promise<T> => {
     setPaeSalvando(true)
@@ -2990,7 +3005,7 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
       <button
         className="mapa-pae-btn"
         type="button"
-        onClick={abrirPae}
+        onClick={solicitarAberturaPae}
         aria-haspopup="dialog"
         aria-expanded={paePainelAberto || paeAcessoAberto}
         title="Abrir painel do Plano de Ação do Evento"

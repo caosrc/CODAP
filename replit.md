@@ -55,7 +55,7 @@ Required env vars (all set in Replit shared env / secrets):
 
 ## Product
 - Register and manage civil defense incidents with photos and GPS
-- PAE — Plano de Ação do Evento — opens over the existing map after the normal app login; its access uses the selected agent's PIN and a restricted Supabase anonymous session
+- PAE — Plano de Ação do Evento — opens in its own map view; the regular Mapa tab stays independent, and PAE access uses the selected agent's PIN and a restricted Supabase session
 - Apply the PAE migrations in `supabase/migrations/` to the configured Supabase project before testing PAE data flows
 - Register risk areas on the Radar DC meteorological map with a marked point, polygon, risk type, start date, rainfall threshold, and agent-password-gated editing/deletion
 - Real-time team tracking via WebSocket

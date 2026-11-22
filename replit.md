@@ -6,12 +6,14 @@
 - `npm run dev` — starts the Express server and Vite development server
 - `npm run build` — build frontend for production only
 
-Required env vars (all set in Replit shared env / secrets):
+Required environment variables:
 - `DATABASE_URL` — Replit PostgreSQL (auto-provisioned; do not set manually)
 - `VITE_USE_SUPABASE` — `true` para usar o banco Supabase no frontend
 - `VITE_SUPABASE_URL` — URL pública do projeto Supabase
 - `VITE_SUPABASE_ANON_KEY` — chave pública anon do projeto Supabase
 - `SUPABASE_URL` e `SUPABASE_ANON_KEY` — mesmos valores para rotas/serviços server-side
+- `SUPABASE_SERVICE_ROLE_KEY` — Secret exigido pela autenticação interna do PAE; nunca usar em variável `VITE_*`
+- `SESSION_SECRET` — Secret do servidor com pelo menos 32 caracteres, usado nas sessões do app e do PAE
 - `VAPID_PUBLIC_KEY` — VAPID public key (shared env var, already set)
 - `VAPID_PRIVATE_KEY` — VAPID private key (**secret** — needed for push notifications)
 - `VAPID_SUBJECT` — mailto: contact for VAPID (already set)
@@ -56,7 +58,7 @@ Required env vars (all set in Replit shared env / secrets):
 ## Product
 - Register and manage civil defense incidents with photos and GPS
 - PAE — Plano de Ação do Evento — opens in its own map view; the regular Mapa tab stays independent, and PAE access uses the existing app login without asking for another password
-- Apply the PAE migrations in `supabase/migrations/` to the configured Supabase project before testing PAE data flows
+- Apply `supabase/pae-setup.sql` in the configured Supabase project's SQL Editor before testing PAE data flows; it includes the core schema, missing-column compatibility updates, and PAE migrations in dependency order
 - Register risk areas on the Radar DC meteorological map with a marked point, polygon, risk type, start date, rainfall threshold, and agent-password-gated editing/deletion
 - Real-time team tracking via WebSocket
 - SOS alert system with Web Push notifications

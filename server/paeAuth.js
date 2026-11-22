@@ -177,17 +177,6 @@ async function obterOuCriarUsuarioPae(admin, agente) {
 
 export async function criarSessaoSupabasePae(agente) {
   const { admin, autenticacao } = obterClientesSupabase()
-  const { data: agenteAtivo, error: erroAgente } = await admin
-    .from('pae_agentes_senhas')
-    .select('agente')
-    .eq('agente', agente)
-    .eq('ativo', true)
-    .maybeSingle()
-  if (erroAgente) throw new Error('A migração de senhas de agente do PAE ainda não foi aplicada.')
-  if (!agenteAtivo) {
-    throw Object.assign(new Error('Este agente não está habilitado para acessar o PAE.'), { status: 403 })
-  }
-
   const { usuario, email, senha } = await obterOuCriarUsuarioPae(admin, agente)
   let autenticado = await autenticacao.auth.signInWithPassword({ email, password: senha })
   if (/invalid login credentials/i.test(autenticado.error?.message || '') && usuario.id) {

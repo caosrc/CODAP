@@ -55,7 +55,7 @@ Required env vars (all set in Replit shared env / secrets):
 
 ## Product
 - Register and manage civil defense incidents with photos and GPS
-- PAE — Plano de Ação do Evento — opens in its own map view; the regular Mapa tab stays independent, and PAE access uses the selected agent's PIN and a restricted Supabase session
+- PAE — Plano de Ação do Evento — opens in its own map view; the regular Mapa tab stays independent, and PAE access uses the existing app login without asking for another password
 - Apply the PAE migrations in `supabase/migrations/` to the configured Supabase project before testing PAE data flows
 - Register risk areas on the Radar DC meteorological map with a marked point, polygon, risk type, start date, rainfall threshold, and agent-password-gated editing/deletion
 - Real-time team tracking via WebSocket
@@ -74,7 +74,7 @@ Required env vars (all set in Replit shared env / secrets):
 ## Gotchas
 - `VITE_USE_SUPABASE=true` is required for Netlify. The Supabase URL and anon key are public frontend configuration; never put a service-role key in the browser
 - Supabase tables and RLS policies must exist before the Netlify app can save data. The anon key cannot create tables, so run the SQL files in `supabase/` once in the Supabase SQL Editor
-- Apply `add_pae_authenticated_access.sql` and `add_pae_agent_password_access.sql` for PAE authorization and the agent allowlist; do not enable anonymous sign-ins. The server creates an internal Supabase Auth session after the regular app login, using `SUPABASE_SERVICE_ROLE_KEY` and `SESSION_SECRET` as server-only secrets
+- Apply `add_pae_authenticated_access.sql` for PAE authorization; `add_pae_agent_password_access.sql` is not required. Do not enable anonymous sign-ins. The server creates a restricted internal Supabase Auth session after the regular app login, using `SUPABASE_SERVICE_ROLE_KEY` and `SESSION_SECRET` as server-only secrets
 - For Netlify, add `SUPABASE_SERVICE_ROLE_KEY` and `SESSION_SECRET` to the site's function environment; never put either value in `netlify.toml` or a `VITE_*` variable
 - For risk areas, apply `supabase/migrations/add_areas_risco.sql` to the configured Supabase project before using the Radar DC map
 - Production on Netlify: `npm run build`, publish `dist`, and load Functions from `netlify/functions`

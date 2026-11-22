@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react'
-import type { FormEvent } from 'react'
-import { autenticarPae, obterAcessoPaeAtual, sairPae } from '../../paeApi'
+import { iniciarSessaoPae, obterAcessoPaeAtual, sairPae } from '../../paeApi'
 import type { PaeUsuarioAutorizado } from '../../paeTypes'
 import { supabaseDisponivel } from '../../supabaseClient'
 import { normalizarNomeAgente } from '../../types'
@@ -14,10 +13,9 @@ interface Props {
 }
 
 export default function PAEAccessDialog({ aberto, agente, onAutorizado, onFechar }: Props) {
-  const [senha, setSenha] = useState('')
   const [carregandoSessao, setCarregandoSessao] = useState(true)
-  const [entrando, setEntrando] = useState(false)
   const [erro, setErro] = useState('')
+  const [tentativa, setTentativa] = useState(0)
 
   useEffect(() => {
     if (!aberto) return
@@ -25,86 +23,54 @@ export default function PAEAccessDialog({ aberto, agente, onAutorizado, onFechar
     setErro('')
     setCarregandoSessao(true)
     if (!supabaseDisponivel) {
-      setErro('A autenticação do PAE ainda não está configurada neste ambiente.')
+      setErro('O Supabase ainda não está configurado neste ambiente.')
       setCarregandoSessao(false)
       return
     }
-    void obterAcessoPaeAtual()
-      .then(usuario => {
-        if (!ativo || !usuario) return
-        if (usuario.agente === normalizarNomeAgente(agente)) {
-          onAutorizado(usuario)
-        } else {
-          void sairPae().catch(() => {})
+    void (async () => {
+      try {
+        const atual = await obterAcessoPaeAtual()
+        if (!ativo) return
+        if (atual?.agente === normalizarNomeAgente(agente)) {
+          onAutorizado(atual)
+          return
         }
-      })
-      .catch(error => {
-        if (ativo) setErro(error instanceof Error ? error.message : 'Não foi possível validar o acesso.')
-      })
-      .finally(() => {
+        if (atual) await sairPae()
+        const usuario = await iniciarSessaoPae(agente)
+        if (ativo) onAutorizado(usuario)
+      } catch (error) {
+        if (ativo) setErro(error instanceof Error ? error.message : 'Não foi possível abrir o PAE.')
+      } finally {
         if (ativo) setCarregandoSessao(false)
-      })
+      }
+    })()
     return () => { ativo = false }
-  }, [aberto, agente, onAutorizado])
+  }, [aberto, agente, onAutorizado, tentativa])
 
   if (!aberto) return null
-
-  async function entrar(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault()
-    setErro('')
-    setEntrando(true)
-    try {
-      const usuario = await autenticarPae(agente, senha)
-      setSenha('')
-      onAutorizado(usuario)
-    } catch (error) {
-      setErro(error instanceof Error ? error.message : 'Não foi possível entrar no PAE.')
-    } finally {
-      setEntrando(false)
-    }
-  }
 
   return (
     <div className="pae-access-backdrop" role="presentation">
       <section className="pae-access-card" role="dialog" aria-modal="true" aria-labelledby="pae-access-title" data-testid="dialog-pae-access">
         <div className="pae-access-mark" aria-hidden="true">PAE</div>
         <div className="pae-detail-kicker">ACESSO INTERNO · DEFESA CIVIL</div>
-        <h2 id="pae-access-title">Entrar no PAE</h2>
-        <p>Confirme seu acesso com a senha do agente selecionado no aplicativo.</p>
-        {carregandoSessao ? (
-          <div className="pae-access-status" role="status">Verificando sessão…</div>
-        ) : (
-          <form className="pae-access-form" onSubmit={entrar}>
-            <div className="pae-access-agent" data-testid="label-pae-agent">
-              <span>Agente selecionado</span>
-              <strong>{normalizarNomeAgente(agente)}</strong>
-            </div>
-            <label>
-              Senha do agente
-              <input
-                autoComplete="off"
-                type="password"
-                inputMode="numeric"
-                required
-                value={senha}
-                maxLength={20}
-                onChange={event => setSenha(event.target.value)}
-                disabled={!supabaseDisponivel || entrando}
-                data-testid="input-pae-password"
-              />
-            </label>
-            {erro && <div className="pae-access-error" role="alert" data-testid="error-pae-access">{erro}</div>}
-            <div className="pae-access-actions">
-              <button className="pae-secondary-button" type="button" onClick={onFechar} disabled={entrando}>Voltar</button>
-              <button className="pae-primary-button" type="submit" disabled={!supabaseDisponivel || entrando}>
-                {entrando ? 'Validando…' : 'Entrar'}
+        <h2 id="pae-access-title">Abrindo o PAE</h2>
+        <p>O acesso usa a sessão do aplicativo. Não é necessário informar outra senha.</p>
+        <div className="pae-access-agent" data-testid="label-pae-agent">
+          <span>Agente</span>
+          <strong>{normalizarNomeAgente(agente)}</strong>
+        </div>
+        {carregandoSessao && <div className="pae-access-status" role="status">Preparando o acesso…</div>}
+        {erro && <div className="pae-access-error" role="alert" data-testid="error-pae-access">{erro}</div>}
+        {!carregandoSessao && (
+          <div className="pae-access-actions">
+            <button className="pae-secondary-button" type="button" onClick={onFechar}>Voltar</button>
+            {erro && (
+              <button className="pae-primary-button" type="button" onClick={() => setTentativa(valor => valor + 1)}>
+                Tentar novamente
               </button>
-            </div>
-          </form>
-        )}
-        {!carregandoSessao && !erro && <div className="pae-access-hint">A senha é validada pelo Supabase e não é salva neste dispositivo.</div>}
-        {!supabaseDisponivel && !carregandoSessao && (
-          <div className="pae-access-error" role="alert">Configure o Supabase para validar o acesso do PAE.</div>
+            )}
+          </div>
         )}
       </section>
     </div>

@@ -822,8 +822,6 @@ interface Props {
   ocorrencias: Ocorrencia[]
   onSelecionar: (o: Ocorrencia) => void
   paeAbrirSignal?: number
-  paeUsuarioInicial?: PaeUsuarioAutorizado | null
-  onSairPae?: () => void
   /** Destino vindo de fora (ex: "Traçar rota de resgate" do SOS). Quando definido,
    *  o mapa centraliza no ponto e calcula a rota automaticamente.
    *  Quando soMostrar=true, apenas centraliza no ponto sem traçar rota. */
@@ -903,7 +901,7 @@ function RaiosMapaBounds({
 }
 
 // ── Componente principal ────────────────────────────────────────
-export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExterno, onDestinoExternoConsumido, equipamentosCampo = [], onVerDetalheCampo, paeAbrirSignal = 0, paeUsuarioInicial = null, onSairPae }: Props) {
+export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExterno, onDestinoExternoConsumido, equipamentosCampo = [], onVerDetalheCampo, paeAbrirSignal = 0 }: Props) {
   const [selecionada, setSelecionada] = useState<Ocorrencia | null>(null)
   const [legendaAberta, setLegendaAberta] = useState(false)
   const [camadaMapa, setCamadaMapa] = useState<CamadaMapa>('padrao')
@@ -1817,10 +1815,6 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
     setPaeErro(null)
   }, [ativarGpsNoPae])
 
-  useEffect(() => {
-    if (paeUsuarioInicial) autorizarPae(paeUsuarioInicial)
-  }, [autorizarPae, paeUsuarioInicial])
-
   const abrirPae = useCallback(() => {
     try { window.localStorage.removeItem('defesacivil-pae-abrir') } catch { /* armazenamento pode estar bloqueado */ }
     setPaePainelAberto(true)
@@ -1989,9 +1983,8 @@ export default function MapaOcorrencias({ ocorrencias, onSelecionar, destinoExte
       setPaePainelAberto(false)
       setPaeAcessoAberto(false)
       setPaeAjusteChamadoId(null)
-      onSairPae?.()
     }
-  }, [encerrarGpsNoPae, onSairPae])
+  }, [encerrarGpsNoPae])
 
   const paeChamadosVisiveis = useMemo(
     () => paeUsuario && paeEventoSelecionadoId

@@ -1,6 +1,6 @@
 import { supabase, supabaseDisponivel } from './supabaseClient'
 import { wsSend } from './wsClient'
-import { AGENTES, normalizarNomeAgente } from './types'
+import { normalizarNomeAgente } from './types'
 import type {
   ConcluirChamadoPaeInput,
   NovoChamadoPaeInput,
@@ -50,7 +50,7 @@ async function tokenPae(): Promise<string> {
   const { data, error } = await supabase.auth.getSession()
   if (error) throw new Error('Não foi possível verificar sua sessão do PAE.')
   const token = data.session?.access_token
-  if (!token) throw new Error('Entre com sua conta Supabase para acessar o PAE.')
+  if (!token) throw new Error('Abra o PAE pelo aplicativo para iniciar sua sessão.')
   return token
 }
 
@@ -83,74 +83,47 @@ export async function obterAcessoPaeAtual(): Promise<PaeUsuarioAutorizado | null
   if (!supabaseDisponivel) return null
   const { data, error } = await supabase.auth.getSession()
   if (error) throw new Error('Não foi possível verificar sua sessão do PAE.')
-  const user = data.session?.user as (typeof data.session.user & { is_anonymous?: boolean }) | undefined
-  const userId = user?.id
+  const userId = data.session?.user?.id
   if (!userId) return null
-  if (user?.is_anonymous !== true) {
-    await supabase.auth.signOut({ scope: 'local' }).catch(() => {})
-    return null
-  }
   return perfilAutorizadoPae(userId)
 }
 
-export async function autenticarPae(agenteInformado: string, password: string): Promise<PaeUsuarioAutorizado> {
+export async function iniciarSessaoPae(agenteInformado: string): Promise<PaeUsuarioAutorizado> {
   if (!supabaseDisponivel) {
-    throw new Error('O acesso ao PAE exige Supabase configurado. Contate a coordenação do sistema.')
+    throw new Error('O Supabase ainda não está configurado neste ambiente.')
   }
   const agente = normalizarNomeAgente(agenteInformado)
-  if (!AGENTES.includes(agente)) {
-    throw new Error('O agente desta sessão não está cadastrado para acessar o PAE.')
-  }
+  if (!agente) throw new Error('Não foi possível identificar o agente selecionado.')
 
-  const sessaoAtual = await supabase.auth.getSession()
-  if (sessaoAtual.error) throw new Error('Não foi possível preparar o acesso do agente ao PAE.')
-  let user = sessaoAtual.data.session?.user as
-    | (typeof sessaoAtual.data.session.user & { is_anonymous?: boolean })
-    | undefined
-
-  if (user?.is_anonymous !== true) {
-    if (user) await supabase.auth.signOut({ scope: 'local' })
-    const anonimo = await supabase.auth.signInAnonymously()
-    if (anonimo.error || !anonimo.data.user) {
-      const mensagem = anonimo.error?.message || ''
-      if (/anonymous.*disabled|anonymous.*not enabled/i.test(mensagem)) {
-        throw new Error('Ative o acesso anônimo em Supabase Auth para permitir entrada somente com a senha do agente.')
-      }
-      throw new Error('Não foi possível iniciar a sessão segura do PAE. Confira se o acesso anônimo está ativo no Supabase.')
-    }
-    user = anonimo.data.user as typeof user
-  }
-
-  if (!user?.id) {
-    throw new Error('Não foi possível iniciar a sessão segura do agente.')
-  }
-
-  const autenticacao = await supabase.rpc('pae_autenticar_agente', {
-    p_agente: agente,
-    p_senha: password,
+  const response = await fetch('/api/pae/session', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'same-origin',
+    body: JSON.stringify({ agente }),
   })
-  if (autenticacao.error) {
-    const mensagem = autenticacao.error.message || ''
-    if (/pae_autenticar_agente|schema cache/i.test(mensagem)) {
-      throw new Error('A migração de acesso por senha do agente ainda não foi aplicada no Supabase.')
-    }
-    throw new Error('Não foi possível validar a senha do agente no Supabase.')
-  }
-  if (autenticacao.data !== true) {
-    throw new Error('Senha incorreta para o agente selecionado.')
+  const resultado = await response.json().catch(() => ({}))
+  if (!response.ok) {
+    throw new Error(typeof resultado.error === 'string' ? resultado.error : 'Não foi possível abrir o PAE.')
   }
 
-  try {
-    const perfil = await perfilAutorizadoPae(user.id)
-    if (!perfil || perfil.agente !== agente) {
-      await supabase.auth.signOut({ scope: 'local' })
-      throw new Error('Não foi possível confirmar o acesso do agente no Supabase.')
-    }
-    return perfil
-  } catch (erro) {
-    await supabase.auth.signOut({ scope: 'local' }).catch(() => {})
-    throw erro
+  const tokens = resultado.session as { access_token?: string; refresh_token?: string } | undefined
+  if (!tokens?.access_token || !tokens.refresh_token) {
+    throw new Error('O servidor não retornou uma sessão válida para o PAE.')
   }
+  const { data, error } = await supabase.auth.setSession({
+    access_token: tokens.access_token,
+    refresh_token: tokens.refresh_token,
+  })
+  if (error || !data.session?.user?.id) {
+    throw new Error('Não foi possível ativar a sessão interna do PAE.')
+  }
+
+  const perfil = await perfilAutorizadoPae(data.session.user.id)
+  if (!perfil || perfil.agente !== agente) {
+    await supabase.auth.signOut({ scope: 'local' }).catch(() => {})
+    throw new Error('Não foi possível confirmar o agente autorizado no PAE.')
+  }
+  return perfil
 }
 
 export async function sairPae(): Promise<void> {

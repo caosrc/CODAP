@@ -7,8 +7,8 @@ type DisabledSupabaseClient = {
   rpc: (...args: unknown[]) => any
   auth: {
     getSession: (...args: unknown[]) => any
+    setSession: (...args: unknown[]) => any
     signInWithPassword: (...args: unknown[]) => any
-    signInAnonymously: (...args: unknown[]) => any
     signOut: (...args: unknown[]) => any
     onAuthStateChange: (...args: unknown[]) => any
   }
@@ -38,8 +38,8 @@ export const supabase = supabaseDisponivel
       rpc: supabaseDisabled,
       auth: {
         getSession: supabaseDisabled,
+        setSession: supabaseDisabled,
         signInWithPassword: supabaseDisabled,
-        signInAnonymously: supabaseDisabled,
         signOut: supabaseDisabled,
         onAuthStateChange: supabaseDisabled,
       },

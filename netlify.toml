@@ -14,6 +14,24 @@
   VITE_VAPID_PUBLIC_KEY = "BDR2WpHgL7IN1NNdJv67HEMbyeUEnDRvgcnyfdWaopzkAOqa6EDYSbkXroYJ8CC_kaPjGEm8q5CCEn0KUqt3kmE"
 
 [[redirects]]
+  from = "/api/app/login"
+  to = "/.netlify/functions/app-login"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/app/session"
+  to = "/.netlify/functions/app-session"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/pae/session"
+  to = "/.netlify/functions/pae-session"
+  status = 200
+  force = true
+
+[[redirects]]
   from = "/api/planet-focos"
   to = "/.netlify/functions/planet-focos"
   status = 200

@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
+import { registerPaeAuthRoutes } from './paeAuth.js'
 
 const PRIORIDADES_PAE = new Set(['baixa', 'media', 'alta', 'critica'])
 const MAX_FOTOS_PAE = 8
@@ -206,6 +207,7 @@ async function carregarChamado(query, id) {
 }
 
 export function registerPaeRoutes(app, { query, pool, broadcastParaTodos, enviarPushParaAgentes, vapidConfigured }) {
+  registerPaeAuthRoutes(app)
   app.use('/api/pae', exigirAcessoPae)
   app.use('/api/push/pae', exigirAcessoPae)
 

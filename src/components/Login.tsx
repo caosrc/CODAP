@@ -93,6 +93,25 @@ export default function Login({ onLogin, apenasAgente = false }: Props) {
     }
   }, [etapa])
 
+  useEffect(() => {
+    if (!apenasAgente) return
+    let ativo = true
+    void fetch('/api/app/session', { credentials: 'same-origin' })
+      .then(response => {
+        if (response.ok || !ativo) return
+        fazerLogout()
+        setErro('Sua sessão expirou. Entre novamente para continuar.')
+        setEtapa('credenciais')
+      })
+      .catch(() => {
+        if (!ativo) return
+        fazerLogout()
+        setErro('Não foi possível validar sua sessão. Entre novamente.')
+        setEtapa('credenciais')
+      })
+    return () => { ativo = false }
+  }, [apenasAgente])
+
   async function entrar(e: React.FormEvent) {
     e.preventDefault()
     setErro('')

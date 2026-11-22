@@ -125,7 +125,35 @@ async function obterOuCriarUsuarioPae(admin, agente) {
     .from('pae_usuarios_autorizados')
     .select('usuario_id, agente, ativo')
     .eq('agente', agente)
-  if (erroPerfis) throw new Error('A migração de acesso interno do PAE ainda não foi aplicada.')
+  if (erroPerfis) {
+    const codigo = String(erroPerfis.code || '')
+    const mensagem = String(erroPerfis.message || 'erro sem mensagem do Supabase')
+    console.error('[PAE auth] Falha ao consultar pae_usuarios_autorizados:', codigo, mensagem)
+
+    if (
+      codigo === '42P01' ||
+      codigo === 'PGRST205' ||
+      /does not exist|could not find the table/i.test(mensagem)
+    ) {
+      throw new Error(
+        'A tabela de acesso interno do PAE não está disponível no Supabase. ' +
+        'Execute supabase/pae-setup.sql no SQL Editor do mesmo projeto. ' +
+        'Se já executou, atualize o schema cache em Supabase > Settings > API.',
+      )
+    }
+
+    if (
+      codigo === 'PGRST301' ||
+      /invalid api key|invalid jwt|unauthorized|permission denied/i.test(mensagem)
+    ) {
+      throw new Error(
+        'O Supabase recusou a chave do servidor. Confirme que SUPABASE_SERVICE_ROLE_KEY ' +
+        'pertence ao mesmo projeto de SUPABASE_URL.',
+      )
+    }
+
+    throw new Error(`Falha ao consultar a migração de acesso do PAE (${codigo || 'sem código'}): ${mensagem}`)
+  }
 
   let usuarioInterno = null
   let perfilInterno = null

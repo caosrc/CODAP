@@ -1926,3 +1926,5 @@ GRANT EXECUTE ON FUNCTION public.pae_atender_reforco(TEXT, TEXT[]) TO authentica
 GRANT EXECUTE ON FUNCTION public.pae_iniciar_chamado(TEXT, TEXT) TO authenticated;
 
 COMMIT;
+
+NOTIFY pgrst, 'reload schema';

@@ -1,4 +1,8 @@
 # APIs / Netlify Functions — devem vir antes do fallback SPA
+/api/app/login  /.netlify/functions/app-login  200!
+/api/app/session  /.netlify/functions/app-session  200!
+/api/pae/session  /.netlify/functions/pae-session  200!
+/api/pae/public-session  /.netlify/functions/pae-public-session  200!
 /api/planet-focos  /.netlify/functions/planet-focos  200!
 /api/focos-incendio  /.netlify/functions/focos-incendio  200!
 /api/monitoramento-incendio  /.netlify/functions/earth-engine-focos  200!

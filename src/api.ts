@@ -231,6 +231,11 @@ export async function listarOcorrencias(): Promise<Ocorrencia[]> {
       }
       console.warn('[api] listarOcorrencias Supabase falhou:', e)
     }
+
+    throw new ApiError(
+      503,
+      'Não foi possível carregar as ocorrências do Supabase. Verifique a conexão e tente novamente.'
+    )
   }
 
   // Express (Replit)
@@ -265,6 +270,10 @@ export async function listarOcorrenciasPorData(dataOcorrencia: string): Promise<
       return (data || []) as Ocorrencia[]
     } catch (error) {
       console.warn('[api] listarOcorrenciasPorData Supabase falhou:', error)
+      throw new ApiError(
+        503,
+        'Não foi possível carregar as ocorrências do Supabase. Verifique a conexão e tente novamente.'
+      )
     }
   }
 

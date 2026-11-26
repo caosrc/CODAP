@@ -125,6 +125,35 @@ input, select, textarea { font-family: inherit; }
   letter-spacing: 0.2px;
 }
 
+.supabase-status-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.55rem 1rem;
+  background: #fff7ed;
+  color: #9a3412;
+  border-bottom: 1px solid #fed7aa;
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.supabase-status-banner button {
+  flex: 0 0 auto;
+  border: 1px solid #c2410c;
+  border-radius: 5px;
+  padding: 0.3rem 0.6rem;
+  background: white;
+  color: #9a3412;
+  font: inherit;
+  cursor: pointer;
+}
+
+.supabase-status-banner button:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
 .sync-banner {
   background: #1a4b8c;
   color: white;

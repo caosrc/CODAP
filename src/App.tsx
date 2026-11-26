@@ -291,6 +291,7 @@ export default function App() {
   const materiaisNoMenuRef = useRef(true)
   const [ocorrencias, setOcorrencias] = useState<Ocorrencia[]>([])
   const [carregando, setCarregando] = useState(true)
+  const [erroConexaoSupabase, setErroConexaoSupabase] = useState(false)
   const [selecionada, setSelecionada] = useState<Ocorrencia | null>(null)
   const [filtroNivel, setFiltroNivel] = useState<NivelRisco | 'todos'>('todos')
   const [filtroStatus, setFiltroStatus] = useState<'todos' | 'ativo' | 'resolvido'>('todos')
@@ -636,7 +637,12 @@ export default function App() {
     try {
       serverData = await listarOcorrencias()
       await cacheOcorrencias(serverData)
-    } catch {
+      setErroConexaoSupabase(false)
+    } catch (error) {
+      if (supabaseDisponivel) {
+        console.warn('[ocorrencias] Supabase indisponível; exibindo somente o cache local.', error)
+        setErroConexaoSupabase(true)
+      }
       serverData = await getCachedOcorrencias()
     }
     const pending = await getPending()
@@ -1066,6 +1072,15 @@ export default function App() {
       {!isOnline && (
         <div className="offline-banner">
           📵 Sem conexão — dados salvos localmente
+        </div>
+      )}
+
+      {erroConexaoSupabase && supabaseDisponivel && (
+        <div className="supabase-status-banner" role="alert">
+          <span>⚠️ Supabase indisponível. A lista usa o cache deste aparelho e pode estar desatualizada.</span>
+          <button onClick={() => void carregar(true)} disabled={carregando}>
+            {carregando ? 'Verificando…' : 'Tentar novamente'}
+          </button>
         </div>
       )}
 

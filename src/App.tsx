@@ -956,23 +956,9 @@ export default function App() {
   }
 
   const datasDisponiveis = useMemo(() => {
-    const mesAtual = hojeStr().slice(0, 7)
     const diasUnicos = new Set(ocorrencias.map((o) => dataLocal(o.created_at)))
     diasUnicos.add(hojeStr())
-    const resultado: string[] = ['todas']
-    const mesesPassados = new Set<string>()
-    for (const d of Array.from(diasUnicos).sort((a, b) => b.localeCompare(a))) {
-      const mes = d.slice(0, 7)
-      if (mes >= mesAtual) {
-        resultado.push(d)
-      } else {
-        if (!mesesPassados.has(mes)) {
-          mesesPassados.add(mes)
-          resultado.push(mes)
-        }
-      }
-    }
-    return resultado
+    return ['todas', ...Array.from(diasUnicos).sort((a, b) => b.localeCompare(a))]
   }, [ocorrencias])
 
   const ocorrenciasMapa = useMemo(() => {
